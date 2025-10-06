@@ -36,6 +36,8 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
   const [activeTool, setActiveTool] = useState<'select' | 'circle' | 'rectangle'>('select');
   const [selectedObject, setSelectedObject] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingComponent, setEditingComponent] = useState<Component | null>(null);
   const [components, setComponents] = useState<Component[]>([]);
   const { toast } = useToast();
 
@@ -74,15 +76,62 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     loadComponents();
 
     canvas.on('selection:created', (e) => {
-      setSelectedObject(e.selected?.[0]);
+      const obj: any = e.selected?.[0];
+      setSelectedObject(obj);
+      if (obj?.componentId) {
+        const component = components.find(c => c.id === obj.componentId);
+        if (component) {
+          setEditingComponent(component);
+          setEditMode(true);
+          populateFormFromComponent(component);
+          setDialogOpen(true);
+        }
+      }
     });
 
     canvas.on('selection:updated', (e) => {
-      setSelectedObject(e.selected?.[0]);
+      const obj: any = e.selected?.[0];
+      setSelectedObject(obj);
+      if (obj?.componentId) {
+        const component = components.find(c => c.id === obj.componentId);
+        if (component) {
+          setEditingComponent(component);
+          setEditMode(true);
+          populateFormFromComponent(component);
+          setDialogOpen(true);
+        }
+      }
     });
 
     canvas.on('selection:cleared', () => {
       setSelectedObject(null);
+    });
+
+    canvas.on('mouse:over', (e) => {
+      const target: any = e.target;
+      if (target?.componentId) {
+        const component = components.find(c => c.id === target.componentId);
+        if (component) {
+          const info = `${component.name}${component.supplier ? ' - ' + component.supplier : ''}${component.aff_code ? ' (' + component.aff_code + ')' : ''}`;
+          target.set('strokeWidth', 4);
+          canvas.renderAll();
+          // Show tooltip via title attribute (browser native)
+          if (canvasRef.current) {
+            canvasRef.current.title = info;
+          }
+        }
+      }
+    });
+
+    canvas.on('mouse:out', (e) => {
+      const target: any = e.target;
+      if (target?.componentId) {
+        target.set('strokeWidth', 2);
+        canvas.renderAll();
+        if (canvasRef.current) {
+          canvasRef.current.title = '';
+        }
+      }
     });
 
     return () => {
@@ -98,18 +147,60 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
   const loadComponents = async () => {
     const { data, error } = await supabase
       .from('components')
-      .select('*')
+      .select(`
+        *,
+        component_geometry (
+          x,
+          y
+        )
+      `)
       .eq('floor_id', floorId);
 
     if (error) {
       console.error('Error loading components:', error);
     } else {
       setComponents(data || []);
+      renderComponentsOnCanvas(data || []);
     }
+  };
+
+  const renderComponentsOnCanvas = (componentsData: any[]) => {
+    if (!fabricCanvas) return;
+
+    componentsData.forEach((component) => {
+      if (component.component_geometry && component.component_geometry.length > 0) {
+        const geometry = component.component_geometry[0];
+        const circle: any = new Circle({
+          left: geometry.x,
+          top: geometry.y,
+          fill: 'rgba(59, 130, 246, 0.5)',
+          stroke: '#3b82f6',
+          strokeWidth: 2,
+          radius: 10,
+          selectable: true,
+        });
+        circle.componentId = component.id;
+        fabricCanvas.add(circle);
+      }
+    });
+    fabricCanvas.renderAll();
+  };
+
+  const populateFormFromComponent = (component: Component) => {
+    setComponentName(component.name);
+    setComponentType(component.type);
+    setComponentStatus(component.status);
+    setSupplier(component.supplier || '');
+    setAffCode(component.aff_code || '');
+    setNotes(component.notes || '');
+    setRoomZone(component.room_zone || '');
   };
 
   const handleToolClick = (tool: typeof activeTool) => {
     setActiveTool(tool);
+    setEditMode(false);
+    setEditingComponent(null);
+    resetForm();
 
     if (tool === 'circle' && fabricCanvas) {
       const circle = new Circle({
@@ -118,7 +209,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         fill: 'rgba(59, 130, 246, 0.5)',
         stroke: '#3b82f6',
         strokeWidth: 2,
-        radius: 30,
+        radius: 10,
       });
       fabricCanvas.add(circle);
       fabricCanvas.setActiveObject(circle);
@@ -129,8 +220,8 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         fill: 'rgba(59, 130, 246, 0.5)',
         stroke: '#3b82f6',
         strokeWidth: 2,
-        width: 80,
-        height: 80,
+        width: 20,
+        height: 20,
       });
       fabricCanvas.add(rect);
       fabricCanvas.setActiveObject(rect);
@@ -147,54 +238,143 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       return;
     }
 
-    const { data: componentData, error: componentError } = await supabase
-      .from('components')
-      .insert([{
-        floor_id: floorId,
-        name: componentName,
-        type: componentType as any,
-        status: componentStatus as any,
-        supplier: supplier || null,
-        aff_code: affCode || null,
-        notes: notes || null,
-        room_zone: roomZone || null,
-      }])
-      .select()
-      .single();
+    if (editMode && editingComponent) {
+      // Update existing component
+      const { error: componentError } = await supabase
+        .from('components')
+        .update({
+          name: componentName,
+          type: componentType as any,
+          status: componentStatus as any,
+          supplier: supplier || null,
+          aff_code: affCode || null,
+          notes: notes || null,
+          room_zone: roomZone || null,
+        })
+        .eq('id', editingComponent.id);
 
-    if (componentError) {
+      if (componentError) {
+        toast({
+          title: 'Fel',
+          description: componentError.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Update geometry
+      const { error: geometryError } = await supabase
+        .from('component_geometry')
+        .update({
+          x: selectedObject.left,
+          y: selectedObject.top,
+        })
+        .eq('component_id', editingComponent.id);
+
+      if (geometryError) {
+        toast({
+          title: 'Fel',
+          description: geometryError.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Komponent uppdaterad!',
+        description: `${componentName} har uppdaterats.`,
+      });
+    } else {
+      // Create new component
+      const { data: componentData, error: componentError } = await supabase
+        .from('components')
+        .insert([{
+          floor_id: floorId,
+          name: componentName,
+          type: componentType as any,
+          status: componentStatus as any,
+          supplier: supplier || null,
+          aff_code: affCode || null,
+          notes: notes || null,
+          room_zone: roomZone || null,
+        }])
+        .select()
+        .single();
+
+      if (componentError) {
+        toast({
+          title: 'Fel',
+          description: componentError.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Save geometry
+      const { error: geometryError } = await supabase
+        .from('component_geometry')
+        .insert([{
+          component_id: componentData.id,
+          x: selectedObject.left,
+          y: selectedObject.top,
+        }]);
+
+      if (geometryError) {
+        toast({
+          title: 'Fel',
+          description: geometryError.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Update the object with component ID for future interactions
+      selectedObject.componentId = componentData.id;
+
+      toast({
+        title: 'Komponent sparad!',
+        description: `${componentName} har lagts till på ritningen.`,
+      });
+    }
+
+    setDialogOpen(false);
+    setEditMode(false);
+    setEditingComponent(null);
+    resetForm();
+    loadComponents();
+    onUpdate();
+  };
+
+  const handleDeleteComponent = async () => {
+    if (!editingComponent) return;
+
+    const { error } = await supabase
+      .from('components')
+      .delete()
+      .eq('id', editingComponent.id);
+
+    if (error) {
       toast({
         title: 'Fel',
-        description: componentError.message,
+        description: error.message,
         variant: 'destructive',
       });
       return;
     }
 
-    // Save geometry
-    const { error: geometryError } = await supabase
-      .from('component_geometry')
-      .insert([{
-        component_id: componentData.id,
-        x: selectedObject.left,
-        y: selectedObject.top,
-      }]);
-
-    if (geometryError) {
-      toast({
-        title: 'Fel',
-        description: geometryError.message,
-        variant: 'destructive',
-      });
-      return;
+    if (fabricCanvas && selectedObject) {
+      fabricCanvas.remove(selectedObject);
     }
 
     toast({
-      title: 'Komponent sparad!',
-      description: `${componentName} har lagts till på ritningen.`,
+      title: 'Komponent borttagen!',
+      description: `${editingComponent.name} har tagits bort.`,
     });
 
     setDialogOpen(false);
+    setEditMode(false);
+    setEditingComponent(null);
+    setSelectedObject(null);
     resetForm();
     loadComponents();
     onUpdate();
@@ -259,7 +439,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Spara komponent</DialogTitle>
+            <DialogTitle>{editMode ? 'Redigera komponent' : 'Spara komponent'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -342,9 +522,17 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
                 placeholder="Ytterligare information..."
               />
             </div>
-            <Button onClick={handleSaveComponent} className="w-full">
-              Spara komponent
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleSaveComponent} className="flex-1">
+                {editMode ? 'Uppdatera' : 'Spara'} komponent
+              </Button>
+              {editMode && (
+                <Button onClick={handleDeleteComponent} variant="destructive">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Ta bort
+                </Button>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
