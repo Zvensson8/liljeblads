@@ -236,22 +236,25 @@ const PropertyDetail = () => {
         </div>
 
         {floors.length === 0 ? (
-          <Card className="text-center py-12">
+          <Card className="text-center py-16 border-dashed">
             <CardContent>
-              <CardTitle className="mb-2">Inga våningar än</CardTitle>
-              <CardDescription>Skapa din första våning och ladda upp en ritning</CardDescription>
+              <div className="inline-flex p-4 rounded-full bg-primary/10 text-primary mb-4">
+                <Plus className="h-8 w-8" />
+              </div>
+              <CardTitle className="mb-2 text-xl">Inga våningar än</CardTitle>
+              <CardDescription className="text-base">Skapa din första våning och ladda upp en ritning</CardDescription>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-8">
             {floors.map((floor) => (
-              <Card key={floor.id}>
-                <CardHeader>
+              <Card key={floor.id} className="overflow-hidden shadow-[var(--shadow-card)]">
+                <CardHeader className="bg-gradient-to-r from-card to-secondary/30">
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle>{floor.name}</CardTitle>
+                      <CardTitle className="text-xl">{floor.name}</CardTitle>
                       {floor.level !== null && (
-                        <CardDescription>Våning {floor.level}</CardDescription>
+                        <CardDescription className="text-base mt-1">Våning {floor.level}</CardDescription>
                       )}
                     </div>
                     {!floor.drawing_url && (
@@ -268,7 +271,7 @@ const PropertyDetail = () => {
                           id={`file-${floor.id}`}
                         />
                         <Label htmlFor={`file-${floor.id}`} className="cursor-pointer">
-                          <Button asChild disabled={uploadingFile}>
+                          <Button asChild disabled={uploadingFile} size="lg">
                             <span>
                               <Upload className="h-4 w-4 mr-2" />
                               {uploadingFile ? 'Laddar upp...' : 'Ladda upp ritning'}
@@ -280,7 +283,7 @@ const PropertyDetail = () => {
                   </div>
                 </CardHeader>
                 {floor.drawing_url && (
-                  <CardContent>
+                  <CardContent className="p-6">
                     <FloorCanvas
                       floorId={floor.id}
                       drawingUrl={floor.drawing_url}

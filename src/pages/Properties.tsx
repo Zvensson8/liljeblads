@@ -155,30 +155,39 @@ const Properties = () => {
         </div>
 
         {properties.length === 0 ? (
-          <Card className="text-center py-12">
+          <Card className="text-center py-16 border-dashed">
             <CardContent>
-              <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <CardTitle className="mb-2">Inga fastigheter än</CardTitle>
-              <CardDescription>Kom igång genom att skapa din första fastighet</CardDescription>
+              <Building2 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <CardTitle className="mb-2 text-2xl">Inga fastigheter än</CardTitle>
+              <CardDescription className="text-base">Kom igång genom att skapa din första fastighet</CardDescription>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {properties.map((property) => (
               <Card
                 key={property.id}
-                className="cursor-pointer hover:border-primary transition-colors"
+                className="cursor-pointer hover:shadow-[var(--shadow-elegant)] hover:border-primary transition-all duration-300 group"
                 onClick={() => navigate(`/property/${property.id}`)}
               >
-                <CardHeader>
-                  <CardTitle>{property.name}</CardTitle>
-                  {property.address && (
-                    <CardDescription>{property.address}</CardDescription>
-                  )}
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="group-hover:text-primary transition-colors">
+                        {property.name}
+                      </CardTitle>
+                      {property.address && (
+                        <CardDescription className="mt-1.5">{property.address}</CardDescription>
+                      )}
+                    </div>
+                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                      <Building2 className="h-5 w-5" />
+                    </div>
+                  </div>
                 </CardHeader>
                 {property.description && (
                   <CardContent>
-                    <p className="text-sm text-muted-foreground">{property.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{property.description}</p>
                   </CardContent>
                 )}
               </Card>
