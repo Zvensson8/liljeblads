@@ -74,7 +74,6 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     });
 
     setFabricCanvas(canvas);
-    loadComponents();
 
     canvas.on('selection:created', (e) => {
       const obj: any = e.selected?.[0];
@@ -140,10 +139,34 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     };
   }, [drawingUrl, floorId]);
 
-  useEffect(() => {
+  const renderComponentsOnCanvas = useCallback((componentsData: any[]) => {
     if (!fabricCanvas) return;
-    fabricCanvas.isDrawingMode = false;
-  }, [activeTool, fabricCanvas]);
+
+    // Clear existing component objects from canvas
+    fabricCanvas.getObjects().forEach((obj: any) => {
+      if (obj.componentId) {
+        fabricCanvas.remove(obj);
+      }
+    });
+
+    componentsData.forEach((component) => {
+      if (component.component_geometry && component.component_geometry.length > 0) {
+        const geometry = component.component_geometry[0];
+        const circle: any = new Circle({
+          left: geometry.x,
+          top: geometry.y,
+          fill: 'rgba(59, 130, 246, 0.5)',
+          stroke: '#3b82f6',
+          strokeWidth: 2,
+          radius: 10,
+          selectable: true,
+        });
+        circle.componentId = component.id;
+        fabricCanvas.add(circle);
+      }
+    });
+    fabricCanvas.renderAll();
+  }, [fabricCanvas]);
 
   const loadComponents = useCallback(async () => {
     const { data, error } = await supabase
@@ -164,29 +187,18 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       componentsRef.current = data || [];
       renderComponentsOnCanvas(data || []);
     }
-  }, [floorId, fabricCanvas]);
+  }, [floorId, renderComponentsOnCanvas]);
 
-  const renderComponentsOnCanvas = (componentsData: any[]) => {
+  useEffect(() => {
     if (!fabricCanvas) return;
+    fabricCanvas.isDrawingMode = false;
+  }, [activeTool, fabricCanvas]);
 
-    componentsData.forEach((component) => {
-      if (component.component_geometry && component.component_geometry.length > 0) {
-        const geometry = component.component_geometry[0];
-        const circle: any = new Circle({
-          left: geometry.x,
-          top: geometry.y,
-          fill: 'rgba(59, 130, 246, 0.5)',
-          stroke: '#3b82f6',
-          strokeWidth: 2,
-          radius: 10,
-          selectable: true,
-        });
-        circle.componentId = component.id;
-        fabricCanvas.add(circle);
-      }
-    });
-    fabricCanvas.renderAll();
-  };
+  // Load components when canvas is ready
+  useEffect(() => {
+    if (!fabricCanvas) return;
+    loadComponents();
+  }, [fabricCanvas, loadComponents]);
 
   const populateFormFromComponent = (component: Component) => {
     setComponentName(component.name);
