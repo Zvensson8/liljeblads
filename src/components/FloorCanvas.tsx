@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Canvas as FabricCanvas, Circle, Rect, FabricImage } from 'fabric';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
   const [editMode, setEditMode] = useState(false);
   const [editingComponent, setEditingComponent] = useState<Component | null>(null);
   const [components, setComponents] = useState<Component[]>([]);
+  const componentsRef = useRef<Component[]>([]);
   const { toast } = useToast();
 
   // Form state
@@ -79,7 +80,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       const obj: any = e.selected?.[0];
       setSelectedObject(obj);
       if (obj?.componentId) {
-        const component = components.find(c => c.id === obj.componentId);
+        const component = componentsRef.current.find(c => c.id === obj.componentId);
         if (component) {
           setEditingComponent(component);
           setEditMode(true);
@@ -93,7 +94,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       const obj: any = e.selected?.[0];
       setSelectedObject(obj);
       if (obj?.componentId) {
-        const component = components.find(c => c.id === obj.componentId);
+        const component = componentsRef.current.find(c => c.id === obj.componentId);
         if (component) {
           setEditingComponent(component);
           setEditMode(true);
@@ -110,7 +111,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     canvas.on('mouse:over', (e) => {
       const target: any = e.target;
       if (target?.componentId) {
-        const component = components.find(c => c.id === target.componentId);
+        const component = componentsRef.current.find(c => c.id === target.componentId);
         if (component) {
           const info = `${component.name}${component.supplier ? ' - ' + component.supplier : ''}${component.aff_code ? ' (' + component.aff_code + ')' : ''}`;
           target.set('strokeWidth', 4);
@@ -144,7 +145,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     fabricCanvas.isDrawingMode = false;
   }, [activeTool, fabricCanvas]);
 
-  const loadComponents = async () => {
+  const loadComponents = useCallback(async () => {
     const { data, error } = await supabase
       .from('components')
       .select(`
@@ -160,9 +161,10 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       console.error('Error loading components:', error);
     } else {
       setComponents(data || []);
+      componentsRef.current = data || [];
       renderComponentsOnCanvas(data || []);
     }
-  };
+  }, [floorId, fabricCanvas]);
 
   const renderComponentsOnCanvas = (componentsData: any[]) => {
     if (!fabricCanvas) return;
@@ -213,6 +215,8 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       });
       fabricCanvas.add(circle);
       fabricCanvas.setActiveObject(circle);
+      setSelectedObject(circle);
+      setDialogOpen(true);
     } else if (tool === 'rectangle' && fabricCanvas) {
       const rect = new Rect({
         left: 100,
@@ -225,6 +229,8 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       });
       fabricCanvas.add(rect);
       fabricCanvas.setActiveObject(rect);
+      setSelectedObject(rect);
+      setDialogOpen(true);
     }
   };
 
