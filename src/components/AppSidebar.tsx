@@ -18,6 +18,7 @@ import { Button } from "./ui/button";
 const navigationItems = [
   { title: "Hem", url: "/", icon: Home },
   { title: "Fastigheter", url: "/properties", icon: Building2 },
+  { title: "Komponenter", url: "/components", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -51,14 +52,14 @@ export function AppSidebar() {
               {navigationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink
+                     <NavLink
                       to={item.url}
                       end
                       className={({ isActive }) =>
                         `flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
                           isActive
                             ? 'bg-primary text-primary-foreground font-medium'
-                            : 'hover:bg-muted'
+                            : 'text-foreground hover:bg-muted hover:text-foreground'
                         }`
                       }
                     >
