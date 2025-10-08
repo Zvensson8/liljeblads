@@ -8,9 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, MapPin, Package, ExternalLink } from 'lucide-react';
+import { Building2, MapPin, Package, ExternalLink, Plus } from 'lucide-react';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
 import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
+import { SelectPropertyFloorDialog } from '@/components/SelectPropertyFloorDialog';
 
 interface Component {
   id: string;
@@ -38,6 +39,9 @@ const Components = () => {
   const [loading, setLoading] = useState(true);
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectPropertyDialogOpen, setSelectPropertyDialogOpen] = useState(false);
+  const [selectedPropertyId, setSelectedPropertyId] = useState('');
+  const [selectedFloorId, setSelectedFloorId] = useState('');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -118,6 +122,17 @@ const Components = () => {
     setDialogOpen(true);
   };
 
+  const handleNewComponent = () => {
+    setSelectPropertyDialogOpen(true);
+  };
+
+  const handlePropertyFloorSelected = (propertyId: string, floorId: string) => {
+    setSelectedPropertyId(propertyId);
+    setSelectedFloorId(floorId);
+    setSelectPropertyDialogOpen(false);
+    setDialogOpen(true);
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -141,15 +156,21 @@ const Components = () => {
 
           <main className="flex-1 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center">
                 <div>
                   <p className="text-muted-foreground">
                     Hantera alla komponenter från dina fastigheter
                   </p>
                 </div>
-                <Badge variant="outline" className="text-base px-4 py-2">
-                  {components.length} komponenter
-                </Badge>
+                <div className="flex items-center gap-4">
+                  <Badge variant="outline" className="text-base px-4 py-2">
+                    {components.length} komponenter
+                  </Badge>
+                  <Button onClick={handleNewComponent}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ny komponent
+                  </Button>
+                </div>
               </div>
 
               {components.length === 0 ? (
@@ -260,14 +281,30 @@ const Components = () => {
         </SidebarInset>
       </div>
 
+      <SelectPropertyFloorDialog
+        open={selectPropertyDialogOpen}
+        onOpenChange={setSelectPropertyDialogOpen}
+        onSelect={handlePropertyFloorSelected}
+      />
+
       <ComponentFormDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        floorId={selectedComponent?.floor_id || ''}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setSelectedComponent(null);
+            setSelectedFloorId('');
+            setSelectedPropertyId('');
+          }
+        }}
+        floorId={selectedComponent?.floor_id || selectedFloorId}
+        propertyId={selectedComponent?.property_id || selectedPropertyId}
         editingComponent={selectedComponent}
         onSuccess={() => {
           setDialogOpen(false);
           setSelectedComponent(null);
+          setSelectedFloorId('');
+          setSelectedPropertyId('');
           fetchComponents();
         }}
       />
