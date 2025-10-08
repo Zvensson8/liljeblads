@@ -54,6 +54,9 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
   const [isPanning, setIsPanning] = useState(false);
   const [editingComponent, setEditingComponent] = useState<Component | null>(null);
   const [propertyId, setPropertyId] = useState<string>('');
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [tooltipComponent, setTooltipComponent] = useState<Component | null>(null);
   const panStart = useRef({ x: 0, y: 0 });
   const { toast } = useToast();
 
@@ -180,7 +183,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
 
       // Handle hover effect for components
       const target: any = e.target;
-      if (target && target.componentId) {
+      if (target && target.componentId && e.pointer) {
         target.set({ 
           strokeWidth: 4,
           stroke: '#2563eb',
@@ -188,6 +191,21 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         });
         canvas.hoverCursor = 'pointer';
         canvas.renderAll();
+        
+        // Show tooltip
+        const component = componentsRef.current.find(c => c.id === target.componentId);
+        if (component) {
+          const canvasElement = canvasRef.current;
+          if (canvasElement) {
+            const rect = canvasElement.getBoundingClientRect();
+            setTooltipPosition({
+              x: rect.left + e.pointer.x + 15,
+              y: rect.top + e.pointer.y - 10
+            });
+            setTooltipComponent(component);
+            setTooltipVisible(true);
+          }
+        }
         
         // Reset other objects
         canvas.getObjects().forEach((obj: any) => {
@@ -200,6 +218,10 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
           }
         });
       } else {
+        // Hide tooltip
+        setTooltipVisible(false);
+        setTooltipComponent(null);
+        
         // Reset all component objects when not hovering
         canvas.getObjects().forEach((obj: any) => {
           if (obj.componentId) {
@@ -593,6 +615,32 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         <div className="border-2 border-border rounded-lg overflow-hidden shadow-[var(--shadow-card)] bg-white">
           <canvas ref={canvasRef} />
         </div>
+
+        {/* Tooltip */}
+        {tooltipVisible && tooltipComponent && (
+          <div
+            className="fixed z-50 px-3 py-2 bg-popover border border-border rounded-lg shadow-lg pointer-events-none"
+            style={{
+              left: `${tooltipPosition.x}px`,
+              top: `${tooltipPosition.y}px`,
+            }}
+          >
+            <div className="space-y-1 text-sm">
+              <div className="font-semibold text-foreground">{tooltipComponent.name}</div>
+              <div className="text-muted-foreground">{tooltipComponent.type}</div>
+              {tooltipComponent.manufacturer && (
+                <div className="text-muted-foreground">
+                  {tooltipComponent.manufacturer}
+                </div>
+              )}
+              {tooltipComponent.installation_year && (
+                <div className="text-muted-foreground">
+                  Installerad: {tooltipComponent.installation_year}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <ComponentFormDialog
           open={dialogOpen}
