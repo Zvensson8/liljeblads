@@ -8,7 +8,23 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, Compass, Sparkles, MapPin, Layers } from 'lucide-react';
+import { Building2, Plus, Compass, Sparkles, MapPin, Layers, Trash2, MoreVertical } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -32,6 +48,8 @@ const Properties = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [description, setDescription] = useState('');
@@ -121,6 +139,31 @@ const Properties = () => {
           variant: 'destructive',
         });
       }
+    }
+  };
+
+  const handleDeleteProperty = async () => {
+    if (!propertyToDelete) return;
+
+    const { error } = await supabase
+      .from('properties')
+      .delete()
+      .eq('id', propertyToDelete.id);
+
+    if (error) {
+      toast({
+        title: 'Fel vid borttagning',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Fastighet borttagen',
+        description: `${propertyToDelete.name} har tagits bort.`,
+      });
+      setDeleteDialogOpen(false);
+      setPropertyToDelete(null);
+      fetchProperties();
     }
   };
 
@@ -294,13 +337,15 @@ const Properties = () => {
                   {properties.map((property, index) => (
                     <Card
                       key={property.id}
-                      className="group cursor-pointer hover:shadow-[var(--shadow-elegant)] hover:border-primary/50 transition-all duration-300 hover-scale border-border/50"
-                      onClick={() => navigate(`/property/${property.id}`)}
+                      className="group hover:shadow-[var(--shadow-elegant)] hover:border-primary/50 transition-all duration-300 hover-scale border-border/50"
                       style={{ animationDelay: `${0.3 + index * 0.05}s` }}
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
+                          <div 
+                            className="flex-1 min-w-0 cursor-pointer"
+                            onClick={() => navigate(`/property/${property.id}`)}
+                          >
                             <CardTitle className="group-hover:text-primary transition-colors truncate text-lg">
                               {property.name}
                             </CardTitle>
@@ -311,8 +356,30 @@ const Properties = () => {
                               </CardDescription>
                             )}
                           </div>
-                          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
-                            <Building2 className="h-6 w-6 text-primary-foreground" />
+                          <div className="flex items-center gap-2">
+                            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
+                              <Building2 className="h-6 w-6 text-primary-foreground" />
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPropertyToDelete(property);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Ta bort
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                         {property.floors && property.floors.length > 0 && (
@@ -337,6 +404,28 @@ const Properties = () => {
           </main>
         </div>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ta bort fastighet?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Är du säker på att du vill ta bort "{propertyToDelete?.name}"? 
+              Detta kommer även ta bort alla våningar, ritningar och komponenter. 
+              Åtgärden kan inte ångras.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteProperty}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Ta bort
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 };

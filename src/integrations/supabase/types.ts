@@ -158,6 +158,50 @@ export type Database = {
           },
         ]
       }
+      maintenance_history: {
+        Row: {
+          action_type: string
+          component_id: string
+          cost: number | null
+          created_at: string
+          id: string
+          notes: string | null
+          performed_date: string
+          supplier: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          component_id: string
+          cost?: number | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          performed_date: string
+          supplier?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          component_id?: string
+          cost?: number | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          performed_date?: string
+          supplier?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_history_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           approved: boolean

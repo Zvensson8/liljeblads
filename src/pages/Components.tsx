@@ -10,6 +10,7 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/s
 import { useAuth } from '@/hooks/useAuth';
 import { Building2, MapPin, Package, ExternalLink } from 'lucide-react';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
+import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
 
 interface Component {
   id: string;
@@ -228,18 +229,26 @@ const Components = () => {
                               {component.floor_level !== null && ` (Våning ${component.floor_level})`}
                             </span>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/property/${component.property_id}`);
-                            }}
-                          >
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            Gå till ritning
-                          </Button>
+                          <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div onClick={(e) => e.stopPropagation()} className="flex-1">
+                              <MaintenanceHistoryDialog
+                                componentId={component.id}
+                                componentName={component.name}
+                              />
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="flex-1"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/property/${component.property_id}`);
+                              }}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              Ritning
+                            </Button>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
