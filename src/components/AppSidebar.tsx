@@ -16,7 +16,7 @@ import {
 import { Button } from "./ui/button";
 
 const navigationItems = [
-  { title: "Hem", url: "/", icon: Home },
+  { title: "Dashboard", url: "/", icon: Home },
   { title: "Fastigheter", url: "/properties", icon: Building2 },
   { title: "Komponenter", url: "/components", icon: Settings },
 ];
@@ -44,26 +44,26 @@ export function AppSidebar() {
 
         {/* Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel className={isCollapsed ? 'sr-only' : ''}>
+          <SidebarGroupLabel className={`text-muted-foreground text-xs uppercase tracking-wider ${isCollapsed ? 'sr-only' : ''}`}>
             Navigation
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navigationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                     <NavLink
+                  <SidebarMenuButton asChild className="hover:bg-sidebar-accent">
+                    <NavLink
                       to={item.url}
                       end
                       className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
+                        `flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-sidebar-foreground ${
                           isActive
-                            ? 'bg-primary text-primary-foreground font-medium'
-                            : 'text-foreground hover:bg-muted hover:text-foreground'
+                            ? 'bg-primary text-primary-foreground font-medium shadow-lg'
+                            : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`
                       }
                     >
-                      <item.icon className="h-5 w-5" />
+                      <item.icon className="h-5 w-5 flex-shrink-0" />
                       {!isCollapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>

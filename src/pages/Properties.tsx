@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, Compass, Sparkles } from 'lucide-react';
+import { Building2, Plus, Compass, Sparkles, MapPin, Layers } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -25,6 +25,7 @@ interface Property {
   name: string;
   address: string | null;
   description: string | null;
+  floors?: any[];
 }
 
 const Properties = () => {
@@ -45,7 +46,14 @@ const Properties = () => {
   const fetchProperties = async () => {
     const { data, error } = await supabase
       .from('properties')
-      .select('*')
+      .select(`
+        *,
+        floors (
+          id,
+          name,
+          level
+        )
+      `)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -156,8 +164,53 @@ const Properties = () => {
 
           <main className="flex-1 overflow-auto">
             <div className="container mx-auto px-6 py-8">
+              {/* Stats Bar */}
+              <div className="grid gap-4 md:grid-cols-3 mb-8 animate-fade-in">
+                <Card className="border-border/50 bg-gradient-to-br from-blue-500/10 to-blue-600/5 hover-scale">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Totalt fastigheter</p>
+                        <p className="text-3xl font-bold">{properties.length}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-blue-500/20">
+                        <Building2 className="h-6 w-6 text-blue-500" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-border/50 bg-gradient-to-br from-green-500/10 to-green-600/5 hover-scale">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Med ritningar</p>
+                        <p className="text-3xl font-bold">{properties.filter(p => p.floors && p.floors.length > 0).length}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-green-500/20">
+                        <MapPin className="h-6 w-6 text-green-500" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-border/50 bg-gradient-to-br from-purple-500/10 to-purple-600/5 hover-scale">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Totalt våningar</p>
+                        <p className="text-3xl font-bold">
+                          {properties.reduce((acc, p) => acc + (p.floors?.length || 0), 0)}
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-purple-500/20">
+                        <Layers className="h-6 w-6 text-purple-500" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
               {/* Page Header */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 animate-fade-in" style={{ animationDelay: '0.1s' }}>
                 <div className="space-y-1">
                   <h2 className="text-3xl font-bold tracking-tight">Mina fastigheter</h2>
                   <p className="text-muted-foreground">
@@ -221,7 +274,7 @@ const Properties = () => {
 
               {/* Properties Grid */}
               {properties.length === 0 ? (
-                <Card className="border-dashed">
+                <Card className="border-dashed animate-fade-in" style={{ animationDelay: '0.2s' }}>
                   <CardContent className="flex flex-col items-center justify-center py-16">
                     <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                       <Building2 className="h-10 w-10 text-primary" />
@@ -237,29 +290,37 @@ const Properties = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {properties.map((property) => (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                  {properties.map((property, index) => (
                     <Card
                       key={property.id}
-                      className="group cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all duration-300 animate-fade-in"
+                      className="group cursor-pointer hover:shadow-[var(--shadow-elegant)] hover:border-primary/50 transition-all duration-300 hover-scale border-border/50"
                       onClick={() => navigate(`/property/${property.id}`)}
+                      style={{ animationDelay: `${0.3 + index * 0.05}s` }}
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <CardTitle className="group-hover:text-primary transition-colors truncate">
+                            <CardTitle className="group-hover:text-primary transition-colors truncate text-lg">
                               {property.name}
                             </CardTitle>
                             {property.address && (
-                              <CardDescription className="mt-1.5 line-clamp-1">
+                              <CardDescription className="mt-1.5 line-clamp-1 flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
                                 {property.address}
                               </CardDescription>
                             )}
                           </div>
-                          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
                             <Building2 className="h-6 w-6 text-primary-foreground" />
                           </div>
                         </div>
+                        {property.floors && property.floors.length > 0 && (
+                          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                            <Layers className="h-4 w-4" />
+                            <span>{property.floors.length} våning{property.floors.length !== 1 ? 'ar' : ''}</span>
+                          </div>
+                        )}
                       </CardHeader>
                       {property.description && (
                         <CardContent>
