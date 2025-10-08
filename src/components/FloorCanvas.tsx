@@ -165,30 +165,53 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       setSelectedObject(null);
     });
 
-    canvas.on('mouse:over', (e) => {
-      const obj: any = e.target;
-      if (obj && obj.componentId) {
-        const component = componentsRef.current.find(c => c.id === obj.componentId);
-        if (component) {
-          obj.set({ 
-            strokeWidth: 4,
-            stroke: '#2563eb'
-          });
-          canvas.renderAll();
-          canvas.defaultCursor = 'pointer';
-        }
+    canvas.on('mouse:move', (e) => {
+      if (isPanning && activeTool === 'pan' && e.pointer) {
+        const delta = {
+          x: e.pointer.x - panStart.current.x,
+          y: e.pointer.y - panStart.current.y
+        };
+        canvas.viewportTransform![4] += delta.x;
+        canvas.viewportTransform![5] += delta.y;
+        canvas.requestRenderAll();
+        panStart.current = { x: e.pointer.x, y: e.pointer.y };
+        return;
       }
-    });
 
-    canvas.on('mouse:out', (e) => {
-      const obj: any = e.target;
-      if (obj && obj.componentId) {
-        obj.set({ 
-          strokeWidth: 2,
-          stroke: '#3b82f6'
+      // Handle hover effect for components
+      const target: any = e.target;
+      if (target && target.componentId) {
+        target.set({ 
+          strokeWidth: 4,
+          stroke: '#2563eb',
+          fill: 'rgba(37, 99, 235, 0.7)'
         });
+        canvas.hoverCursor = 'pointer';
         canvas.renderAll();
-        canvas.defaultCursor = 'default';
+        
+        // Reset other objects
+        canvas.getObjects().forEach((obj: any) => {
+          if (obj.componentId && obj !== target) {
+            obj.set({ 
+              strokeWidth: 2,
+              stroke: '#3b82f6',
+              fill: 'rgba(59, 130, 246, 0.5)'
+            });
+          }
+        });
+      } else {
+        // Reset all component objects when not hovering
+        canvas.getObjects().forEach((obj: any) => {
+          if (obj.componentId) {
+            obj.set({ 
+              strokeWidth: 2,
+              stroke: '#3b82f6',
+              fill: 'rgba(59, 130, 246, 0.5)'
+            });
+          }
+        });
+        canvas.hoverCursor = activeTool === 'pan' ? 'grab' : 'default';
+        canvas.renderAll();
       }
     });
 
