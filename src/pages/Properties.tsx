@@ -8,9 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, LogOut } from 'lucide-react';
+import { Building2, Plus, Compass, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/AppSidebar';
 
 const propertySchema = z.object({
   name: z.string().trim().min(1, 'Namn är obligatoriskt').max(200, 'Namn får vara max 200 tecken'),
@@ -123,116 +125,158 @@ const Properties = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold">Blueprint Mapper</h1>
-          </div>
-          <Button variant="outline" onClick={signOut}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Logga ut
-          </Button>
-        </div>
-      </header>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <AppSidebar />
+        
+        <div className="flex-1 flex flex-col">
+          {/* Modern Header */}
+          <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex h-16 items-center gap-4 px-6">
+              <SidebarTrigger className="hover:bg-muted rounded-md p-2 transition-colors" />
+              
+              <div className="flex items-center gap-3 flex-1">
+                <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                  <Compass className="h-5 w-5 text-primary-foreground" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold">NavRitning</h1>
+                  <p className="text-xs text-muted-foreground">Professionell ritningshantering</p>
+                </div>
+              </div>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-3xl font-bold">Mina fastigheter</h2>
-            <p className="text-muted-foreground">Hantera dina fastigheter och ritningar</p>
-          </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Ny fastighet
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Skapa ny fastighet</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateProperty} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Namn</Label>
-                  <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="T.ex. Storgatan 1"
-                    required
-                  />
+              <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm">
+                  <Sparkles className="h-4 w-4" />
+                  <span className="font-medium">{properties.length} fastigheter</span>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="address">Adress</Label>
-                  <Input
-                    id="address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="T.ex. Storgatan 1, 123 45 Stockholm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Beskrivning</Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Valfri beskrivning..."
-                  />
-                </div>
-                <Button type="submit" className="w-full">
-                  Skapa fastighet
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+              </div>
+            </div>
+          </header>
 
-        {properties.length === 0 ? (
-          <Card className="text-center py-16 border-dashed">
-            <CardContent>
-              <Building2 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <CardTitle className="mb-2 text-2xl">Inga fastigheter än</CardTitle>
-              <CardDescription className="text-base">Kom igång genom att skapa din första fastighet</CardDescription>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {properties.map((property) => (
-              <Card
-                key={property.id}
-                className="cursor-pointer hover:shadow-[var(--shadow-elegant)] hover:border-primary transition-all duration-300 group"
-                onClick={() => navigate(`/property/${property.id}`)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="group-hover:text-primary transition-colors">
-                        {property.name}
-                      </CardTitle>
-                      {property.address && (
-                        <CardDescription className="mt-1.5">{property.address}</CardDescription>
-                      )}
+          <main className="flex-1 overflow-auto">
+            <div className="container mx-auto px-6 py-8">
+              {/* Page Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div className="space-y-1">
+                  <h2 className="text-3xl font-bold tracking-tight">Mina fastigheter</h2>
+                  <p className="text-muted-foreground">
+                    Hantera och organisera alla dina fastigheter och ritningar
+                  </p>
+                </div>
+                
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="lg" className="gap-2">
+                      <Plus className="h-5 w-5" />
+                      Ny fastighet
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>Skapa ny fastighet</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateProperty} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Namn <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder="T.ex. Storgatan 1"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="address">Adress</Label>
+                        <Input
+                          id="address"
+                          value={address}
+                          onChange={(e) => setAddress(e.target.value)}
+                          placeholder="T.ex. Storgatan 1, 123 45 Stockholm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="description">Beskrivning</Label>
+                        <Textarea
+                          id="description"
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Valfri beskrivning..."
+                          rows={3}
+                        />
+                      </div>
+                      <div className="flex gap-2 pt-4">
+                        <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="flex-1">
+                          Avbryt
+                        </Button>
+                        <Button type="submit" className="flex-1">
+                          Skapa fastighet
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Properties Grid */}
+              {properties.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardContent className="flex flex-col items-center justify-center py-16">
+                    <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                      <Building2 className="h-10 w-10 text-primary" />
                     </div>
-                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                      <Building2 className="h-5 w-5" />
-                    </div>
-                  </div>
-                </CardHeader>
-                {property.description && (
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{property.description}</p>
+                    <CardTitle className="mb-2 text-2xl">Inga fastigheter än</CardTitle>
+                    <CardDescription className="text-base mb-6 text-center max-w-md">
+                      Kom igång genom att skapa din första fastighet och börja hantera dina ritningar
+                    </CardDescription>
+                    <Button onClick={() => setDialogOpen(true)} size="lg" className="gap-2">
+                      <Plus className="h-5 w-5" />
+                      Skapa din första fastighet
+                    </Button>
                   </CardContent>
-                )}
-              </Card>
-            ))}
-          </div>
-        )}
-      </main>
-    </div>
+                </Card>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {properties.map((property) => (
+                    <Card
+                      key={property.id}
+                      className="group cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all duration-300 animate-fade-in"
+                      onClick={() => navigate(`/property/${property.id}`)}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="group-hover:text-primary transition-colors truncate">
+                              {property.name}
+                            </CardTitle>
+                            {property.address && (
+                              <CardDescription className="mt-1.5 line-clamp-1">
+                                {property.address}
+                              </CardDescription>
+                            )}
+                          </div>
+                          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                            <Building2 className="h-6 w-6 text-primary-foreground" />
+                          </div>
+                        </div>
+                      </CardHeader>
+                      {property.description && (
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {property.description}
+                          </p>
+                        </CardContent>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 };
 
