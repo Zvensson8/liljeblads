@@ -8,10 +8,12 @@ import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, MapPin, Package, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download } from 'lucide-react';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
 import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
 import { SelectPropertyFloorDialog } from '@/components/SelectPropertyFloorDialog';
+import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface Component {
   id: string;
@@ -23,6 +25,10 @@ interface Component {
   serial_number: string | null;
   room_zone: string | null;
   installation_year: number | null;
+  registration_number: string | null;
+  refrigerant_code: string | null;
+  refrigerant_amount_kg: number | null;
+  refrigerant_type: string | null;
   floor_id: string;
   floor_name?: string;
   floor_level?: number | null;
@@ -89,6 +95,44 @@ const Components = () => {
     }
 
     setLoading(false);
+  };
+
+  const handleExport = async (format: 'excel' | 'pdf') => {
+    // Fetch maintenance records for all components
+    const maintenanceRecords: Record<string, any[]> = {};
+    
+    for (const component of components) {
+      const { data } = await supabase
+        .from('maintenance_history')
+        .select('*')
+        .eq('component_id', component.id)
+        .order('performed_date', { ascending: false });
+      
+      maintenanceRecords[component.id] = data || [];
+    }
+
+    if (format === 'excel') {
+      exportComponentsToExcel(
+        components,
+        maintenanceRecords,
+        `komponenter-${new Date().toISOString().split('T')[0]}.xlsx`
+      );
+      toast({
+        title: 'Export lyckades',
+        description: 'Komponenter exporterade till Excel',
+      });
+    } else {
+      exportComponentsToPDF(
+        components,
+        maintenanceRecords,
+        'Komponentregister',
+        `komponenter-${new Date().toISOString().split('T')[0]}.pdf`
+      );
+      toast({
+        title: 'Export lyckades',
+        description: 'Komponenter exporterade till PDF',
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -191,6 +235,24 @@ const Components = () => {
                   <Badge variant="outline" className="text-base px-4 py-2">
                     {components.length} komponenter
                   </Badge>
+                  {components.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline">
+                          <Download className="h-4 w-4 mr-2" />
+                          Exportera
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleExport('excel')}>
+                          Exportera till Excel
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                          Exportera till PDF
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                   <Button onClick={handleNewComponent}>
                     <Plus className="h-4 w-4 mr-2" />
                     Ny komponent

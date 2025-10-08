@@ -170,8 +170,12 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       if (obj && obj.componentId) {
         const component = componentsRef.current.find(c => c.id === obj.componentId);
         if (component) {
-          obj.set({ strokeWidth: 4 });
+          obj.set({ 
+            strokeWidth: 4,
+            stroke: '#2563eb'
+          });
           canvas.renderAll();
+          canvas.defaultCursor = 'pointer';
         }
       }
     });
@@ -179,8 +183,12 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     canvas.on('mouse:out', (e) => {
       const obj: any = e.target;
       if (obj && obj.componentId) {
-        obj.set({ strokeWidth: 2 });
+        obj.set({ 
+          strokeWidth: 2,
+          stroke: '#3b82f6'
+        });
         canvas.renderAll();
+        canvas.defaultCursor = 'default';
       }
     });
 
@@ -262,6 +270,8 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
           strokeWidth: 2,
           radius: 15,
           selectable: true,
+          evented: true,
+          hoverCursor: 'pointer',
         });
         circle.componentId = component.id;
         fabricCanvas.add(circle);

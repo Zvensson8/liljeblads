@@ -7,9 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Upload, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Trash2, Download } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { FloorCanvas } from '@/components/FloorCanvas';
+import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface Property {
   id: string;
@@ -209,6 +211,74 @@ const PropertyDetail = () => {
     }
   };
 
+  const handleExportProperty = async (format: 'excel' | 'pdf') => {
+    if (!property) return;
+
+    // Fetch all components for this property
+    const { data: componentsData } = await supabase
+      .from('components')
+      .select(`
+        *,
+        floors!inner(
+          property_id,
+          name
+        )
+      `)
+      .eq('floors.property_id', property.id);
+
+    if (!componentsData || componentsData.length === 0) {
+      toast({
+        title: 'Ingen data',
+        description: 'Det finns inga komponenter att exportera för denna fastighet.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Fetch maintenance records for all components
+    const maintenanceRecords: Record<string, any[]> = {};
+    
+    for (const component of componentsData) {
+      const { data } = await supabase
+        .from('maintenance_history')
+        .select('*')
+        .eq('component_id', component.id)
+        .order('performed_date', { ascending: false });
+      
+      maintenanceRecords[component.id] = data || [];
+    }
+
+    const formattedComponents = componentsData.map((comp: any) => ({
+      ...comp,
+      floor_name: comp.floors?.name,
+      property_name: property.name,
+      property_address: property.address,
+    }));
+
+    if (format === 'excel') {
+      exportComponentsToExcel(
+        formattedComponents,
+        maintenanceRecords,
+        `${property.name}-${new Date().toISOString().split('T')[0]}.xlsx`
+      );
+      toast({
+        title: 'Export lyckades',
+        description: `Komponenter för ${property.name} exporterade till Excel`,
+      });
+    } else {
+      exportComponentsToPDF(
+        formattedComponents,
+        maintenanceRecords,
+        `Komponentregister - ${property.name}`,
+        `${property.name}-${new Date().toISOString().split('T')[0]}.pdf`
+      );
+      toast({
+        title: 'Export lyckades',
+        description: `Komponenter för ${property.name} exporterade till PDF`,
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -245,44 +315,64 @@ const PropertyDetail = () => {
 
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Våningsplan</h2>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Ny våning
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Skapa ny våning</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateFloor} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="floorName">Namn</Label>
-                  <Input
-                    id="floorName"
-                    value={floorName}
-                    onChange={(e) => setFloorName(e.target.value)}
-                    placeholder="T.ex. Bottenvåning"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="floorLevel">Våningsnummer (valfritt)</Label>
-                  <Input
-                    id="floorLevel"
-                    type="number"
-                    value={floorLevel}
-                    onChange={(e) => setFloorLevel(e.target.value)}
-                    placeholder="T.ex. 1"
-                  />
-                </div>
-                <Button type="submit" className="w-full">
-                  Skapa våning
+          <div className="flex gap-2">
+            {floors.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportera fastighet
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleExportProperty('excel')}>
+                    Exportera till Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportProperty('pdf')}>
+                    Exportera till PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ny våning
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Skapa ny våning</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreateFloor} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="floorName">Namn</Label>
+                    <Input
+                      id="floorName"
+                      value={floorName}
+                      onChange={(e) => setFloorName(e.target.value)}
+                      placeholder="T.ex. Bottenvåning"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="floorLevel">Våningsnummer (valfritt)</Label>
+                    <Input
+                      id="floorLevel"
+                      type="number"
+                      value={floorLevel}
+                      onChange={(e) => setFloorLevel(e.target.value)}
+                      placeholder="T.ex. 1"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">
+                    Skapa våning
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {floors.length === 0 ? (

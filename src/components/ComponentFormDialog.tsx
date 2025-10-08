@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ComponentTemplate } from '@/hooks/useComponentLibrary';
 import { z } from 'zod';
+import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
 
 const componentSchema = z.object({
   name: z.string().trim().min(1, 'Beteckning är obligatorisk').max(200, 'Beteckning får vara max 200 tecken'),
@@ -401,6 +402,15 @@ export const ComponentFormDialog = ({
               </>
             )}
           </div>
+
+          {editingComponent && (
+            <div className="pt-4 border-t">
+              <MaintenanceHistoryDialog
+                componentId={editingComponent.id}
+                componentName={editingComponent.name}
+              />
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Button 
