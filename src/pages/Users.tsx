@@ -8,7 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, Mail, Calendar, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, Mail, Calendar, Loader2, Building2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface Profile {
   id: string;
@@ -19,6 +22,16 @@ interface Profile {
   created_at: string;
 }
 
+interface Property {
+  id: string;
+  name: string;
+}
+
+interface PropertyAssignment {
+  property_id: string;
+  user_id: string;
+}
+
 export default function Users() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -26,6 +39,11 @@ export default function Users() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [propertyDialogOpen, setPropertyDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [userProperties, setUserProperties] = useState<string[]>([]);
+  const [savingProperties, setSavingProperties] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -36,6 +54,7 @@ export default function Users() {
   useEffect(() => {
     if (user) {
       fetchProfiles();
+      fetchProperties();
     }
   }, [user]);
 
@@ -57,6 +76,109 @@ export default function Users() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchProperties = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("id, name")
+        .order("name");
+
+      if (error) throw error;
+      setProperties(data || []);
+    } catch (error) {
+      console.error("Error fetching properties:", error);
+    }
+  };
+
+  const fetchUserProperties = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("property_users")
+        .select("property_id")
+        .eq("user_id", userId);
+
+      if (error) throw error;
+      setUserProperties(data?.map(p => p.property_id) || []);
+    } catch (error) {
+      console.error("Error fetching user properties:", error);
+    }
+  };
+
+  const handleOpenPropertyDialog = async (profile: Profile) => {
+    setSelectedUser(profile);
+    await fetchUserProperties(profile.id);
+    setPropertyDialogOpen(true);
+  };
+
+  const handleToggleProperty = (propertyId: string) => {
+    setUserProperties(prev =>
+      prev.includes(propertyId)
+        ? prev.filter(id => id !== propertyId)
+        : [...prev, propertyId]
+    );
+  };
+
+  const handleSavePropertyAssignments = async () => {
+    if (!selectedUser) return;
+
+    setSavingProperties(true);
+    try {
+      // Fetch current assignments
+      const { data: currentAssignments, error: fetchError } = await supabase
+        .from("property_users")
+        .select("property_id")
+        .eq("user_id", selectedUser.id);
+
+      if (fetchError) throw fetchError;
+
+      const currentPropertyIds = currentAssignments?.map(a => a.property_id) || [];
+      
+      // Determine which to add and which to remove
+      const toAdd = userProperties.filter(id => !currentPropertyIds.includes(id));
+      const toRemove = currentPropertyIds.filter(id => !userProperties.includes(id));
+
+      // Add new assignments
+      if (toAdd.length > 0) {
+        const { error: insertError } = await supabase
+          .from("property_users")
+          .insert(toAdd.map(property_id => ({
+            user_id: selectedUser.id,
+            property_id
+          })));
+
+        if (insertError) throw insertError;
+      }
+
+      // Remove old assignments
+      if (toRemove.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("property_users")
+          .delete()
+          .eq("user_id", selectedUser.id)
+          .in("property_id", toRemove);
+
+        if (deleteError) throw deleteError;
+      }
+
+      toast({
+        title: "Fastigheter uppdaterade",
+        description: `Fastighetstilldelningar för ${selectedUser.full_name || selectedUser.email} har uppdaterats`,
+      });
+
+      setPropertyDialogOpen(false);
+      setSelectedUser(null);
+    } catch (error) {
+      console.error("Error saving property assignments:", error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte uppdatera fastighetstilldelningar",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingProperties(false);
     }
   };
 
@@ -160,18 +282,27 @@ export default function Users() {
                       </CardHeader>
                       <CardContent className="space-y-2">
                         <Badge variant="outline">{profile.role}</Badge>
-                        <Button
-                          onClick={() => handleApprove(profile.id, true)}
-                          disabled={processingId === profile.id}
-                          className="w-full"
-                        >
-                          {processingId === profile.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                          )}
-                          Godkänn användare
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleApprove(profile.id, true)}
+                            disabled={processingId === profile.id}
+                            className="flex-1"
+                          >
+                            {processingId === profile.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4 mr-2" />
+                            )}
+                            Godkänn
+                          </Button>
+                          <Button
+                            onClick={() => handleOpenPropertyDialog(profile)}
+                            variant="outline"
+                            size="icon"
+                          >
+                            <Building2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -206,19 +337,29 @@ export default function Users() {
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <Badge variant="outline">{profile.role}</Badge>
-                      <Button
-                        onClick={() => handleApprove(profile.id, false)}
-                        disabled={processingId === profile.id}
-                        variant="outline"
-                        className="w-full"
-                      >
-                        {processingId === profile.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <XCircle className="h-4 w-4 mr-2" />
-                        )}
-                        Återkalla godkännande
-                      </Button>
+                      <div className="space-y-2">
+                        <Button
+                          onClick={() => handleOpenPropertyDialog(profile)}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          <Building2 className="h-4 w-4 mr-2" />
+                          Hantera fastigheter
+                        </Button>
+                        <Button
+                          onClick={() => handleApprove(profile.id, false)}
+                          disabled={processingId === profile.id}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          {processingId === profile.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <XCircle className="h-4 w-4 mr-2" />
+                          )}
+                          Återkalla godkännande
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -227,6 +368,70 @@ export default function Users() {
           </main>
         </SidebarInset>
       </div>
+
+      {/* Property Assignment Dialog */}
+      <Dialog open={propertyDialogOpen} onOpenChange={setPropertyDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+              Hantera fastigheter för {selectedUser?.full_name || selectedUser?.email}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {properties.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Inga fastigheter tillgängliga
+              </p>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {properties.map((property) => (
+                  <div
+                    key={property.id}
+                    className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                  >
+                    <Checkbox
+                      id={`property-${property.id}`}
+                      checked={userProperties.includes(property.id)}
+                      onCheckedChange={() => handleToggleProperty(property.id)}
+                    />
+                    <Label
+                      htmlFor={`property-${property.id}`}
+                      className="flex-1 cursor-pointer font-normal"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        {property.name}
+                      </div>
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setPropertyDialogOpen(false)}
+              disabled={savingProperties}
+            >
+              Avbryt
+            </Button>
+            <Button
+              onClick={handleSavePropertyAssignments}
+              disabled={savingProperties}
+            >
+              {savingProperties ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sparar...
+                </>
+              ) : (
+                "Spara"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 }
