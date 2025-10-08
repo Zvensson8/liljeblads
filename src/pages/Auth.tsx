@@ -40,7 +40,7 @@ const Auth = () => {
       // Validate input
       authSchema.parse({ email, password });
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
@@ -51,12 +51,35 @@ const Auth = () => {
           description: error.message,
           variant: 'destructive',
         });
-      } else {
-        toast({
-          title: 'Välkommen!',
-          description: 'Du är nu inloggad.',
-        });
-        navigate('/');
+      } else if (data.user) {
+        // Check if user is approved
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('approved')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError || !profile) {
+          toast({
+            title: 'Fel',
+            description: 'Kunde inte hämta användarprofil',
+            variant: 'destructive',
+          });
+          await supabase.auth.signOut();
+        } else if (!profile.approved) {
+          toast({
+            title: 'Väntar på godkännande',
+            description: 'Ditt konto väntar på att godkännas av en administratör. Du kommer få ett meddelande när ditt konto är godkänt.',
+            variant: 'destructive',
+          });
+          await supabase.auth.signOut();
+        } else {
+          toast({
+            title: 'Välkommen!',
+            description: 'Du är nu inloggad.',
+          });
+          navigate('/');
+        }
       }
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -100,7 +123,7 @@ const Auth = () => {
       } else {
         toast({
           title: 'Kontot skapat!',
-          description: 'Du kan nu logga in.',
+          description: 'Ditt konto har skapats och väntar nu på godkännande från en administratör. Du kommer få ett meddelande när ditt konto är godkänt.',
         });
       }
     } catch (error: any) {
