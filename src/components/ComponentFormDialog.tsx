@@ -253,16 +253,27 @@ export const ComponentFormDialog = ({
                 <SelectTrigger id="componentType">
                   <SelectValue placeholder="Välj komponenttyp" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="heat_pump">Värmepump</SelectItem>
-                  <SelectItem value="ventilation">Ventilationsaggregat</SelectItem>
-                  <SelectItem value="electrical">Elcentral</SelectItem>
-                  <SelectItem value="district_heating">Fjärrvärmecentral</SelectItem>
-                  <SelectItem value="entrance">Entréparti</SelectItem>
-                  <SelectItem value="motorized_gate">Maskindriven Port</SelectItem>
-                  <SelectItem value="loading_dock">Lastbrygga</SelectItem>
-                  <SelectItem value="cooling">Kylaggregat</SelectItem>
-                  <SelectItem value="other">Övrigt</SelectItem>
+                <SelectContent className="bg-popover z-50">
+                  <SelectItem value="SC1">Styr och övervakningssystem</SelectItem>
+                  <SelectItem value="SC2.1.1">Takbeläggningar och Tätskikt</SelectItem>
+                  <SelectItem value="SC2.3">Entréer Portar mm</SelectItem>
+                  <SelectItem value="SC2.3.1">Entrépartier Karuselldörrar</SelectItem>
+                  <SelectItem value="SC2.3.3">Manuella Portar</SelectItem>
+                  <SelectItem value="SC2.3.4">Maskindrivna Portar</SelectItem>
+                  <SelectItem value="SC2.3.7">Lastbryggor</SelectItem>
+                  <SelectItem value="SC2.6.2">Skyddsrum</SelectItem>
+                  <SelectItem value="SC4.1.2.5.1">Fettavskiljare</SelectItem>
+                  <SelectItem value="SC4.1.2.5.3">Oljeavskiljare</SelectItem>
+                  <SelectItem value="SC4.1.6.9">Fjärrvärmeväxlare</SelectItem>
+                  <SelectItem value="SC4.2.4.6">Port Vertikal</SelectItem>
+                  <SelectItem value="SC4.2.4.7">Port Horisontell</SelectItem>
+                  <SelectItem value="SC4.5.1">Kylanläggning</SelectItem>
+                  <SelectItem value="SC4.6.2.6">Värmepump</SelectItem>
+                  <SelectItem value="SC4.6.2.6.1">Värmeväxlare</SelectItem>
+                  <SelectItem value="SC4.7">Ventsystem</SelectItem>
+                  <SelectItem value="SC5.5">Reserv eller nödkraftsystem</SelectItem>
+                  <SelectItem value="SC7.1">Hiss</SelectItem>
+                  <SelectItem value="SC7.2">Rulltrappor och Rullramper</SelectItem>
                 </SelectContent>
               </Select>
             </div>

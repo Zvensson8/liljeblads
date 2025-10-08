@@ -313,15 +313,26 @@ export type Database = {
         | "needs_repair"
         | "decommissioned"
       component_type:
-        | "hvac"
-        | "electrical"
-        | "plumbing"
-        | "fire_safety"
-        | "security"
-        | "elevator"
-        | "door"
-        | "window"
-        | "other"
+        | "SC1"
+        | "SC2.1.1"
+        | "SC2.3"
+        | "SC2.3.1"
+        | "SC2.3.3"
+        | "SC2.3.4"
+        | "SC2.3.7"
+        | "SC2.6.2"
+        | "SC4.1.2.5.1"
+        | "SC4.1.2.5.3"
+        | "SC4.1.6.9"
+        | "SC4.2.4.6"
+        | "SC4.2.4.7"
+        | "SC4.5.1"
+        | "SC4.6.2.6"
+        | "SC4.6.2.6.1"
+        | "SC4.7"
+        | "SC5.5"
+        | "SC7.1"
+        | "SC7.2"
       user_role: "admin" | "user" | "reader"
     }
     CompositeTypes: {
@@ -459,15 +470,26 @@ export const Constants = {
         "decommissioned",
       ],
       component_type: [
-        "hvac",
-        "electrical",
-        "plumbing",
-        "fire_safety",
-        "security",
-        "elevator",
-        "door",
-        "window",
-        "other",
+        "SC1",
+        "SC2.1.1",
+        "SC2.3",
+        "SC2.3.1",
+        "SC2.3.3",
+        "SC2.3.4",
+        "SC2.3.7",
+        "SC2.6.2",
+        "SC4.1.2.5.1",
+        "SC4.1.2.5.3",
+        "SC4.1.6.9",
+        "SC4.2.4.6",
+        "SC4.2.4.7",
+        "SC4.5.1",
+        "SC4.6.2.6",
+        "SC4.6.2.6.1",
+        "SC4.7",
+        "SC5.5",
+        "SC7.1",
+        "SC7.2",
       ],
       user_role: ["admin", "user", "reader"],
     },
