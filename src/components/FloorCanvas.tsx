@@ -447,6 +447,69 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     saveHistory();
   };
 
+  const handleExistingComponentSelect = async (component: Component) => {
+    if (!fabricCanvas) return;
+    
+    // Place the existing component on the canvas
+    const shape = new Circle({
+      left: 150,
+      top: 150,
+      fill: 'rgba(59, 130, 246, 0.5)',
+      stroke: '#3b82f6',
+      strokeWidth: 2,
+      radius: 15,
+    });
+    (shape as any).existingComponentId = component.id;
+    
+    fabricCanvas.add(shape);
+    fabricCanvas.setActiveObject(shape);
+    
+    toast({
+      title: 'Placera komponenten',
+      description: 'Dra komponenten till rätt position och klicka "Spara position" för att bekräfta.',
+    });
+    
+    saveHistory();
+  };
+
+  const handleSaveComponentPosition = async () => {
+    if (!fabricCanvas || !selectedObject) return;
+    
+    const existingComponentId = (selectedObject as any).existingComponentId;
+    if (!existingComponentId) return;
+
+    // Delete existing geometry if any
+    await supabase
+      .from('component_geometry')
+      .delete()
+      .eq('component_id', existingComponentId);
+
+    // Save new position
+    const { error } = await supabase
+      .from('component_geometry')
+      .insert({
+        component_id: existingComponentId,
+        x: selectedObject.left || 0,
+        y: selectedObject.top || 0,
+      });
+
+    if (error) {
+      toast({
+        title: 'Fel',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Position sparad',
+        description: 'Komponentens position har sparats.',
+      });
+      loadComponents();
+      fabricCanvas.remove(selectedObject);
+      setSelectedObject(null);
+    }
+  };
+
   const handleComponentSaved = () => {
     loadComponents();
     onUpdate();
@@ -459,9 +522,18 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
 
   return (
     <div className="flex gap-4">
-      <ComponentLibraryPanel onSelectTemplate={handleTemplateSelect} />
+      <ComponentLibraryPanel 
+        onSelectTemplate={handleTemplateSelect}
+        propertyId={propertyId}
+        onSelectExistingComponent={handleExistingComponentSelect}
+      />
       
       <div className="flex-1 flex flex-col gap-4">
+        {selectedObject && (selectedObject as any).existingComponentId && (
+          <Button onClick={handleSaveComponentPosition} size="lg">
+            Spara position
+          </Button>
+        )}
         <CanvasToolbar
           activeTool={activeTool}
           onToolClick={handleToolClick}

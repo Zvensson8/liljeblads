@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Upload } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { FloorCanvas } from '@/components/FloorCanvas';
 
@@ -159,6 +159,56 @@ const PropertyDetail = () => {
     setUploadingFile(false);
   };
 
+  const handleDeleteFloor = async (floorId: string) => {
+    if (!confirm('Är du säker på att du vill ta bort denna våning? Alla komponenter på våningen kommer också att tas bort.')) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from('floors')
+      .delete()
+      .eq('id', floorId);
+
+    if (error) {
+      toast({
+        title: 'Fel',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Våning borttagen',
+        description: 'Våningen har tagits bort.',
+      });
+      fetchPropertyAndFloors();
+    }
+  };
+
+  const handleDeleteDrawing = async (floor: Floor) => {
+    if (!confirm('Är du säker på att du vill ta bort ritningen? Komponenter på våningen kommer att behållas.')) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from('floors')
+      .update({ drawing_url: null })
+      .eq('id', floor.id);
+
+    if (error) {
+      toast({
+        title: 'Fel',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Ritning borttagen',
+        description: 'Ritningen har tagits bort. Du kan ladda upp en ny.',
+      });
+      fetchPropertyAndFloors();
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -257,29 +307,69 @@ const PropertyDetail = () => {
                         <CardDescription className="text-base mt-1">Våning {floor.level}</CardDescription>
                       )}
                     </div>
-                    {!floor.drawing_url && (
-                      <div>
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleFileUpload(floor.id, file);
-                          }}
-                          disabled={uploadingFile}
-                          className="hidden"
-                          id={`file-${floor.id}`}
-                        />
-                        <Label htmlFor={`file-${floor.id}`} className="cursor-pointer">
-                          <Button asChild disabled={uploadingFile} size="lg">
-                            <span>
-                              <Upload className="h-4 w-4 mr-2" />
-                              {uploadingFile ? 'Laddar upp...' : 'Ladda upp ritning'}
-                            </span>
+                    <div className="flex gap-2">
+                      {floor.drawing_url ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteDrawing(floor)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Ta bort ritning
                           </Button>
-                        </Label>
-                      </div>
-                    )}
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload(floor.id, file);
+                            }}
+                            disabled={uploadingFile}
+                            className="hidden"
+                            id={`file-${floor.id}`}
+                          />
+                          <Label htmlFor={`file-${floor.id}`} className="cursor-pointer">
+                            <Button asChild disabled={uploadingFile} size="sm" variant="outline">
+                              <span>
+                                <Upload className="h-4 w-4 mr-2" />
+                                Byt ritning
+                              </span>
+                            </Button>
+                          </Label>
+                        </>
+                      ) : (
+                        <div>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload(floor.id, file);
+                            }}
+                            disabled={uploadingFile}
+                            className="hidden"
+                            id={`file-${floor.id}`}
+                          />
+                          <Label htmlFor={`file-${floor.id}`} className="cursor-pointer">
+                            <Button asChild disabled={uploadingFile} size="lg">
+                              <span>
+                                <Upload className="h-4 w-4 mr-2" />
+                                {uploadingFile ? 'Laddar upp...' : 'Ladda upp ritning'}
+                              </span>
+                            </Button>
+                          </Label>
+                        </div>
+                      )}
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteFloor(floor.id)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Ta bort våning
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 {floor.drawing_url && (
