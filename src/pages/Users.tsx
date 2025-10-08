@@ -269,7 +269,7 @@ export default function Users() {
                         <CardTitle className="text-lg flex items-center gap-2">
                           {profile.full_name || "Ej angivet"}
                         </CardTitle>
-                        <CardDescription className="space-y-2">
+                        <div className="space-y-2 text-sm text-muted-foreground">
                           <div className="flex items-center gap-2">
                             <Mail className="h-4 w-4" />
                             {profile.email}
@@ -278,7 +278,7 @@ export default function Users() {
                             <Calendar className="h-4 w-4" />
                             {new Date(profile.created_at).toLocaleDateString("sv-SE")}
                           </div>
-                        </CardDescription>
+                        </div>
                       </CardHeader>
                       <CardContent className="space-y-2">
                         <Badge variant="outline">{profile.role}</Badge>
@@ -324,7 +324,7 @@ export default function Users() {
                           Godkänd
                         </Badge>
                       </CardTitle>
-                      <CardDescription className="space-y-2">
+                      <div className="space-y-2 text-sm text-muted-foreground">
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4" />
                           {profile.email}
@@ -333,7 +333,7 @@ export default function Users() {
                           <Calendar className="h-4 w-4" />
                           {new Date(profile.created_at).toLocaleDateString("sv-SE")}
                         </div>
-                      </CardDescription>
+                      </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <Badge variant="outline">{profile.role}</Badge>
@@ -371,7 +371,7 @@ export default function Users() {
 
       {/* Property Assignment Dialog */}
       <Dialog open={propertyDialogOpen} onOpenChange={setPropertyDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px]" aria-describedby="property-assignment-description">
           <DialogHeader>
             <DialogTitle>
               Hantera fastigheter för {selectedUser?.full_name || selectedUser?.email}

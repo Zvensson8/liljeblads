@@ -33,7 +33,8 @@ interface ComponentFormDialogProps {
   propertyId?: string;
   selectedTemplate?: ComponentTemplate | null;
   editingComponent?: any;
-  onSuccess: () => void;
+  canvasPosition?: { x: number; y: number } | null;
+  onSuccess: (componentId?: string) => void;
 }
 
 export const ComponentFormDialog = ({ 
@@ -43,6 +44,7 @@ export const ComponentFormDialog = ({
   propertyId,
   selectedTemplate,
   editingComponent,
+  canvasPosition,
   onSuccess 
 }: ComponentFormDialogProps) => {
   const { toast } = useToast();
@@ -162,16 +164,40 @@ export const ComponentFormDialog = ({
         });
       } else {
         // Create new component
-        const { error } = await supabase
+        const { data: newComponent, error } = await supabase
           .from('components')
-          .insert([componentData]);
+          .insert([componentData])
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Save canvas position if provided
+        if (newComponent && canvasPosition) {
+          const { error: geometryError } = await supabase
+            .from('component_geometry')
+            .insert({
+              component_id: newComponent.id,
+              x: canvasPosition.x,
+              y: canvasPosition.y,
+            });
+
+          if (geometryError) {
+            console.error('Error saving geometry:', geometryError);
+          }
+        }
 
         toast({
           title: 'Komponent skapad!',
           description: `${designation} har lagts till.`,
         });
+
+        // Pass the component ID to onSuccess
+        resetForm();
+        onOpenChange(false);
+        onSuccess(newComponent?.id);
+        setLoading(false);
+        return;
       }
 
       resetForm();
@@ -215,7 +241,7 @@ export const ComponentFormDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto" aria-describedby="component-form-description">
         <DialogHeader>
           <DialogTitle>
             {editingComponent ? 'Redigera komponent' : 'Ny komponent'}

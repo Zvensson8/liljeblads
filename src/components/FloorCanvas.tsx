@@ -565,7 +565,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     }
   };
 
-  const handleComponentSaved = () => {
+  const handleComponentSaved = (componentId?: string) => {
     loadComponents();
     onUpdate();
     if (selectedObject) {
@@ -573,6 +573,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       setSelectedObject(null);
     }
     setSelectedTemplate(null);
+    setEditingComponent(null);
   };
 
   return (
@@ -649,6 +650,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
           propertyId={propertyId}
           selectedTemplate={selectedTemplate}
           editingComponent={editingComponent}
+          canvasPosition={selectedObject && !editingComponent ? { x: selectedObject.left || 0, y: selectedObject.top || 0 } : null}
           onSuccess={handleComponentSaved}
         />
       </div>
