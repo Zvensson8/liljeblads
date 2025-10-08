@@ -20,6 +20,9 @@ const componentSchema = z.object({
   serial_number: z.string().max(100, 'Serie-ID får vara max 100 tecken').optional().or(z.literal('')),
   room_zone: z.string().max(200, 'Placering får vara max 200 tecken').optional().or(z.literal('')),
   notes: z.string().max(5000, 'Anteckningar får vara max 5000 tecken').optional().or(z.literal('')),
+  refrigerant_code: z.string().max(50, 'Kod får vara max 50 tecken').optional().or(z.literal('')),
+  refrigerant_amount_kg: z.number().positive('Fyllnadsmängd måste vara positiv').optional().nullable(),
+  refrigerant_type: z.string().max(100, 'Köldmedietyp får vara max 100 tecken').optional().or(z.literal('')),
 });
 
 interface ComponentFormDialogProps {
@@ -56,6 +59,9 @@ export const ComponentFormDialog = ({
   const [serialNumber, setSerialNumber] = useState('');
   const [placement, setPlacement] = useState('');
   const [notes, setNotes] = useState('');
+  const [refrigerantCode, setRefrigerantCode] = useState('');
+  const [refrigerantAmount, setRefrigerantAmount] = useState('');
+  const [refrigerantType, setRefrigerantType] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -72,6 +78,9 @@ export const ComponentFormDialog = ({
         setSerialNumber(editingComponent.serial_number || '');
         setPlacement(editingComponent.room_zone || '');
         setNotes(editingComponent.notes || '');
+        setRefrigerantCode(editingComponent.refrigerant_code || '');
+        setRefrigerantAmount(editingComponent.refrigerant_amount_kg?.toString() || '');
+        setRefrigerantType(editingComponent.refrigerant_type || '');
       } else if (selectedTemplate) {
         // Pre-fill type from template
         setComponentType(selectedTemplate.type);
@@ -111,6 +120,9 @@ export const ComponentFormDialog = ({
       serial_number: serialNumber || '',
       room_zone: placement || '',
       notes: notes || '',
+      refrigerant_code: refrigerantCode || '',
+      refrigerant_amount_kg: refrigerantAmount ? parseFloat(refrigerantAmount) : null,
+      refrigerant_type: refrigerantType || '',
     };
 
     try {
@@ -127,6 +139,9 @@ export const ComponentFormDialog = ({
         serial_number: serialNumber.trim() || null,
         room_zone: placement.trim() || null,
         notes: notes.trim() || null,
+        refrigerant_code: refrigerantCode.trim() || null,
+        refrigerant_amount_kg: refrigerantAmount ? parseFloat(refrigerantAmount) : null,
+        refrigerant_type: refrigerantType.trim() || null,
         status: 'active' as const,
         floor_id: floorId,
       };
@@ -192,6 +207,9 @@ export const ComponentFormDialog = ({
     setSerialNumber('');
     setPlacement('');
     setNotes('');
+    setRefrigerantCode('');
+    setRefrigerantAmount('');
+    setRefrigerantType('');
   };
 
   return (
@@ -341,6 +359,47 @@ export const ComponentFormDialog = ({
                 rows={3}
               />
             </div>
+
+            {componentType === 'SC4.5.1' && (
+              <>
+                <div className="space-y-2 col-span-2 pt-4 border-t">
+                  <h3 className="text-sm font-semibold">Kylaggregat - Specifika fält</h3>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="refrigerantCode">Kod</Label>
+                  <Input
+                    id="refrigerantCode"
+                    value={refrigerantCode}
+                    onChange={(e) => setRefrigerantCode(e.target.value)}
+                    placeholder="Ange kod"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="refrigerantAmount">Fyllnadsmängd (kg)</Label>
+                  <Input
+                    id="refrigerantAmount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={refrigerantAmount}
+                    onChange={(e) => setRefrigerantAmount(e.target.value)}
+                    placeholder="Ange fyllnadsmängd"
+                  />
+                </div>
+
+                <div className="space-y-2 col-span-2">
+                  <Label htmlFor="refrigerantType">Köldmedietyp</Label>
+                  <Input
+                    id="refrigerantType"
+                    value={refrigerantType}
+                    onChange={(e) => setRefrigerantType(e.target.value)}
+                    placeholder="Ange köldmedietyp"
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-4">

@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, MapPin, Package, ExternalLink, Plus } from 'lucide-react';
+import { Building2, MapPin, Package, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
 import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
 import { SelectPropertyFloorDialog } from '@/components/SelectPropertyFloorDialog';
@@ -133,6 +133,31 @@ const Components = () => {
     setDialogOpen(true);
   };
 
+  const handleDeleteComponent = async (componentId: string, componentName: string) => {
+    if (!confirm(`Är du säker på att du vill ta bort ${componentName}?`)) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from('components')
+      .delete()
+      .eq('id', componentId);
+
+    if (error) {
+      toast({
+        title: 'Fel',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Komponent borttagen',
+        description: `${componentName} har tagits bort.`,
+      });
+      fetchComponents();
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -250,24 +275,37 @@ const Components = () => {
                               {component.floor_level !== null && ` (Våning ${component.floor_level})`}
                             </span>
                           </div>
-                          <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div onClick={(e) => e.stopPropagation()} className="flex-1">
-                              <MaintenanceHistoryDialog
-                                componentId={component.id}
-                                componentName={component.name}
-                              />
+                          <div className="flex flex-col gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex gap-2">
+                              <div onClick={(e) => e.stopPropagation()} className="flex-1">
+                                <MaintenanceHistoryDialog
+                                  componentId={component.id}
+                                  componentName={component.name}
+                                />
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="flex-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/property/${component.property_id}`);
+                                }}
+                              >
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                Ritning
+                              </Button>
                             </div>
                             <Button
-                              variant="ghost"
+                              variant="destructive"
                               size="sm"
-                              className="flex-1"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(`/property/${component.property_id}`);
+                                handleDeleteComponent(component.id, component.name);
                               }}
                             >
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              Ritning
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Ta bort
                             </Button>
                           </div>
                         </div>

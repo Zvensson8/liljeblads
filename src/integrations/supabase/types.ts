@@ -60,6 +60,9 @@ export type Database = {
           next_service_date: string | null
           notes: string | null
           priority: number | null
+          refrigerant_amount_kg: number | null
+          refrigerant_code: string | null
+          refrigerant_type: string | null
           registration_number: string | null
           room_zone: string | null
           serial_number: string | null
@@ -81,6 +84,9 @@ export type Database = {
           next_service_date?: string | null
           notes?: string | null
           priority?: number | null
+          refrigerant_amount_kg?: number | null
+          refrigerant_code?: string | null
+          refrigerant_type?: string | null
           registration_number?: string | null
           room_zone?: string | null
           serial_number?: string | null
@@ -102,6 +108,9 @@ export type Database = {
           next_service_date?: string | null
           notes?: string | null
           priority?: number | null
+          refrigerant_amount_kg?: number | null
+          refrigerant_code?: string | null
+          refrigerant_type?: string | null
           registration_number?: string | null
           room_zone?: string | null
           serial_number?: string | null
