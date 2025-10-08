@@ -53,11 +53,16 @@ export type Database = {
           created_at: string
           floor_id: string
           id: string
+          installation_year: number | null
+          manufacturer: string | null
+          model: string | null
           name: string
           next_service_date: string | null
           notes: string | null
           priority: number | null
+          registration_number: string | null
           room_zone: string | null
+          serial_number: string | null
           status: Database["public"]["Enums"]["component_status"]
           supplier: string | null
           type: Database["public"]["Enums"]["component_type"]
@@ -69,11 +74,16 @@ export type Database = {
           created_at?: string
           floor_id: string
           id?: string
+          installation_year?: number | null
+          manufacturer?: string | null
+          model?: string | null
           name: string
           next_service_date?: string | null
           notes?: string | null
           priority?: number | null
+          registration_number?: string | null
           room_zone?: string | null
+          serial_number?: string | null
           status?: Database["public"]["Enums"]["component_status"]
           supplier?: string | null
           type?: Database["public"]["Enums"]["component_type"]
@@ -85,11 +95,16 @@ export type Database = {
           created_at?: string
           floor_id?: string
           id?: string
+          installation_year?: number | null
+          manufacturer?: string | null
+          model?: string | null
           name?: string
           next_service_date?: string | null
           notes?: string | null
           priority?: number | null
+          registration_number?: string | null
           room_zone?: string | null
+          serial_number?: string | null
           status?: Database["public"]["Enums"]["component_status"]
           supplier?: string | null
           type?: Database["public"]["Enums"]["component_type"]

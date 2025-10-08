@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useToast } from '@/hooks/use-toast';
 import { CanvasToolbar } from './CanvasToolbar';
 import { ComponentLibraryPanel } from './ComponentLibraryPanel';
+import { ComponentFormDialog } from './ComponentFormDialog';
+import { ComponentTemplate } from '@/hooks/useComponentLibrary';
 
 interface FloorCanvasProps {
   floorId: string;
@@ -29,6 +31,11 @@ interface Component {
   priority: number | null;
   cost_center: string | null;
   next_service_date: string | null;
+  registration_number: string | null;
+  installation_year: number | null;
+  manufacturer: string | null;
+  model: string | null;
+  serial_number: string | null;
 }
 
 export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps) => {
@@ -37,13 +44,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
   const [activeTool, setActiveTool] = useState<string>('select');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedObject, setSelectedObject] = useState<any>(null);
-  const [componentName, setComponentName] = useState('');
-  const [componentType, setComponentType] = useState('hvac');
-  const [componentStatus, setComponentStatus] = useState('active');
-  const [supplier, setSupplier] = useState('');
-  const [affCode, setAffCode] = useState('');
-  const [notes, setNotes] = useState('');
-  const [roomZone, setRoomZone] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<ComponentTemplate | null>(null);
   const [components, setComponents] = useState<Component[]>([]);
   const componentsRef = useRef<Component[]>([]);
   const [history, setHistory] = useState<any[]>([]);
@@ -51,8 +52,8 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
   const [gridEnabled, setGridEnabled] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
-  const [editMode, setEditMode] = useState(false);
   const [editingComponent, setEditingComponent] = useState<Component | null>(null);
+  const [propertyId, setPropertyId] = useState<string>('');
   const panStart = useRef({ x: 0, y: 0 });
   const { toast } = useToast();
 
@@ -96,6 +97,23 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [fabricCanvas, historyStep]);
 
+  // Fetch property ID for this floor
+  useEffect(() => {
+    const fetchPropertyId = async () => {
+      const { data } = await supabase
+        .from('floors')
+        .select('property_id')
+        .eq('id', floorId)
+        .single();
+      
+      if (data) {
+        setPropertyId(data.property_id);
+      }
+    };
+    
+    fetchPropertyId();
+  }, [floorId]);
+
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -126,8 +144,6 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         const component = componentsRef.current.find(c => c.id === obj.componentId);
         if (component) {
           setEditingComponent(component);
-          setEditMode(true);
-          populateFormFromComponent(component);
           setDialogOpen(true);
         }
       }
@@ -140,8 +156,6 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         const component = componentsRef.current.find(c => c.id === obj.componentId);
         if (component) {
           setEditingComponent(component);
-          setEditMode(true);
-          populateFormFromComponent(component);
           setDialogOpen(true);
         }
       }
@@ -282,16 +296,6 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     loadComponents();
   }, [fabricCanvas, loadComponents]);
 
-  const populateFormFromComponent = (component: Component) => {
-    setComponentName(component.name);
-    setComponentType(component.type);
-    setComponentStatus(component.status);
-    setSupplier(component.supplier || '');
-    setAffCode(component.aff_code || '');
-    setNotes(component.notes || '');
-    setRoomZone(component.room_zone || '');
-  };
-
   const drawGrid = () => {
     if (!fabricCanvas) return;
     
@@ -396,51 +400,16 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
 
   const handleToolClick = (tool: string) => {
     setActiveTool(tool);
-    setEditMode(false);
     setEditingComponent(null);
-    resetForm();
+    setSelectedTemplate(null);
 
-    if (tool === 'circle' && fabricCanvas) {
-      const circle = new Circle({
-        left: 100,
-        top: 100,
-        fill: 'rgba(59, 130, 246, 0.5)',
-        stroke: '#3b82f6',
-        strokeWidth: 2,
-        radius: 15,
-      });
-      (circle as any).componentId = null;
-      fabricCanvas.add(circle);
-      fabricCanvas.setActiveObject(circle);
-      setSelectedObject(circle);
-      setDialogOpen(true);
-      saveHistory();
-    } else if (tool === 'rectangle' && fabricCanvas) {
-      const rect = new Rect({
-        left: 100,
-        top: 100,
-        fill: 'rgba(59, 130, 246, 0.5)',
-        stroke: '#3b82f6',
-        strokeWidth: 2,
-        width: 60,
-        height: 40,
-      });
-      (rect as any).componentId = null;
-      fabricCanvas.add(rect);
-      fabricCanvas.setActiveObject(rect);
-      setSelectedObject(rect);
-      setDialogOpen(true);
-      saveHistory();
-    } else if (tool === 'line' && fabricCanvas) {
+    if (tool === 'line' && fabricCanvas) {
       const line = new Line([50, 50, 200, 50], {
         stroke: '#3b82f6',
         strokeWidth: 3,
       });
-      (line as any).componentId = null;
       fabricCanvas.add(line);
       fabricCanvas.setActiveObject(line);
-      setSelectedObject(line);
-      setDialogOpen(true);
       saveHistory();
     } else if (tool === 'text' && fabricCanvas) {
       const text = new FabricText('Dubbelklicka för att redigera', {
@@ -449,14 +418,13 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         fontSize: 20,
         fill: '#333',
       });
-      (text as any).componentId = null;
       fabricCanvas.add(text);
       fabricCanvas.setActiveObject(text);
       saveHistory();
     }
   };
 
-  const handleTemplateSelect = (template: any) => {
+  const handleTemplateSelect = (template: ComponentTemplate) => {
     if (!fabricCanvas) return;
     
     const shape = new Circle({
@@ -473,167 +441,20 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     fabricCanvas.add(shape);
     fabricCanvas.setActiveObject(shape);
     setSelectedObject(shape);
-    setComponentType(template.type);
-    setComponentName(template.name);
+    setSelectedTemplate(template);
+    setEditingComponent(null);
     setDialogOpen(true);
     saveHistory();
   };
 
-  const handleSaveComponent = async () => {
-    if (!selectedObject || !componentName) {
-      toast({
-        title: 'Fel',
-        description: 'Välj ett objekt och fyll i namn',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (editMode && editingComponent) {
-      const { error: componentError } = await supabase
-        .from('components')
-        .update({
-          name: componentName,
-          type: componentType as any,
-          status: componentStatus as any,
-          supplier: supplier || null,
-          aff_code: affCode || null,
-          notes: notes || null,
-          room_zone: roomZone || null,
-        })
-        .eq('id', editingComponent.id);
-
-      if (componentError) {
-        toast({
-          title: 'Fel',
-          description: componentError.message,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const { error: geometryError } = await supabase
-        .from('component_geometry')
-        .update({
-          x: selectedObject.left,
-          y: selectedObject.top,
-        })
-        .eq('component_id', editingComponent.id);
-
-      if (geometryError) {
-        toast({
-          title: 'Fel',
-          description: geometryError.message,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      toast({
-        title: 'Komponent uppdaterad!',
-        description: `${componentName} har uppdaterats.`,
-      });
-    } else {
-      const { data: componentData, error: componentError } = await supabase
-        .from('components')
-        .insert([{
-          floor_id: floorId,
-          name: componentName,
-          type: componentType as any,
-          status: componentStatus as any,
-          supplier: supplier || null,
-          aff_code: affCode || null,
-          notes: notes || null,
-          room_zone: roomZone || null,
-        }])
-        .select()
-        .single();
-
-      if (componentError) {
-        toast({
-          title: 'Fel',
-          description: componentError.message,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const { error: geometryError } = await supabase
-        .from('component_geometry')
-        .insert([{
-          component_id: componentData.id,
-          x: selectedObject.left,
-          y: selectedObject.top,
-        }]);
-
-      if (geometryError) {
-        toast({
-          title: 'Fel',
-          description: geometryError.message,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      (selectedObject as any).componentId = componentData.id;
-
-      toast({
-        title: 'Komponent sparad!',
-        description: `${componentName} har lagts till på ritningen.`,
-      });
-    }
-
-    setDialogOpen(false);
-    setEditMode(false);
-    setEditingComponent(null);
-    resetForm();
+  const handleComponentSaved = () => {
     loadComponents();
     onUpdate();
-  };
-
-  const handleDeleteComponent = async () => {
-    if (!editingComponent) return;
-
-    const { error } = await supabase
-      .from('components')
-      .delete()
-      .eq('id', editingComponent.id);
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-      return;
+    if (selectedObject) {
+      fabricCanvas?.remove(selectedObject);
+      setSelectedObject(null);
     }
-
-    if (fabricCanvas && selectedObject) {
-      fabricCanvas.remove(selectedObject);
-    }
-
-    toast({
-      title: 'Komponent borttagen!',
-      description: `${editingComponent.name} har tagits bort.`,
-    });
-
-    setDialogOpen(false);
-    setEditMode(false);
-    setEditingComponent(null);
-    setSelectedObject(null);
-    resetForm();
-    loadComponents();
-    onUpdate();
-  };
-
-  const resetForm = () => {
-    setComponentName('');
-    setComponentType('hvac');
-    setComponentStatus('active');
-    setSupplier('');
-    setAffCode('');
-    setNotes('');
-    setRoomZone('');
+    setSelectedTemplate(null);
   };
 
   return (
@@ -668,110 +489,15 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
           <canvas ref={canvasRef} />
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editMode ? 'Redigera komponent' : 'Spara komponent'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="componentName">Namn *</Label>
-                <Input
-                  id="componentName"
-                  value={componentName}
-                  onChange={(e) => setComponentName(e.target.value)}
-                  placeholder="T.ex. Värmepump VP-101"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="componentType">Typ *</Label>
-                  <Select value={componentType} onValueChange={setComponentType}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hvac">HVAC</SelectItem>
-                      <SelectItem value="heat_pump">Värmepump</SelectItem>
-                      <SelectItem value="ventilation">Ventilation</SelectItem>
-                      <SelectItem value="radiator">Radiator</SelectItem>
-                      <SelectItem value="fan">Fläkt</SelectItem>
-                      <SelectItem value="water_heater">Varmvattenberedare</SelectItem>
-                      <SelectItem value="electrical">El</SelectItem>
-                      <SelectItem value="plumbing">VVS</SelectItem>
-                      <SelectItem value="fire_safety">Brandskydd</SelectItem>
-                      <SelectItem value="security">Säkerhet</SelectItem>
-                      <SelectItem value="other">Övrigt</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="componentStatus">Status *</Label>
-                  <Select value={componentStatus} onValueChange={setComponentStatus}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Aktiv</SelectItem>
-                      <SelectItem value="inactive">Inaktiv</SelectItem>
-                      <SelectItem value="maintenance">Underhåll</SelectItem>
-                      <SelectItem value="decommissioned">Utfasad</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="supplier">Leverantör</Label>
-                  <Input
-                    id="supplier"
-                    value={supplier}
-                    onChange={(e) => setSupplier(e.target.value)}
-                    placeholder="T.ex. Företag AB"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="affCode">AFF-kod</Label>
-                  <Input
-                    id="affCode"
-                    value={affCode}
-                    onChange={(e) => setAffCode(e.target.value)}
-                    placeholder="T.ex. AFF-123"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="roomZone">Rum/Zon</Label>
-                <Input
-                  id="roomZone"
-                  value={roomZone}
-                  onChange={(e) => setRoomZone(e.target.value)}
-                  placeholder="T.ex. Källare, Zon A"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="notes">Anteckningar</Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ytterligare information..."
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleSaveComponent} className="flex-1">
-                  {editMode ? 'Uppdatera' : 'Spara'} komponent
-                </Button>
-                {editMode && (
-                  <Button onClick={handleDeleteComponent} variant="destructive">
-                    Ta bort
-                  </Button>
-                )}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <ComponentFormDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          floorId={floorId}
+          propertyId={propertyId}
+          selectedTemplate={selectedTemplate}
+          editingComponent={editingComponent}
+          onSuccess={handleComponentSaved}
+        />
       </div>
     </div>
   );
