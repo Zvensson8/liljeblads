@@ -8,6 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Building2 } from 'lucide-react';
+import { z } from 'zod';
+
+const authSchema = z.object({
+  email: z.string().trim().email('Ogiltig e-postadress').max(255, 'E-postadress får vara max 255 tecken'),
+  password: z.string().min(6, 'Lösenord måste vara minst 6 tecken'),
+  fullName: z.string().trim().max(200, 'Namn får vara max 200 tecken').optional(),
+});
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -29,57 +36,85 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // Validate input
+      authSchema.parse({ email, password });
 
-    if (error) {
-      toast({
-        title: 'Inloggning misslyckades',
-        description: error.message,
-        variant: 'destructive',
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
       });
-    } else {
-      toast({
-        title: 'Välkommen!',
-        description: 'Du är nu inloggad.',
-      });
-      navigate('/');
+
+      if (error) {
+        toast({
+          title: 'Inloggning misslyckades',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Välkommen!',
+          description: 'Du är nu inloggad.',
+        });
+        navigate('/');
+      }
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        const firstError = error.errors[0];
+        toast({
+          title: 'Valideringsfel',
+          description: firstError.message,
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: {
-          full_name: fullName,
+    try {
+      // Validate input
+      authSchema.parse({ email, password, fullName });
+
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: fullName.trim(),
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      toast({
-        title: 'Registrering misslyckades',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Kontot skapat!',
-        description: 'Du kan nu logga in.',
-      });
+      if (error) {
+        toast({
+          title: 'Registrering misslyckades',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Kontot skapat!',
+          description: 'Du kan nu logga in.',
+        });
+      }
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        const firstError = error.errors[0];
+        toast({
+          title: 'Valideringsfel',
+          description: firstError.message,
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (

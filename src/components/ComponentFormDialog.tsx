@@ -8,6 +8,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ComponentTemplate } from '@/hooks/useComponentLibrary';
+import { z } from 'zod';
+
+const componentSchema = z.object({
+  name: z.string().trim().min(1, 'Beteckning är obligatorisk').max(200, 'Beteckning får vara max 200 tecken'),
+  registration_number: z.string().max(100, 'Reg.nr får vara max 100 tecken').optional().or(z.literal('')),
+  type: z.string().min(1, 'Komponenttyp är obligatorisk'),
+  installation_year: z.number().int().min(1900, 'Installationsår måste vara minst 1900').max(2100, 'Installationsår får vara max 2100').optional().nullable(),
+  manufacturer: z.string().max(100, 'Tillverkare får vara max 100 tecken').optional().or(z.literal('')),
+  model: z.string().max(100, 'Modell får vara max 100 tecken').optional().or(z.literal('')),
+  serial_number: z.string().max(100, 'Serie-ID får vara max 100 tecken').optional().or(z.literal('')),
+  room_zone: z.string().max(200, 'Placering får vara max 200 tecken').optional().or(z.literal('')),
+  notes: z.string().max(5000, 'Anteckningar får vara max 5000 tecken').optional().or(z.literal('')),
+});
 
 interface ComponentFormDialogProps {
   open: boolean;
@@ -87,21 +100,37 @@ export const ComponentFormDialog = ({
     e.preventDefault();
     setLoading(true);
 
-    const componentData = {
+    // Validate input data
+    const validationData = {
       name: designation,
-      registration_number: registrationNumber || null,
-      type: componentType as any,
+      registration_number: registrationNumber || '',
+      type: componentType,
       installation_year: installationYear ? parseInt(installationYear) : null,
-      manufacturer: manufacturer || null,
-      model: model || null,
-      serial_number: serialNumber || null,
-      room_zone: placement || null,
-      notes: notes || null,
-      status: 'active' as const,
-      floor_id: floorId,
+      manufacturer: manufacturer || '',
+      model: model || '',
+      serial_number: serialNumber || '',
+      room_zone: placement || '',
+      notes: notes || '',
     };
 
     try {
+      // Validate with Zod
+      componentSchema.parse(validationData);
+
+      const componentData = {
+        name: designation.trim(),
+        registration_number: registrationNumber.trim() || null,
+        type: componentType as any,
+        installation_year: installationYear ? parseInt(installationYear) : null,
+        manufacturer: manufacturer.trim() || null,
+        model: model.trim() || null,
+        serial_number: serialNumber.trim() || null,
+        room_zone: placement.trim() || null,
+        notes: notes.trim() || null,
+        status: 'active' as const,
+        floor_id: floorId,
+      };
+
       if (editingComponent) {
         // Update existing component
         const { error } = await supabase
@@ -133,11 +162,21 @@ export const ComponentFormDialog = ({
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
+      // Handle Zod validation errors
+      if (error instanceof z.ZodError) {
+        const firstError = error.errors[0];
+        toast({
+          title: 'Valideringsfel',
+          description: firstError.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Fel',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
     }

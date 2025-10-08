@@ -10,6 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { z } from 'zod';
+
+const propertySchema = z.object({
+  name: z.string().trim().min(1, 'Namn är obligatoriskt').max(200, 'Namn får vara max 200 tecken'),
+  address: z.string().max(500, 'Adress får vara max 500 tecken').optional().or(z.literal('')),
+  description: z.string().max(2000, 'Beskrivning får vara max 2000 tecken').optional().or(z.literal('')),
+});
 
 interface Property {
   id: string;
@@ -54,26 +61,56 @@ const Properties = () => {
   const handleCreateProperty = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const { error } = await supabase
-      .from('properties')
-      .insert([{ name, address, description, owner_id: user?.id }]);
+    try {
+      // Validate input data
+      propertySchema.parse({
+        name,
+        address: address || '',
+        description: description || '',
+      });
 
-    if (error) {
-      toast({
-        title: 'Fel vid skapande',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Fastighet skapad!',
-        description: `${name} har lagts till.`,
-      });
-      setDialogOpen(false);
-      setName('');
-      setAddress('');
-      setDescription('');
-      fetchProperties();
+      const { error } = await supabase
+        .from('properties')
+        .insert([{ 
+          name: name.trim(), 
+          address: address.trim() || null, 
+          description: description.trim() || null, 
+          owner_id: user?.id 
+        }]);
+
+      if (error) {
+        toast({
+          title: 'Fel vid skapande',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Fastighet skapad!',
+          description: `${name} har lagts till.`,
+        });
+        setDialogOpen(false);
+        setName('');
+        setAddress('');
+        setDescription('');
+        fetchProperties();
+      }
+    } catch (error: any) {
+      // Handle Zod validation errors
+      if (error instanceof z.ZodError) {
+        const firstError = error.errors[0];
+        toast({
+          title: 'Valideringsfel',
+          description: firstError.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Fel',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
     }
   };
 
