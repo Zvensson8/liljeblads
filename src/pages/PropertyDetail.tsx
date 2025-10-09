@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { FloorCanvas } from '@/components/FloorCanvas';
 import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ComponentImportDialog } from '@/components/ComponentImportDialog';
 
 interface Property {
   id: string;
@@ -317,22 +318,29 @@ const PropertyDetail = () => {
           <h2 className="text-2xl font-bold">Våningsplan</h2>
           <div className="flex gap-2">
             {floors.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportera fastighet
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => handleExportProperty('excel')}>
-                    Exportera till Excel
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportProperty('pdf')}>
-                    Exportera till PDF
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <>
+                <ComponentImportDialog
+                  propertyId={property.id}
+                  propertyName={property.name}
+                  onSuccess={fetchPropertyAndFloors}
+                />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportera fastighet
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExportProperty('excel')}>
+                      Exportera till Excel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExportProperty('pdf')}>
+                      Exportera till PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
             )}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
