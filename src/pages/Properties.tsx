@@ -16,6 +16,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -315,7 +323,7 @@ const Properties = () => {
                 </Dialog>
               </div>
 
-              {/* Properties Grid */}
+              {/* Properties Table */}
               {properties.length === 0 ? (
                 <Card className="border-dashed animate-fade-in" style={{ animationDelay: '0.2s' }}>
                   <CardContent className="flex flex-col items-center justify-center py-16">
@@ -333,33 +341,62 @@ const Properties = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                  {properties.map((property, index) => (
-                    <Card
-                      key={property.id}
-                      className="group hover:shadow-[var(--shadow-elegant)] hover:border-primary/50 transition-all duration-300 hover-scale border-border/50"
-                      style={{ animationDelay: `${0.3 + index * 0.05}s` }}
-                    >
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div 
-                            className="flex-1 min-w-0 cursor-pointer"
-                            onClick={() => navigate(`/property/${property.id}`)}
-                          >
-                            <CardTitle className="group-hover:text-primary transition-colors truncate text-lg">
+                <div className="rounded-lg border border-border bg-card animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fastighet</TableHead>
+                        <TableHead>Adress</TableHead>
+                        <TableHead>Beskrivning</TableHead>
+                        <TableHead className="text-center">Våningar</TableHead>
+                        <TableHead className="w-[70px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {properties.map((property) => (
+                        <TableRow
+                          key={property.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => navigate(`/property/${property.id}`)}
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0">
+                                <Building2 className="h-5 w-5 text-primary-foreground" />
+                              </div>
                               {property.name}
-                            </CardTitle>
-                            {property.address && (
-                              <CardDescription className="mt-1.5 line-clamp-1 flex items-center gap-1">
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {property.address ? (
+                              <div className="flex items-center gap-1 text-muted-foreground">
                                 <MapPin className="h-3 w-3" />
                                 {property.address}
-                              </CardDescription>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
                             )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
-                              <Building2 className="h-6 w-6 text-primary-foreground" />
-                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {property.description ? (
+                              <span className="text-sm text-muted-foreground line-clamp-1">
+                                {property.description}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {property.floors && property.floors.length > 0 ? (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-sm">
+                                <Layers className="h-3 w-3" />
+                                {property.floors.length}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -380,24 +417,11 @@ const Properties = () => {
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          </div>
-                        </div>
-                        {property.floors && property.floors.length > 0 && (
-                          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-                            <Layers className="h-4 w-4" />
-                            <span>{property.floors.length} våning{property.floors.length !== 1 ? 'ar' : ''}</span>
-                          </div>
-                        )}
-                      </CardHeader>
-                      {property.description && (
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {property.description}
-                          </p>
-                        </CardContent>
-                      )}
-                    </Card>
-                  ))}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
             </div>
