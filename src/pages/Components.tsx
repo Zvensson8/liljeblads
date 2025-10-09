@@ -8,10 +8,11 @@ import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download } from 'lucide-react';
+import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download, Upload } from 'lucide-react';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
 import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
 import { SelectPropertyFloorDialog } from '@/components/SelectPropertyFloorDialog';
+import { ComponentImportDialog } from '@/components/ComponentImportDialog';
 import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
@@ -235,6 +236,7 @@ const Components = () => {
                   <Badge variant="outline" className="text-base px-4 py-2">
                     {components.length} komponenter
                   </Badge>
+                  <ComponentImportDialog onSuccess={fetchComponents} />
                   {components.length > 0 && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

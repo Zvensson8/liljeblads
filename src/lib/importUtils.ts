@@ -112,6 +112,7 @@ const componentSchema = z.object({
   name: z.string().min(1, 'Beteckning krävs'),
   type: z.string().min(1, 'Komponenttyp krävs'),
   floorName: z.string().min(1, 'Våning krävs'),
+  propertyName: z.string().optional(),
   registration_number: z.string().optional(),
   installation_year: z.number().optional(),
   manufacturer: z.string().optional(),
@@ -131,23 +132,58 @@ interface ValidationResult {
   data: any;
   floorId?: string;
   floorName: string;
+  propertyName?: string;
 }
 
 export const validateAndMatchComponents = async (
   csvData: any[],
-  propertyId: string
+  propertyId: string | null
 ): Promise<ValidationResult[]> => {
-  // Fetch all floors for this property
-  const { data: floors, error: floorsError } = await supabase
-    .from('floors')
-    .select('id, name')
-    .eq('property_id', propertyId);
+  let floors: any[] = [];
+  let properties: any[] = [];
+  let floorMap: Map<string, string>;
+  let propertyMap: Map<string, string> | undefined;
 
-  if (floorsError || !floors) {
-    throw new Error('Kunde inte hämta våningar för fastigheten');
+  if (propertyId) {
+    // Single property mode - fetch floors for specific property
+    const { data: floorsData, error: floorsError } = await supabase
+      .from('floors')
+      .select('id, name')
+      .eq('property_id', propertyId);
+
+    if (floorsError || !floorsData) {
+      throw new Error('Kunde inte hämta våningar för fastigheten');
+    }
+
+    floors = floorsData;
+    floorMap = new Map(floors.map((f) => [f.name.toLowerCase(), f.id]));
+  } else {
+    // Multi-property mode - fetch all properties and floors
+    const { data: propertiesData, error: propertiesError } = await supabase
+      .from('properties')
+      .select('id, name');
+
+    if (propertiesError || !propertiesData) {
+      throw new Error('Kunde inte hämta fastigheter');
+    }
+
+    properties = propertiesData;
+    propertyMap = new Map(properties.map((p) => [p.name.toLowerCase(), p.id]));
+
+    const { data: floorsData, error: floorsError } = await supabase
+      .from('floors')
+      .select('id, name, property_id');
+
+    if (floorsError || !floorsData) {
+      throw new Error('Kunde inte hämta våningar');
+    }
+
+    floors = floorsData;
+    // Create compound key: "propertyId-floorName" -> floorId
+    floorMap = new Map(
+      floors.map((f) => [`${f.property_id}-${f.name.toLowerCase()}`, f.id])
+    );
   }
-
-  const floorMap = new Map(floors.map((f) => [f.name.toLowerCase(), f.id]));
 
   // Fetch existing components to check for duplicates
   const { data: existingComponents } = await supabase
@@ -167,6 +203,7 @@ export const validateAndMatchComponents = async (
       message: 'Redo för import',
       data: {},
       floorName: row['Våning'] || '',
+      propertyName: row['Fastighet'] || undefined,
     };
 
     try {
@@ -175,6 +212,7 @@ export const validateAndMatchComponents = async (
         name: row['Beteckning'],
         type: componentTypeMap[row['Komponenttyp']] || row['Komponenttyp'],
         floorName: row['Våning'],
+        propertyName: row['Fastighet'] || undefined,
         registration_number: row['Reg.nr'] || null,
         installation_year: row['Installationsår'] ? parseInt(row['Installationsår']) : null,
         manufacturer: row['Tillverkare'] || null,
@@ -191,14 +229,45 @@ export const validateAndMatchComponents = async (
       // Validate with Zod
       componentSchema.parse(mappedData);
 
-      // Check if floor exists
-      const floorId = floorMap.get(mappedData.floorName.toLowerCase());
-      if (!floorId) {
-        result.status = 'error';
-        result.message = `Våning "${mappedData.floorName}" finns inte`;
-        result.data = mappedData;
-        results.push(result);
-        continue;
+      let floorId: string | undefined;
+
+      if (propertyId) {
+        // Single property mode
+        floorId = floorMap.get(mappedData.floorName.toLowerCase());
+        if (!floorId) {
+          result.status = 'error';
+          result.message = `Våning "${mappedData.floorName}" finns inte`;
+          result.data = mappedData;
+          results.push(result);
+          continue;
+        }
+      } else {
+        // Multi-property mode
+        if (!mappedData.propertyName) {
+          result.status = 'error';
+          result.message = 'Fastighet saknas';
+          result.data = mappedData;
+          results.push(result);
+          continue;
+        }
+
+        const propId = propertyMap!.get(mappedData.propertyName.toLowerCase());
+        if (!propId) {
+          result.status = 'error';
+          result.message = `Fastighet "${mappedData.propertyName}" finns inte`;
+          result.data = mappedData;
+          results.push(result);
+          continue;
+        }
+
+        floorId = floorMap.get(`${propId}-${mappedData.floorName.toLowerCase()}`);
+        if (!floorId) {
+          result.status = 'error';
+          result.message = `Våning "${mappedData.floorName}" finns inte i fastigheten "${mappedData.propertyName}"`;
+          result.data = mappedData;
+          results.push(result);
+          continue;
+        }
       }
 
       // Check for duplicates

@@ -11,8 +11,8 @@ import { parseCSV, validateAndMatchComponents, importComponents } from '@/lib/im
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ComponentImportDialogProps {
-  propertyId: string;
-  propertyName: string;
+  propertyId?: string;
+  propertyName?: string;
   onSuccess: () => void;
 }
 
@@ -48,7 +48,7 @@ export const ComponentImportDialog = ({
       const parsed = await parseCSV(selectedFile);
       setParsedData(parsed);
 
-      const validated = await validateAndMatchComponents(parsed, propertyId);
+      const validated = await validateAndMatchComponents(parsed, propertyId || null);
       setValidationResults(validated);
       setStage('preview');
     } catch (error: any) {
@@ -96,45 +96,83 @@ export const ComponentImportDialog = ({
   };
 
   const handleDownloadTemplate = () => {
-    const headers = [
-      'Beteckning',
-      'Komponenttyp',
-      'Våning',
-      'Reg.nr',
-      'Installationsår',
-      'Tillverkare',
-      'Modell',
-      'Serie-ID',
-      'Placering',
-      'Status',
-      'Anteckningar',
-      'Kod',
-      'Fyllnadsmängd (kg)',
-      'Köldmedietyp',
-    ];
+    const headers = propertyId 
+      ? [
+          'Beteckning',
+          'Komponenttyp',
+          'Våning',
+          'Reg.nr',
+          'Installationsår',
+          'Tillverkare',
+          'Modell',
+          'Serie-ID',
+          'Placering',
+          'Status',
+          'Anteckningar',
+          'Kod',
+          'Fyllnadsmängd (kg)',
+          'Köldmedietyp',
+        ]
+      : [
+          'Beteckning',
+          'Komponenttyp',
+          'Fastighet',
+          'Våning',
+          'Reg.nr',
+          'Installationsår',
+          'Tillverkare',
+          'Modell',
+          'Serie-ID',
+          'Placering',
+          'Status',
+          'Anteckningar',
+          'Kod',
+          'Fyllnadsmängd (kg)',
+          'Köldmedietyp',
+        ];
 
-    const exampleRow = [
-      'VP-01-Källare',
-      'SC4.6.2.6',
-      'Källare',
-      'REG-123',
-      '2020',
-      'NIBE',
-      'F2120',
-      'SN-123456',
-      'Pannrum',
-      'active',
-      'Testkomponent',
-      'R410A',
-      '2.5',
-      'R410A',
-    ];
+    const exampleRow = propertyId
+      ? [
+          'VP-01-Källare',
+          'SC4.6.2.6',
+          'Källare',
+          'REG-123',
+          '2020',
+          'NIBE',
+          'F2120',
+          'SN-123456',
+          'Pannrum',
+          'active',
+          'Testkomponent',
+          'R410A',
+          '2.5',
+          'R410A',
+        ]
+      : [
+          'VP-01-Källare',
+          'SC4.6.2.6',
+          'Centrumhuset',
+          'Källare',
+          'REG-123',
+          '2020',
+          'NIBE',
+          'F2120',
+          'SN-123456',
+          'Pannrum',
+          'active',
+          'Testkomponent',
+          'R410A',
+          '2.5',
+          'R410A',
+        ];
 
     const csvContent = [headers.join(','), exampleRow.join(',')].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `komponent-mall-${propertyName}.csv`;
+    link.download = propertyId 
+      ? `komponent-mall-${propertyName}.csv`
+      : `komponent-mall-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
 
     toast({
@@ -183,7 +221,10 @@ export const ComponentImportDialog = ({
       </DialogTrigger>
       <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Importera komponenter från CSV</DialogTitle>
+          <DialogTitle>
+            Importera komponenter från CSV
+            {propertyName && ` - ${propertyName}`}
+          </DialogTitle>
         </DialogHeader>
 
         {stage === 'upload' && (
@@ -216,6 +257,7 @@ export const ComponentImportDialog = ({
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Beteckning</li>
                 <li>• Komponenttyp</li>
+                {!propertyId && <li>• Fastighet</li>}
                 <li>• Våning</li>
               </ul>
             </div>
@@ -246,6 +288,7 @@ export const ComponentImportDialog = ({
                     <TableHead className="w-12">Status</TableHead>
                     <TableHead>Beteckning</TableHead>
                     <TableHead>Typ</TableHead>
+                    {!propertyId && <TableHead>Fastighet</TableHead>}
                     <TableHead>Våning</TableHead>
                     <TableHead>Meddelande</TableHead>
                   </TableRow>
@@ -256,6 +299,7 @@ export const ComponentImportDialog = ({
                       <TableCell>{getStatusIcon(result.status)}</TableCell>
                       <TableCell className="font-medium">{result.data.name}</TableCell>
                       <TableCell>{result.data.type}</TableCell>
+                      {!propertyId && <TableCell>{result.propertyName}</TableCell>}
                       <TableCell>{result.floorName}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
