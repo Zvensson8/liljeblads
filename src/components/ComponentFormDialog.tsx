@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ComponentTemplate } from '@/hooks/useComponentLibrary';
 import { z } from 'zod';
 import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
+import { ComponentServicePlanSection } from './ComponentServicePlanSection';
 
 const componentSchema = z.object({
   name: z.string().trim().min(1, 'Beteckning är obligatorisk').max(200, 'Beteckning får vara max 200 tecken'),
@@ -429,8 +430,12 @@ export const ComponentFormDialog = ({
             )}
           </div>
 
-          {editingComponent && (
-            <div className="pt-4 border-t">
+          {editingComponent && propertyId && (
+            <div className="pt-4 border-t space-y-4">
+              <ComponentServicePlanSection
+                componentId={editingComponent.id}
+                propertyId={propertyId}
+              />
               <MaintenanceHistoryDialog
                 componentId={editingComponent.id}
                 componentName={editingComponent.name}

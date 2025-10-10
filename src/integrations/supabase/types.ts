@@ -218,24 +218,27 @@ export type Database = {
       }
       drift_task_components: {
         Row: {
-          component_id: string
+          component_id: string | null
           created_at: string
           id: string
           is_reported: boolean
+          object_name: string | null
           task_id: string
         }
         Insert: {
-          component_id: string
+          component_id?: string | null
           created_at?: string
           id?: string
           is_reported?: boolean
+          object_name?: string | null
           task_id: string
         }
         Update: {
-          component_id?: string
+          component_id?: string | null
           created_at?: string
           id?: string
           is_reported?: boolean
+          object_name?: string | null
           task_id?: string
         }
         Relationships: [

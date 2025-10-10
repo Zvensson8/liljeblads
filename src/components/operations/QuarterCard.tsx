@@ -36,12 +36,13 @@ interface Task {
 
 interface TaskObject {
   id: string;
-  component_id: string;
+  component_id: string | null;
+  object_name: string | null;
   is_reported: boolean;
-  component: {
+  component?: {
     name: string;
     type: string;
-  };
+  } | null;
 }
 
 interface Component {
@@ -65,9 +66,8 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
   const [taskObjects, setTaskObjects] = useState<Record<string, TaskObject[]>>({});
   const [availableComponents, setAvailableComponents] = useState<Component[]>([]);
   const [selectedComponentId, setSelectedComponentId] = useState<Record<string, string>>({});
+  const [newObjectName, setNewObjectName] = useState<Record<string, string>>({});
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<Partial<Task>>({});
   
   // Form state
   const [newTaskName, setNewTaskName] = useState("");
@@ -157,6 +157,7 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
       .select(`
         id,
         component_id,
+        object_name,
         is_reported,
         component:components (
           name,
@@ -189,6 +190,38 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
     const { error } = await supabase.from("drift_task_components").insert({
       task_id: taskId,
       component_id: componentId,
+      object_name: null,
+      is_reported: false,
+    });
+
+    if (error) {
+      toast.error("Kunde inte lägga till objekt");
+      return;
+    }
+
+    const currentObjects = taskObjects[taskId] || [];
+    await supabase
+      .from("drift_tasks")
+      .update({ planned_count: currentObjects.length + 1 })
+      .eq("id", taskId);
+
+    toast.success("Komponent tillagd");
+    setSelectedComponentId(prev => ({ ...prev, [taskId]: "" }));
+    fetchTaskObjects(taskId);
+    fetchTasks();
+  };
+
+  const handleAddObjectByName = async (taskId: string) => {
+    const objectName = newObjectName[taskId]?.trim();
+    if (!objectName) {
+      toast.error("Ange objektnamn");
+      return;
+    }
+
+    const { error } = await supabase.from("drift_task_components").insert({
+      task_id: taskId,
+      component_id: null,
+      object_name: objectName,
       is_reported: false,
     });
 
@@ -204,7 +237,7 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
       .eq("id", taskId);
 
     toast.success("Objekt tillagt");
-    setSelectedComponentId(prev => ({ ...prev, [taskId]: "" }));
+    setNewObjectName(prev => ({ ...prev, [taskId]: "" }));
     fetchTaskObjects(taskId);
     fetchTasks();
   };
@@ -246,20 +279,10 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
     fetchTasks();
   };
 
-  const handleStartEdit = (task: Task) => {
-    setEditingTaskId(task.id);
-    setEditValues({
-      name: task.name,
-      description: task.description,
-      planned_count: task.planned_count,
-      reported_count: task.reported_count,
-    });
-  };
-
-  const handleSaveEdit = async (taskId: string) => {
+  const handleUpdateField = async (taskId: string, field: keyof Task, value: any) => {
     const { error } = await supabase
       .from("drift_tasks")
-      .update(editValues)
+      .update({ [field]: value })
       .eq("id", taskId);
 
     if (error) {
@@ -267,14 +290,7 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
       return;
     }
 
-    toast.success("Uppgift uppdaterad");
-    setEditingTaskId(null);
     fetchTasks();
-  };
-
-  const handleCancelEdit = () => {
-    setEditingTaskId(null);
-    setEditValues({});
   };
 
   const handleAddTask = async (e: React.FormEvent) => {
@@ -398,111 +414,71 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
                           </Button>
                         </TableCell>
                         <TableCell>
-                          {editingTaskId === task.id ? (
-                            <Input
-                              value={editValues.name}
-                              onChange={(e) =>
-                                setEditValues({ ...editValues, name: e.target.value })
-                              }
-                              className="h-8"
-                            />
-                          ) : (
-                            <span className="font-medium">{task.name}</span>
-                          )}
+                          <Input
+                            value={task.name}
+                            onChange={(e) => {
+                              setTasks(tasks.map(t => 
+                                t.id === task.id ? { ...t, name: e.target.value } : t
+                              ));
+                            }}
+                            onBlur={(e) => handleUpdateField(task.id, "name", e.target.value)}
+                            className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
+                          />
                         </TableCell>
                         <TableCell>
-                          {editingTaskId === task.id ? (
-                            <Input
-                              value={editValues.description || ""}
-                              onChange={(e) =>
-                                setEditValues({ ...editValues, description: e.target.value })
-                              }
-                              className="h-8"
-                            />
-                          ) : (
-                            task.description || "-"
-                          )}
+                          <Input
+                            value={task.description || ""}
+                            onChange={(e) => {
+                              setTasks(tasks.map(t => 
+                                t.id === task.id ? { ...t, description: e.target.value } : t
+                              ));
+                            }}
+                            onBlur={(e) => handleUpdateField(task.id, "description", e.target.value || null)}
+                            className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
+                            placeholder="-"
+                          />
                         </TableCell>
                         <TableCell>
-                          {editingTaskId === task.id ? (
-                            <Input
-                              type="number"
-                              value={editValues.planned_count}
-                              onChange={(e) =>
-                                setEditValues({
-                                  ...editValues,
-                                  planned_count: parseInt(e.target.value) || 0,
-                                })
-                              }
-                              className="h-8 w-20"
-                            />
-                          ) : (
-                            task.planned_count
-                          )}
+                          <Input
+                            type="number"
+                            value={task.planned_count}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value) || 0;
+                              setTasks(tasks.map(t => 
+                                t.id === task.id ? { ...t, planned_count: value } : t
+                              ));
+                            }}
+                            onBlur={(e) => handleUpdateField(task.id, "planned_count", parseInt(e.target.value) || 0)}
+                            className="h-8 w-20 border-0 bg-transparent focus:bg-background focus:border-input"
+                          />
                         </TableCell>
                         <TableCell>
-                          {editingTaskId === task.id ? (
-                            <Input
-                              type="number"
-                              value={editValues.reported_count}
-                              onChange={(e) =>
-                                setEditValues({
-                                  ...editValues,
-                                  reported_count: parseInt(e.target.value) || 0,
-                                })
-                              }
-                              className="h-8 w-20"
-                            />
-                          ) : (
-                            task.reported_count
-                          )}
+                          <Input
+                            type="number"
+                            value={task.reported_count}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value) || 0;
+                              setTasks(tasks.map(t => 
+                                t.id === task.id ? { ...t, reported_count: value } : t
+                              ));
+                            }}
+                            onBlur={(e) => handleUpdateField(task.id, "reported_count", parseInt(e.target.value) || 0)}
+                            className="h-8 w-20 border-0 bg-transparent focus:bg-background focus:border-input"
+                          />
                         </TableCell>
                         <TableCell>
                           {taskObjects[task.id]?.length || 0}
                         </TableCell>
                         <TableCell>{getStatusBadge(getStatus(task))}</TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
-                            {editingTaskId === task.id ? (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleSaveEdit(task.id)}
-                                  className="h-8 px-2"
-                                >
-                                  Spara
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={handleCancelEdit}
-                                  className="h-8 px-2"
-                                >
-                                  Avbryt
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleStartEdit(task)}
-                                  className="h-8 px-2"
-                                >
-                                  Redigera
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteTask(task.id)}
-                                  className="h-8 px-2"
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteTask(task.id)}
+                            className="h-8 px-2"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                       {expandedTaskId === task.id && (
@@ -527,10 +503,16 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
                                         }
                                       />
                                       <div className="flex-1">
-                                        <p className="text-sm font-medium">{obj.component.name}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {obj.component.type}
-                                        </p>
+                                        {obj.component_id ? (
+                                          <>
+                                            <p className="text-sm font-medium">{obj.component?.name}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {obj.component?.type}
+                                            </p>
+                                          </>
+                                        ) : (
+                                          <p className="text-sm font-medium">{obj.object_name}</p>
+                                        )}
                                       </div>
                                       <Button
                                         variant="ghost"
@@ -551,46 +533,64 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
                                 </p>
                               )}
 
-                              <div className="flex gap-2 pt-2 border-t">
-                                <Input
-                                  placeholder="Nytt objektnamn..."
-                                  value={selectedComponentId[task.id] || ""}
-                                  onChange={(e) =>
-                                    setSelectedComponentId({
-                                      ...selectedComponentId,
-                                      [task.id]: e.target.value,
-                                    })
-                                  }
-                                  className="flex-1"
-                                />
-                                <Select
-                                  value={selectedComponentId[task.id] || ""}
-                                  onValueChange={(value) =>
-                                    setSelectedComponentId({
-                                      ...selectedComponentId,
-                                      [task.id]: value,
-                                    })
-                                  }
-                                >
-                                  <SelectTrigger className="w-[250px]">
-                                    <SelectValue placeholder="Välj komponent" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {availableComponents.map((comp) => (
-                                      <SelectItem key={comp.id} value={comp.id}>
-                                        {comp.name} ({comp.type})
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  onClick={() => handleAddComponent(task.id)}
-                                  size="sm"
-                                  disabled={!selectedComponentId[task.id]}
-                                >
-                                  <Plus className="h-4 w-4 mr-1" />
-                                  Lägg till
-                                </Button>
+                              <div className="space-y-2 pt-2 border-t">
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="Nytt objektnamn..."
+                                    value={newObjectName[task.id] || ""}
+                                    onChange={(e) =>
+                                      setNewObjectName({
+                                        ...newObjectName,
+                                        [task.id]: e.target.value,
+                                      })
+                                    }
+                                    className="flex-1"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && newObjectName[task.id]?.trim()) {
+                                        handleAddObjectByName(task.id);
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    onClick={() => handleAddObjectByName(task.id)}
+                                    size="sm"
+                                    disabled={!newObjectName[task.id]?.trim()}
+                                  >
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    Lägg till
+                                  </Button>
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                  <Select
+                                    value={selectedComponentId[task.id] || ""}
+                                    onValueChange={(value) =>
+                                      setSelectedComponentId({
+                                        ...selectedComponentId,
+                                        [task.id]: value,
+                                      })
+                                    }
+                                  >
+                                    <SelectTrigger className="flex-1">
+                                      <SelectValue placeholder="Eller välj från komponenter..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {availableComponents.map((comp) => (
+                                        <SelectItem key={comp.id} value={comp.id}>
+                                          {comp.name} ({comp.type})
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Button
+                                    onClick={() => handleAddComponent(task.id)}
+                                    size="sm"
+                                    disabled={!selectedComponentId[task.id]}
+                                  >
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    Lägg till
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </TableCell>
