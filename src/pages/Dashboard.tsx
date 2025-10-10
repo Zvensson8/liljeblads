@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 import { ComponentsChart } from '@/components/dashboard/ComponentsChart';
 import { OperationsProgress } from '@/components/dashboard/OperationsProgress';
+import { CostAnalysis } from '@/components/dashboard/CostAnalysis';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface DashboardStats {
   totalProperties: number;
@@ -169,81 +171,95 @@ const Dashboard = () => {
                 ))}
               </div>
 
-              {/* Analytics Section */}
-              <div className="grid gap-6 lg:grid-cols-2 animate-fade-in" style={{ animationDelay: '0.6s' }}>
-                <ComponentsChart />
-                <OperationsProgress />
-              </div>
+              {/* Tabs for Analytics and Cost */}
+              <Tabs defaultValue="overview" className="space-y-6 animate-fade-in" style={{ animationDelay: '0.6s' }}>
+                <TabsList>
+                  <TabsTrigger value="overview">Översikt</TabsTrigger>
+                  <TabsTrigger value="cost">Kostnadsanalys</TabsTrigger>
+                </TabsList>
 
-              {/* Activity Feed and Quick Actions */}
-              <div className="grid gap-6 lg:grid-cols-3 animate-fade-in" style={{ animationDelay: '0.7s' }}>
-                <div className="lg:col-span-2">
-                  <ActivityFeed />
-                </div>
-                <Card className="border-border/50">
-                  <CardHeader>
-                    <CardTitle>Snabbåtgärder</CardTitle>
-                    <CardDescription>
-                      Vanliga uppgifter
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
-                      onClick={() => navigate('/properties')}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-blue-500/10">
-                          <Building2 className="h-5 w-5 text-blue-500" />
-                        </div>
-                        <div className="text-left">
-                          <div className="font-semibold text-sm">Hantera fastigheter</div>
-                          <div className="text-xs text-muted-foreground">
-                            Lägg till eller redigera
-                          </div>
-                        </div>
-                      </div>
-                    </Button>
+                <TabsContent value="overview" className="space-y-6">
+                  {/* Analytics Section */}
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <ComponentsChart />
+                    <OperationsProgress />
+                  </div>
 
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
-                      onClick={() => navigate('/components')}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-green-500/10">
-                          <Package className="h-5 w-5 text-green-500" />
-                        </div>
-                        <div className="text-left">
-                          <div className="font-semibold text-sm">Se komponenter</div>
-                          <div className="text-xs text-muted-foreground">
-                            Översikt och hantering
+                  {/* Activity Feed and Quick Actions */}
+                  <div className="grid gap-6 lg:grid-cols-3">
+                    <div className="lg:col-span-2">
+                      <ActivityFeed />
+                    </div>
+                    <Card className="border-border/50">
+                      <CardHeader>
+                        <CardTitle>Snabbåtgärder</CardTitle>
+                        <CardDescription>
+                          Vanliga uppgifter
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
+                          onClick={() => navigate('/properties')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-blue-500/10">
+                              <Building2 className="h-5 w-5 text-blue-500" />
+                            </div>
+                            <div className="text-left">
+                              <div className="font-semibold text-sm">Hantera fastigheter</div>
+                              <div className="text-xs text-muted-foreground">
+                                Lägg till eller redigera
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </Button>
+                        </Button>
 
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
-                      onClick={() => navigate('/operations')}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-purple-500/10">
-                          <Activity className="h-5 w-5 text-purple-500" />
-                        </div>
-                        <div className="text-left">
-                          <div className="font-semibold text-sm">Driftuppgifter</div>
-                          <div className="text-xs text-muted-foreground">
-                            Hantera kvartalsuppgifter
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
+                          onClick={() => navigate('/components')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-green-500/10">
+                              <Package className="h-5 w-5 text-green-500" />
+                            </div>
+                            <div className="text-left">
+                              <div className="font-semibold text-sm">Se komponenter</div>
+                              <div className="text-xs text-muted-foreground">
+                                Översikt och hantering
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
+                          onClick={() => navigate('/operations')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-purple-500/10">
+                              <Activity className="h-5 w-5 text-purple-500" />
+                            </div>
+                            <div className="text-left">
+                              <div className="font-semibold text-sm">Driftuppgifter</div>
+                              <div className="text-xs text-muted-foreground">
+                                Hantera kvartalsuppgifter
+                              </div>
+                            </div>
+                          </div>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="cost">
+                  <CostAnalysis />
+                </TabsContent>
+              </Tabs>
             </div>
           </main>
         </SidebarInset>

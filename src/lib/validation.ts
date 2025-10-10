@@ -116,3 +116,28 @@ export const floorSchema = z.object({
   level: z.number().int().optional().nullable(),
   drawing_url: urlSchema,
 });
+
+// Cost budget validation
+export const costBudgetSchema = z.object({
+  year: yearSchema,
+  quarter: z.enum(['Q1', 'Q2', 'Q3', 'Q4', 'YEAR']),
+  budgeted_amount: positiveNumberSchema,
+  alert_threshold_75: z.boolean().default(true),
+  alert_threshold_90: z.boolean().default(true),
+  alert_threshold_100: z.boolean().default(true),
+});
+
+// Component purchase info validation
+export const componentPurchaseInfoSchema = z.object({
+  purchase_cost: positiveNumberSchema.optional().nullable(),
+  purchase_date: dateSchema.optional().nullable(),
+  warranty_years: z.number().int().nonnegative().optional().nullable(),
+  expected_lifespan_years: z.number().int().positive().optional().nullable(),
+});
+
+// Update maintenance history schema with new fields
+export const enhancedMaintenanceHistorySchema = maintenanceHistorySchema.extend({
+  category: z.enum(['acute', 'planned', 'warranty', 'preventive']).optional(),
+  is_warranty: z.boolean().default(false),
+  expected_cost: nonNegativeNumberSchema.optional().nullable(),
+});

@@ -46,6 +46,47 @@ export type Database = {
           },
         ]
       }
+      component_purchase_info: {
+        Row: {
+          component_id: string
+          created_at: string
+          expected_lifespan_years: number | null
+          id: string
+          purchase_cost: number | null
+          purchase_date: string | null
+          updated_at: string
+          warranty_years: number | null
+        }
+        Insert: {
+          component_id: string
+          created_at?: string
+          expected_lifespan_years?: number | null
+          id?: string
+          purchase_cost?: number | null
+          purchase_date?: string | null
+          updated_at?: string
+          warranty_years?: number | null
+        }
+        Update: {
+          component_id?: string
+          created_at?: string
+          expected_lifespan_years?: number | null
+          id?: string
+          purchase_cost?: number | null
+          purchase_date?: string | null
+          updated_at?: string
+          warranty_years?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "component_purchase_info_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: true
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       component_service_plans: {
         Row: {
           category_id: string
@@ -170,6 +211,96 @@ export type Database = {
             columns: ["floor_id"]
             isOneToOne: false
             referencedRelation: "floors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cost_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string
+          id: string
+          is_active: boolean
+          notification_method: string
+          threshold_value: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notification_method?: string
+          threshold_value?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notification_method?: string
+          threshold_value?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cost_budgets: {
+        Row: {
+          alert_threshold_100: boolean
+          alert_threshold_75: boolean
+          alert_threshold_90: boolean
+          budgeted_amount: number
+          component_id: string | null
+          created_at: string
+          id: string
+          property_id: string | null
+          quarter: string | null
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          alert_threshold_100?: boolean
+          alert_threshold_75?: boolean
+          alert_threshold_90?: boolean
+          budgeted_amount: number
+          component_id?: string | null
+          created_at?: string
+          id?: string
+          property_id?: string | null
+          quarter?: string | null
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          alert_threshold_100?: boolean
+          alert_threshold_75?: boolean
+          alert_threshold_90?: boolean
+          budgeted_amount?: number
+          component_id?: string | null
+          created_at?: string
+          id?: string
+          property_id?: string | null
+          quarter?: string | null
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_budgets_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cost_budgets_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]
@@ -362,10 +493,13 @@ export type Database = {
       maintenance_history: {
         Row: {
           action_type: string
+          category: string | null
           component_id: string
           cost: number | null
           created_at: string
+          expected_cost: number | null
           id: string
+          is_warranty: boolean | null
           notes: string | null
           performed_date: string
           supplier: string | null
@@ -373,10 +507,13 @@ export type Database = {
         }
         Insert: {
           action_type: string
+          category?: string | null
           component_id: string
           cost?: number | null
           created_at?: string
+          expected_cost?: number | null
           id?: string
+          is_warranty?: boolean | null
           notes?: string | null
           performed_date: string
           supplier?: string | null
@@ -384,10 +521,13 @@ export type Database = {
         }
         Update: {
           action_type?: string
+          category?: string | null
           component_id?: string
           cost?: number | null
           created_at?: string
+          expected_cost?: number | null
           id?: string
+          is_warranty?: boolean | null
           notes?: string | null
           performed_date?: string
           supplier?: string | null
@@ -436,6 +576,7 @@ export type Database = {
       properties: {
         Row: {
           address: string | null
+          area_sqm: number | null
           created_at: string
           description: string | null
           id: string
@@ -445,6 +586,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          area_sqm?: number | null
           created_at?: string
           description?: string | null
           id?: string
@@ -454,6 +596,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          area_sqm?: number | null
           created_at?: string
           description?: string | null
           id?: string
