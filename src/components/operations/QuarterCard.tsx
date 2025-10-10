@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronDown, ChevronUp, Trash2, Plus, CheckCircle2, AlertCircle, XCircle, Download } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Plus, CheckCircle2, AlertCircle, XCircle, Download, Link2, FileText, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -216,12 +216,6 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
       return;
     }
 
-    const currentObjects = taskObjects[taskId] || [];
-    await supabase
-      .from("drift_tasks")
-      .update({ planned_count: currentObjects.length + 1 })
-      .eq("id", taskId);
-
     toast.success("Komponent tillagd");
     setSelectedComponentId(prev => ({ ...prev, [taskId]: "" }));
     fetchTaskObjects(taskId);
@@ -248,12 +242,6 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
       toast.error("Kunde inte lägga till objekt");
       return;
     }
-
-    const currentObjects = taskObjects[taskId] || [];
-    await supabase
-      .from("drift_tasks")
-      .update({ planned_count: currentObjects.length + 1 })
-      .eq("id", taskId);
 
     toast.success("Objekt tillagt");
     setNewObjectName(prev => ({ ...prev, [taskId]: "" }));
@@ -297,15 +285,6 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
 
   const handleRemoveObject = async (taskId: string, objectId: string) => {
     await supabase.from("drift_task_components").delete().eq("id", objectId);
-
-    const currentObjects = taskObjects[taskId] || [];
-    await supabase
-      .from("drift_tasks")
-      .update({ 
-        planned_count: Math.max(0, currentObjects.length - 1),
-        reported_count: Math.max(0, currentObjects.filter(o => o.is_reported).length - 1)
-      })
-      .eq("id", taskId);
 
     toast.success("Objekt borttaget");
     fetchTaskObjects(taskId);
@@ -517,120 +496,202 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
                       {expandedTaskId === task.id && (
                         <TableRow>
                           <TableCell colSpan={8} className="bg-muted/30 p-4">
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-medium">
-                                Objekt ({taskObjects[task.id]?.length || 0})
-                              </h4>
-                              
-                              {taskObjects[task.id]?.length > 0 && (
+                            <div className="space-y-4">
+                              {/* Component-based objects section */}
+                              {taskObjects[task.id]?.some(obj => obj.component_id) && (
                                 <div className="space-y-2">
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead className="w-[40px]"></TableHead>
-                                        <TableHead>Namn</TableHead>
-                                        <TableHead>Serie-ID</TableHead>
-                                        <TableHead>Reg.nr</TableHead>
-                                        <TableHead className="w-[80px]"></TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {taskObjects[task.id].map((obj) => {
-                                        // If object is linked to component, use component data, otherwise use object's own data
-                                        const seriesId = obj.component_id ? (obj.component?.serial_number || "") : (obj.series_id || "");
-                                        const regNumber = obj.component_id ? (obj.component?.registration_number || "") : (obj.registration_number || "");
-                                        const isLinkedToComponent = !!obj.component_id;
-                                        
-                                        return (
-                                          <TableRow key={obj.id}>
-                                            <TableCell>
-                                              <Checkbox
-                                                checked={obj.is_reported}
-                                                onCheckedChange={(checked) =>
-                                                  handleToggleReported(task.id, obj.id, checked as boolean)
-                                                }
-                                              />
-                                            </TableCell>
-                                            <TableCell>
-                                              {obj.component_id ? (
-                                                <>
-                                                  <p className="text-sm font-medium">{obj.component?.name}</p>
-                                                  <p className="text-xs text-muted-foreground">
-                                                    {obj.component?.type}
-                                                  </p>
-                                                </>
-                                              ) : (
-                                                <p className="text-sm font-medium">{obj.object_name}</p>
-                                              )}
-                                            </TableCell>
-                                            <TableCell>
-                                              <Input
-                                                type="text"
-                                                value={seriesId}
-                                                onChange={(e) => {
-                                                  if (!isLinkedToComponent) {
-                                                    const newObjects = taskObjects[task.id].map(o =>
-                                                      o.id === obj.id ? { ...o, series_id: e.target.value } : o
-                                                    );
-                                                    setTaskObjects(prev => ({ ...prev, [task.id]: newObjects }));
-                                                  }
-                                                }}
-                                                onBlur={(e) => {
-                                                  if (!isLinkedToComponent) {
-                                                    handleUpdateObjectField(task.id, obj.id, "series_id", e.target.value);
-                                                  }
-                                                }}
-                                                className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
-                                                placeholder="Serie-ID"
-                                                disabled={isLinkedToComponent}
-                                                title={isLinkedToComponent ? "Värdet kommer från kopplad komponent" : ""}
-                                              />
-                                            </TableCell>
-                                            <TableCell>
-                                              <Input
-                                                type="text"
-                                                value={regNumber}
-                                                onChange={(e) => {
-                                                  if (!isLinkedToComponent) {
-                                                    const newObjects = taskObjects[task.id].map(o =>
-                                                      o.id === obj.id ? { ...o, registration_number: e.target.value } : o
-                                                    );
-                                                    setTaskObjects(prev => ({ ...prev, [task.id]: newObjects }));
-                                                  }
-                                                }}
-                                                onBlur={(e) => {
-                                                  if (!isLinkedToComponent) {
-                                                    handleUpdateObjectField(task.id, obj.id, "registration_number", e.target.value);
-                                                  }
-                                                }}
-                                                className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
-                                                placeholder="Reg.nr"
-                                                disabled={isLinkedToComponent}
-                                                title={isLinkedToComponent ? "Värdet kommer från kopplad komponent" : ""}
-                                              />
-                                            </TableCell>
-                                            <TableCell>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleRemoveObject(task.id, obj.id)}
-                                                className="h-8 px-2"
-                                              >
-                                                <Trash2 className="h-4 w-4" />
-                                              </Button>
-                                            </TableCell>
-                                          </TableRow>
-                                        );
-                                      })}
-                                    </TableBody>
-                                  </Table>
+                                  <div className="flex items-center gap-2">
+                                    <Link2 className="h-4 w-4 text-primary" />
+                                    <h4 className="text-sm font-semibold">
+                                      Komponentbaserade objekt ({taskObjects[task.id]?.filter(obj => obj.component_id).length || 0})
+                                    </h4>
+                                  </div>
+                                  <div className="rounded-md border">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow className="bg-muted/50">
+                                          <TableHead className="w-[40px]"></TableHead>
+                                          <TableHead>Komponent</TableHead>
+                                          <TableHead className="w-[140px]">Serie-ID</TableHead>
+                                          <TableHead className="w-[140px]">Reg.nr</TableHead>
+                                          <TableHead className="w-[120px]">Åtgärder</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {taskObjects[task.id]
+                                          ?.filter(obj => obj.component_id)
+                                          .map((obj) => {
+                                            const seriesId = obj.component?.serial_number || "";
+                                            const regNumber = obj.component?.registration_number || "";
+                                            
+                                            return (
+                                              <TableRow key={obj.id} className="hover:bg-muted/30">
+                                                <TableCell>
+                                                  <Checkbox
+                                                    checked={obj.is_reported}
+                                                    onCheckedChange={(checked) =>
+                                                      handleToggleReported(task.id, obj.id, checked as boolean)
+                                                    }
+                                                  />
+                                                </TableCell>
+                                                <TableCell>
+                                                  <div className="flex items-start gap-2">
+                                                    <Link2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                                                    <div>
+                                                      <p className="text-sm font-medium">{obj.component?.name}</p>
+                                                      <p className="text-xs text-muted-foreground">
+                                                        {obj.component?.type}
+                                                      </p>
+                                                    </div>
+                                                  </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                  <span className="text-sm text-muted-foreground">
+                                                    {seriesId || "-"}
+                                                  </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                  <span className="text-sm text-muted-foreground">
+                                                    {regNumber || "-"}
+                                                  </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                  <div className="flex gap-1">
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => {
+                                                        // Navigate to component - could open in dialog or navigate to components page
+                                                        toast.info("Visa komponent-funktion kommer snart");
+                                                      }}
+                                                      className="h-8 px-2"
+                                                      title="Visa komponent"
+                                                    >
+                                                      <ExternalLink className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => handleRemoveObject(task.id, obj.id)}
+                                                      className="h-8 px-2"
+                                                      title="Ta bort"
+                                                    >
+                                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                  </div>
+                                                </TableCell>
+                                              </TableRow>
+                                            );
+                                          })}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Standalone objects section */}
+                              {taskObjects[task.id]?.some(obj => !obj.component_id) && (
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-primary" />
+                                    <h4 className="text-sm font-semibold">
+                                      Fristående objekt ({taskObjects[task.id]?.filter(obj => !obj.component_id).length || 0})
+                                    </h4>
+                                  </div>
+                                  <div className="rounded-md border">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow className="bg-muted/50">
+                                          <TableHead className="w-[40px]"></TableHead>
+                                          <TableHead>Objektnamn</TableHead>
+                                          <TableHead className="w-[140px]">Serie-ID</TableHead>
+                                          <TableHead className="w-[140px]">Reg.nr</TableHead>
+                                          <TableHead className="w-[80px]">Åtgärder</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {taskObjects[task.id]
+                                          ?.filter(obj => !obj.component_id)
+                                          .map((obj) => {
+                                            return (
+                                              <TableRow key={obj.id} className="hover:bg-muted/30">
+                                                <TableCell>
+                                                  <Checkbox
+                                                    checked={obj.is_reported}
+                                                    onCheckedChange={(checked) =>
+                                                      handleToggleReported(task.id, obj.id, checked as boolean)
+                                                    }
+                                                  />
+                                                </TableCell>
+                                                <TableCell>
+                                                  <div className="flex items-center gap-2">
+                                                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                                    <p className="text-sm font-medium">{obj.object_name}</p>
+                                                  </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                  <Input
+                                                    type="text"
+                                                    value={obj.series_id || ""}
+                                                    onChange={(e) => {
+                                                      const newObjects = taskObjects[task.id].map(o =>
+                                                        o.id === obj.id ? { ...o, series_id: e.target.value } : o
+                                                      );
+                                                      setTaskObjects(prev => ({ ...prev, [task.id]: newObjects }));
+                                                    }}
+                                                    onBlur={(e) => {
+                                                      handleUpdateObjectField(task.id, obj.id, "series_id", e.target.value);
+                                                    }}
+                                                    className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
+                                                    placeholder="Serie-ID"
+                                                  />
+                                                </TableCell>
+                                                <TableCell>
+                                                  <Input
+                                                    type="text"
+                                                    value={obj.registration_number || ""}
+                                                    onChange={(e) => {
+                                                      const newObjects = taskObjects[task.id].map(o =>
+                                                        o.id === obj.id ? { ...o, registration_number: e.target.value } : o
+                                                      );
+                                                      setTaskObjects(prev => ({ ...prev, [task.id]: newObjects }));
+                                                    }}
+                                                    onBlur={(e) => {
+                                                      handleUpdateObjectField(task.id, obj.id, "registration_number", e.target.value);
+                                                    }}
+                                                    className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
+                                                    placeholder="Reg.nr"
+                                                  />
+                                                </TableCell>
+                                                <TableCell>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleRemoveObject(task.id, obj.id)}
+                                                    className="h-8 px-2"
+                                                    title="Ta bort"
+                                                  >
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                  </Button>
+                                                </TableCell>
+                                              </TableRow>
+                                            );
+                                          })}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
                                 </div>
                               )}
 
                               {taskObjects[task.id]?.length === 0 && (
-                                <p className="text-sm text-muted-foreground text-center py-2">
-                                  Inga objekt skapade ännu
-                                </p>
+                                <div className="text-center py-6 border rounded-md bg-muted/20">
+                                  <p className="text-sm text-muted-foreground">
+                                    Inga objekt skapade ännu
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Lägg till objekt via formuläret nedan
+                                  </p>
+                                </div>
                               )}
 
                               <div className="space-y-2 pt-2 border-t">
