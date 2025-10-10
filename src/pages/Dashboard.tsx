@@ -7,6 +7,9 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/s
 import { useAuth } from '@/hooks/useAuth';
 import { Building2, Package, AlertTriangle, TrendingUp, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
+import { ComponentsChart } from '@/components/dashboard/ComponentsChart';
+import { OperationsProgress } from '@/components/dashboard/OperationsProgress';
 
 interface DashboardStats {
   totalProperties: number;
@@ -166,52 +169,81 @@ const Dashboard = () => {
                 ))}
               </div>
 
-              {/* Quick Actions */}
-              <Card className="animate-fade-in border-border/50" style={{ animationDelay: '0.5s' }}>
-                <CardHeader>
-                  <CardTitle>Snabbåtgärder</CardTitle>
-                  <CardDescription>
-                    Vanliga uppgifter för att komma igång snabbt
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2">
-                  <Button
-                    variant="outline"
-                    className="justify-start h-auto py-4 px-6 hover:bg-primary/10 hover:border-primary transition-all"
-                    onClick={() => navigate('/properties')}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-lg bg-blue-500/10">
-                        <Building2 className="h-6 w-6 text-blue-500" />
-                      </div>
-                      <div className="text-left">
-                        <div className="font-semibold">Hantera fastigheter</div>
-                        <div className="text-sm text-muted-foreground">
-                          Lägg till eller redigera fastigheter
-                        </div>
-                      </div>
-                    </div>
-                  </Button>
+              {/* Analytics Section */}
+              <div className="grid gap-6 lg:grid-cols-2 animate-fade-in" style={{ animationDelay: '0.6s' }}>
+                <ComponentsChart />
+                <OperationsProgress />
+              </div>
 
-                  <Button
-                    variant="outline"
-                    className="justify-start h-auto py-4 px-6 hover:bg-primary/10 hover:border-primary transition-all"
-                    onClick={() => navigate('/components')}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-lg bg-green-500/10">
-                        <Package className="h-6 w-6 text-green-500" />
-                      </div>
-                      <div className="text-left">
-                        <div className="font-semibold">Se alla komponenter</div>
-                        <div className="text-sm text-muted-foreground">
-                          Översikt och hantering av komponenter
+              {/* Activity Feed and Quick Actions */}
+              <div className="grid gap-6 lg:grid-cols-3 animate-fade-in" style={{ animationDelay: '0.7s' }}>
+                <div className="lg:col-span-2">
+                  <ActivityFeed />
+                </div>
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <CardTitle>Snabbåtgärder</CardTitle>
+                    <CardDescription>
+                      Vanliga uppgifter
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
+                      onClick={() => navigate('/properties')}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-blue-500/10">
+                          <Building2 className="h-5 w-5 text-blue-500" />
+                        </div>
+                        <div className="text-left">
+                          <div className="font-semibold text-sm">Hantera fastigheter</div>
+                          <div className="text-xs text-muted-foreground">
+                            Lägg till eller redigera
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Button>
-                </CardContent>
-              </Card>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
+                      onClick={() => navigate('/components')}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-green-500/10">
+                          <Package className="h-5 w-5 text-green-500" />
+                        </div>
+                        <div className="text-left">
+                          <div className="font-semibold text-sm">Se komponenter</div>
+                          <div className="text-xs text-muted-foreground">
+                            Översikt och hantering
+                          </div>
+                        </div>
+                      </div>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
+                      onClick={() => navigate('/operations')}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-purple-500/10">
+                          <Activity className="h-5 w-5 text-purple-500" />
+                        </div>
+                        <div className="text-left">
+                          <div className="font-semibold text-sm">Driftuppgifter</div>
+                          <div className="text-xs text-muted-foreground">
+                            Hantera kvartalsuppgifter
+                          </div>
+                        </div>
+                      </div>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </main>
         </SidebarInset>
