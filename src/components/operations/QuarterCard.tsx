@@ -328,6 +328,8 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
       toast.error("Kunde inte exportera data");
     }
   };
+
+  const handleDeleteTask = async (taskId: string) => {
     if (!confirm("Är du säker på att du vill ta bort denna uppgift?")) return;
 
     const { error } = await supabase
