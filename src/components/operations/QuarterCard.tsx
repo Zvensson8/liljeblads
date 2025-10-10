@@ -73,6 +73,14 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
   const [newObjectName, setNewObjectName] = useState<Record<string, string>>({});
   const [showAddForm, setShowAddForm] = useState(false);
   
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "remaining" | "missing">("all");
+  
+  // Bulk operations state
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [bulkActionMode, setBulkActionMode] = useState(false);
+  
   // Form state
   const [newTaskName, setNewTaskName] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
@@ -353,6 +361,72 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
     fetchTasks();
   };
 
+  // Bulk operations
+  const handleToggleTaskSelection = (taskId: string) => {
+    const newSelected = new Set(selectedTaskIds);
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId);
+    } else {
+      newSelected.add(taskId);
+    }
+    setSelectedTaskIds(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedTaskIds.size === filteredTasks.length) {
+      setSelectedTaskIds(new Set());
+    } else {
+      setSelectedTaskIds(new Set(filteredTasks.map(t => t.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Är du säker på att du vill ta bort ${selectedTaskIds.size} uppgifter?`)) return;
+
+    const { error } = await supabase
+      .from("drift_tasks")
+      .delete()
+      .in("id", Array.from(selectedTaskIds));
+
+    if (error) {
+      toast.error("Kunde inte ta bort uppgifter");
+      return;
+    }
+
+    toast.success(`${selectedTaskIds.size} uppgifter borttagna`);
+    setSelectedTaskIds(new Set());
+    setBulkActionMode(false);
+    fetchTasks();
+  };
+
+  const handleBulkMarkReported = async () => {
+    const updates = Array.from(selectedTaskIds).map(taskId => {
+      const task = tasks.find(t => t.id === taskId);
+      return supabase
+        .from("drift_tasks")
+        .update({ reported_count: task?.planned_count || 0 })
+        .eq("id", taskId);
+    });
+
+    await Promise.all(updates);
+    toast.success(`${selectedTaskIds.size} uppgifter markerade som klara`);
+    setSelectedTaskIds(new Set());
+    setBulkActionMode(false);
+    fetchTasks();
+  };
+
+  // Filter tasks based on search and status
+  const filteredTasks = tasks.filter(task => {
+    const matchesSearch = 
+      task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+    
+    const status = getStatus(task);
+    const matchesStatus = statusFilter === "all" || status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <Card>
       <Collapsible open={expanded} onOpenChange={setExpanded}>
@@ -387,16 +461,79 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
 
         <CollapsibleContent>
           <CardContent className="space-y-4 p-4">
+            {/* Search and Filter */}
+            <div className="flex flex-wrap gap-3 pb-4 border-b">
+              <Input
+                placeholder="Sök uppgifter..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 min-w-[200px]"
+              />
+              <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alla status</SelectItem>
+                  <SelectItem value="completed">Klara</SelectItem>
+                  <SelectItem value="remaining">Kvar</SelectItem>
+                  <SelectItem value="missing">Saknas</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant={bulkActionMode ? "default" : "outline"}
+                onClick={() => {
+                  setBulkActionMode(!bulkActionMode);
+                  setSelectedTaskIds(new Set());
+                }}
+              >
+                {bulkActionMode ? "Avbryt val" : "Välj flera"}
+              </Button>
+            </div>
+
+            {/* Bulk Actions Bar */}
+            {bulkActionMode && selectedTaskIds.size > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-primary/10 rounded-md">
+                <span className="text-sm font-medium">
+                  {selectedTaskIds.size} valda
+                </span>
+                <div className="flex gap-2 ml-auto">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBulkMarkReported}
+                  >
+                    Markera som klara
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleBulkDelete}
+                  >
+                    Ta bort valda
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {loading ? (
               <div className="text-center py-8">Laddar uppgifter...</div>
-            ) : tasks.length === 0 ? (
+            ) : filteredTasks.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                Inga uppgifter för detta kvartal
+                {tasks.length === 0 ? "Inga uppgifter för detta kvartal" : "Inga uppgifter matchar filtret"}
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {bulkActionMode && (
+                      <TableHead className="w-[40px]">
+                        <Checkbox
+                          checked={selectedTaskIds.size === filteredTasks.length && filteredTasks.length > 0}
+                          onCheckedChange={handleSelectAll}
+                        />
+                      </TableHead>
+                    )}
                     <TableHead className="w-[30px]"></TableHead>
                     <TableHead>Uppgift</TableHead>
                     <TableHead>Beskrivning</TableHead>
@@ -408,9 +545,17 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tasks.map((task) => (
+                  {filteredTasks.map((task) => (
                     <>
                       <TableRow key={task.id} className="hover:bg-muted/50">
+                        {bulkActionMode && (
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedTaskIds.has(task.id)}
+                              onCheckedChange={() => handleToggleTaskSelection(task.id)}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -495,7 +640,7 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
                       </TableRow>
                       {expandedTaskId === task.id && (
                         <TableRow>
-                          <TableCell colSpan={8} className="bg-muted/30 p-4">
+                          <TableCell colSpan={bulkActionMode ? 9 : 8} className="bg-muted/30 p-4">
                             <div className="space-y-4">
                               {/* Component-based objects section */}
                               {taskObjects[task.id]?.some(obj => obj.component_id) && (

@@ -13,13 +13,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Wrench } from "lucide-react";
+import { Wrench, ExternalLink, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
 
 interface DriftTask {
   id: string;
   name: string;
   year: number;
   quarter: Database["public"]["Enums"]["quarter_type"];
+  planned_count: number;
+  reported_count: number;
+  objectCount?: number;
 }
 
 interface ComponentServicePlanSectionProps {
@@ -31,6 +36,7 @@ export function ComponentServicePlanSection({
   componentId,
   propertyId,
 }: ComponentServicePlanSectionProps) {
+  const navigate = useNavigate();
   const [driftTasks, setDriftTasks] = useState<DriftTask[]>([]);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,13 +52,35 @@ export function ComponentServicePlanSection({
   const fetchDriftTasks = async () => {
     const { data } = await supabase
       .from("drift_tasks")
-      .select("id, name, year, quarter")
+      .select("id, name, year, quarter, planned_count, reported_count")
       .eq("property_id", propertyId)
       .gte("year", currentYear - 1)
       .order("year", { ascending: true })
       .order("quarter", { ascending: true });
 
-    setDriftTasks(data || []);
+    if (data) {
+      // Fetch object count for each task
+      const tasksWithCounts = await Promise.all(
+        data.map(async (task) => {
+          const { count } = await supabase
+            .from("drift_task_components")
+            .select("*", { count: "exact", head: true })
+            .eq("task_id", task.id);
+          
+          return {
+            ...task,
+            objectCount: count || 0,
+          };
+        })
+      );
+      setDriftTasks(tasksWithCounts);
+    }
+  };
+
+  const getTaskStatus = (task: DriftTask) => {
+    if (task.reported_count === 0) return "missing";
+    if (task.reported_count >= task.planned_count) return "completed";
+    return "remaining";
   };
 
   const fetchExistingLinks = async () => {
@@ -70,12 +98,35 @@ export function ComponentServicePlanSection({
     setLoading(true);
 
     if (checked) {
+      // Check if component is already added
+      const { data: existing } = await supabase
+        .from("drift_task_components")
+        .select("id")
+        .eq("task_id", taskId)
+        .eq("component_id", componentId)
+        .maybeSingle();
+
+      if (existing) {
+        toast.error("Komponenten finns redan i denna driftuppgift");
+        setLoading(false);
+        return;
+      }
+
+      // Fetch component data for series_id and registration_number
+      const { data: component } = await supabase
+        .from("components")
+        .select("serial_number, registration_number")
+        .eq("id", componentId)
+        .single();
+
       // Add link
       const { error } = await supabase.from("drift_task_components").insert({
         task_id: taskId,
         component_id: componentId,
         object_name: null,
         is_reported: false,
+        series_id: component?.serial_number || null,
+        registration_number: component?.registration_number || null,
       });
 
       if (error) {
@@ -84,22 +135,9 @@ export function ComponentServicePlanSection({
         return;
       }
 
-      // Update planned count
-      const task = driftTasks.find((t) => t.id === taskId);
-      if (task) {
-        const { data: existingObjects } = await supabase
-          .from("drift_task_components")
-          .select("id")
-          .eq("task_id", taskId);
-
-        await supabase
-          .from("drift_tasks")
-          .update({ planned_count: existingObjects?.length || 0 })
-          .eq("id", taskId);
-      }
-
       setSelectedTaskIds([...selectedTaskIds, taskId]);
       toast.success("Komponent tillagd i driftuppgift");
+      fetchDriftTasks(); // Refresh to update counts
     } else {
       // Remove link
       const { error } = await supabase
@@ -114,22 +152,9 @@ export function ComponentServicePlanSection({
         return;
       }
 
-      // Update planned count
-      const task = driftTasks.find((t) => t.id === taskId);
-      if (task) {
-        const { data: remainingObjects } = await supabase
-          .from("drift_task_components")
-          .select("id")
-          .eq("task_id", taskId);
-
-        await supabase
-          .from("drift_tasks")
-          .update({ planned_count: remainingObjects?.length || 0 })
-          .eq("id", taskId);
-      }
-
       setSelectedTaskIds(selectedTaskIds.filter((id) => id !== taskId));
       toast.success("Komponent borttagen från driftuppgift");
+      fetchDriftTasks(); // Refresh to update counts
     }
 
     setLoading(false);
@@ -175,24 +200,76 @@ export function ComponentServicePlanSection({
                     {year} - {quarter}
                   </h4>
                   <div className="space-y-2 pl-2">
-                    {tasks.map((task) => (
-                      <div key={task.id} className="flex items-center gap-3 hover:bg-muted/50 p-2 rounded transition-colors">
-                        <Checkbox
-                          id={`task-${task.id}`}
-                          checked={selectedTaskIds.includes(task.id)}
-                          onCheckedChange={(checked) =>
-                            handleToggleTask(task.id, checked as boolean)
-                          }
-                          disabled={loading}
-                        />
-                        <Label htmlFor={`task-${task.id}`} className="cursor-pointer text-sm flex-1">
-                          {task.name}
-                        </Label>
-                        {selectedTaskIds.includes(task.id) && (
-                          <span className="text-xs text-green-600 font-medium">✓ Inkluderad</span>
-                        )}
-                      </div>
-                    ))}
+                    {tasks.map((task) => {
+                      const status = getTaskStatus(task);
+                      const isSelected = selectedTaskIds.includes(task.id);
+                      
+                      return (
+                        <div key={task.id} className="border rounded-md p-3 hover:bg-muted/30 transition-colors">
+                          <div className="flex items-start gap-3">
+                            <Checkbox
+                              id={`task-${task.id}`}
+                              checked={isSelected}
+                              onCheckedChange={(checked) =>
+                                handleToggleTask(task.id, checked as boolean)
+                              }
+                              disabled={loading}
+                              className="mt-1"
+                            />
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <Label htmlFor={`task-${task.id}`} className="cursor-pointer text-sm font-medium flex-1">
+                                  {task.name}
+                                </Label>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => navigate("/operations")}
+                                  className="h-7 px-2"
+                                  title="Öppna i Driftuppföljning"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <span className="font-medium">{task.objectCount || 0}</span> objekt
+                                </span>
+                                <span>•</span>
+                                <span className="flex items-center gap-1">
+                                  <span className="font-medium">{task.reported_count}/{task.planned_count}</span> redovisade
+                                </span>
+                                <span>•</span>
+                                {status === "completed" && (
+                                  <Badge variant="default" className="bg-green-600 h-5 px-1.5 text-xs">
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Klar
+                                  </Badge>
+                                )}
+                                {status === "remaining" && (
+                                  <Badge variant="default" className="bg-yellow-600 h-5 px-1.5 text-xs">
+                                    Kvar
+                                  </Badge>
+                                )}
+                                {status === "missing" && (
+                                  <Badge variant="default" className="bg-red-600 h-5 px-1.5 text-xs">
+                                    Saknas
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {isSelected && (
+                                <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium bg-green-50 rounded px-2 py-1">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Komponenten ingår i denna uppgift
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
