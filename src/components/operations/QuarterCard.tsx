@@ -39,6 +39,8 @@ interface TaskObject {
   component_id: string | null;
   object_name: string | null;
   is_reported: boolean;
+  serial_number: string | null;
+  id_number: string | null;
   component?: {
     name: string;
     type: string;
@@ -159,6 +161,8 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
         component_id,
         object_name,
         is_reported,
+        serial_number,
+        id_number,
         component:components (
           name,
           type
@@ -187,11 +191,20 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
       return;
     }
 
+    // Fetch component to get serial_number
+    const { data: component } = await supabase
+      .from("components")
+      .select("serial_number")
+      .eq("id", componentId)
+      .single();
+
     const { error } = await supabase.from("drift_task_components").insert({
       task_id: taskId,
       component_id: componentId,
       object_name: null,
       is_reported: false,
+      serial_number: component?.serial_number || null,
+      id_number: null,
     });
 
     if (error) {
@@ -223,6 +236,8 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
       component_id: null,
       object_name: objectName,
       is_reported: false,
+      serial_number: null,
+      id_number: null,
     });
 
     if (error) {
@@ -260,6 +275,20 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
 
     fetchTaskObjects(taskId);
     fetchTasks();
+  };
+
+  const handleUpdateObjectField = async (
+    taskId: string,
+    objectId: string,
+    field: "serial_number" | "id_number",
+    value: string
+  ) => {
+    await supabase
+      .from("drift_task_components")
+      .update({ [field]: value || null })
+      .eq("id", objectId);
+
+    fetchTaskObjects(taskId);
   };
 
   const handleRemoveObject = async (taskId: string, objectId: string) => {
@@ -491,39 +520,83 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
                               
                               {taskObjects[task.id]?.length > 0 && (
                                 <div className="space-y-2">
-                                  {taskObjects[task.id].map((obj) => (
-                                    <div
-                                      key={obj.id}
-                                      className="flex items-center gap-3 bg-background p-2 rounded border"
-                                    >
-                                      <Checkbox
-                                        checked={obj.is_reported}
-                                        onCheckedChange={(checked) =>
-                                          handleToggleReported(task.id, obj.id, checked as boolean)
-                                        }
-                                      />
-                                      <div className="flex-1">
-                                        {obj.component_id ? (
-                                          <>
-                                            <p className="text-sm font-medium">{obj.component?.name}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                              {obj.component?.type}
-                                            </p>
-                                          </>
-                                        ) : (
-                                          <p className="text-sm font-medium">{obj.object_name}</p>
-                                        )}
-                                      </div>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleRemoveObject(task.id, obj.id)}
-                                        className="h-8"
-                                      >
-                                        Ta bort
-                                      </Button>
-                                    </div>
-                                  ))}
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="w-[40px]"></TableHead>
+                                        <TableHead>Namn</TableHead>
+                                        <TableHead>Serienummer</TableHead>
+                                        <TableHead>ID</TableHead>
+                                        <TableHead className="w-[80px]"></TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {taskObjects[task.id].map((obj) => (
+                                        <TableRow key={obj.id}>
+                                          <TableCell>
+                                            <Checkbox
+                                              checked={obj.is_reported}
+                                              onCheckedChange={(checked) =>
+                                                handleToggleReported(task.id, obj.id, checked as boolean)
+                                              }
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            {obj.component_id ? (
+                                              <>
+                                                <p className="text-sm font-medium">{obj.component?.name}</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                  {obj.component?.type}
+                                                </p>
+                                              </>
+                                            ) : (
+                                              <p className="text-sm font-medium">{obj.object_name}</p>
+                                            )}
+                                          </TableCell>
+                                          <TableCell>
+                                            <Input
+                                              type="text"
+                                              value={obj.serial_number || ""}
+                                              onChange={(e) => {
+                                                const newObjects = taskObjects[task.id].map(o =>
+                                                  o.id === obj.id ? { ...o, serial_number: e.target.value } : o
+                                                );
+                                                setTaskObjects(prev => ({ ...prev, [task.id]: newObjects }));
+                                              }}
+                                              onBlur={(e) => handleUpdateObjectField(task.id, obj.id, "serial_number", e.target.value)}
+                                              className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
+                                              placeholder="Serienummer"
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <Input
+                                              type="text"
+                                              value={obj.id_number || ""}
+                                              onChange={(e) => {
+                                                const newObjects = taskObjects[task.id].map(o =>
+                                                  o.id === obj.id ? { ...o, id_number: e.target.value } : o
+                                                );
+                                                setTaskObjects(prev => ({ ...prev, [task.id]: newObjects }));
+                                              }}
+                                              onBlur={(e) => handleUpdateObjectField(task.id, obj.id, "id_number", e.target.value)}
+                                              className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
+                                              placeholder="ID"
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => handleRemoveObject(task.id, obj.id)}
+                                              className="h-8 px-2"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
                                 </div>
                               )}
 

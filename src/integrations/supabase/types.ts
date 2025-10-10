@@ -221,24 +221,30 @@ export type Database = {
           component_id: string | null
           created_at: string
           id: string
+          id_number: string | null
           is_reported: boolean
           object_name: string | null
+          serial_number: string | null
           task_id: string
         }
         Insert: {
           component_id?: string | null
           created_at?: string
           id?: string
+          id_number?: string | null
           is_reported?: boolean
           object_name?: string | null
+          serial_number?: string | null
           task_id: string
         }
         Update: {
           component_id?: string | null
           created_at?: string
           id?: string
+          id_number?: string | null
           is_reported?: boolean
           object_name?: string | null
+          serial_number?: string | null
           task_id?: string
         }
         Relationships: [
