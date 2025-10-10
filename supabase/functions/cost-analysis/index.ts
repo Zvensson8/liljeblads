@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
@@ -8,13 +9,31 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const componentDataSchema = z.object({
+  name: z.string().max(200),
+  type: z.string().max(50),
+  totalCost: z.number().nonnegative().optional(),
+  maintenanceCount: z.number().int().nonnegative().optional(),
+  lastMaintenanceDate: z.string().optional(),
+  maintenanceHistory: z.array(z.any()).max(100).optional(),
+  purchaseCost: z.number().nonnegative().optional(),
+  totalMaintenanceCost: z.number().nonnegative().optional(),
+  yearsInService: z.number().int().nonnegative().optional()
+});
+
+const requestSchema = z.object({
+  componentData: componentDataSchema,
+  analysisType: z.enum(['cost_prediction', 'maintenance_optimization', 'replacement_recommendation'])
+});
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { componentData, analysisType } = await req.json();
+    const body = await req.json();
+    const { componentData, analysisType } = requestSchema.parse(body);
 
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
@@ -92,9 +111,20 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in cost-analysis function:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Handle validation errors
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid input data' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: 'Unable to complete analysis' }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
