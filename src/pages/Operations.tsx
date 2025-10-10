@@ -12,12 +12,21 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Copy, Download, ClipboardList } from "lucide-react";
+import { Loader2, Copy, Download, ClipboardList, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { QuarterCard } from "@/components/operations/QuarterCard";
 import { CategoryDialog } from "@/components/operations/CategoryDialog";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { exportYearToExcel } from "@/lib/operationsExport";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Property {
   id: string;
@@ -104,8 +113,22 @@ export default function Operations() {
     }
   };
 
-  const handleExport = async () => {
-    toast.info("Exportfunktion kommer snart");
+  const handleExportYear = async () => {
+    if (!selectedProperty) return;
+
+    const property = properties.find((p) => p.id === selectedProperty);
+    if (!property) return;
+
+    try {
+      setLoading(true);
+      await exportYearToExcel(selectedProperty, property.name, selectedYear);
+      toast.success("Export slutförd");
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Kunde inte exportera data");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 2 + i);
@@ -154,14 +177,25 @@ export default function Operations() {
                     )}
                     Kopiera år
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleExport}
-                    disabled={!selectedProperty}
-                  >
-                    <Download className="h-4 w-4" />
-                    Exportera
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        disabled={!selectedProperty || loading}
+                      >
+                        <FileSpreadsheet className="h-4 w-4 mr-2" />
+                        Exportera
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Exportera till Excel</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleExportYear}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Hela året ({selectedYear})
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
@@ -207,14 +241,18 @@ export default function Operations() {
 
               {selectedProperty && (
                 <div className="grid gap-6">
-                  {(["Q1", "Q2", "Q3", "Q4"] as const).map((quarter) => (
-                    <QuarterCard
-                      key={quarter}
-                      quarter={quarter}
-                      propertyId={selectedProperty}
-                      year={selectedYear}
-                    />
-                  ))}
+                  {(["Q1", "Q2", "Q3", "Q4"] as const).map((quarter) => {
+                    const property = properties.find(p => p.id === selectedProperty);
+                    return (
+                      <QuarterCard
+                        key={quarter}
+                        quarter={quarter}
+                        propertyId={selectedProperty}
+                        propertyName={property?.name || ""}
+                        year={selectedYear}
+                      />
+                    );
+                  })}
                 </div>
               )}
 

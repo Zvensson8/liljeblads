@@ -24,6 +24,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { TaskFormDialog } from "./TaskFormDialog";
+import { StatisticsCard } from "./StatisticsCard";
+import { exportQuarterToExcel } from "@/lib/operationsExport";
 
 interface Task {
   id: string;
@@ -58,20 +61,21 @@ interface Component {
 interface QuarterCardProps {
   quarter: Database["public"]["Enums"]["quarter_type"];
   propertyId: string;
+  propertyName: string;
   year: number;
 }
 
-export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
+export function QuarterCard({ quarter, propertyId, propertyName, year }: QuarterCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState({ completed: 0, remaining: 0, missing: 0 });
+  const [stats, setStats] = useState({ completed: 0, remaining: 0, missing: 0, totalPlanned: 0, totalReported: 0, totalTasks: 0 });
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [taskObjects, setTaskObjects] = useState<Record<string, TaskObject[]>>({});
   const [availableComponents, setAvailableComponents] = useState<Component[]>([]);
   const [selectedComponentId, setSelectedComponentId] = useState<Record<string, string>>({});
   const [newObjectName, setNewObjectName] = useState<Record<string, string>>({});
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -80,11 +84,6 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
   // Bulk operations state
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [bulkActionMode, setBulkActionMode] = useState(false);
-  
-  // Form state
-  const [newTaskName, setNewTaskName] = useState("");
-  const [newTaskDescription, setNewTaskDescription] = useState("");
-  const [newTaskPlanned, setNewTaskPlanned] = useState<number>(0);
 
   useEffect(() => {
     if (propertyId) {
@@ -122,7 +121,10 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
       (t) => t.reported_count > 0 && t.reported_count < t.planned_count
     ).length;
     const missing = taskList.filter((t) => t.reported_count === 0).length;
-    setStats({ completed, remaining, missing });
+    const totalPlanned = taskList.reduce((sum, t) => sum + t.planned_count, 0);
+    const totalReported = taskList.reduce((sum, t) => sum + t.reported_count, 0);
+    
+    setStats({ completed, remaining, missing, totalPlanned, totalReported, totalTasks: taskList.length });
   };
 
   const getStatus = (task: Task) => {
@@ -314,37 +316,18 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
   };
 
   const handleAddTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!newTaskName.trim()) {
-      toast.error("Uppgiftsnamn krävs");
-      return;
-    }
-
-    const { error } = await supabase.from("drift_tasks").insert({
-      property_id: propertyId,
-      year,
-      quarter,
-      name: newTaskName.trim(),
-      description: newTaskDescription.trim() || null,
-      planned_count: newTaskPlanned,
-      reported_count: 0,
-    });
-
-    if (error) {
-      toast.error("Kunde inte skapa uppgift");
-      return;
-    }
-
-    toast.success("Uppgift skapad");
-    setNewTaskName("");
-    setNewTaskDescription("");
-    setNewTaskPlanned(0);
-    setShowAddForm(false);
-    fetchTasks();
+    // This function is no longer used - replaced by TaskFormDialog
   };
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleExportQuarter = async () => {
+    try {
+      await exportQuarterToExcel(propertyId, propertyName, year, quarter);
+      toast.success("Export slutförd");
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Kunde inte exportera data");
+    }
+  };
     if (!confirm("Är du säker på att du vill ta bort denna uppgift?")) return;
 
     const { error } = await supabase
@@ -450,8 +433,13 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">{tasks.length} klara</span>
-              <Button variant="ghost" size="sm">
+              <span className="text-sm text-muted-foreground">{tasks.length} uppgifter</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleExportQuarter}
+                title="Exportera kvartal"
+              >
                 <Download className="h-4 w-4" />
               </Button>
               {expanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
@@ -461,6 +449,9 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
 
         <CollapsibleContent>
           <CardContent className="space-y-4 p-4">
+            {/* Statistics Card */}
+            <StatisticsCard stats={stats} quarter={quarter} />
+
             {/* Search and Filter */}
             <div className="flex flex-wrap gap-3 pb-4 border-b">
               <Input
@@ -910,65 +901,20 @@ export function QuarterCard({ quarter, propertyId, year }: QuarterCardProps) {
 
             {/* Add new task */}
             <div className="border-t pt-4 mt-4">
-              {!showAddForm ? (
-                <Button onClick={() => setShowAddForm(true)} variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Lägg till ny uppgift
-                </Button>
-              ) : (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium">Lägg till ny uppgift</h3>
-                  <form onSubmit={handleAddTask} className="space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <Input
-                        placeholder="Uppgift *"
-                        value={newTaskName}
-                        onChange={(e) => setNewTaskName(e.target.value)}
-                        required
-                      />
-                      <Input
-                        placeholder="Beskrivning"
-                        value={newTaskDescription}
-                        onChange={(e) => setNewTaskDescription(e.target.value)}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Input
-                        type="number"
-                        placeholder="Antal enheter"
-                        value={newTaskPlanned || ""}
-                        onChange={(e) => setNewTaskPlanned(parseInt(e.target.value) || 0)}
-                        min="0"
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Redan redovisade"
-                        value={0}
-                        disabled
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button type="submit" size="sm">
-                        Skapa uppgift
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setNewTaskName("");
-                          setNewTaskDescription("");
-                          setNewTaskPlanned(0);
-                          setShowAddForm(false);
-                        }}
-                      >
-                        Avbryt
-                      </Button>
-                    </div>
-                  </form>
-                </div>
-              )}
+              <Button onClick={() => setTaskDialogOpen(true)} variant="outline" size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Lägg till ny uppgift
+              </Button>
             </div>
+
+            <TaskFormDialog
+              open={taskDialogOpen}
+              onOpenChange={setTaskDialogOpen}
+              propertyId={propertyId}
+              year={year}
+              quarter={quarter}
+              onSuccess={fetchTasks}
+            />
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
