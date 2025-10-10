@@ -9,6 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -17,8 +26,27 @@ import {
   Package,
   Calendar,
   PieChart,
-  ArrowRight
+  ArrowRight,
+  BarChart3,
+  Filter
 } from "lucide-react";
+import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
+import { 
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Area,
+  AreaChart
+} from "recharts";
 import { 
   getTopCostComponents, 
   getCostTrend, 
@@ -26,6 +54,9 @@ import {
   getFlagEmoji 
 } from "@/lib/costUtils";
 import { CostBudgetDialog } from "@/components/cost/CostBudgetDialog";
+import { supabase } from "@/integrations/supabase/client";
+
+type TimeRangePreset = '3' | '6' | '12' | '24' | 'custom';
 
 export default function CostOverview() {
   const navigate = useNavigate();
@@ -33,12 +64,26 @@ export default function CostOverview() {
   const [loading, setLoading] = useState(true);
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   
-  const [totalCost12Months, setTotalCost12Months] = useState(0);
+  // Time filter state
+  const [timeRange, setTimeRange] = useState<TimeRangePreset>('12');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subMonths(new Date(), 12),
+    to: new Date()
+  });
+  
+  // Data state
+  const [totalCost, setTotalCost] = useState(0);
   const [avgMonthlyCost, setAvgMonthlyCost] = useState(0);
   const [costChange, setCostChange] = useState(0);
   const [criticalComponents, setCriticalComponents] = useState(0);
   const [topComponents, setTopComponents] = useState<any[]>([]);
   const [topSuppliers, setTopSuppliers] = useState<any[]>([]);
+  const [costTrendData, setCostTrendData] = useState<any[]>([]);
+  const [monthlyDistribution, setMonthlyDistribution] = useState<any[]>([]);
+  
+  // Budget tracking state
+  const [budgets, setBudgets] = useState<any[]>([]);
+  const [budgetProgress, setBudgetProgress] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -46,44 +91,110 @@ export default function CostOverview() {
     } else if (user) {
       fetchOverviewData();
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, dateRange]);
+
+  useEffect(() => {
+    if (timeRange !== 'custom') {
+      const months = parseInt(timeRange);
+      setDateRange({
+        from: subMonths(new Date(), months),
+        to: new Date()
+      });
+    }
+  }, [timeRange]);
 
   const fetchOverviewData = async () => {
+    if (!dateRange?.from || !dateRange?.to) return;
+    
     setLoading(true);
     try {
-      const [components, trend, suppliers] = await Promise.all([
-        getTopCostComponents(5, 12),
-        getCostTrend(12),
-        getSupplierAnalysis()
+      const monthsDiff = Math.round(
+        (dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24 * 30)
+      );
+
+      const [components, trend, suppliers, budgetData] = await Promise.all([
+        getTopCostComponents(5, monthsDiff || 12),
+        getCostTrend(monthsDiff || 12),
+        getSupplierAnalysis(),
+        fetchBudgets()
       ]);
 
       // Calculate totals
-      const total12 = trend.reduce((sum, t) => sum + t.cost, 0);
-      const avgMonthly = trend.length > 0 ? total12 / trend.length : 0;
+      const total = trend.reduce((sum, t) => sum + t.cost, 0);
+      const avgMonthly = trend.length > 0 ? total / trend.length : 0;
 
-      // Calculate cost change (last 6 months vs previous 6 months)
-      const lastSixMonths = trend.slice(-6).reduce((sum, t) => sum + t.cost, 0);
-      const prevSixMonths = trend.slice(0, 6).reduce((sum, t) => sum + t.cost, 0);
-      const change = prevSixMonths > 0 
-        ? ((lastSixMonths - prevSixMonths) / prevSixMonths) * 100 
-        : 0;
+      // Calculate cost change
+      const halfPoint = Math.floor(trend.length / 2);
+      const firstHalf = trend.slice(0, halfPoint).reduce((sum, t) => sum + t.cost, 0);
+      const secondHalf = trend.slice(halfPoint).reduce((sum, t) => sum + t.cost, 0);
+      const change = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf) * 100 : 0;
 
       const critical = components.filter(c => 
         c.flag_type === 'red' || c.flag_type === 'black'
       ).length;
 
-      setTotalCost12Months(total12);
+      // Process trend data for charts
+      const trendWithFormatted = trend.map(t => ({
+        ...t,
+        monthLabel: formatMonthLabel(t.month)
+      }));
+
+      // Group by month for distribution
+      const monthlyDist = trend.map(t => ({
+        month: formatMonthLabel(t.month),
+        cost: t.cost
+      }));
+
+      setTotalCost(total);
       setAvgMonthlyCost(avgMonthly);
       setCostChange(change);
       setCriticalComponents(critical);
       setTopComponents(components);
       setTopSuppliers(suppliers.slice(0, 3));
+      setCostTrendData(trendWithFormatted);
+      setMonthlyDistribution(monthlyDist);
+      setBudgets(budgetData);
+
+      // Calculate budget progress
+      if (budgetData.length > 0) {
+        const yearlyBudget = budgetData.find(b => b.quarter === 'YEAR');
+        if (yearlyBudget) {
+          const progress = (total / yearlyBudget.budgeted_amount) * 100;
+          setBudgetProgress(progress);
+        }
+      }
 
     } catch (error) {
       console.error('Error fetching overview data:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchBudgets = async () => {
+    const currentYear = new Date().getFullYear();
+    const { data, error } = await supabase
+      .from('cost_budgets')
+      .select('*')
+      .eq('year', currentYear)
+      .is('property_id', null)
+      .is('component_id', null);
+
+    if (error) {
+      console.error('Error fetching budgets:', error);
+      return [];
+    }
+    return data || [];
+  };
+
+  const formatMonthLabel = (monthStr: string) => {
+    const [year, month] = monthStr.split('-');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
+    return `${monthNames[parseInt(month) - 1]} ${year.slice(2)}`;
+  };
+
+  const handleTimeRangeChange = (value: TimeRangePreset) => {
+    setTimeRange(value);
   };
 
   if (authLoading || loading) {
@@ -145,6 +256,250 @@ export default function CostOverview() {
                 </Alert>
               )}
 
+              {/* Time Filter Section */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Tidsperiod</CardTitle>
+                      <CardDescription>Välj period för kostnadsanalys</CardDescription>
+                    </div>
+                    <Filter className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </CardHeader>
+                <CardContent className="flex gap-4">
+                  <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Välj period" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">Senaste 3 månaderna</SelectItem>
+                      <SelectItem value="6">Senaste 6 månaderna</SelectItem>
+                      <SelectItem value="12">Senaste 12 månaderna</SelectItem>
+                      <SelectItem value="24">Senaste 24 månaderna</SelectItem>
+                      <SelectItem value="custom">Anpassat datum</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {timeRange === 'custom' && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "justify-start text-left font-normal",
+                            !dateRange && "text-muted-foreground"
+                          )}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {dateRange?.from ? (
+                            dateRange.to ? (
+                              <>
+                                {format(dateRange.from, "PPP")} -{" "}
+                                {format(dateRange.to, "PPP")}
+                              </>
+                            ) : (
+                              format(dateRange.from, "PPP")
+                            )
+                          ) : (
+                            <span>Välj datumintervall</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          initialFocus
+                          mode="range"
+                          defaultMonth={dateRange?.from}
+                          selected={dateRange}
+                          onSelect={setDateRange}
+                          numberOfMonths={2}
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Budget Tracking */}
+              {budgets.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Budgetuppföljning</CardTitle>
+                    <CardDescription>Aktuell budget vs faktiska kostnader</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {budgets.map((budget) => {
+                      const budgetForPeriod = budget.budgeted_amount;
+                      const progress = (totalCost / budgetForPeriod) * 100;
+                      const remaining = budgetForPeriod - totalCost;
+                      const isOverBudget = progress > 100;
+                      const isNearLimit = progress > 75 && progress <= 100;
+
+                      return (
+                        <div key={budget.id} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">
+                                {budget.quarter === 'YEAR' ? 'Årsbudget' : `Kvartal ${budget.quarter}`} {budget.year}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {Math.round(totalCost).toLocaleString('sv-SE')} kr av {Math.round(budgetForPeriod).toLocaleString('sv-SE')} kr
+                              </p>
+                            </div>
+                            <Badge variant={isOverBudget ? "destructive" : isNearLimit ? "secondary" : "default"}>
+                              {progress.toFixed(1)}%
+                            </Badge>
+                          </div>
+                          
+                          <Progress 
+                            value={Math.min(progress, 100)} 
+                            className={cn(
+                              "h-3",
+                              isOverBudget && "[&>div]:bg-destructive",
+                              isNearLimit && "[&>div]:bg-yellow-500"
+                            )}
+                          />
+                          
+                          <div className="flex items-center justify-between text-sm">
+                            {!isOverBudget ? (
+                              <span className="text-muted-foreground">
+                                Återstår: {Math.round(remaining).toLocaleString('sv-SE')} kr
+                              </span>
+                            ) : (
+                              <span className="text-destructive">
+                                Överskriden med: {Math.round(Math.abs(remaining)).toLocaleString('sv-SE')} kr
+                              </span>
+                            )}
+                          </div>
+
+                          {isNearLimit && !isOverBudget && (
+                            <Alert>
+                              <AlertTriangle className="h-4 w-4" />
+                              <AlertDescription>
+                                Du har använt {progress.toFixed(0)}% av budgeten
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Visual Charts Section */}
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Cost Trend Line Chart */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Kostnadstrend</CardTitle>
+                        <CardDescription>Utveckling över tid</CardDescription>
+                      </div>
+                      <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {costTrendData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <AreaChart data={costTrendData}>
+                          <defs>
+                            <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                          <XAxis 
+                            dataKey="monthLabel" 
+                            tick={{ fontSize: 12 }}
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                          />
+                          <YAxis 
+                            tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                            tick={{ fontSize: 12 }}
+                          />
+                          <Tooltip 
+                            formatter={(value: number) => [`${Math.round(value).toLocaleString('sv-SE')} kr`, 'Kostnad']}
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--background))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '6px'
+                            }}
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="cost" 
+                            stroke="hsl(var(--primary))" 
+                            strokeWidth={2}
+                            fill="url(#colorCost)"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                        Ingen data tillgänglig
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Monthly Distribution Bar Chart */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Månatlig fördelning</CardTitle>
+                        <CardDescription>Kostnad per månad</CardDescription>
+                      </div>
+                      <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {monthlyDistribution.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={monthlyDistribution}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                          <XAxis 
+                            dataKey="month" 
+                            tick={{ fontSize: 12 }}
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                          />
+                          <YAxis 
+                            tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                            tick={{ fontSize: 12 }}
+                          />
+                          <Tooltip 
+                            formatter={(value: number) => [`${Math.round(value).toLocaleString('sv-SE')} kr`, 'Kostnad']}
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--background))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '6px'
+                            }}
+                          />
+                          <Bar 
+                            dataKey="cost" 
+                            fill="hsl(var(--primary))"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                        Ingen data tillgänglig
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
               {/* Main KPI Cards */}
               <div className="grid gap-4 md:grid-cols-4">
                 <Card>
@@ -154,7 +509,7 @@ export default function CostOverview() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold">
-                      {Math.round(totalCost12Months).toLocaleString('sv-SE')} kr
+                      {Math.round(totalCost).toLocaleString('sv-SE')} kr
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Alla underhållskostnader
@@ -291,8 +646,8 @@ export default function CostOverview() {
                     {topSuppliers.length > 0 ? (
                       <div className="space-y-6">
                         {topSuppliers.map((supplier, index) => {
-                          const percentage = totalCost12Months > 0 
-                            ? (supplier.total_cost / totalCost12Months) * 100 
+                          const percentage = totalCost > 0 
+                            ? (supplier.total_cost / totalCost) * 100 
                             : 0;
                           
                           return (
