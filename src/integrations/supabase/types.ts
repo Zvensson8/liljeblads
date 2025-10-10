@@ -46,6 +46,51 @@ export type Database = {
           },
         ]
       }
+      component_service_plans: {
+        Row: {
+          category_id: string
+          component_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          quarters: string[]
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          component_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          quarters?: string[]
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          component_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          quarters?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "component_service_plans_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "drift_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "component_service_plans_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       components: {
         Row: {
           aff_code: string | null
@@ -125,6 +170,144 @@ export type Database = {
             columns: ["floor_id"]
             isOneToOne: false
             referencedRelation: "floors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drift_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          parent_id: string | null
+          property_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          parent_id?: string | null
+          property_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          parent_id?: string | null
+          property_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drift_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "drift_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drift_categories_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drift_task_components: {
+        Row: {
+          component_id: string
+          created_at: string
+          id: string
+          is_reported: boolean
+          task_id: string
+        }
+        Insert: {
+          component_id: string
+          created_at?: string
+          id?: string
+          is_reported?: boolean
+          task_id: string
+        }
+        Update: {
+          component_id?: string
+          created_at?: string
+          id?: string
+          is_reported?: boolean
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drift_task_components_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drift_task_components_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "drift_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drift_tasks: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          planned_count: number
+          property_id: string
+          quarter: Database["public"]["Enums"]["quarter_type"]
+          reported_count: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          planned_count?: number
+          property_id: string
+          quarter: Database["public"]["Enums"]["quarter_type"]
+          reported_count?: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          planned_count?: number
+          property_id?: string
+          quarter?: Database["public"]["Enums"]["quarter_type"]
+          reported_count?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drift_tasks_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "drift_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drift_tasks_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]
@@ -334,6 +517,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_task_status: {
+        Args: { planned: number; reported: number }
+        Returns: Database["public"]["Enums"]["task_status"]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -371,6 +558,8 @@ export type Database = {
         | "SC5.5"
         | "SC7.1"
         | "SC7.2"
+      quarter_type: "Q1" | "Q2" | "Q3" | "Q4"
+      task_status: "completed" | "remaining" | "missing"
       user_role: "admin" | "user" | "reader"
     }
     CompositeTypes: {
@@ -529,6 +718,8 @@ export const Constants = {
         "SC7.1",
         "SC7.2",
       ],
+      quarter_type: ["Q1", "Q2", "Q3", "Q4"],
+      task_status: ["completed", "remaining", "missing"],
       user_role: ["admin", "user", "reader"],
     },
   },
