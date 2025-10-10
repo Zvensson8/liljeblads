@@ -1,4 +1,4 @@
-import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList } from "lucide-react";
+import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -20,6 +20,7 @@ const navigationItems = [
   { title: "Fastigheter", url: "/properties", icon: Building2 },
   { title: "Komponenter", url: "/components", icon: Settings },
   { title: "Driftuppföljning", url: "/operations", icon: ClipboardList },
+  { title: "Kostnader", url: "/cost-overview", icon: DollarSign },
   { title: "Användare", url: "/users", icon: Users },
 ];
 
