@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
+import { useNavigate } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -11,11 +12,12 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Copy, Download, Plus } from "lucide-react";
+import { Loader2, Copy, Download, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { QuarterCard } from "@/components/operations/QuarterCard";
-import { TaskDialog } from "@/components/operations/TaskDialog";
 import { CategoryDialog } from "@/components/operations/CategoryDialog";
+import { AppSidebar } from "@/components/AppSidebar";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 
 interface Property {
   id: string;
@@ -23,20 +25,21 @@ interface Property {
 }
 
 export default function Operations() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [properties, setProperties] = useState<Property[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>("");
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
-  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  const [selectedQuarter, setSelectedQuarter] = useState<Database["public"]["Enums"]["quarter_type"] | null>(null);
 
   useEffect(() => {
-    if (user) {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    } else if (user) {
       fetchProperties();
     }
-  }, [user]);
+  }, [user, authLoading, navigate]);
 
   const fetchProperties = async () => {
     const { data, error } = await supabase
@@ -105,128 +108,125 @@ export default function Operations() {
     toast.info("Exportfunktion kommer snart");
   };
 
-  const handleAddTask = (quarter: Database["public"]["Enums"]["quarter_type"]) => {
-    setSelectedQuarter(quarter);
-    setTaskDialogOpen(true);
-  };
-
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 2 + i);
 
-  if (!user) {
+  if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p>Vänligen logga in för att se driftuppföljning</p>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <h1 className="text-3xl font-bold">Driftuppföljning</h1>
-          
-          <div className="flex flex-wrap gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setCategoryDialogOpen(true)}
-              disabled={!selectedProperty}
-            >
-              Hantera kategorier
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleCopyYear}
-              disabled={loading || !selectedProperty}
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Copy className="h-4 w-4" />
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background">
+        <AppSidebar />
+        <SidebarInset className="flex-1">
+          <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+            <SidebarTrigger />
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-primary" />
+              <h1 className="text-xl font-semibold">Driftuppföljning</h1>
+            </div>
+          </header>
+
+          <main className="flex-1 p-6">
+            <div className="max-w-7xl mx-auto space-y-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCategoryDialogOpen(true)}
+                    disabled={!selectedProperty}
+                  >
+                    Hantera kategorier
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleCopyYear}
+                    disabled={loading || !selectedProperty}
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                    Kopiera år
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleExport}
+                    disabled={!selectedProperty}
+                  >
+                    <Download className="h-4 w-4" />
+                    Exportera
+                  </Button>
+                </div>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Välj fastighet och år</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-4">
+                  <div className="flex-1 min-w-[200px]">
+                    <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Välj fastighet" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {properties.map((property) => (
+                          <SelectItem key={property.id} value={property.id}>
+                            {property.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex-1 min-w-[200px]">
+                    <Select
+                      value={selectedYear.toString()}
+                      onValueChange={(value) => setSelectedYear(parseInt(value))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {years.map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {selectedProperty && (
+                <div className="grid gap-6">
+                  {(["Q1", "Q2", "Q3", "Q4"] as const).map((quarter) => (
+                    <QuarterCard
+                      key={quarter}
+                      quarter={quarter}
+                      propertyId={selectedProperty}
+                      year={selectedYear}
+                    />
+                  ))}
+                </div>
               )}
-              Kopiera år
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleExport}
-              disabled={!selectedProperty}
-            >
-              <Download className="h-4 w-4" />
-              Exportera
-            </Button>
-          </div>
-        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Välj fastighet och år</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[200px]">
-              <Select value={selectedProperty} onValueChange={setSelectedProperty}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Välj fastighet" />
-                </SelectTrigger>
-                <SelectContent>
-                  {properties.map((property) => (
-                    <SelectItem key={property.id} value={property.id}>
-                      {property.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex-1 min-w-[200px]">
-              <Select
-                value={selectedYear.toString()}
-                onValueChange={(value) => setSelectedYear(parseInt(value))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {selectedProperty && (
-          <div className="grid gap-6">
-            {(["Q1", "Q2", "Q3", "Q4"] as const).map((quarter) => (
-              <QuarterCard
-                key={quarter}
-                quarter={quarter}
+              <CategoryDialog
+                open={categoryDialogOpen}
+                onOpenChange={setCategoryDialogOpen}
                 propertyId={selectedProperty}
-                year={selectedYear}
-                onAddTask={() => handleAddTask(quarter)}
               />
-            ))}
-          </div>
-        )}
-
-        {selectedQuarter && (
-          <TaskDialog
-            open={taskDialogOpen}
-            onOpenChange={setTaskDialogOpen}
-            propertyId={selectedProperty}
-            year={selectedYear}
-            quarter={selectedQuarter}
-          />
-        )}
-
-        <CategoryDialog
-          open={categoryDialogOpen}
-          onOpenChange={setCategoryDialogOpen}
-          propertyId={selectedProperty}
-        />
+            </div>
+          </main>
+        </SidebarInset>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }
