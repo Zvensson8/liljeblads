@@ -269,19 +269,6 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       saveHistory();
     });
 
-    // Enable text editing on double-click
-    canvas.on('mouse:dblclick', (e) => {
-      const target = e.target;
-      if (target && target.type === 'text') {
-        const textObj = target as any;
-        if (textObj.editable) {
-          canvas.setActiveObject(textObj);
-          textObj.enterEditing();
-          textObj.selectAll();
-        }
-      }
-    });
-
     return () => {
       canvas.dispose();
     };
