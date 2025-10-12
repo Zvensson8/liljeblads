@@ -269,6 +269,19 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       saveHistory();
     });
 
+    // Enable text editing on double-click
+    canvas.on('mouse:dblclick', (e) => {
+      const target = e.target;
+      if (target && target.type === 'text') {
+        const textObj = target as any;
+        if (textObj.editable) {
+          canvas.setActiveObject(textObj);
+          textObj.enterEditing();
+          textObj.selectAll();
+        }
+      }
+    });
+
     return () => {
       canvas.dispose();
     };
@@ -466,12 +479,38 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       fabricCanvas.add(line);
       fabricCanvas.setActiveObject(line);
       saveHistory();
+    } else if (tool === 'rectangle' && fabricCanvas) {
+      const rect = new Rect({
+        left: 100,
+        top: 100,
+        fill: 'rgba(59, 130, 246, 0.3)',
+        stroke: '#3b82f6',
+        strokeWidth: 2,
+        width: 150,
+        height: 100,
+      });
+      fabricCanvas.add(rect);
+      fabricCanvas.setActiveObject(rect);
+      saveHistory();
+    } else if (tool === 'circle' && fabricCanvas) {
+      const circle = new Circle({
+        left: 100,
+        top: 100,
+        fill: 'rgba(59, 130, 246, 0.3)',
+        stroke: '#3b82f6',
+        strokeWidth: 2,
+        radius: 50,
+      });
+      fabricCanvas.add(circle);
+      fabricCanvas.setActiveObject(circle);
+      saveHistory();
     } else if (tool === 'text' && fabricCanvas) {
       const text = new FabricText('Dubbelklicka för att redigera', {
         left: 100,
         top: 100,
         fontSize: 20,
         fill: '#333',
+        editable: true,
       });
       fabricCanvas.add(text);
       fabricCanvas.setActiveObject(text);
