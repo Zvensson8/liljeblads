@@ -23,27 +23,28 @@ export function PropertyEconomy({ propertyId }: PropertyEconomyProps) {
 
   const fetchEconomyData = async () => {
     try {
-      const compQuery = await supabase
+      // Fetch components
+      const result: any = await (supabase as any)
         .from("components")
         .select("id, type")
         .eq("property_id", propertyId);
       
-      const componentsData = compQuery.data;
-      const compError = compQuery.error;
+      const { data: componentsData, error: compError } = result;
 
       if (compError || !componentsData || componentsData.length === 0) {
         setLoading(false);
         return;
       }
 
-      const componentIds = componentsData.map((c: any) => c.id);
+      const componentIds = componentsData.map(c => c.id);
 
       // Fetch maintenance history
+      const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
       const { data: maintenanceData } = await supabase
         .from("maintenance_history")
         .select("performed_date, cost, component_id")
         .in("component_id", componentIds)
-        .gte("performed_date", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
+        .gte("performed_date", oneYearAgo)
         .order("performed_date", { ascending: true });
 
       if (!maintenanceData) {

@@ -41,21 +41,23 @@ export function PropertyMaintenancePlan({ propertyId }: PropertyMaintenancePlanP
 
   const fetchMaintenancePlan = async () => {
     try {
-      const compQuery = await supabase
+      // Fetch components with maintenance dates
+      const result: any = await (supabase as any)
         .from("components")
         .select("id, name, type, next_service_date, installation_year")
-        .eq("property_id", propertyId)
-        .not("next_service_date", "is", null);
+        .eq("property_id", propertyId);
       
-      const componentsData = compQuery.data;
-      const compError = compQuery.error;
+      const { data: allComponents, error: compError } = result;
+      
+      // Filter out components without next_service_date
+      const componentsData = allComponents?.filter(c => c.next_service_date != null) || [];
 
       if (compError || !componentsData) {
         setLoading(false);
         return;
       }
 
-      const maintenanceEvents: MaintenanceEvent[] = componentsData.map((comp: any) => ({
+      const maintenanceEvents: MaintenanceEvent[] = componentsData.map(comp => ({
         id: comp.id,
         component_name: comp.name || "Namnlös komponent",
         component_type: comp.type || "Okänd typ",
