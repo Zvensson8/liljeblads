@@ -21,6 +21,8 @@ import { PropertyNotes } from '@/components/property/PropertyNotes';
 import { PropertyTodos } from '@/components/property/PropertyTodos';
 import { PropertyContacts } from '@/components/property/PropertyContacts';
 import { PropertyDocuments } from '@/components/property/PropertyDocuments';
+import { PropertyEconomy } from '@/components/property/PropertyEconomy';
+import { PropertyMaintenancePlan } from '@/components/property/PropertyMaintenancePlan';
 import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { Badge } from '@/components/ui/badge';
 
@@ -492,11 +494,13 @@ const PropertyDetail = () => {
 
         {/* Tabs for different sections */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
+          <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="overview">Översikt</TabsTrigger>
             <TabsTrigger value="components">Komponenter</TabsTrigger>
             <TabsTrigger value="drawings">Ritningar</TabsTrigger>
             <TabsTrigger value="workorders">Arbetsordrar</TabsTrigger>
+            <TabsTrigger value="economy">Ekonomi</TabsTrigger>
+            <TabsTrigger value="maintenance">Underhållsplan</TabsTrigger>
             <TabsTrigger value="notes">Anteckningar</TabsTrigger>
             <TabsTrigger value="todo">Att-göra</TabsTrigger>
             <TabsTrigger value="invoicing">Fakturering</TabsTrigger>
@@ -764,6 +768,16 @@ const PropertyDetail = () => {
                 </div>
               )}
             </div>
+          </TabsContent>
+
+          {/* Economy Tab */}
+          <TabsContent value="economy">
+            <PropertyEconomy propertyId={property.id} />
+          </TabsContent>
+
+          {/* Maintenance Plan Tab */}
+          <TabsContent value="maintenance">
+            <PropertyMaintenancePlan propertyId={property.id} />
           </TabsContent>
 
           {/* Work Orders Tab */}

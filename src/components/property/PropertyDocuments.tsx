@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Upload, FileText, Trash2, Download } from "lucide-react";
+import { Upload, FileText, Trash2, Download, CloudUpload } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface PropertyDocumentsProps {
   propertyId: string;
@@ -18,6 +19,8 @@ interface PropertyDocumentsProps {
 export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
   const { session } = useAuth();
   const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: documents, refetch } = useQuery({
     queryKey: ["property-documents", propertyId],
@@ -33,9 +36,8 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
     },
   });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !session?.user) return;
+  const uploadFile = async (file: File) => {
+    if (!session?.user) return;
 
     setUploading(true);
     try {
@@ -70,7 +72,35 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
       toast.error("Kunde inte ladda upp dokument: " + error.message);
     } finally {
       setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadFile(file);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      await uploadFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
   };
 
   const handleDeleteDocument = async (docId: string, fileUrl: string) => {
@@ -98,23 +128,58 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
   };
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Label htmlFor="doc-upload" className="cursor-pointer">
-          <Button disabled={uploading} asChild>
-            <span>
-              <Upload className="h-4 w-4 mr-2" />
-              {uploading ? "Laddar upp..." : "Ladda upp Dokument"}
-            </span>
+    <div className="space-y-4 animate-fade-in">
+      {/* Drag & Drop Zone */}
+      <div
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        className={cn(
+          "border-2 border-dashed rounded-lg p-8 transition-all duration-200",
+          isDragging 
+            ? "border-primary bg-primary/5 scale-[1.02]" 
+            : "border-border hover:border-primary/50 hover:bg-accent/50",
+          uploading && "opacity-50 pointer-events-none"
+        )}
+      >
+        <div className="flex flex-col items-center justify-center gap-4 text-center">
+          <div className={cn(
+            "p-4 rounded-full transition-colors",
+            isDragging ? "bg-primary/20" : "bg-muted"
+          )}>
+            <CloudUpload className={cn(
+              "h-8 w-8",
+              isDragging ? "text-primary" : "text-muted-foreground"
+            )} />
+          </div>
+          
+          <div>
+            <p className="text-lg font-semibold mb-1">
+              {isDragging ? "Släpp filen här" : "Dra & släpp fil här"}
+            </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              eller klicka för att välja fil
+            </p>
+          </div>
+
+          <Button 
+            disabled={uploading} 
+            onClick={() => fileInputRef.current?.click()}
+            variant={isDragging ? "default" : "outline"}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {uploading ? "Laddar upp..." : "Välj fil"}
           </Button>
-        </Label>
-        <Input
-          id="doc-upload"
-          type="file"
-          className="hidden"
-          onChange={handleFileUpload}
-          disabled={uploading}
-        />
+          
+          <Input
+            ref={fileInputRef}
+            id="doc-upload"
+            type="file"
+            className="hidden"
+            onChange={handleFileUpload}
+            disabled={uploading}
+          />
+        </div>
       </div>
 
       <div className="space-y-2">

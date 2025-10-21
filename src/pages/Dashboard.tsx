@@ -11,6 +11,7 @@ import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 import { ComponentsChart } from '@/components/dashboard/ComponentsChart';
 import { OperationsProgress } from '@/components/dashboard/OperationsProgress';
 import { CostAnalysis } from '@/components/dashboard/CostAnalysis';
+import { WorkOrdersChart } from '@/components/dashboard/WorkOrdersChart';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface DashboardStats {
@@ -182,6 +183,10 @@ const Dashboard = () => {
                   {/* Analytics Section */}
                   <div className="grid gap-6 lg:grid-cols-2">
                     <ComponentsChart />
+                    <WorkOrdersChart />
+                  </div>
+
+                  <div className="grid gap-6 lg:grid-cols-2">
                     <OperationsProgress />
                   </div>
 
