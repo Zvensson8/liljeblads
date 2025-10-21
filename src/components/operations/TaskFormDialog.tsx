@@ -25,6 +25,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { TaskTemplateSelector } from "./TaskTemplateSelector";
+import { useState } from "react";
 
 const taskFormSchema = z.object({
   name: z
@@ -63,6 +65,8 @@ export function TaskFormDialog({
   quarter,
   onSuccess,
 }: TaskFormDialogProps) {
+  const [templateLibraryOpen, setTemplateLibraryOpen] = useState(false);
+  
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
@@ -106,6 +110,16 @@ export function TaskFormDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <TaskTemplateSelector
+              propertyId={propertyId}
+              onSelectTemplate={(template) => {
+                form.setValue("name", template.name);
+                form.setValue("description", template.description || "");
+                form.setValue("planned_count", template.planned_count);
+              }}
+              onOpenLibrary={() => setTemplateLibraryOpen(true)}
+            />
+            
             <FormField
               control={form.control}
               name="name"

@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import { QuarterCard } from "@/components/operations/QuarterCard";
 import { CategoryDialog } from "@/components/operations/CategoryDialog";
 import { AppSidebar } from "@/components/AppSidebar";
+import { TaskTemplateLibrary } from "@/components/operations/TaskTemplateLibrary";
+import { ReportGenerator } from "@/components/operations/ReportGenerator";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { exportYearToExcel } from "@/lib/operationsExport";
 import {
@@ -41,6 +43,8 @@ export default function Operations() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [templateLibraryOpen, setTemplateLibraryOpen] = useState(false);
+  const [reportGeneratorOpen, setReportGeneratorOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {

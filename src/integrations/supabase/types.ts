@@ -349,30 +349,36 @@ export type Database = {
       }
       drift_task_components: {
         Row: {
+          auto_detected_from: string | null
           component_id: string | null
           created_at: string
           id: string
           is_reported: boolean
+          manually_edited: boolean | null
           object_name: string | null
           registration_number: string | null
           series_id: string | null
           task_id: string
         }
         Insert: {
+          auto_detected_from?: string | null
           component_id?: string | null
           created_at?: string
           id?: string
           is_reported?: boolean
+          manually_edited?: boolean | null
           object_name?: string | null
           registration_number?: string | null
           series_id?: string | null
           task_id: string
         }
         Update: {
+          auto_detected_from?: string | null
           component_id?: string | null
           created_at?: string
           id?: string
           is_reported?: boolean
+          manually_edited?: boolean | null
           object_name?: string | null
           registration_number?: string | null
           series_id?: string | null
@@ -391,6 +397,53 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "drift_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drift_task_templates: {
+        Row: {
+          category_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          planned_count: number | null
+          quarters: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          planned_count?: number | null
+          quarters?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          planned_count?: number | null
+          quarters?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drift_task_templates_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "drift_categories"
             referencedColumns: ["id"]
           },
         ]

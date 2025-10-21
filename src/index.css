@@ -103,6 +103,41 @@ All colors MUST be HSL.
       transform: scale(1);
     }
   }
+  
+  @keyframes progress-spin {
+    from {
+      stroke-dashoffset: 251.2;
+    }
+    to {
+      stroke-dashoffset: var(--progress-offset);
+    }
+  }
+  
+  @keyframes confetti-pop {
+    0% {
+      transform: scale(0) rotate(0deg);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.2) rotate(180deg);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1) rotate(360deg);
+      opacity: 0;
+    }
+  }
+  
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+  }
+  
+  @keyframes pulse-success {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+  }
 }
 
 @layer base {
@@ -150,5 +185,37 @@ All colors MUST be HSL.
   
   .glass-effect {
     @apply bg-background/80 backdrop-blur-sm border border-border/50;
+  }
+  
+  /* Gradient backgrounds for completion rates */
+  .gradient-success {
+    background: linear-gradient(135deg, rgb(34 197 94 / 0.1) 0%, rgb(34 197 94 / 0.2) 100%);
+    border-left: 4px solid rgb(34 197 94);
+  }
+
+  .gradient-warning {
+    background: linear-gradient(135deg, rgb(234 179 8 / 0.1) 0%, rgb(234 179 8 / 0.2) 100%);
+    border-left: 4px solid rgb(234 179 8);
+  }
+
+  .gradient-danger {
+    background: linear-gradient(135deg, rgb(239 68 68 / 0.1) 0%, rgb(239 68 68 / 0.2) 100%);
+    border-left: 4px solid rgb(239 68 68);
+  }
+  
+  .progress-circle {
+    animation: progress-spin 1s ease-out forwards;
+  }
+  
+  .confetti {
+    animation: confetti-pop 0.6s ease-out;
+  }
+  
+  .shake {
+    animation: shake 0.3s ease-in-out;
+  }
+  
+  .pulse-success {
+    animation: pulse-success 0.5s ease-in-out;
   }
 }
