@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, Compass, Sparkles, MapPin, Layers, Trash2, MoreVertical, Search, Filter } from 'lucide-react';
+import { Building2, Plus, Compass, Sparkles, MapPin, Layers, Trash2, MoreVertical, Search, Filter, Wrench, FileText, StickyNote } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PropertyFilterChips } from '@/components/PropertyFilterChips';
 import {
@@ -562,18 +562,46 @@ const Properties = () => {
                             <span className="text-foreground">{property.area_sqm} m²</span>
                           </div>
                         )}
-                        <div className="pt-3 mt-3 border-t border-border/50 flex justify-between items-center">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/property/${property.id}`);
-                            }}
-                          >
-                            ✏️ Redigera
-                          </Button>
+                        <div className="pt-3 mt-3 border-t border-border/50">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 gap-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Create work order - navigate to work orders with property pre-selected
+                                navigate('/work-orders', { state: { propertyId: property.id } });
+                              }}
+                            >
+                              <Wrench className="h-3.5 w-3.5" />
+                              Arbetsorder
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 gap-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/property/${property.id}?tab=drawings`);
+                              }}
+                            >
+                              <Layers className="h-3.5 w-3.5" />
+                              Ritningar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 gap-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/property/${property.id}?tab=notes`);
+                              }}
+                            >
+                              <StickyNote className="h-3.5 w-3.5" />
+                              Anteckn.
+                            </Button>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>

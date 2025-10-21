@@ -14,6 +14,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "./ui/button";
+import { NotificationBell } from "./NotificationBell";
+import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
 
 const navigationItems = [
   { title: "Dashboard", url: "/", icon: Home },
@@ -34,14 +36,22 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent>
         {/* Logo and brand */}
-        <div className={`flex items-center gap-3 p-4 border-b border-border ${isCollapsed ? 'justify-center' : ''}`}>
-          <div className="bg-gradient-to-br from-primary to-primary/70 p-2 rounded-lg">
-            <Compass className="h-6 w-6 text-primary-foreground" />
+        <div className={`flex items-center justify-between p-4 border-b border-border ${isCollapsed ? 'flex-col gap-2' : ''}`}>
+          <div className={`flex items-center gap-3 ${isCollapsed ? 'flex-col' : ''}`}>
+            <div className="bg-gradient-to-br from-primary to-primary/70 p-2 rounded-lg">
+              <Compass className="h-6 w-6 text-primary-foreground" />
+            </div>
+            {!isCollapsed && (
+              <div>
+                <h2 className="font-bold text-lg">NavRitning</h2>
+                <p className="text-xs text-muted-foreground">Ritningshantering</p>
+              </div>
+            )}
           </div>
           {!isCollapsed && (
-            <div>
-              <h2 className="font-bold text-lg">NavRitning</h2>
-              <p className="text-xs text-muted-foreground">Ritningshantering</p>
+            <div className="flex items-center gap-1">
+              <NotificationBell />
+              <KeyboardShortcutsDialog />
             </div>
           )}
         </div>

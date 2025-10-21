@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Upload, Trash2, Download, MapPin, Building2, Settings, Wrench, TrendingUp, FileText, CheckSquare, Users, File, Edit, Phone, Mail } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Trash2, Download, MapPin, Building2, Settings, Wrench, TrendingUp, FileText, CheckSquare, Users, File, Edit, Phone, Mail, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { FloorCanvas } from '@/components/FloorCanvas';
 import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
@@ -22,6 +22,7 @@ import { PropertyTodos } from '@/components/property/PropertyTodos';
 import { PropertyContacts } from '@/components/property/PropertyContacts';
 import { PropertyDocuments } from '@/components/property/PropertyDocuments';
 import { ActivityTimeline } from '@/components/ActivityTimeline';
+import { Badge } from '@/components/ui/badge';
 
 interface Property {
   id: string;
@@ -46,6 +47,7 @@ interface Floor {
 const PropertyDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { user } = useAuth();
   const [property, setProperty] = useState<Property | null>(null);
@@ -61,6 +63,9 @@ const PropertyDetail = () => {
   const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [workOrderDialogOpen, setWorkOrderDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
+  const [overdueTodos, setOverdueTodos] = useState(0);
+  const [urgentWorkOrders, setUrgentWorkOrders] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -124,6 +129,20 @@ const PropertyDetail = () => {
       .neq('status', 'archived');
     
     setWorkOrders(workOrdersData || []);
+
+    // Count urgent work orders
+    const urgent = (workOrdersData || []).filter((wo: any) => wo.priority === 'high').length;
+    setUrgentWorkOrders(urgent);
+
+    // Count overdue todos
+    const { data: todosData } = await supabase
+      .from('property_todos')
+      .select('*')
+      .eq('property_id', id)
+      .eq('completed', false)
+      .lt('due_date', new Date().toISOString());
+    
+    setOverdueTodos((todosData || []).length);
 
     setLoading(false);
   };
@@ -343,11 +362,32 @@ const PropertyDetail = () => {
                 Tillbaka
               </Button>
               <div className="h-8 w-px bg-border" />
-              <div>
-                <h1 className="text-2xl font-bold">{property.name}</h1>
-                <p className="text-sm text-muted-foreground">
-                  {property.property_number ? `#${property.property_number}` : `#${property.id.substring(0, 5).toUpperCase()}`}
-                </p>
+              <div className="flex items-center gap-3">
+                <div>
+                  <h1 className="text-2xl font-bold">{property.name}</h1>
+                  <p className="text-sm text-muted-foreground">
+                    {property.property_number ? `#${property.property_number}` : `#${property.id.substring(0, 5).toUpperCase()}`}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {urgentWorkOrders > 0 && (
+                    <Badge variant="destructive" className="gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {urgentWorkOrders} brådskande
+                    </Badge>
+                  )}
+                  {overdueTodos > 0 && (
+                    <Badge variant="outline" className="gap-1 border-orange-500 text-orange-500">
+                      <AlertCircle className="h-3 w-3" />
+                      {overdueTodos} överfälliga
+                    </Badge>
+                  )}
+                  {urgentWorkOrders === 0 && overdueTodos === 0 && (
+                    <Badge variant="outline" className="gap-1 border-green-500 text-green-500">
+                      ✓ Allt OK
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
             <Button className="gap-2" onClick={() => setEditDialogOpen(true)}>
@@ -451,7 +491,7 @@ const PropertyDetail = () => {
         </div>
 
         {/* Tabs for different sections */}
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
             <TabsTrigger value="overview">Översikt</TabsTrigger>
             <TabsTrigger value="components">Komponenter</TabsTrigger>
