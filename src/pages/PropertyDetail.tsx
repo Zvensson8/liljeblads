@@ -15,12 +15,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ComponentImportDialog } from '@/components/ComponentImportDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { PropertyEditDialog } from '@/components/PropertyEditDialog';
+import { WorkOrderDialog } from '@/components/WorkOrderDialog';
 
 interface Property {
   id: string;
   name: string;
   address: string | null;
   description: string | null;
+  area_sqm: number | null;
 }
 
 interface Floor {
@@ -46,6 +49,8 @@ const PropertyDetail = () => {
   const [components, setComponents] = useState<any[]>([]);
   const [todoText, setTodoText] = useState('');
   const [workOrders, setWorkOrders] = useState<any[]>([]);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [workOrderDialogOpen, setWorkOrderDialogOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -333,7 +338,7 @@ const PropertyDetail = () => {
                 <p className="text-sm text-muted-foreground">#{property.id.substring(0, 5).toUpperCase()}</p>
               </div>
             </div>
-            <Button className="gap-2">
+            <Button className="gap-2" onClick={() => setEditDialogOpen(true)}>
               <Edit className="h-4 w-4" />
               Redigera Fastighet
             </Button>
@@ -368,7 +373,7 @@ const PropertyDetail = () => {
                 </div>
                 <div>
                   <span className="text-muted-foreground">LOA: </span>
-                  <span className="text-foreground">- m²</span>
+                  <span className="text-foreground">{property.area_sqm ? `${property.area_sqm} m²` : '- m²'}</span>
                 </div>
               </CardContent>
             </Card>
@@ -722,16 +727,73 @@ const PropertyDetail = () => {
           <TabsContent value="workorders">
             <Card>
               <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Wrench className="h-5 w-5 text-primary" />
-                  <CardTitle>Arbetsordrar (0)</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="h-5 w-5 text-primary" />
+                    <CardTitle>Arbetsordrar ({workOrders.length})</CardTitle>
+                  </div>
+                  <Button onClick={() => setWorkOrderDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ny Arbetsorder
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground mb-4">Inga arbetsordrar registrerade</p>
-                  <p className="text-sm text-muted-foreground">Denna funktion kräver backend-implementation</p>
-                </div>
+                {workOrders.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">Inga arbetsordrar registrerade</p>
+                    <Button onClick={() => setWorkOrderDialogOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Skapa Första Arbetsordern
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b text-sm text-muted-foreground">
+                          <th className="text-left py-3 px-2 font-medium">Åtgärd</th>
+                          <th className="text-left py-3 px-2 font-medium">Status</th>
+                          <th className="text-left py-3 px-2 font-medium">Prioritet</th>
+                          <th className="text-left py-3 px-2 font-medium">Entreprenör</th>
+                          <th className="text-left py-3 px-2 font-medium">Pris</th>
+                          <th className="text-left py-3 px-2 font-medium">Datum</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {workOrders.map((order) => (
+                          <tr key={order.id} className="border-b hover:bg-muted/50">
+                            <td className="py-3 px-2 font-medium">{order.action}</td>
+                            <td className="py-3 px-2">
+                              <span className="inline-flex items-center rounded-md border px-2 py-1 text-xs">
+                                {order.status === 'not_started' && 'Ej påbörjad'}
+                                {order.status === 'awaiting_quote' && 'Inväntar offert'}
+                                {order.status === 'ordered' && 'Beställt'}
+                                {order.status === 'completed' && 'Slutförd'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-2">
+                              <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs ${
+                                order.priority === 'high' ? 'bg-red-500/10 text-red-500' :
+                                order.priority === 'medium' ? 'bg-yellow-500/10 text-yellow-500' :
+                                'bg-green-500/10 text-green-500'
+                              }`}>
+                                {order.priority === 'high' && 'Hög'}
+                                {order.priority === 'medium' && 'Medel'}
+                                {order.priority === 'low' && 'Låg'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-2">{order.contractor || '-'}</td>
+                            <td className="py-3 px-2">
+                              {order.price ? `${Number(order.price).toLocaleString('sv-SE')} kr` : '-'}
+                            </td>
+                            <td className="py-3 px-2">{order.due_date || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -879,6 +941,27 @@ const PropertyDetail = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Dialogs */}
+      <PropertyEditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        property={property}
+        onSuccess={() => {
+          fetchPropertyAndFloors();
+          setEditDialogOpen(false);
+        }}
+      />
+
+      <WorkOrderDialog
+        open={workOrderDialogOpen}
+        onOpenChange={setWorkOrderDialogOpen}
+        propertyId={id}
+        onSuccess={() => {
+          fetchPropertyAndFloors();
+          setWorkOrderDialogOpen(false);
+        }}
+      />
     </div>
   );
 };
