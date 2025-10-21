@@ -16,14 +16,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -263,9 +255,9 @@ const Properties = () => {
               {/* Page Header */}
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 animate-fade-in" style={{ animationDelay: '0.1s' }}>
                 <div className="space-y-1">
-                  <h2 className="text-3xl font-bold tracking-tight">Mina fastigheter</h2>
+                  <h2 className="text-3xl font-bold tracking-tight">{properties.length} fastigheter</h2>
                   <p className="text-muted-foreground">
-                    Hantera och organisera alla dina fastigheter och ritningar
+                    Hantera dina tilldelade fastigheter
                   </p>
                 </div>
                 
@@ -273,7 +265,7 @@ const Properties = () => {
                   <DialogTrigger asChild>
                     <Button size="lg" className="gap-2">
                       <Plus className="h-5 w-5" />
-                      Ny fastighet
+                      Ny Fastighet
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[500px]">
@@ -323,7 +315,7 @@ const Properties = () => {
                 </Dialog>
               </div>
 
-              {/* Properties Table */}
+              {/* Properties Grid */}
               {properties.length === 0 ? (
                 <Card className="border-dashed animate-fade-in" style={{ animationDelay: '0.2s' }}>
                   <CardContent className="flex flex-col items-center justify-center py-16">
@@ -341,87 +333,88 @@ const Properties = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="rounded-lg border border-border bg-card animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fastighet</TableHead>
-                        <TableHead>Adress</TableHead>
-                        <TableHead>Beskrivning</TableHead>
-                        <TableHead className="text-center">Våningar</TableHead>
-                        <TableHead className="w-[70px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {properties.map((property) => (
-                        <TableRow
-                          key={property.id}
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => navigate(`/property/${property.id}`)}
-                        >
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0">
-                                <Building2 className="h-5 w-5 text-primary-foreground" />
-                              </div>
-                              {property.name}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {property.address ? (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <MapPin className="h-3 w-3" />
-                                {property.address}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {property.description ? (
-                              <span className="text-sm text-muted-foreground line-clamp-1">
-                                {property.description}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {property.floors && property.floors.length > 0 ? (
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-sm">
-                                <Layers className="h-3 w-3" />
-                                {property.floors.length}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">0</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPropertyToDelete(property);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Ta bort
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                  {properties.map((property, index) => (
+                    <Card 
+                      key={property.id} 
+                      className="group hover:shadow-[var(--shadow-elegant)] transition-all duration-300 cursor-pointer border-border/50 bg-card hover-scale"
+                      style={{ animationDelay: `${0.05 * index}s` }}
+                      onClick={() => navigate(`/property/${property.id}`)}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="p-2 rounded-lg bg-primary/10">
+                            <Building2 className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/property/${property.id}`);
+                              }}
+                            >
+                              <span className="sr-only">Redigera</span>
+                              ✏️
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPropertyToDelete(property);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <CardTitle className="text-xl group-hover:text-primary transition-colors">
+                          {property.name}
+                        </CardTitle>
+                        <CardDescription className="text-primary/80 font-mono text-sm">
+                          #{property.id.substring(0, 5).toUpperCase()}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {property.address && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                            <span className="text-muted-foreground">{property.address}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">📅</span>
+                          <span className="text-muted-foreground">Byggår: -</span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Typ: </span>
+                          <span className="text-foreground">-</span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">LOA: </span>
+                          <span className="text-foreground">- m²</span>
+                        </div>
+                        <div className="pt-3 mt-3 border-t border-border/50 flex justify-between items-center">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/property/${property.id}`);
+                            }}
+                          >
+                            ✏️ Redigera
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               )}
             </div>
