@@ -664,6 +664,59 @@ export type Database = {
         }
         Relationships: []
       }
+      work_orders: {
+        Row: {
+          action: string
+          comments: string | null
+          contractor: string | null
+          created_at: string
+          due_date: string | null
+          id: string
+          price: number | null
+          priority: Database["public"]["Enums"]["work_order_priority"]
+          property_id: string
+          quarter: string | null
+          status: Database["public"]["Enums"]["work_order_status"]
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          comments?: string | null
+          contractor?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          price?: number | null
+          priority?: Database["public"]["Enums"]["work_order_priority"]
+          property_id: string
+          quarter?: string | null
+          status?: Database["public"]["Enums"]["work_order_status"]
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          comments?: string | null
+          contractor?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          price?: number | null
+          priority?: Database["public"]["Enums"]["work_order_priority"]
+          property_id?: string
+          quarter?: string | null
+          status?: Database["public"]["Enums"]["work_order_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_orders_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -713,6 +766,13 @@ export type Database = {
       quarter_type: "Q1" | "Q2" | "Q3" | "Q4"
       task_status: "completed" | "remaining" | "missing"
       user_role: "admin" | "user" | "reader"
+      work_order_priority: "low" | "medium" | "high"
+      work_order_status:
+        | "not_started"
+        | "awaiting_quote"
+        | "ordered"
+        | "completed"
+        | "archived"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -873,6 +933,14 @@ export const Constants = {
       quarter_type: ["Q1", "Q2", "Q3", "Q4"],
       task_status: ["completed", "remaining", "missing"],
       user_role: ["admin", "user", "reader"],
+      work_order_priority: ["low", "medium", "high"],
+      work_order_status: [
+        "not_started",
+        "awaiting_quote",
+        "ordered",
+        "completed",
+        "archived",
+      ],
     },
   },
 } as const

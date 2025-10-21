@@ -45,6 +45,7 @@ const PropertyDetail = () => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [components, setComponents] = useState<any[]>([]);
   const [todoText, setTodoText] = useState('');
+  const [workOrders, setWorkOrders] = useState<any[]>([]);
 
   useEffect(() => {
     if (id) {
@@ -99,6 +100,15 @@ const PropertyDetail = () => {
       .eq('floors.property_id', id);
     
     setComponents(componentsData || []);
+
+    // Fetch work orders for this property
+    const { data: workOrdersData } = await supabase
+      .from('work_orders')
+      .select('*')
+      .eq('property_id', id)
+      .neq('status', 'archived');
+    
+    setWorkOrders(workOrdersData || []);
 
     setLoading(false);
   };
@@ -386,7 +396,7 @@ const PropertyDetail = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold mb-1">0</div>
+                <div className="text-4xl font-bold mb-1">{workOrders.length}</div>
                 <p className="text-sm text-muted-foreground">Aktiva arbetsordrar</p>
               </CardContent>
             </Card>

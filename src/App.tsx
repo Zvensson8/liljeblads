@@ -12,6 +12,7 @@ import Components from "./pages/Components";
 import Users from "./pages/Users";
 import Operations from "./pages/Operations";
 import CostOverview from "./pages/CostOverview";
+import WorkOrders from "./pages/WorkOrders";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/properties" element={<Properties />} />
             <Route path="/property/:id" element={<PropertyDetail />} />
             <Route path="/components" element={<Components />} />
+            <Route path="/work-orders" element={<WorkOrders />} />
             <Route path="/operations" element={<Operations />} />
             <Route path="/cost-overview" element={<CostOverview />} />
             <Route path="/users" element={<Users />} />
