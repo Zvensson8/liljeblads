@@ -577,31 +577,46 @@ export type Database = {
         Row: {
           address: string | null
           area_sqm: number | null
+          construction_year: number | null
           created_at: string
           description: string | null
           id: string
+          invoice_address: string | null
+          loa: string | null
           name: string
           owner_id: string
+          property_number: string | null
+          property_type: string | null
           updated_at: string
         }
         Insert: {
           address?: string | null
           area_sqm?: number | null
+          construction_year?: number | null
           created_at?: string
           description?: string | null
           id?: string
+          invoice_address?: string | null
+          loa?: string | null
           name: string
           owner_id: string
+          property_number?: string | null
+          property_type?: string | null
           updated_at?: string
         }
         Update: {
           address?: string | null
           area_sqm?: number | null
+          construction_year?: number | null
           created_at?: string
           description?: string | null
           id?: string
+          invoice_address?: string | null
+          loa?: string | null
           name?: string
           owner_id?: string
+          property_number?: string | null
+          property_type?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -610,6 +625,155 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_contacts: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          property_id: string
+          role: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          property_id: string
+          role?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          property_id?: string
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_contacts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_documents: {
+        Row: {
+          created_at: string
+          file_size: number | null
+          file_url: string
+          id: string
+          mime_type: string | null
+          name: string
+          property_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          name: string
+          property_id: string
+        }
+        Update: {
+          created_at?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          name?: string
+          property_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_documents_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_notes: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          property_id: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          property_id: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          property_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_notes_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_todos: {
+        Row: {
+          completed: boolean
+          created_at: string
+          due_date: string | null
+          id: string
+          property_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          property_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          property_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_todos_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]
@@ -663,6 +827,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      work_order_files: {
+        Row: {
+          created_at: string
+          file_size: number | null
+          file_url: string
+          id: string
+          mime_type: string | null
+          name: string
+          work_order_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          name: string
+          work_order_id: string
+        }
+        Update: {
+          created_at?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          name?: string
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_files_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       work_orders: {
         Row: {

@@ -24,8 +24,13 @@ import { useEffect } from "react";
 
 const propertySchema = z.object({
   name: z.string().min(1, "Namn krävs").max(200, "Max 200 tecken"),
+  property_number: z.string().max(50, "Max 50 tecken").optional(),
   address: z.string().max(300, "Max 300 tecken").optional(),
   area_sqm: z.string().optional(),
+  construction_year: z.string().optional(),
+  property_type: z.string().max(100, "Max 100 tecken").optional(),
+  loa: z.string().max(100, "Max 100 tecken").optional(),
+  invoice_address: z.string().max(500, "Max 500 tecken").optional(),
   description: z.string().max(1000, "Max 1000 tecken").optional(),
 });
 
@@ -48,8 +53,13 @@ export function PropertyEditDialog({
     resolver: zodResolver(propertySchema),
     defaultValues: {
       name: "",
+      property_number: "",
       address: "",
       area_sqm: "",
+      construction_year: "",
+      property_type: "",
+      loa: "",
+      invoice_address: "",
       description: "",
     },
   });
@@ -58,8 +68,13 @@ export function PropertyEditDialog({
     if (property) {
       form.reset({
         name: property.name || "",
+        property_number: property.property_number || "",
         address: property.address || "",
         area_sqm: property.area_sqm?.toString() || "",
+        construction_year: property.construction_year?.toString() || "",
+        property_type: property.property_type || "",
+        loa: property.loa || "",
+        invoice_address: property.invoice_address || "",
         description: property.description || "",
       });
     }
@@ -68,8 +83,13 @@ export function PropertyEditDialog({
   const onSubmit = async (data: PropertyFormData) => {
     const payload = {
       name: data.name,
+      property_number: data.property_number || null,
       address: data.address || null,
       area_sqm: data.area_sqm ? parseFloat(data.area_sqm) : null,
+      construction_year: data.construction_year ? parseInt(data.construction_year) : null,
+      property_type: data.property_type || null,
+      loa: data.loa || null,
+      invoice_address: data.invoice_address || null,
       description: data.description || null,
     };
 
@@ -112,6 +132,20 @@ export function PropertyEditDialog({
 
             <FormField
               control={form.control}
+              name="property_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fastighetsnummer</FormLabel>
+                  <FormControl>
+                    <Input placeholder="t.ex. Vägen 13" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="address"
               render={({ field }) => (
                 <FormItem>
@@ -124,16 +158,84 @@ export function PropertyEditDialog({
               )}
             />
 
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="area_sqm"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Area (m²)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="t.ex. 5000"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="construction_year"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Byggår</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="t.ex. 1985"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="property_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Typ</FormLabel>
+                    <FormControl>
+                      <Input placeholder="t.ex. Hyresrätt, Kontor" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="loa"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>LOA</FormLabel>
+                    <FormControl>
+                      <Input placeholder="LOA" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <FormField
               control={form.control}
-              name="area_sqm"
+              name="invoice_address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Area (m²)</FormLabel>
+                  <FormLabel>Fakturaadress</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="t.ex. 5000"
+                    <Textarea
+                      placeholder="Fakturaadress..."
+                      className="min-h-[80px]"
                       {...field}
                     />
                   </FormControl>

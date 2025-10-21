@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Archive, Edit2, Trash2 } from "lucide-react";
 import { WorkOrderDialog } from "@/components/WorkOrderDialog";
+import { WorkOrderDetailDialog } from "@/components/WorkOrderDetailDialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -20,6 +21,8 @@ const WorkOrders = () => {
   const [showArchived, setShowArchived] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [detailOrder, setDetailOrder] = useState<any>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   const { data: workOrders, refetch } = useQuery({
     queryKey: ["work-orders", showArchived],
@@ -33,7 +36,7 @@ const WorkOrders = () => {
             name
           )
         `)
-        .neq("status", showArchived ? "not_started" : "archived")
+        .in("status", showArchived ? ["completed", "archived"] : ["not_started", "awaiting_quote", "ordered"])
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -134,7 +137,14 @@ const WorkOrders = () => {
               </thead>
               <tbody>
                 {filteredOrders(orders).map((order) => (
-                  <tr key={order.id} className="border-b hover:bg-muted/50">
+                  <tr 
+                    key={order.id} 
+                    className="border-b hover:bg-muted/50 cursor-pointer"
+                    onClick={() => {
+                      setDetailOrder(order);
+                      setDetailDialogOpen(true);
+                    }}
+                  >
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">🏢</span>
@@ -176,7 +186,8 @@ const WorkOrders = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditingOrder(order);
                             setDialogOpen(true);
                           }}
@@ -186,7 +197,10 @@ const WorkOrders = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(order.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(order.id);
+                          }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -268,6 +282,13 @@ const WorkOrders = () => {
           setDialogOpen(false);
           setEditingOrder(null);
         }}
+      />
+
+      <WorkOrderDetailDialog
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        workOrder={detailOrder}
+        onUpdate={refetch}
       />
     </SidebarProvider>
   );
