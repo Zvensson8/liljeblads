@@ -59,6 +59,49 @@ All colors MUST be HSL.
     
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 }
 
@@ -75,5 +118,37 @@ All colors MUST be HSL.
 @layer utilities {
   .hover-scale {
     @apply transition-transform duration-300 hover:scale-105;
+  }
+  
+  .animate-slide-in-up {
+    animation: slideInUp 0.4s ease-out;
+  }
+  
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+  
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+  
+  .transition-fast {
+    transition: var(--transition-fast);
+  }
+  
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-[var(--shadow-elegant)] hover:-translate-y-1;
+  }
+  
+  .glass-effect {
+    @apply bg-background/80 backdrop-blur-sm border border-border/50;
   }
 }

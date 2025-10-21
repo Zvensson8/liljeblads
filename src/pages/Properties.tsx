@@ -8,7 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, Compass, Sparkles, MapPin, Layers, Trash2, MoreVertical } from 'lucide-react';
+import { Building2, Plus, Compass, Sparkles, MapPin, Layers, Trash2, MoreVertical, Search, Filter } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PropertyFilterChips } from '@/components/PropertyFilterChips';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +61,10 @@ const Properties = () => {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [description, setDescription] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<Array<{ id: string; label: string; value: any }>>([]);
+  const [filterType, setFilterType] = useState<string>('');
+  const [filterValue, setFilterValue] = useState<string>('');
   const { toast } = useToast();
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
@@ -173,6 +179,60 @@ const Properties = () => {
     }
   };
 
+  const addFilter = () => {
+    if (!filterType || !filterValue) return;
+    
+    const filterLabels: Record<string, string> = {
+      property_type: 'Typ',
+      construction_year: 'Byggår',
+      area_sqm: 'Area',
+    };
+
+    setFilters([
+      ...filters,
+      {
+        id: `${filterType}-${filterValue}`,
+        label: `${filterLabels[filterType]}: ${filterValue}`,
+        value: { type: filterType, value: filterValue },
+      },
+    ]);
+    setFilterType('');
+    setFilterValue('');
+  };
+
+  const removeFilter = (filterId: string) => {
+    setFilters(filters.filter((f) => f.id !== filterId));
+  };
+
+  const clearAllFilters = () => {
+    setFilters([]);
+  };
+
+  const filteredProperties = properties.filter((property) => {
+    // Text search
+    const matchesSearch =
+      property.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      property.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      property.description?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    // Apply filters
+    return filters.every((filter) => {
+      const { type, value } = filter.value;
+      switch (type) {
+        case 'property_type':
+          return property.property_type?.toLowerCase().includes(value.toLowerCase());
+        case 'construction_year':
+          return property.construction_year?.toString() === value;
+        case 'area_sqm':
+          return property.area_sqm && property.area_sqm >= parseInt(value);
+        default:
+          return true;
+      }
+    });
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -258,14 +318,88 @@ const Properties = () => {
                 </Card>
               </div>
               
-              {/* Page Header */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-                <div className="space-y-1">
-                  <h2 className="text-3xl font-bold tracking-tight">{properties.length} fastigheter</h2>
-                  <p className="text-muted-foreground">
-                    Hantera dina tilldelade fastigheter
-                  </p>
+              {/* Search and Filter Bar */}
+              <div className="space-y-4 mb-8 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <h2 className="text-3xl font-bold tracking-tight">{filteredProperties.length} fastigheter</h2>
+                    <p className="text-muted-foreground">
+                      Hantera dina tilldelade fastigheter
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-3 items-center">
+                    <div className="relative w-96">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Sök fastigheter..."
+                        className="pl-10"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon">
+                          <Filter className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-72">
+                        <div className="p-4 space-y-4">
+                          <div className="space-y-2">
+                            <Label>Filtertyp</Label>
+                            <Select value={filterType} onValueChange={setFilterType}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Välj filter" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="property_type">Typ</SelectItem>
+                                <SelectItem value="construction_year">Byggår</SelectItem>
+                                <SelectItem value="area_sqm">Min area (m²)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          {filterType && (
+                            <div className="space-y-2">
+                              <Label>Värde</Label>
+                              <Input
+                                placeholder={
+                                  filterType === 'area_sqm'
+                                    ? 't.ex. 100'
+                                    : filterType === 'construction_year'
+                                    ? 't.ex. 2020'
+                                    : 't.ex. Kontor'
+                                }
+                                value={filterValue}
+                                onChange={(e) => setFilterValue(e.target.value)}
+                              />
+                            </div>
+                          )}
+                          
+                          <Button
+                            className="w-full"
+                            onClick={addFilter}
+                            disabled={!filterType || !filterValue}
+                          >
+                            Lägg till filter
+                          </Button>
+                        </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
+                
+                <PropertyFilterChips
+                  filters={filters}
+                  onRemoveFilter={removeFilter}
+                  onClearAll={clearAllFilters}
+                />
+              </div>
+
+              {/* Page Actions */}
+              <div className="flex justify-end mb-8">
                 
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
@@ -322,7 +456,7 @@ const Properties = () => {
               </div>
 
               {/* Properties Grid */}
-              {properties.length === 0 ? (
+              {filteredProperties.length === 0 && searchQuery === '' && filters.length === 0 ? (
                 <Card className="border-dashed animate-fade-in" style={{ animationDelay: '0.2s' }}>
                   <CardContent className="flex flex-col items-center justify-center py-16">
                     <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
@@ -338,12 +472,21 @@ const Properties = () => {
                     </Button>
                   </CardContent>
                 </Card>
+              ) : filteredProperties.length === 0 ? (
+                <Card className="border-dashed animate-fade-in">
+                  <CardContent className="flex flex-col items-center justify-center py-16">
+                    <p className="text-muted-foreground mb-4">Inga fastigheter matchar dina filter</p>
+                    <Button variant="outline" onClick={clearAllFilters}>
+                      Rensa filter
+                    </Button>
+                  </CardContent>
+                </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                  {properties.map((property, index) => (
+                  {filteredProperties.map((property, index) => (
                     <Card 
                       key={property.id} 
-                      className="group hover:shadow-[var(--shadow-elegant)] transition-all duration-300 cursor-pointer border-border/50 bg-card hover-scale"
+                      className="group cursor-pointer border-border card-hover animate-scale-in"
                       style={{ animationDelay: `${0.05 * index}s` }}
                       onClick={() => navigate(`/property/${property.id}`)}
                     >

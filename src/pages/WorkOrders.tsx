@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Archive, Edit2, Trash2 } from "lucide-react";
+import { Plus, Search, Archive, Edit2, Trash2, LayoutGrid, Table as TableIcon } from "lucide-react";
 import { WorkOrderDialog } from "@/components/WorkOrderDialog";
 import { WorkOrderDetailDialog } from "@/components/WorkOrderDetailDialog";
+import { WorkOrderKanban } from "@/components/WorkOrderKanban";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -23,6 +24,7 @@ const WorkOrders = () => {
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [detailOrder, setDetailOrder] = useState<any>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
 
   const { data: workOrders, refetch } = useQuery({
     queryKey: ["work-orders", showArchived],
@@ -238,10 +240,28 @@ const WorkOrders = () => {
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 <span className="font-semibold text-foreground">{activeCount} aktiva arbetsordrar</span>
-                <span className="mx-2">·</span>
-                <button className="hover:underline">Hantera arbetsordrar i tabellvy</button>
               </div>
               <div className="flex gap-2">
+                <div className="flex gap-1 border border-border rounded-lg p-1">
+                  <Button
+                    variant={viewMode === "kanban" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("kanban")}
+                    className="h-8"
+                  >
+                    <LayoutGrid className="h-4 w-4 mr-2" />
+                    Kanban
+                  </Button>
+                  <Button
+                    variant={viewMode === "table" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("table")}
+                    className="h-8"
+                  >
+                    <TableIcon className="h-4 w-4 mr-2" />
+                    Tabell
+                  </Button>
+                </div>
                 <Button
                   variant="outline"
                   onClick={() => setShowArchived(!showArchived)}
@@ -261,11 +281,27 @@ const WorkOrders = () => {
               </div>
             </div>
 
-            <div className="space-y-4">
-              {renderOrdersTable(notStarted, "Ej påbörjad", notStarted.length)}
-              {renderOrdersTable(awaitingQuote, "Inväntar offert", awaitingQuote.length)}
-              {renderOrdersTable(ordered, "Beställt", ordered.length, orderedTotal)}
-            </div>
+            {viewMode === "kanban" ? (
+              <WorkOrderKanban
+                workOrders={filteredOrders(workOrders || [])}
+                onEdit={(order) => {
+                  setEditingOrder(order);
+                  setDialogOpen(true);
+                }}
+                onDelete={handleDelete}
+                onViewDetails={(order) => {
+                  setDetailOrder(order);
+                  setDetailDialogOpen(true);
+                }}
+                onRefetch={refetch}
+              />
+            ) : (
+              <div className="space-y-4">
+                {renderOrdersTable(notStarted, "Ej påbörjad", notStarted.length)}
+                {renderOrdersTable(awaitingQuote, "Inväntar offert", awaitingQuote.length)}
+                {renderOrdersTable(ordered, "Beställt", ordered.length, orderedTotal)}
+              </div>
+            )}
           </div>
         </SidebarInset>
       </div>

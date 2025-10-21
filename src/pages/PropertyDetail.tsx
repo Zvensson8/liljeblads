@@ -21,6 +21,7 @@ import { PropertyNotes } from '@/components/property/PropertyNotes';
 import { PropertyTodos } from '@/components/property/PropertyTodos';
 import { PropertyContacts } from '@/components/property/PropertyContacts';
 import { PropertyDocuments } from '@/components/property/PropertyDocuments';
+import { ActivityTimeline } from '@/components/ActivityTimeline';
 
 interface Property {
   id: string;
@@ -464,8 +465,11 @@ const PropertyDetail = () => {
           </TabsList>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
+          <TabsContent value="overview" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Activity Timeline */}
+              <ActivityTimeline propertyId={property.id} />
+              
               {/* Description */}
               <Card>
                 <CardHeader>
