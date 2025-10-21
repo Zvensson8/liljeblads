@@ -41,6 +41,12 @@ interface Property {
   name: string;
   address: string | null;
   description: string | null;
+  area_sqm: number | null;
+  construction_year: number | null;
+  property_type: string | null;
+  loa: string | null;
+  property_number: string | null;
+  invoice_address: string | null;
   floors?: any[];
 }
 
@@ -376,9 +382,11 @@ const Properties = () => {
                         <CardTitle className="text-xl group-hover:text-primary transition-colors">
                           {property.name}
                         </CardTitle>
-                        <CardDescription className="text-primary/80 font-mono text-sm">
-                          #{property.id.substring(0, 5).toUpperCase()}
-                        </CardDescription>
+                        {property.property_number && (
+                          <CardDescription className="text-primary/80 font-mono text-sm">
+                            {property.property_number}
+                          </CardDescription>
+                        )}
                       </CardHeader>
                       <CardContent className="space-y-3">
                         {property.address && (
@@ -387,18 +395,30 @@ const Properties = () => {
                             <span className="text-muted-foreground">{property.address}</span>
                           </div>
                         )}
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-muted-foreground">📅</span>
-                          <span className="text-muted-foreground">Byggår: -</span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-muted-foreground">Typ: </span>
-                          <span className="text-foreground">-</span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-muted-foreground">LOA: </span>
-                          <span className="text-foreground">- m²</span>
-                        </div>
+                        {property.construction_year && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-muted-foreground">📅</span>
+                            <span className="text-muted-foreground">Byggår: {property.construction_year}</span>
+                          </div>
+                        )}
+                        {property.property_type && (
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Typ: </span>
+                            <span className="text-foreground">{property.property_type}</span>
+                          </div>
+                        )}
+                        {property.loa && (
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">LOA: </span>
+                            <span className="text-foreground">{property.loa} m²</span>
+                          </div>
+                        )}
+                        {property.area_sqm && (
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Area: </span>
+                            <span className="text-foreground">{property.area_sqm} m²</span>
+                          </div>
+                        )}
                         <div className="pt-3 mt-3 border-t border-border/50 flex justify-between items-center">
                           <Button 
                             variant="outline" 
