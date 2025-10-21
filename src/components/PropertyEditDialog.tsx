@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { FileText } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -226,23 +227,30 @@ export function PropertyEditDialog({
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="invoice_address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fakturaadress</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Fakturaadress..."
-                      className="min-h-[80px]"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="space-y-4 border-t pt-4">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Fakturainformation</h3>
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="invoice_address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fakturaadress</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Bolagsnamn&#10;Organisationsnummer&#10;Postnummer/Box&#10;Postort"
+                        className="min-h-[120px]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}

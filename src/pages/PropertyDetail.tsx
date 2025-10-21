@@ -17,6 +17,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { PropertyEditDialog } from '@/components/PropertyEditDialog';
 import { WorkOrderDialog } from '@/components/WorkOrderDialog';
+import { PropertyNotes } from '@/components/property/PropertyNotes';
+import { PropertyTodos } from '@/components/property/PropertyTodos';
+import { PropertyContacts } from '@/components/property/PropertyContacts';
+import { PropertyDocuments } from '@/components/property/PropertyDocuments';
 
 interface Property {
   id: string;
@@ -24,6 +28,11 @@ interface Property {
   address: string | null;
   description: string | null;
   area_sqm: number | null;
+  construction_year: number | null;
+  property_type: string | null;
+  loa: string | null;
+  property_number: string | null;
+  invoice_address: string | null;
 }
 
 interface Floor {
@@ -335,7 +344,9 @@ const PropertyDetail = () => {
               <div className="h-8 w-px bg-border" />
               <div>
                 <h1 className="text-2xl font-bold">{property.name}</h1>
-                <p className="text-sm text-muted-foreground">#{property.id.substring(0, 5).toUpperCase()}</p>
+                <p className="text-sm text-muted-foreground">
+                  {property.property_number ? `#${property.property_number}` : `#${property.id.substring(0, 5).toUpperCase()}`}
+                </p>
               </div>
             </div>
             <Button className="gap-2" onClick={() => setEditDialogOpen(true)}>
@@ -365,15 +376,19 @@ const PropertyDetail = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">📅</span>
-                  <span className="text-muted-foreground">Byggår: -</span>
+                  <span className="text-muted-foreground">Byggår: {property.construction_year || '-'}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Typ: </span>
-                  <span className="text-foreground">-</span>
+                  <span className="text-foreground">{property.property_type || '-'}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">LOA: </span>
-                  <span className="text-foreground">{property.area_sqm ? `${property.area_sqm} m²` : '- m²'}</span>
+                  <span className="text-foreground">{property.loa || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Area: </span>
+                  <span className="text-foreground">{property.area_sqm ? `${property.area_sqm} m²` : '-'}</span>
                 </div>
               </CardContent>
             </Card>
@@ -441,65 +456,49 @@ const PropertyDetail = () => {
             <TabsTrigger value="components">Komponenter</TabsTrigger>
             <TabsTrigger value="drawings">Ritningar</TabsTrigger>
             <TabsTrigger value="workorders">Arbetsordrar</TabsTrigger>
-            <TabsTrigger value="invoice">Faktura</TabsTrigger>
+            <TabsTrigger value="notes">Anteckningar</TabsTrigger>
+            <TabsTrigger value="todo">Att-göra</TabsTrigger>
+            <TabsTrigger value="invoicing">Fakturering</TabsTrigger>
             <TabsTrigger value="contacts">Kontakter</TabsTrigger>
             <TabsTrigger value="documents">Dokument</TabsTrigger>
-            <TabsTrigger value="notes">Anteckningar</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Notes */}
+              {/* Description */}
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardHeader>
                   <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5 text-primary" />
-                    <CardTitle>Anteckningar</CardTitle>
+                    <CardTitle>Beskrivning</CardTitle>
                   </div>
-                  <Button size="sm" variant="outline">
-                    Redigera
-                  </Button>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground italic">Inga anteckningar ännu</p>
+                  <p className="text-sm">
+                    {property.description || 'Ingen beskrivning tillgänglig'}
+                  </p>
                 </CardContent>
               </Card>
 
-              {/* To-do List */}
+              {/* Quick Stats */}
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-3">
-                  <div className="flex items-center gap-2">
-                    <CheckSquare className="h-5 w-5 text-primary" />
-                    <CardTitle>Att-göra lista</CardTitle>
-                  </div>
+                <CardHeader>
+                  <CardTitle>Snabbstatistik</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="flex gap-2">
-                    <Input 
-                      placeholder="Lägg till ny uppgift..." 
-                      value={todoText}
-                      onChange={(e) => setTodoText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && todoText.trim()) {
-                          toast({ title: 'Uppgift tillagd!' });
-                          setTodoText('');
-                        }
-                      }}
-                    />
-                    <Button 
-                      size="icon"
-                      onClick={() => {
-                        if (todoText.trim()) {
-                          toast({ title: 'Uppgift tillagd!' });
-                          setTodoText('');
-                        }
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Våningar:</span>
+                    <span className="font-medium">{floors.length}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground italic">Inga uppgifter ännu</p>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Komponenter:</span>
+                    <span className="font-medium">{components.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Arbetsordrar:</span>
+                    <span className="font-medium">{workOrders.length}</span>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -798,30 +797,25 @@ const PropertyDetail = () => {
             </Card>
           </TabsContent>
 
-          {/* Invoice Tab */}
-          <TabsContent value="invoice">
+          {/* Invoicing Tab */}
+          <TabsContent value="invoicing">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
-                  <CardTitle>Fakturainformation</CardTitle>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    Fakturaadress & Kontakt
-                  </Button>
-                  <Button size="sm">Redigera</Button>
+                  <CardTitle>Fakturaadress</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="border rounded-lg p-4 space-y-2">
-                  <p className="font-medium">Trophi Nora HB</p>
-                  <p className="text-sm text-muted-foreground">Org.nr: 969750-5601</p>
-                  <p className="text-sm text-muted-foreground">Adress:</p>
-                  <p className="text-sm text-muted-foreground">Box 239</p>
-                  <p className="text-sm text-muted-foreground">721 06 Västerås</p>
-                </div>
-                <p className="text-xs text-muted-foreground">Exempeldata - redigera via backend</p>
+              <CardContent>
+                {property.invoice_address ? (
+                  <div className="whitespace-pre-wrap border rounded-lg p-4 bg-muted/30">
+                    {property.invoice_address}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    Ingen fakturaadress registrerad. Lägg till via "Redigera Fastighet".
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -829,50 +823,14 @@ const PropertyDetail = () => {
           {/* Contacts Tab */}
           <TabsContent value="contacts">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <div className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-primary" />
-                  <CardTitle>Kontakter (1)</CardTitle>
+                  <CardTitle>Kontakter</CardTitle>
                 </div>
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ny kontakt
-                </Button>
               </CardHeader>
               <CardContent>
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="font-semibold">Axel Eriksson</p>
-                      <span className="inline-block px-2 py-0.5 bg-primary/20 text-primary text-xs rounded-full mt-1">
-                        Driftansvarig
-                      </span>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">0766686261</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Axel.eriksson@fastighetsnabben.se</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Fastighetsnabben</span>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-4">Exempeldata - funktion kräver backend-implementation</p>
+                <PropertyContacts propertyId={property.id} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -885,34 +843,9 @@ const PropertyDetail = () => {
                   <File className="h-5 w-5 text-primary" />
                   <CardTitle>Dokument</CardTitle>
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Hantera dokument som är kopplade till denna fastighet
-                </p>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-2 mb-6">
-                  <Button className="flex-1">
-                    <File className="h-4 w-4 mr-2" />
-                    Dokument
-                  </Button>
-                  <Button variant="secondary" className="flex-1">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Ladda upp
-                  </Button>
-                </div>
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Input placeholder="Sök dokument..." />
-                    <Button variant="outline">
-                      Alla filtyper
-                    </Button>
-                  </div>
-                  <div className="text-center py-12">
-                    <File className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                    <p className="text-muted-foreground">Inga dokument hittades</p>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-4">Funktion kräver backend-implementation för filuppladdning och lagring</p>
+                <PropertyDocuments propertyId={property.id} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -920,22 +853,29 @@ const PropertyDetail = () => {
           {/* Notes Tab */}
           <TabsContent value="notes">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
                   <CardTitle>Anteckningar</CardTitle>
                 </div>
-                <Button size="sm">
-                  Redigera
-                </Button>
               </CardHeader>
               <CardContent>
-                <Textarea 
-                  placeholder="Skriv dina anteckningar här..." 
-                  rows={10}
-                  className="resize-none"
-                />
-                <p className="text-xs text-muted-foreground mt-4">Anteckningar sparas automatiskt</p>
+                <PropertyNotes propertyId={property.id} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Todo Tab */}
+          <TabsContent value="todo">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <CheckSquare className="h-5 w-5 text-primary" />
+                  <CardTitle>Att-göra lista</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <PropertyTodos propertyId={property.id} />
               </CardContent>
             </Card>
           </TabsContent>
