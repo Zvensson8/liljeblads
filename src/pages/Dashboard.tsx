@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrganization } from '@/hooks/useOrganization';
 import { Building2, Wrench, FolderKanban, CheckSquare, Loader2, TrendingUp } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +57,7 @@ interface Todo {
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { organization } = useOrganization();
   const [selectedProperty, setSelectedProperty] = useState<string>("all");
   const [properties, setProperties] = useState<Property[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
@@ -312,9 +314,9 @@ const Dashboard = () => {
               {/* Header with Property Filter */}
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-3xl font-bold">Översikt</h2>
+                  <h2 className="text-3xl font-bold">Välkommen till {organization?.name || 'NavRitning'}</h2>
                   <p className="text-muted-foreground">
-                    Sammanställning av dina fastigheter och uppgifter
+                    Sammanställning av {organization?.name ? 'organisationens' : 'dina'} fastigheter och uppgifter
                   </p>
                 </div>
                 <div className="w-64">

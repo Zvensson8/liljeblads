@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Compass } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { z } from 'zod';
 
 const authSchema = z.object({
@@ -146,11 +146,11 @@ const Auth = () => {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-              <Compass className="h-8 w-8 text-primary-foreground" />
+              <Building2 className="h-8 w-8 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold">NavRitning</CardTitle>
-          <CardDescription>Professionell ritningshantering för fastigheter</CardDescription>
+          <CardTitle className="text-3xl font-bold">FastighetsPortal</CardTitle>
+          <CardDescription>Professionell fastighetshantering</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">

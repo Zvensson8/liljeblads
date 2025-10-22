@@ -2,6 +2,7 @@ import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, Dolla
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
@@ -33,6 +34,7 @@ const navigationItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const { signOut, user } = useAuth();
+  const { organization, loading: orgLoading } = useOrganization();
   const isCollapsed = state === "collapsed";
   const [isFounder, setIsFounder] = useState(false);
 
@@ -55,19 +57,35 @@ export function AppSidebar() {
     setIsFounder(!!data);
   };
 
+  // Använd organisationens namn eller fallback till NavRitning
+  const appName = organization?.name || "NavRitning";
+  const appDescription = organization?.name ? "Fastighetshantering" : "Ritningshantering";
+
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
         {/* Logo and brand */}
         <div className={`flex items-center justify-between p-4 border-b border-border ${isCollapsed ? 'flex-col gap-2' : ''}`}>
           <div className={`flex items-center gap-3 ${isCollapsed ? 'flex-col' : ''}`}>
-            <div className="bg-gradient-to-br from-primary to-primary/70 p-2 rounded-lg">
-              <Compass className="h-6 w-6 text-primary-foreground" />
-            </div>
+            {organization?.logo_url ? (
+              // Visa organisationens logga
+              <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-muted">
+                <img 
+                  src={organization.logo_url} 
+                  alt={`${organization.name} logo`}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            ) : (
+              // Fallback till standard ikon
+              <div className="bg-gradient-to-br from-primary to-primary/70 p-2 rounded-lg">
+                <Compass className="h-6 w-6 text-primary-foreground" />
+              </div>
+            )}
             {!isCollapsed && (
               <div>
-                <h2 className="font-bold text-lg">NavRitning</h2>
-                <p className="text-xs text-muted-foreground">Ritningshantering</p>
+                <h2 className="font-bold text-lg">{appName}</h2>
+                <p className="text-xs text-muted-foreground">{appDescription}</p>
               </div>
             )}
           </div>
