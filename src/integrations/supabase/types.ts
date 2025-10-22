@@ -731,6 +731,53 @@ export type Database = {
           },
         ]
       }
+      organization_pricing_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          new_max_properties: number | null
+          new_max_users: number | null
+          new_tier: string | null
+          old_max_properties: number | null
+          old_max_users: number | null
+          old_tier: string | null
+          organization_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_max_properties?: number | null
+          new_max_users?: number | null
+          new_tier?: string | null
+          old_max_properties?: number | null
+          old_max_users?: number | null
+          old_tier?: string | null
+          organization_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_max_properties?: number | null
+          new_max_users?: number | null
+          new_tier?: string | null
+          old_max_properties?: number | null
+          old_max_users?: number | null
+          old_tier?: string | null
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_pricing_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           billing_contact: string | null

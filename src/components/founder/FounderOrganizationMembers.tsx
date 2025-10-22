@@ -83,14 +83,15 @@ export function FounderOrganizationMembers() {
     try {
       setLoading(true);
       
-      const [membersRes, orgsRes, profilesRes] = await Promise.all([
-        supabase
-          .from("organization_members")
-          .select(`
-            *,
-            profiles:user_id(id, email, full_name),
-            organizations(id, name)
-          `),
+      // Hämta data separat för att undvika foreign key-problem
+      const { data: membersData, error: membersError } = await supabase
+        .from("organization_members")
+        .select("*");
+
+      if (membersError) throw membersError;
+
+      // Hämta profiler och organisationer
+      const [orgsRes, profilesRes] = await Promise.all([
         supabase
           .from("organizations")
           .select("id, name")
@@ -101,12 +102,22 @@ export function FounderOrganizationMembers() {
           .order("email"),
       ]);
 
-      if (membersRes.error) throw membersRes.error;
       if (orgsRes.error) throw orgsRes.error;
       if (profilesRes.error) throw profilesRes.error;
 
-      setMembers(membersRes.data as any || []);
-      setFilteredMembers(membersRes.data as any || []);
+      // Kombinera data manuellt
+      const enrichedMembers = (membersData || []).map(member => {
+        const profile = profilesRes.data?.find(p => p.id === member.user_id);
+        const org = orgsRes.data?.find(o => o.id === member.organization_id);
+        return {
+          ...member,
+          profiles: profile || { id: member.user_id, email: "Unknown", full_name: "Unknown" },
+          organizations: org || { id: member.organization_id, name: "Unknown" },
+        };
+      });
+
+      setMembers(enrichedMembers as any);
+      setFilteredMembers(enrichedMembers as any);
       setOrganizations(orgsRes.data || []);
       setProfiles(profilesRes.data || []);
     } catch (error: any) {
