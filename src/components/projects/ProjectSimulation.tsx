@@ -4,8 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { CalendarIcon, Loader2, Plus, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Calculator, RotateCcw, Plus, Trash2 } from "lucide-react";
 
 interface ProjectSimulationProps {
   currentBudget: number;
