@@ -733,34 +733,55 @@ export type Database = {
       }
       organizations: {
         Row: {
+          billing_contact: string | null
+          billing_cycle: string | null
           created_at: string
           id: string
+          invoice_email: string | null
+          last_payment_date: string | null
           logo_url: string | null
           max_properties: number
           max_users: number
           name: string
+          next_billing_date: string | null
+          notes: string | null
+          payment_status: string | null
           primary_color: string | null
           subscription_tier: string
           updated_at: string
         }
         Insert: {
+          billing_contact?: string | null
+          billing_cycle?: string | null
           created_at?: string
           id?: string
+          invoice_email?: string | null
+          last_payment_date?: string | null
           logo_url?: string | null
           max_properties?: number
           max_users?: number
           name: string
+          next_billing_date?: string | null
+          notes?: string | null
+          payment_status?: string | null
           primary_color?: string | null
           subscription_tier?: string
           updated_at?: string
         }
         Update: {
+          billing_contact?: string | null
+          billing_cycle?: string | null
           created_at?: string
           id?: string
+          invoice_email?: string | null
+          last_payment_date?: string | null
           logo_url?: string | null
           max_properties?: number
           max_users?: number
           name?: string
+          next_billing_date?: string | null
+          notes?: string | null
+          payment_status?: string | null
           primary_color?: string | null
           subscription_tier?: string
           updated_at?: string
