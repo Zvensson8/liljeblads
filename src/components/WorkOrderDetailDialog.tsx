@@ -2,19 +2,30 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, Trash2, Download, Edit2 } from "lucide-react";
+import { Upload, FileText, Trash2, Download, Edit2, FolderKanban } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -34,8 +45,11 @@ export function WorkOrderDetailDialog({
   onUpdate,
 }: WorkOrderDetailDialogProps) {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [uploading, setUploading] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [converting, setConverting] = useState(false);
 
   const { data: files, refetch: refetchFiles } = useQuery({
     queryKey: ["work-order-files", workOrder?.id],
@@ -142,6 +156,51 @@ export function WorkOrderDetailDialog({
     return labels[status as keyof typeof labels] || status;
   };
 
+  const handleConvertToProject = async () => {
+    if (!workOrder) return;
+    
+    setConverting(true);
+    try {
+      // Skapa nytt projekt baserat på arbetsorderns data
+      const { data: newProject, error: projectError } = await supabase
+        .from("projects")
+        .insert([{
+          name: workOrder.action,
+          property_id: workOrder.property_id,
+          description: workOrder.comments || `Konverterat från arbetsorder: ${workOrder.action}`,
+          status: "planerat",
+          start_date: workOrder.due_date || new Date().toISOString().split('T')[0],
+          budget: workOrder.price || null,
+          project_number: `WO-${workOrder.id.substring(0, 8)}`,
+          type: "underhall",
+        }])
+        .select()
+        .single();
+
+      if (projectError) throw projectError;
+
+      // Uppdatera arbetsorderns status till arkiverad
+      const { error: updateError } = await supabase
+        .from("work_orders")
+        .update({ status: "archived" })
+        .eq("id", workOrder.id);
+
+      if (updateError) throw updateError;
+
+      toast.success("Arbetsorder konverterad till projekt!");
+      onUpdate();
+      onOpenChange(false);
+      setConvertDialogOpen(false);
+      
+      // Navigera till det nya projektet
+      navigate(`/projects/${newProject.id}`);
+    } catch (error: any) {
+      toast.error("Kunde inte konvertera till projekt: " + error.message);
+    } finally {
+      setConverting(false);
+    }
+  };
+
   if (!workOrder) return null;
 
   return (
@@ -151,14 +210,24 @@ export function WorkOrderDetailDialog({
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="text-2xl">Arbetsorder Detaljer</DialogTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditDialogOpen(true)}
-              >
-                <Edit2 className="h-4 w-4 mr-2" />
-                Redigera
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setConvertDialogOpen(true)}
+                >
+                  <FolderKanban className="h-4 w-4 mr-2" />
+                  Konvertera till projekt
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditDialogOpen(true)}
+                >
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Redigera
+                </Button>
+              </div>
             </div>
           </DialogHeader>
 
@@ -301,6 +370,28 @@ export function WorkOrderDetailDialog({
           setEditDialogOpen(false);
         }}
       />
+
+      <AlertDialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konvertera till projekt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Detta kommer att skapa ett nytt projekt baserat på denna arbetsorder. 
+              Arbetsordern kommer att arkiveras automatiskt. 
+              Du kan redigera projektdetaljer efter konverteringen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={converting}>Avbryt</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConvertToProject}
+              disabled={converting}
+            >
+              {converting ? "Konverterar..." : "Konvertera till projekt"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
