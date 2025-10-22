@@ -28,6 +28,7 @@ import { ProjectCostManagement } from "@/components/projects/ProjectCostManageme
 import { ProjectChecklistManagement } from "@/components/projects/ProjectChecklistManagement";
 import { ProjectDocuments } from "@/components/projects/ProjectDocuments";
 import { ProjectSimulation } from "@/components/projects/ProjectSimulation";
+import { ProjectActivityLog } from "@/components/projects/ProjectActivityLog";
 
 type ProjectStatus = Database["public"]["Enums"]["project_status"];
 type ProjectType = Database["public"]["Enums"]["project_type"];
