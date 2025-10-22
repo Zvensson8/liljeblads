@@ -1,0 +1,542 @@
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  Package,
+  Edit,
+  Trash2,
+  TrendingUp,
+  FileText,
+  Calendar,
+  DollarSign,
+  AlertTriangle,
+  CheckCircle2,
+} from "lucide-react";
+import { format } from "date-fns";
+import { sv } from "date-fns/locale";
+import { ComponentFormDialog } from "@/components/ComponentFormDialog";
+import { MaintenanceHistoryDialog } from "@/components/MaintenanceHistoryDialog";
+
+interface Component {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  manufacturer: string | null;
+  model: string | null;
+  serial_number: string | null;
+  registration_number: string | null;
+  room_zone: string | null;
+  installation_year: number | null;
+  refrigerant_code: string | null;
+  refrigerant_amount_kg: number | null;
+  refrigerant_type: string | null;
+  notes: string | null;
+  floor_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Floor {
+  id: string;
+  name: string;
+  level: number | null;
+  property_id: string;
+  properties: {
+    id: string;
+    name: string;
+    address: string | null;
+  };
+}
+
+interface MaintenanceRecord {
+  id: string;
+  performed_date: string;
+  action_type: string;
+  cost: number | null;
+  expected_cost: number | null;
+  supplier: string | null;
+  notes: string | null;
+  is_warranty: boolean;
+  category: string | null;
+}
+
+export default function ComponentDetail() {
+  const { id } = useParams<{ id: string }>();
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [component, setComponent] = useState<Component | null>(null);
+  const [floor, setFloor] = useState<Floor | null>(null);
+  const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    } else if (user && id) {
+      fetchComponentData();
+    }
+  }, [user, authLoading, id, navigate]);
+
+  const fetchComponentData = async () => {
+    if (!id) return;
+    
+    setLoading(true);
+    try {
+      // Fetch component
+      const { data: componentData, error: componentError } = await supabase
+        .from("components")
+        .select(`
+          *,
+          floors:floor_id (
+            id,
+            name,
+            level,
+            property_id,
+            properties:property_id (
+              id,
+              name,
+              address
+            )
+          )
+        `)
+        .eq("id", id)
+        .single();
+
+      if (componentError) throw componentError;
+      setComponent(componentData);
+      setFloor(componentData.floors as any);
+
+      // Fetch maintenance history
+      const { data: maintenanceData, error: maintenanceError } = await supabase
+        .from("maintenance_history")
+        .select("*")
+        .eq("component_id", id)
+        .order("performed_date", { ascending: false });
+
+      if (maintenanceError) throw maintenanceError;
+      setMaintenanceHistory(maintenanceData || []);
+    } catch (error: any) {
+      toast.error("Kunde inte hämta komponentdata");
+      navigate("/components");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!component || !confirm(`Är du säker på att du vill ta bort ${component.name}?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from("components")
+        .delete()
+        .eq("id", component.id);
+
+      if (error) throw error;
+
+      toast.success("Komponent borttagen");
+      navigate("/components");
+    } catch (error: any) {
+      toast.error("Kunde inte ta bort komponent");
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      active: { label: "Aktiv", className: "bg-green-500", icon: CheckCircle2 },
+      maintenance: { label: "Underhåll", className: "bg-yellow-500", icon: AlertTriangle },
+      inactive: { label: "Inaktiv", className: "bg-red-500", icon: AlertTriangle },
+    };
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.active;
+    const Icon = config.icon;
+    return (
+      <Badge className={`${config.className} flex items-center gap-1`}>
+        <Icon className="h-3 w-3" />
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const totalMaintenanceCost = maintenanceHistory.reduce((sum, record) => sum + (record.cost || 0), 0);
+  const averageMaintenanceCost = maintenanceHistory.length > 0 
+    ? totalMaintenanceCost / maintenanceHistory.length 
+    : 0;
+  const lastMaintenance = maintenanceHistory[0];
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!component || !floor) {
+    return null;
+  }
+
+  const property = floor.properties;
+
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background">
+        <AppSidebar />
+        <SidebarInset className="flex-1">
+          <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+            <SidebarTrigger />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/components")}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Tillbaka
+            </Button>
+            <div className="flex items-center gap-2 flex-1">
+              <Package className="h-5 w-5 text-primary" />
+              <h1 className="text-xl font-semibold">{component.name}</h1>
+              {getStatusBadge(component.status)}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(true)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Redigera
+              </Button>
+              <Button variant="destructive" size="sm" onClick={handleDelete}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Ta bort
+              </Button>
+            </div>
+          </header>
+
+          <main className="flex-1 p-6">
+            <div className="max-w-7xl mx-auto space-y-6">
+              {/* Quick Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Total kostnad
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold">
+                      {totalMaintenanceCost.toLocaleString("sv-SE")} kr
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Snitt per tillfälle
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold">
+                      {averageMaintenanceCost.toLocaleString("sv-SE")} kr
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Senaste service
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-base font-semibold">
+                      {lastMaintenance 
+                        ? format(new Date(lastMaintenance.performed_date), "PPP", { locale: sv })
+                        : "Ingen service registrerad"
+                      }
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Antal åtgärder
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold">
+                      {maintenanceHistory.length}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Main Content Tabs */}
+              <Tabs defaultValue="info" className="w-full">
+                <TabsList className="grid w-full grid-cols-5">
+                  <TabsTrigger value="info">Information</TabsTrigger>
+                  <TabsTrigger value="maintenance">Underhåll</TabsTrigger>
+                  <TabsTrigger value="costs">Kostnadsanalys</TabsTrigger>
+                  <TabsTrigger value="location">Placering</TabsTrigger>
+                  <TabsTrigger value="documents">Dokument</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="info" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Teknisk information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Komponenttyp</p>
+                          <p className="text-base">{component.type}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Registreringsnummer</p>
+                          <p className="text-base">{component.registration_number || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Tillverkare</p>
+                          <p className="text-base">{component.manufacturer || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Modell</p>
+                          <p className="text-base">{component.model || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Serienummer</p>
+                          <p className="text-base">{component.serial_number || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Installationsår</p>
+                          <p className="text-base">{component.installation_year || "-"}</p>
+                        </div>
+                        {component.refrigerant_code && (
+                          <>
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Köldmediekod</p>
+                              <p className="text-base">{component.refrigerant_code}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Köldmedietyp</p>
+                              <p className="text-base">{component.refrigerant_type || "-"}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Fyllnadsmängd</p>
+                              <p className="text-base">
+                                {component.refrigerant_amount_kg 
+                                  ? `${component.refrigerant_amount_kg} kg`
+                                  : "-"
+                                }
+                              </p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {component.notes && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground mb-2">Anteckningar</p>
+                          <p className="text-base whitespace-pre-wrap">{component.notes}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="maintenance">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle>Underhållshistorik</CardTitle>
+                        <Button onClick={() => setMaintenanceDialogOpen(true)}>
+                          Lägg till åtgärd
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {maintenanceHistory.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>Ingen underhållshistorik registrerad</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {maintenanceHistory.map((record) => (
+                            <div
+                              key={record.id}
+                              className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <p className="font-medium">{record.action_type}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {format(new Date(record.performed_date), "PPP", { locale: sv })}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold">
+                                    {record.cost?.toLocaleString("sv-SE")} kr
+                                  </p>
+                                  {record.is_warranty && (
+                                    <Badge variant="outline" className="mt-1">Garanti</Badge>
+                                  )}
+                                </div>
+                              </div>
+                              {record.supplier && (
+                                <p className="text-sm text-muted-foreground">
+                                  Leverantör: {record.supplier}
+                                </p>
+                              )}
+                              {record.notes && (
+                                <p className="text-sm mt-2">{record.notes}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="costs">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Kostnadsanalys</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-4 border rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-1">Total kostnad</p>
+                            <p className="text-2xl font-bold">
+                              {totalMaintenanceCost.toLocaleString("sv-SE")} kr
+                            </p>
+                          </div>
+                          <div className="p-4 border rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-1">Genomsnittskostnad</p>
+                            <p className="text-2xl font-bold">
+                              {averageMaintenanceCost.toLocaleString("sv-SE")} kr
+                            </p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="font-semibold mb-3">Kostnadsfördelning per kategori</h3>
+                          {maintenanceHistory.length > 0 ? (
+                            <div className="space-y-2">
+                              {Object.entries(
+                                maintenanceHistory.reduce((acc, record) => {
+                                  const category = record.category || 'Okategoriserad';
+                                  acc[category] = (acc[category] || 0) + (record.cost || 0);
+                                  return acc;
+                                }, {} as Record<string, number>)
+                              ).map(([category, cost]) => (
+                                <div key={category} className="flex items-center justify-between p-3 border rounded-lg">
+                                  <span>{category}</span>
+                                  <span className="font-semibold">{cost.toLocaleString("sv-SE")} kr</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground">Ingen data tillgänglig</p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="location">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Placering</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Fastighet</p>
+                        <p className="text-lg font-semibold">{property.name}</p>
+                        {property.address && (
+                          <p className="text-sm text-muted-foreground">{property.address}</p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Våningsplan</p>
+                        <p className="text-base">
+                          {floor.name}
+                          {floor.level !== null && ` (Våning ${floor.level})`}
+                        </p>
+                      </div>
+                      {component.room_zone && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Rum/Zon</p>
+                          <p className="text-base">{component.room_zone}</p>
+                        </div>
+                      )}
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate(`/property/${property.id}`)}
+                      >
+                        Visa på ritning
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="documents">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Dokument & Rapporter</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center py-12 text-muted-foreground">
+                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>Dokumenthantering kommer snart</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </main>
+        </SidebarInset>
+      </div>
+
+      <ComponentFormDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        floorId={component.floor_id}
+        propertyId={property.id}
+        editingComponent={component}
+        onSuccess={() => {
+          setEditDialogOpen(false);
+          fetchComponentData();
+        }}
+      />
+
+      <MaintenanceHistoryDialog
+        componentId={component.id}
+        componentName={component.name}
+      />
+    </SidebarProvider>
+  );
+}

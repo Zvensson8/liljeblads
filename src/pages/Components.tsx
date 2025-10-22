@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
@@ -226,13 +227,20 @@ const Components = () => {
 
           <main className="flex-1 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-muted-foreground">
-                    Hantera alla komponenter från dina fastigheter
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
+              <Tabs defaultValue="components" className="w-full">
+                <TabsList>
+                  <TabsTrigger value="components">Komponenter</TabsTrigger>
+                  <TabsTrigger value="costs">Kostnadsöversikt</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="components" className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-muted-foreground">
+                        Hantera alla komponenter från dina fastigheter
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4">
                   <Badge variant="outline" className="text-base px-4 py-2">
                     {components.length} komponenter
                   </Badge>
@@ -255,36 +263,36 @@ const Components = () => {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
-                  <Button onClick={handleNewComponent}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Ny komponent
-                  </Button>
-                </div>
-              </div>
-
-              {components.length === 0 ? (
-                <Card className="text-center py-16 border-dashed">
-                  <CardContent>
-                    <div className="inline-flex p-4 rounded-full bg-primary/10 text-primary mb-4">
-                      <Package className="h-8 w-8" />
+                      <Button onClick={handleNewComponent}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Ny komponent
+                      </Button>
                     </div>
-                    <CardTitle className="mb-2 text-xl">Inga komponenter ännu</CardTitle>
-                    <CardDescription className="text-base mb-4">
-                      Lägg till komponenter via ritningarna i dina fastigheter
-                    </CardDescription>
-                    <Button onClick={() => navigate('/properties')}>
-                      Gå till Fastigheter
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {components.map((component) => (
-                    <Card
-                      key={component.id}
-                      className="group hover:shadow-lg transition-all duration-300 cursor-pointer"
-                      onClick={() => handleEditComponent(component)}
-                    >
+                  </div>
+
+                  {components.length === 0 ? (
+                    <Card className="text-center py-16 border-dashed">
+                      <CardContent>
+                        <div className="inline-flex p-4 rounded-full bg-primary/10 text-primary mb-4">
+                          <Package className="h-8 w-8" />
+                        </div>
+                        <CardTitle className="mb-2 text-xl">Inga komponenter ännu</CardTitle>
+                        <CardDescription className="text-base mb-4">
+                          Lägg till komponenter via ritningarna i dina fastigheter
+                        </CardDescription>
+                        <Button onClick={() => navigate('/properties')}>
+                          Gå till Fastigheter
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {components.map((component) => (
+                        <Card
+                          key={component.id}
+                          className="group hover:shadow-lg transition-all duration-300 cursor-pointer"
+                          onClick={() => navigate(`/components/${component.id}`)}
+                        >
                       <CardHeader>
                         <div className="flex justify-between items-start mb-2">
                           <CardTitle className="text-lg">{component.name}</CardTitle>
@@ -374,10 +382,33 @@ const Components = () => {
                           </div>
                         </div>
                       </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="costs">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Kostnadsöversikt</CardTitle>
+                    <CardDescription>
+                      Analysera och följ upp underhållskostnader för alla komponenter
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground mb-4">
+                        Kostnadsöversikt över alla komponenter kommer snart
+                      </p>
+                      <Button variant="outline" onClick={() => navigate('/cost-overview')}>
+                        Öppna fullständig kostnadsöversikt
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
             </div>
           </main>
         </SidebarInset>

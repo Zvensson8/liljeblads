@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Properties from "./pages/Properties";
 import PropertyDetail from "./pages/PropertyDetail";
 import Components from "./pages/Components";
+import ComponentDetail from "./pages/ComponentDetail";
 import ProjectDetail from "./pages/ProjectDetail";
 import Users from "./pages/Users";
 import Operations from "./pages/Operations";
@@ -28,6 +29,7 @@ const AppContent = () => {
       <Route path="/properties" element={<Properties />} />
       <Route path="/property/:id" element={<PropertyDetail />} />
       <Route path="/components" element={<Components />} />
+      <Route path="/components/:id" element={<ComponentDetail />} />
       <Route path="/work-orders" element={<WorkOrders />} />
       <Route path="/operations" element={<Operations />} />
       <Route path="/projects" element={<Projects />} />
