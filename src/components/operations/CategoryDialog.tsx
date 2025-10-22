@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -101,9 +102,12 @@ export function CategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" aria-describedby="category-description">
         <DialogHeader>
           <DialogTitle>Hantera kategorier</DialogTitle>
+          <DialogDescription id="category-description" className="sr-only">
+            Skapa och hantera kategorier för driftuppgifter
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">

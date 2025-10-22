@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -219,12 +219,15 @@ export const ComponentImportDialog = ({
           Importera från CSV
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col" aria-describedby="import-dialog-description">
         <DialogHeader>
           <DialogTitle>
             Importera komponenter från CSV
             {propertyName && ` - ${propertyName}`}
           </DialogTitle>
+          <DialogDescription id="import-dialog-description" className="sr-only">
+            Importera komponenter från en CSV-fil
+          </DialogDescription>
         </DialogHeader>
 
         {stage === 'upload' && (

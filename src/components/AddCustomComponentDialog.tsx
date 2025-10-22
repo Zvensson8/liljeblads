@@ -45,10 +45,10 @@ export const AddCustomComponentDialog = ({ open, onOpenChange, onAdd }: AddCusto
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px]" aria-describedby="custom-component-description">
         <DialogHeader>
           <DialogTitle>Lägg till anpassad komponent</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="custom-component-description">
             Skapa en ny komponenttyp som du använder ofta
           </DialogDescription>
         </DialogHeader>

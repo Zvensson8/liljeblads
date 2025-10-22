@@ -100,10 +100,10 @@ export function TaskFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px]" aria-describedby="task-form-description">
         <DialogHeader>
           <DialogTitle>Skapa ny uppgift</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="task-form-description">
             Lägg till en ny driftuppgift för {quarter} {year}
           </DialogDescription>
         </DialogHeader>

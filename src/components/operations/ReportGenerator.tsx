@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -96,12 +97,15 @@ export function ReportGenerator({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" aria-describedby="report-generator-description">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
             Generera rapport
           </DialogTitle>
+          <DialogDescription id="report-generator-description" className="sr-only">
+            Välj rapportformat och generera rapport
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
