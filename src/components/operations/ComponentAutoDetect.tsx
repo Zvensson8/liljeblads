@@ -24,14 +24,12 @@ interface Component {
 
 interface ComponentAutoDetectProps {
   propertyId: string;
-  taskId: string;
-  onComponentLinked: () => void;
+  onSelectComponent: (component: Component) => void;
 }
 
 export function ComponentAutoDetect({
   propertyId,
-  taskId,
-  onComponentLinked,
+  onSelectComponent,
 }: ComponentAutoDetectProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [components, setComponents] = useState<Component[]>([]);
@@ -102,47 +100,10 @@ export function ComponentAutoDetect({
     }
   };
 
-  const handleLinkComponent = async (component: Component) => {
-    setLoading(true);
-    try {
-      // Determine what was matched
-      let detectedFrom = "name";
-      const query = searchQuery.toLowerCase();
-      if (
-        component.registration_number?.toLowerCase().includes(query)
-      ) {
-        detectedFrom = "registration_number";
-      } else if (
-        component.serial_number?.toLowerCase().includes(query)
-      ) {
-        detectedFrom = "serial_number";
-      } else if (
-        component.aff_code?.toLowerCase().includes(query)
-      ) {
-        detectedFrom = "aff_code";
-      }
-
-      const { error } = await supabase.from("drift_task_components").insert({
-        task_id: taskId,
-        component_id: component.id,
-        series_id: component.serial_number,
-        registration_number: component.registration_number,
-        auto_detected_from: detectedFrom,
-        manually_edited: false,
-        is_reported: false,
-      });
-
-      if (error) throw error;
-
-      toast.success(`Komponent länkad: ${component.name}`);
-      setSearchQuery("");
-      setComponents([]);
-      onComponentLinked();
-    } catch (error: any) {
-      toast.error("Kunde inte länka komponent");
-    } finally {
-      setLoading(false);
-    }
+  const handleSelectComponent = (component: Component) => {
+    onSelectComponent(component);
+    setSearchQuery("");
+    setComponents([]);
   };
 
   return (
@@ -204,11 +165,10 @@ export function ComponentAutoDetect({
                   </div>
                   <Button
                     size="sm"
-                    onClick={() => handleLinkComponent(component)}
-                    disabled={loading}
+                    onClick={() => handleSelectComponent(component)}
                   >
                     <Link2 className="w-4 h-4 mr-1" />
-                    Länka
+                    Välj
                   </Button>
                 </div>
               </div>

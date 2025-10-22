@@ -28,19 +28,17 @@ interface ReportGeneratorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   propertyId: string;
-  propertyName: string;
-  currentYear: number;
+  year: number;
 }
 
 export function ReportGenerator({
   open,
   onOpenChange,
   propertyId,
-  propertyName,
-  currentYear,
+  year: initialYear,
 }: ReportGeneratorProps) {
   const [reportType, setReportType] = useState<string>("year");
-  const [year, setYear] = useState<number>(currentYear);
+  const [year, setYear] = useState<number>(initialYear);
   const [quarter, setQuarter] = useState<string>("Q1");
   const [format, setFormat] = useState<"excel" | "pdf">("excel");
   const [threshold, setThreshold] = useState<number>(20);
@@ -49,6 +47,9 @@ export function ReportGenerator({
   const handleGenerate = async () => {
     setLoading(true);
     try {
+      // For now, use a placeholder property name
+      const propertyName = "Fastighet";
+      
       switch (reportType) {
         case "year":
           await generateYearReport(propertyId, propertyName, year, format);
