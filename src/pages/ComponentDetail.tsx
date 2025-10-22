@@ -29,6 +29,8 @@ import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { ComponentFormDialog } from "@/components/ComponentFormDialog";
 import { MaintenanceHistoryDialog } from "@/components/MaintenanceHistoryDialog";
+import { ComponentDocuments } from "@/components/component/ComponentDocuments";
+import { ComponentCosts } from "@/components/component/ComponentCosts";
 
 interface Component {
   id: string;
@@ -291,10 +293,11 @@ export default function ComponentDetail() {
 
               {/* Main Content Tabs */}
               <Tabs defaultValue="info" className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-6">
                   <TabsTrigger value="info">Information</TabsTrigger>
                   <TabsTrigger value="maintenance">Underhåll</TabsTrigger>
                   <TabsTrigger value="costs">Kostnadsanalys</TabsTrigger>
+                  <TabsTrigger value="operations">Driftkostnader</TabsTrigger>
                   <TabsTrigger value="location">Placering</TabsTrigger>
                   <TabsTrigger value="documents">Dokument</TabsTrigger>
                 </TabsList>
@@ -421,13 +424,13 @@ export default function ComponentDetail() {
                 <TabsContent value="costs">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Kostnadsanalys</CardTitle>
+                      <CardTitle>Kostnadsanalys underhåll</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-6">
                         <div className="grid grid-cols-2 gap-4">
                           <div className="p-4 border rounded-lg">
-                            <p className="text-sm text-muted-foreground mb-1">Total kostnad</p>
+                            <p className="text-sm text-muted-foreground mb-1">Total underhållskostnad</p>
                             <p className="text-2xl font-bold">
                               {totalMaintenanceCost.toLocaleString("sv-SE")} kr
                             </p>
@@ -464,6 +467,10 @@ export default function ComponentDetail() {
                       </div>
                     </CardContent>
                   </Card>
+                </TabsContent>
+
+                <TabsContent value="operations">
+                  <ComponentCosts componentId={component.id} />
                 </TabsContent>
 
                 <TabsContent value="location">
@@ -508,10 +515,7 @@ export default function ComponentDetail() {
                       <CardTitle>Dokument & Rapporter</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-center py-12 text-muted-foreground">
-                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>Dokumenthantering kommer snart</p>
-                      </div>
+                      <ComponentDocuments componentId={component.id} />
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -536,6 +540,9 @@ export default function ComponentDetail() {
       <MaintenanceHistoryDialog
         componentId={component.id}
         componentName={component.name}
+        open={maintenanceDialogOpen}
+        onOpenChange={setMaintenanceDialogOpen}
+        onSuccess={fetchComponentData}
       />
     </SidebarProvider>
   );

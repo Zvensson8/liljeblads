@@ -23,10 +23,22 @@ interface MaintenanceRecord {
 interface MaintenanceHistoryDialogProps {
   componentId: string;
   componentName: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
-export const MaintenanceHistoryDialog = ({ componentId, componentName }: MaintenanceHistoryDialogProps) => {
-  const [open, setOpen] = useState(false);
+export const MaintenanceHistoryDialog = ({ 
+  componentId, 
+  componentName, 
+  open: externalOpen, 
+  onOpenChange: externalOnOpenChange,
+  onSuccess 
+}: MaintenanceHistoryDialogProps) => {
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = externalOnOpenChange || setInternalOpen;
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionType, setActionType] = useState('');
@@ -93,6 +105,7 @@ export const MaintenanceHistoryDialog = ({ componentId, componentName }: Mainten
       setCost('');
       setNotes('');
       fetchRecords();
+      onSuccess?.();
     }
   };
 

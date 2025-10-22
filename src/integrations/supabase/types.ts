@@ -38,6 +38,88 @@ export type Database = {
         }
         Relationships: []
       }
+      component_costs: {
+        Row: {
+          amount: number
+          category: string | null
+          component_id: string
+          cost_date: string
+          created_at: string
+          description: string
+          id: string
+          supplier: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          component_id: string
+          cost_date: string
+          created_at?: string
+          description: string
+          id?: string
+          supplier?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          component_id?: string
+          cost_date?: string
+          created_at?: string
+          description?: string
+          id?: string
+          supplier?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "component_costs_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      component_documents: {
+        Row: {
+          component_id: string
+          created_at: string
+          file_size: number | null
+          file_url: string
+          id: string
+          mime_type: string | null
+          name: string
+        }
+        Insert: {
+          component_id: string
+          created_at?: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          name: string
+        }
+        Update: {
+          component_id?: string
+          created_at?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "component_documents_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       component_geometry: {
         Row: {
           component_id: string
