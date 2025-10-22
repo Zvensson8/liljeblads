@@ -18,6 +18,7 @@ import Operations from "./pages/Operations";
 import CostOverview from "./pages/CostOverview";
 import WorkOrders from "./pages/WorkOrders";
 import Projects from "./pages/Projects";
+import OrganizationSettings from "./pages/OrganizationSettings";
 import NotFound from "./pages/NotFound";
 
 const AppContent = () => {
@@ -36,6 +37,7 @@ const AppContent = () => {
       <Route path="/projects/:id" element={<ProjectDetail />} />
       <Route path="/cost-overview" element={<CostOverview />} />
       <Route path="/users" element={<Users />} />
+      <Route path="/organization/settings" element={<OrganizationSettings />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

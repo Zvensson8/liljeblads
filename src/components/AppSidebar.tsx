@@ -1,4 +1,4 @@
-import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase } from "lucide-react";
+import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -25,6 +25,7 @@ const navigationItems = [
   { title: "Driftuppföljning", url: "/operations", icon: ClipboardList },
   { title: "Projekthantering", url: "/projects", icon: Briefcase },
   { title: "Användare", url: "/users", icon: Users },
+  { title: "Organisation", url: "/organization/settings", icon: Building },
 ];
 
 export function AppSidebar() {
