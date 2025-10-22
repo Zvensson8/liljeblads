@@ -23,6 +23,12 @@ export function StatisticsCard({ stats, quarter }: StatisticsCardProps) {
     ? Math.round((stats.totalReported / stats.totalPlanned) * 100)
     : 0;
 
+  // Circular progress calculations
+  const radius = 50;
+  const circumference = 2 * Math.PI * radius;
+  const completionOffset = circumference - (completionRate / 100) * circumference;
+  const reportedOffset = circumference - (reportedRate / 100) * circumference;
+
   return (
     <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
       <CardHeader>
@@ -32,13 +38,43 @@ export function StatisticsCard({ stats, quarter }: StatisticsCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Task completion overview */}
+        {/* Task completion overview with circular progress */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Uppgifter slutförda</span>
-            <span className="text-2xl font-bold text-primary">{completionRate}%</span>
+            <div className="relative w-16 h-16">
+              <svg className="transform -rotate-90 w-16 h-16">
+                <circle
+                  cx="32"
+                  cy="32"
+                  r={radius / 3}
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="none"
+                  className="text-muted"
+                />
+                <circle
+                  cx="32"
+                  cy="32"
+                  r={radius / 3}
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="none"
+                  strokeDasharray={circumference / 3}
+                  strokeDashoffset={completionOffset / 3}
+                  className="text-primary progress-circle"
+                  strokeLinecap="round"
+                  style={{ 
+                    '--progress-offset': `${completionOffset / 3}px`,
+                    transition: 'stroke-dashoffset 1s ease-out'
+                  } as React.CSSProperties}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-lg font-bold text-primary">{completionRate}%</span>
+              </div>
+            </div>
           </div>
-          <Progress value={completionRate} className="h-3" />
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="space-y-1">
               <div className="flex items-center justify-center gap-1 text-green-600">
@@ -64,13 +100,43 @@ export function StatisticsCard({ stats, quarter }: StatisticsCardProps) {
           </div>
         </div>
 
-        {/* Object reporting overview */}
+        {/* Object reporting overview with circular progress */}
         <div className="space-y-3 pt-3 border-t">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Objekt redovisade</span>
-            <span className="text-2xl font-bold text-primary">{reportedRate}%</span>
+            <div className="relative w-16 h-16">
+              <svg className="transform -rotate-90 w-16 h-16">
+                <circle
+                  cx="32"
+                  cy="32"
+                  r={radius / 3}
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="none"
+                  className="text-muted"
+                />
+                <circle
+                  cx="32"
+                  cy="32"
+                  r={radius / 3}
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="none"
+                  strokeDasharray={circumference / 3}
+                  strokeDashoffset={reportedOffset / 3}
+                  className="text-primary progress-circle"
+                  strokeLinecap="round"
+                  style={{ 
+                    '--progress-offset': `${reportedOffset / 3}px`,
+                    transition: 'stroke-dashoffset 1s ease-out'
+                  } as React.CSSProperties}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-lg font-bold text-primary">{reportedRate}%</span>
+              </div>
+            </div>
           </div>
-          <Progress value={reportedRate} className="h-3" />
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-muted-foreground" />

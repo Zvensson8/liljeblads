@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronDown, ChevronUp, Trash2, Plus, CheckCircle2, AlertCircle, XCircle, Download, Link2, FileText, ExternalLink } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Plus, CheckCircle2, AlertCircle, XCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -27,6 +27,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { TaskFormDialog } from "./TaskFormDialog";
 import { StatisticsCard } from "./StatisticsCard";
 import { exportQuarterToExcel } from "@/lib/operationsExport";
+import { ComponentAutoDetect } from "./ComponentAutoDetect";
+import { LinkedComponentCard } from "./LinkedComponentCard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Task {
   id: string;
@@ -44,9 +47,14 @@ interface TaskObject {
   is_reported: boolean;
   series_id: string | null;
   registration_number: string | null;
+  auto_detected_from: string | null;
+  manually_edited: boolean;
   component?: {
+    id: string;
     name: string;
     type: string;
+    room_zone: string | null;
+    floor_id: string;
     serial_number: string | null;
     registration_number: string | null;
   } | null;
@@ -77,11 +85,8 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
   const [newObjectName, setNewObjectName] = useState<Record<string, string>>({});
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   
-  // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "remaining" | "missing">("all");
-  
-  // Bulk operations state
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [bulkActionMode, setBulkActionMode] = useState(false);
 
@@ -114,13 +119,9 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
   };
 
   const calculateStats = (taskList: Task[]) => {
-    const completed = taskList.filter(
-      (t) => t.reported_count >= t.planned_count
-    ).length;
-    const remaining = taskList.filter(
-      (t) => t.reported_count > 0 && t.reported_count < t.planned_count
-    ).length;
-    const missing = taskList.filter((t) => t.reported_count === 0).length;
+    const completed = taskList.filter(t => t.reported_count >= t.planned_count).length;
+    const remaining = taskList.filter(t => t.reported_count > 0 && t.reported_count < t.planned_count).length;
+    const missing = taskList.filter(t => t.reported_count === 0).length;
     const totalPlanned = taskList.reduce((sum, t) => sum + t.planned_count, 0);
     const totalReported = taskList.reduce((sum, t) => sum + t.reported_count, 0);
     
@@ -154,7 +155,7 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
 
     if (!floors) return;
 
-    const floorIds = floors.map((f) => f.id);
+    const floorIds = floors.map(f => f.id);
 
     const { data: components } = await supabase
       .from("components")
@@ -175,9 +176,14 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
         is_reported,
         series_id,
         registration_number,
+        auto_detected_from,
+        manually_edited,
         component:components (
+          id,
           name,
           type,
+          room_zone,
+          floor_id,
           serial_number,
           registration_number
         )
@@ -205,7 +211,6 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
       return;
     }
 
-    // Fetch component to get serial_number and registration_number
     const { data: component } = await supabase
       .from("components")
       .select("serial_number, registration_number")
@@ -219,6 +224,7 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
       is_reported: false,
       series_id: component?.serial_number || null,
       registration_number: component?.registration_number || null,
+      manually_edited: false,
     });
 
     if (error) {
@@ -246,6 +252,7 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
       is_reported: false,
       series_id: null,
       registration_number: null,
+      manually_edited: false,
     });
 
     if (error) {
@@ -265,10 +272,10 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
       .update({ is_reported: isReported })
       .eq("id", objectId);
 
-    const newObjects = (taskObjects[taskId] || []).map((o) =>
+    const newObjects = (taskObjects[taskId] || []).map(o =>
       o.id === objectId ? { ...o, is_reported: isReported } : o
     );
-    const reportedCount = newObjects.filter((o) => o.is_reported).length;
+    const reportedCount = newObjects.filter(o => o.is_reported).length;
 
     await supabase
       .from("drift_tasks")
@@ -279,23 +286,8 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     fetchTasks();
   };
 
-  const handleUpdateObjectField = async (
-    taskId: string,
-    objectId: string,
-    field: "series_id" | "registration_number",
-    value: string
-  ) => {
-    await supabase
-      .from("drift_task_components")
-      .update({ [field]: value || null })
-      .eq("id", objectId);
-
-    fetchTaskObjects(taskId);
-  };
-
   const handleRemoveObject = async (taskId: string, objectId: string) => {
     await supabase.from("drift_task_components").delete().eq("id", objectId);
-
     toast.success("Objekt borttaget");
     fetchTaskObjects(taskId);
     fetchTasks();
@@ -313,10 +305,6 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     }
 
     fetchTasks();
-  };
-
-  const handleAddTask = async (e: React.FormEvent) => {
-    // This function is no longer used - replaced by TaskFormDialog
   };
 
   const handleExportQuarter = async () => {
@@ -346,7 +334,6 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     fetchTasks();
   };
 
-  // Bulk operations
   const handleToggleTaskSelection = (taskId: string) => {
     const newSelected = new Set(selectedTaskIds);
     if (newSelected.has(taskId)) {
@@ -400,7 +387,6 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     fetchTasks();
   };
 
-  // Filter tasks based on search and status
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = 
       task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -412,8 +398,16 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     return matchesSearch && matchesStatus;
   });
 
+  const completionRate = stats.totalTasks > 0 
+    ? Math.round((stats.completed / stats.totalTasks) * 100)
+    : 0;
+
+  const gradientClass = 
+    completionRate >= 80 ? 'gradient-success' :
+    completionRate >= 40 ? 'gradient-warning' : 'gradient-danger';
+
   return (
-    <Card>
+    <Card className={gradientClass}>
       <Collapsible open={expanded} onOpenChange={setExpanded}>
         <CardHeader className="cursor-pointer hover:bg-muted/50 p-4">
           <CollapsibleTrigger className="flex items-center justify-between w-full">
@@ -451,10 +445,8 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
 
         <CollapsibleContent>
           <CardContent className="space-y-4 p-4">
-            {/* Statistics Card */}
             <StatisticsCard stats={stats} quarter={quarter} />
 
-            {/* Search and Filter */}
             <div className="flex flex-wrap gap-3 pb-4 border-b">
               <Input
                 placeholder="Sök uppgifter..."
@@ -484,7 +476,6 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
               </Button>
             </div>
 
-            {/* Bulk Actions Bar */}
             {bulkActionMode && selectedTaskIds.size > 0 && (
               <div className="flex items-center gap-3 p-3 bg-primary/10 rounded-md">
                 <span className="text-sm font-medium">
@@ -635,261 +626,115 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
                         <TableRow>
                           <TableCell colSpan={bulkActionMode ? 9 : 8} className="bg-muted/30 p-4">
                             <div className="space-y-4">
-                              {/* Component-based objects section */}
-                              {taskObjects[task.id]?.some(obj => obj.component_id) && (
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <Link2 className="h-4 w-4 text-primary" />
-                                    <h4 className="text-sm font-semibold">
-                                      Komponentbaserade objekt ({taskObjects[task.id]?.filter(obj => obj.component_id).length || 0})
-                                    </h4>
-                                  </div>
-                                  <div className="rounded-md border">
-                                    <Table>
-                                      <TableHeader>
-                                        <TableRow className="bg-muted/50">
-                                          <TableHead className="w-[40px]"></TableHead>
-                                          <TableHead>Komponent</TableHead>
-                                          <TableHead className="w-[140px]">Serie-ID</TableHead>
-                                          <TableHead className="w-[140px]">Reg.nr</TableHead>
-                                          <TableHead className="w-[120px]">Åtgärder</TableHead>
-                                        </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                        {taskObjects[task.id]
-                                          ?.filter(obj => obj.component_id)
-                                          .map((obj) => {
-                                            const seriesId = obj.component?.serial_number || "";
-                                            const regNumber = obj.component?.registration_number || "";
-                                            
-                                            return (
-                                              <TableRow key={obj.id} className="hover:bg-muted/30">
-                                                <TableCell>
-                                                  <Checkbox
-                                                    checked={obj.is_reported}
-                                                    onCheckedChange={(checked) =>
-                                                      handleToggleReported(task.id, obj.id, checked as boolean)
-                                                    }
-                                                  />
-                                                </TableCell>
-                                                <TableCell>
-                                                  <div className="flex items-start gap-2">
-                                                    <Link2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                                                    <div>
-                                                      <p className="text-sm font-medium">{obj.component?.name}</p>
-                                                      <p className="text-xs text-muted-foreground">
-                                                        {obj.component?.type}
-                                                      </p>
-                                                    </div>
-                                                  </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                  <span className="text-sm text-muted-foreground">
-                                                    {seriesId || "-"}
-                                                  </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                  <span className="text-sm text-muted-foreground">
-                                                    {regNumber || "-"}
-                                                  </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                  <div className="flex gap-1">
-                                                    <Button
-                                                      variant="ghost"
-                                                      size="sm"
-                                                      onClick={() => {
-                                                        // Navigate to component - could open in dialog or navigate to components page
-                                                        toast.info("Visa komponent-funktion kommer snart");
-                                                      }}
-                                                      className="h-8 px-2"
-                                                      title="Visa komponent"
-                                                    >
-                                                      <ExternalLink className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                      variant="ghost"
-                                                      size="sm"
-                                                      onClick={() => handleRemoveObject(task.id, obj.id)}
-                                                      className="h-8 px-2"
-                                                      title="Ta bort"
-                                                    >
-                                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                  </div>
-                                                </TableCell>
-                                              </TableRow>
-                                            );
-                                          })}
-                                      </TableBody>
-                                    </Table>
+                              {taskObjects[task.id] && taskObjects[task.id].length > 0 && (
+                                <div className="space-y-3">
+                                  <h4 className="text-sm font-semibold">
+                                    Länkade objekt ({taskObjects[task.id].length})
+                                  </h4>
+                                  <div className="grid gap-2">
+                                    {taskObjects[task.id].map((obj) => (
+                                      <LinkedComponentCard
+                                        key={obj.id}
+                                        taskObject={obj}
+                                        onEdit={() => toast.info("Redigering öppnas snart")}
+                                        onUnlink={() => handleRemoveObject(task.id, obj.id)}
+                                        onToggleReported={() => 
+                                          handleToggleReported(task.id, obj.id, !obj.is_reported)
+                                        }
+                                      />
+                                    ))}
                                   </div>
                                 </div>
                               )}
 
-                              {/* Standalone objects section */}
-                              {taskObjects[task.id]?.some(obj => !obj.component_id) && (
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <FileText className="h-4 w-4 text-primary" />
-                                    <h4 className="text-sm font-semibold">
-                                      Fristående objekt ({taskObjects[task.id]?.filter(obj => !obj.component_id).length || 0})
-                                    </h4>
-                                  </div>
-                                  <div className="rounded-md border">
-                                    <Table>
-                                      <TableHeader>
-                                        <TableRow className="bg-muted/50">
-                                          <TableHead className="w-[40px]"></TableHead>
-                                          <TableHead>Objektnamn</TableHead>
-                                          <TableHead className="w-[140px]">Serie-ID</TableHead>
-                                          <TableHead className="w-[140px]">Reg.nr</TableHead>
-                                          <TableHead className="w-[80px]">Åtgärder</TableHead>
-                                        </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                        {taskObjects[task.id]
-                                          ?.filter(obj => !obj.component_id)
-                                          .map((obj) => {
-                                            return (
-                                              <TableRow key={obj.id} className="hover:bg-muted/30">
-                                                <TableCell>
-                                                  <Checkbox
-                                                    checked={obj.is_reported}
-                                                    onCheckedChange={(checked) =>
-                                                      handleToggleReported(task.id, obj.id, checked as boolean)
-                                                    }
-                                                  />
-                                                </TableCell>
-                                                <TableCell>
-                                                  <div className="flex items-center gap-2">
-                                                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                                    <p className="text-sm font-medium">{obj.object_name}</p>
-                                                  </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                  <Input
-                                                    type="text"
-                                                    value={obj.series_id || ""}
-                                                    onChange={(e) => {
-                                                      const newObjects = taskObjects[task.id].map(o =>
-                                                        o.id === obj.id ? { ...o, series_id: e.target.value } : o
-                                                      );
-                                                      setTaskObjects(prev => ({ ...prev, [task.id]: newObjects }));
-                                                    }}
-                                                    onBlur={(e) => {
-                                                      handleUpdateObjectField(task.id, obj.id, "series_id", e.target.value);
-                                                    }}
-                                                    className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
-                                                    placeholder="Serie-ID"
-                                                  />
-                                                </TableCell>
-                                                <TableCell>
-                                                  <Input
-                                                    type="text"
-                                                    value={obj.registration_number || ""}
-                                                    onChange={(e) => {
-                                                      const newObjects = taskObjects[task.id].map(o =>
-                                                        o.id === obj.id ? { ...o, registration_number: e.target.value } : o
-                                                      );
-                                                      setTaskObjects(prev => ({ ...prev, [task.id]: newObjects }));
-                                                    }}
-                                                    onBlur={(e) => {
-                                                      handleUpdateObjectField(task.id, obj.id, "registration_number", e.target.value);
-                                                    }}
-                                                    className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
-                                                    placeholder="Reg.nr"
-                                                  />
-                                                </TableCell>
-                                                <TableCell>
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleRemoveObject(task.id, obj.id)}
-                                                    className="h-8 px-2"
-                                                    title="Ta bort"
-                                                  >
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                  </Button>
-                                                </TableCell>
-                                              </TableRow>
-                                            );
-                                          })}
-                                      </TableBody>
-                                    </Table>
-                                  </div>
-                                </div>
-                              )}
+                              <div className="rounded-md border">
+                                <Tabs defaultValue="auto-detect" className="w-full">
+                                  <TabsList className="w-full grid grid-cols-3">
+                                    <TabsTrigger value="auto-detect">Auto-detektera</TabsTrigger>
+                                    <TabsTrigger value="dropdown">Välj från lista</TabsTrigger>
+                                    <TabsTrigger value="manual">Skapa fristående</TabsTrigger>
+                                  </TabsList>
+                                  
+                                  <TabsContent value="auto-detect" className="p-4">
+                                    <ComponentAutoDetect
+                                      propertyId={propertyId}
+                                      onSelectComponent={async (component) => {
+                                        const { error } = await supabase
+                                          .from("drift_task_components")
+                                          .insert({
+                                            task_id: task.id,
+                                            component_id: component.id,
+                                            object_name: null,
+                                            is_reported: false,
+                                            series_id: component.serial_number || null,
+                                            registration_number: component.registration_number || null,
+                                            auto_detected_from: component.name,
+                                            manually_edited: false,
+                                          });
 
-                              {taskObjects[task.id]?.length === 0 && (
-                                <div className="text-center py-6 border rounded-md bg-muted/20">
-                                  <p className="text-sm text-muted-foreground">
-                                    Inga objekt skapade ännu
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Lägg till objekt via formuläret nedan
-                                  </p>
-                                </div>
-                              )}
+                                        if (error) {
+                                          toast.error("Kunde inte länka komponent");
+                                          return;
+                                        }
 
-                              <div className="space-y-2 pt-2 border-t">
-                                <div className="flex gap-2">
-                                  <Input
-                                    placeholder="Nytt objektnamn..."
-                                    value={newObjectName[task.id] || ""}
-                                    onChange={(e) =>
-                                      setNewObjectName({
-                                        ...newObjectName,
-                                        [task.id]: e.target.value,
-                                      })
-                                    }
-                                    className="flex-1"
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && newObjectName[task.id]?.trim()) {
-                                        handleAddObjectByName(task.id);
-                                      }
-                                    }}
-                                  />
-                                  <Button
-                                    onClick={() => handleAddObjectByName(task.id)}
-                                    size="sm"
-                                    disabled={!newObjectName[task.id]?.trim()}
-                                  >
-                                    <Plus className="h-4 w-4 mr-1" />
-                                    Lägg till
-                                  </Button>
-                                </div>
-                                
-                                <div className="flex gap-2">
-                                  <Select
-                                    value={selectedComponentId[task.id] || ""}
-                                    onValueChange={(value) =>
-                                      setSelectedComponentId({
-                                        ...selectedComponentId,
-                                        [task.id]: value,
-                                      })
-                                    }
-                                  >
-                                    <SelectTrigger className="flex-1">
-                                      <SelectValue placeholder="Eller välj från komponenter..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {availableComponents.map((comp) => (
-                                        <SelectItem key={comp.id} value={comp.id}>
-                                          {comp.name} ({comp.type})
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Button
-                                    onClick={() => handleAddComponent(task.id)}
-                                    size="sm"
-                                    disabled={!selectedComponentId[task.id]}
-                                  >
-                                    <Plus className="h-4 w-4 mr-1" />
-                                    Lägg till
-                                  </Button>
-                                </div>
+                                        toast.success("Komponent länkad");
+                                        fetchTaskObjects(task.id);
+                                        fetchTasks();
+                                      }}
+                                    />
+                                  </TabsContent>
+
+                                  <TabsContent value="dropdown" className="p-4">
+                                    <div className="flex gap-2">
+                                      <Select
+                                        value={selectedComponentId[task.id] || ""}
+                                        onValueChange={(value) =>
+                                          setSelectedComponentId(prev => ({ ...prev, [task.id]: value }))
+                                        }
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Välj komponent..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {availableComponents.map((comp) => (
+                                            <SelectItem key={comp.id} value={comp.id}>
+                                              {comp.name} ({comp.type})
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Button
+                                        onClick={() => handleAddComponent(task.id)}
+                                        size="sm"
+                                      >
+                                        <Plus className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TabsContent>
+
+                                  <TabsContent value="manual" className="p-4">
+                                    <div className="flex gap-2">
+                                      <Input
+                                        placeholder="Objektnamn..."
+                                        value={newObjectName[task.id] || ""}
+                                        onChange={(e) =>
+                                          setNewObjectName(prev => ({ ...prev, [task.id]: e.target.value }))
+                                        }
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") {
+                                            handleAddObjectByName(task.id);
+                                          }
+                                        }}
+                                      />
+                                      <Button
+                                        onClick={() => handleAddObjectByName(task.id)}
+                                        size="sm"
+                                      >
+                                        <Plus className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TabsContent>
+                                </Tabs>
                               </div>
                             </div>
                           </TableCell>
@@ -901,25 +746,27 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
               </Table>
             )}
 
-            {/* Add new task */}
-            <div className="border-t pt-4 mt-4">
-              <Button onClick={() => setTaskDialogOpen(true)} variant="outline" size="sm">
+            <div className="flex justify-end pt-4">
+              <Button
+                onClick={() => setTaskDialogOpen(true)}
+                disabled={!propertyId}
+              >
                 <Plus className="h-4 w-4 mr-2" />
-                Lägg till ny uppgift
+                Skapa ny uppgift
               </Button>
             </div>
-
-            <TaskFormDialog
-              open={taskDialogOpen}
-              onOpenChange={setTaskDialogOpen}
-              propertyId={propertyId}
-              year={year}
-              quarter={quarter}
-              onSuccess={fetchTasks}
-            />
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
+
+      <TaskFormDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        propertyId={propertyId}
+        year={year}
+        quarter={quarter}
+        onSuccess={fetchTasks}
+      />
     </Card>
   );
 }

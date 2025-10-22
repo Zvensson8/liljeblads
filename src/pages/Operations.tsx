@@ -164,6 +164,20 @@ export default function Operations() {
                 <div className="flex flex-wrap gap-3">
                   <Button
                     variant="outline"
+                    onClick={() => setReportGeneratorOpen(true)}
+                    disabled={!selectedProperty}
+                  >
+                    Generera rapport
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setTemplateLibraryOpen(true)}
+                    disabled={!selectedProperty}
+                  >
+                    Mallbibliotek
+                  </Button>
+                  <Button
+                    variant="outline"
                     onClick={() => setCategoryDialogOpen(true)}
                     disabled={!selectedProperty}
                   >
@@ -265,6 +279,23 @@ export default function Operations() {
                 onOpenChange={setCategoryDialogOpen}
                 propertyId={selectedProperty}
               />
+
+              {selectedProperty && (
+                <>
+                  <ReportGenerator
+                    open={reportGeneratorOpen}
+                    onOpenChange={setReportGeneratorOpen}
+                    propertyId={selectedProperty}
+                    year={selectedYear}
+                  />
+
+                  <TaskTemplateLibrary
+                    open={templateLibraryOpen}
+                    onOpenChange={setTemplateLibraryOpen}
+                    propertyId={selectedProperty}
+                  />
+                </>
+              )}
             </div>
           </main>
         </SidebarInset>
