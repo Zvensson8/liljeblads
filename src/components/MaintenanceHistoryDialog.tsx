@@ -18,6 +18,7 @@ interface MaintenanceRecord {
   supplier: string | null;
   cost: number | null;
   notes: string | null;
+  category: string | null;
 }
 
 interface MaintenanceHistoryDialogProps {
@@ -46,7 +47,17 @@ export const MaintenanceHistoryDialog = ({
   const [supplier, setSupplier] = useState('');
   const [cost, setCost] = useState('');
   const [notes, setNotes] = useState('');
+  const [category, setCategory] = useState('');
   const { toast } = useToast();
+
+  const categories = [
+    'Drift',
+    'Renovering',
+    'Förebyggande underhåll',
+    'Akut reparation',
+    'Inspektion',
+    'Annat'
+  ];
 
   useEffect(() => {
     if (open) {
@@ -86,6 +97,7 @@ export const MaintenanceHistoryDialog = ({
         supplier: supplier || null,
         cost: cost ? parseFloat(cost) : null,
         notes: notes || null,
+        category: category || null,
       }]);
 
     if (error) {
@@ -104,6 +116,7 @@ export const MaintenanceHistoryDialog = ({
       setSupplier('');
       setCost('');
       setNotes('');
+      setCategory('');
       fetchRecords();
       onSuccess?.();
     }
@@ -170,7 +183,7 @@ export const MaintenanceHistoryDialog = ({
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="supplier">Leverantör/Utförare</Label>
                     <Input
@@ -190,6 +203,20 @@ export const MaintenanceHistoryDialog = ({
                       onChange={(e) => setCost(e.target.value)}
                       placeholder="T.ex. 33000"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Kategori</Label>
+                    <select
+                      id="category"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <option value="">Välj kategori</option>
+                      {categories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -225,6 +252,11 @@ export const MaintenanceHistoryDialog = ({
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-3">
                           <h4 className="font-semibold">{record.action_type}</h4>
+                          {record.category && (
+                            <span className="text-xs px-2 py-1 bg-muted rounded">
+                              {record.category}
+                            </span>
+                          )}
                           <span className="text-sm text-muted-foreground">
                             {format(new Date(record.performed_date), 'PPP', { locale: sv })}
                           </span>

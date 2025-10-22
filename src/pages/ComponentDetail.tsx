@@ -30,7 +30,6 @@ import { sv } from "date-fns/locale";
 import { ComponentFormDialog } from "@/components/ComponentFormDialog";
 import { MaintenanceHistoryDialog } from "@/components/MaintenanceHistoryDialog";
 import { ComponentDocuments } from "@/components/component/ComponentDocuments";
-import { ComponentCosts } from "@/components/component/ComponentCosts";
 
 interface Component {
   id: string;
@@ -293,11 +292,10 @@ export default function ComponentDetail() {
 
               {/* Main Content Tabs */}
               <Tabs defaultValue="info" className="w-full">
-                <TabsList className="grid w-full grid-cols-6">
+                <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="info">Information</TabsTrigger>
                   <TabsTrigger value="maintenance">Underhåll</TabsTrigger>
                   <TabsTrigger value="costs">Kostnadsanalys</TabsTrigger>
-                  <TabsTrigger value="operations">Driftkostnader</TabsTrigger>
                   <TabsTrigger value="location">Placering</TabsTrigger>
                   <TabsTrigger value="documents">Dokument</TabsTrigger>
                 </TabsList>
@@ -424,19 +422,19 @@ export default function ComponentDetail() {
                 <TabsContent value="costs">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Kostnadsanalys underhåll</CardTitle>
+                      <CardTitle>Kostnadsanalys</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-6">
                         <div className="grid grid-cols-2 gap-4">
                           <div className="p-4 border rounded-lg">
-                            <p className="text-sm text-muted-foreground mb-1">Total underhållskostnad</p>
+                            <p className="text-sm text-muted-foreground mb-1">Total kostnad</p>
                             <p className="text-2xl font-bold">
                               {totalMaintenanceCost.toLocaleString("sv-SE")} kr
                             </p>
                           </div>
                           <div className="p-4 border rounded-lg">
-                            <p className="text-sm text-muted-foreground mb-1">Genomsnittskostnad</p>
+                            <p className="text-sm text-muted-foreground mb-1">Genomsnittskostnad per åtgärd</p>
                             <p className="text-2xl font-bold">
                               {averageMaintenanceCost.toLocaleString("sv-SE")} kr
                             </p>
@@ -453,9 +451,9 @@ export default function ComponentDetail() {
                                   acc[category] = (acc[category] || 0) + (record.cost || 0);
                                   return acc;
                                 }, {} as Record<string, number>)
-                              ).map(([category, cost]) => (
+                              ).sort(([, a], [, b]) => b - a).map(([category, cost]) => (
                                 <div key={category} className="flex items-center justify-between p-3 border rounded-lg">
-                                  <span>{category}</span>
+                                  <span className="font-medium">{category}</span>
                                   <span className="font-semibold">{cost.toLocaleString("sv-SE")} kr</span>
                                 </div>
                               ))}
@@ -467,10 +465,6 @@ export default function ComponentDetail() {
                       </div>
                     </CardContent>
                   </Card>
-                </TabsContent>
-
-                <TabsContent value="operations">
-                  <ComponentCosts componentId={component.id} />
                 </TabsContent>
 
                 <TabsContent value="location">
