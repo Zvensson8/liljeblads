@@ -3,12 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, Mail, Calendar, Loader2, Building2, Settings } from "lucide-react";
+import { CheckCircle2, XCircle, Mail, Calendar, Loader2, Building2, Settings, Users as UsersIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -366,16 +366,24 @@ export default function Users() {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
-        <SidebarInset>
-          <main className="flex-1 p-6 md:p-8 space-y-8">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Användarhantering</h1>
-              <p className="text-muted-foreground">
-                Hantera och godkänn nya användare för systemet
-              </p>
+        <SidebarInset className="flex-1">
+          <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+            <SidebarTrigger />
+            <div className="flex items-center gap-2">
+              <UsersIcon className="h-5 w-5 text-primary" />
+              <h1 className="text-xl font-semibold">Användare</h1>
             </div>
+          </header>
+
+          <main className="flex-1 p-6">
+            <div className="max-w-7xl mx-auto space-y-6">
+              <div>
+                <p className="text-muted-foreground">
+                  Hantera och godkänn nya användare för systemet
+                </p>
+              </div>
 
             {/* Pending Users */}
             <div>
@@ -515,6 +523,7 @@ export default function Users() {
                   </Card>
                 ))}
               </div>
+            </div>
             </div>
           </main>
         </SidebarInset>

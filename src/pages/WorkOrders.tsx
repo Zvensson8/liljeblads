@@ -3,12 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { AppSidebar } from "@/components/AppSidebar";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Archive, Edit2, Trash2, LayoutGrid, Table as TableIcon } from "lucide-react";
+import { Plus, Search, Archive, Edit2, Trash2, LayoutGrid, Table as TableIcon, Wrench } from "lucide-react";
 import { WorkOrderDialog } from "@/components/WorkOrderDialog";
 import { WorkOrderDetailDialog } from "@/components/WorkOrderDetailDialog";
 import { WorkOrderKanban } from "@/components/WorkOrderKanban";
@@ -220,27 +220,34 @@ const WorkOrders = () => {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
         <SidebarInset className="flex-1">
-          <div className="container mx-auto p-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <h1 className="text-3xl font-bold">Arbetsordrar</h1>
-              <div className="relative w-96">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Sök fastigheter, komponenter, arbetsordrar"
-                  className="pl-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+          <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+            <SidebarTrigger />
+            <div className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-primary" />
+              <h1 className="text-xl font-semibold">Arbetsordrar</h1>
             </div>
+          </header>
 
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">{activeCount} aktiva arbetsordrar</span>
+          <main className="flex-1 p-6">
+            <div className="max-w-7xl mx-auto space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">{activeCount} aktiva arbetsordrar</span>
+                </div>
+                <div className="relative w-96">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Sök fastigheter, komponenter, arbetsordrar"
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
+
               <div className="flex gap-2">
                 <div className="flex gap-1 border border-border rounded-lg p-1">
                   <Button
@@ -279,9 +286,8 @@ const WorkOrders = () => {
                   Ny Arbetsorder
                 </Button>
               </div>
-            </div>
 
-            {viewMode === "kanban" ? (
+              {viewMode === "kanban" ? (
               <WorkOrderKanban
                 workOrders={filteredOrders(workOrders || [])}
                 onEdit={(order) => {
@@ -303,6 +309,7 @@ const WorkOrders = () => {
               </div>
             )}
           </div>
+        </main>
         </SidebarInset>
       </div>
 

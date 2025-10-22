@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { AppSidebar } from "@/components/AppSidebar";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { Building } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -126,16 +127,25 @@ export default function OrganizationSettings() {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
-        <main className="flex-1 p-8">
-          <div className="max-w-6xl mx-auto space-y-6">
-            <div>
-              <h1 className="text-3xl font-bold">{organization.name}</h1>
-              <p className="text-muted-foreground">
-                Hantera din organisations inställningar och medlemmar
-              </p>
+        <SidebarInset className="flex-1">
+          <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+            <SidebarTrigger />
+            <div className="flex items-center gap-2">
+              <Building className="h-5 w-5 text-primary" />
+              <h1 className="text-xl font-semibold">Organisation</h1>
             </div>
+          </header>
+
+          <main className="flex-1 p-6">
+            <div className="max-w-6xl mx-auto space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold">{organization.name}</h2>
+                <p className="text-muted-foreground">
+                  Hantera din organisations inställningar och medlemmar
+                </p>
+              </div>
 
             {/* Statistik Cards */}
             <div className="grid gap-4 md:grid-cols-3">
@@ -229,8 +239,9 @@ export default function OrganizationSettings() {
                 </TabsContent>
               )}
             </Tabs>
-          </div>
-        </main>
+            </div>
+          </main>
+        </SidebarInset>
       </div>
     </SidebarProvider>
   );

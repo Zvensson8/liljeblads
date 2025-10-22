@@ -252,14 +252,9 @@ const Properties = () => {
             <div className="flex h-16 items-center gap-4 px-6">
               <SidebarTrigger className="hover:bg-muted rounded-md p-2 transition-colors" />
               
-              <div className="flex items-center gap-3 flex-1">
-                <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-                  <Compass className="h-5 w-5 text-primary-foreground" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold">NavRitning</h1>
-                  <p className="text-xs text-muted-foreground">Professionell ritningshantering</p>
-                </div>
+              <div className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                <h1 className="text-xl font-semibold">Fastigheter</h1>
               </div>
 
               <div className="flex items-center gap-2">
