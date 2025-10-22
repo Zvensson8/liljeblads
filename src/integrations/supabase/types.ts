@@ -626,6 +626,382 @@ export type Database = {
         }
         Relationships: []
       }
+      project_activity_log: {
+        Row: {
+          activity_type: string
+          created_at: string | null
+          created_by: string | null
+          description: string
+          id: string
+          metadata: Json | null
+          project_id: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          id?: string
+          metadata?: Json | null
+          project_id: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          id?: string
+          metadata?: Json | null
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_activity_log_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_budget_items: {
+        Row: {
+          budgeted_amount: number
+          category: string | null
+          created_at: string | null
+          description: string
+          forecasted_amount: number | null
+          id: string
+          project_id: string
+        }
+        Insert: {
+          budgeted_amount: number
+          category?: string | null
+          created_at?: string | null
+          description: string
+          forecasted_amount?: number | null
+          id?: string
+          project_id: string
+        }
+        Update: {
+          budgeted_amount?: number
+          category?: string | null
+          created_at?: string | null
+          description?: string
+          forecasted_amount?: number | null
+          id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_budget_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_checklist_items: {
+        Row: {
+          completed: boolean | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string | null
+          deadline: string | null
+          description: string | null
+          id: string
+          order_index: number | null
+          project_id: string
+          responsible: string | null
+          title: string
+        }
+        Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          order_index?: number | null
+          project_id: string
+          responsible?: string | null
+          title: string
+        }
+        Update: {
+          completed?: boolean | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          order_index?: number | null
+          project_id?: string
+          responsible?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_checklist_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_checklist_templates: {
+        Row: {
+          created_at: string | null
+          id: string
+          items: Json
+          name: string
+          project_type: Database["public"]["Enums"]["project_type"]
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          items: Json
+          name: string
+          project_type: Database["public"]["Enums"]["project_type"]
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          items?: Json
+          name?: string
+          project_type?: Database["public"]["Enums"]["project_type"]
+        }
+        Relationships: []
+      }
+      project_cost_items: {
+        Row: {
+          actor: string | null
+          amount: number
+          category: string | null
+          cost_date: string
+          created_at: string | null
+          created_by: string | null
+          description: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          actor?: string | null
+          amount: number
+          category?: string | null
+          cost_date: string
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          id?: string
+          project_id: string
+        }
+        Update: {
+          actor?: string | null
+          amount?: number
+          category?: string | null
+          cost_date?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_cost_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_document_comments: {
+        Row: {
+          comment: string
+          created_at: string | null
+          created_by: string | null
+          document_id: string
+          id: string
+        }
+        Insert: {
+          comment: string
+          created_at?: string | null
+          created_by?: string | null
+          document_id: string
+          id?: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string | null
+          created_by?: string | null
+          document_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_document_comments_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "project_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_documents: {
+        Row: {
+          created_at: string | null
+          file_size: number | null
+          file_url: string
+          folder: string | null
+          id: string
+          mime_type: string | null
+          name: string
+          project_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_size?: number | null
+          file_url: string
+          folder?: string | null
+          id?: string
+          mime_type?: string | null
+          name: string
+          project_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_size?: number | null
+          file_url?: string
+          folder?: string | null
+          id?: string
+          mime_type?: string | null
+          name?: string
+          project_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_notes: {
+        Row: {
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          project_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          project_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          project_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_notes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          actors: string[] | null
+          actual_cost: number | null
+          budget: number | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_date: string | null
+          forecast: number | null
+          id: string
+          is_archived: boolean | null
+          name: string
+          project_manager: string | null
+          project_number: string
+          property_id: string
+          start_date: string | null
+          status: Database["public"]["Enums"]["project_status"]
+          type: Database["public"]["Enums"]["project_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          actors?: string[] | null
+          actual_cost?: number | null
+          budget?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          forecast?: number | null
+          id?: string
+          is_archived?: boolean | null
+          name: string
+          project_manager?: string | null
+          project_number: string
+          property_id: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["project_status"]
+          type: Database["public"]["Enums"]["project_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          actors?: string[] | null
+          actual_cost?: number | null
+          budget?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          forecast?: number | null
+          id?: string
+          is_archived?: boolean | null
+          name?: string
+          project_manager?: string | null
+          project_number?: string
+          property_id?: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["project_status"]
+          type?: Database["public"]["Enums"]["project_type"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       properties: {
         Row: {
           address: string | null
@@ -1018,6 +1394,14 @@ export type Database = {
         | "SC5.5"
         | "SC7.1"
         | "SC7.2"
+      project_status:
+        | "planerat"
+        | "invantar_offert"
+        | "offert_finns"
+        | "pagaende"
+        | "pausat"
+        | "avslutat"
+      project_type: "renovering" | "underhall" | "energi" | "annat"
       quarter_type: "Q1" | "Q2" | "Q3" | "Q4"
       task_status: "completed" | "remaining" | "missing"
       user_role: "admin" | "user" | "reader"
@@ -1185,6 +1569,15 @@ export const Constants = {
         "SC7.1",
         "SC7.2",
       ],
+      project_status: [
+        "planerat",
+        "invantar_offert",
+        "offert_finns",
+        "pagaende",
+        "pausat",
+        "avslutat",
+      ],
+      project_type: ["renovering", "underhall", "energi", "annat"],
       quarter_type: ["Q1", "Q2", "Q3", "Q4"],
       task_status: ["completed", "remaining", "missing"],
       user_role: ["admin", "user", "reader"],

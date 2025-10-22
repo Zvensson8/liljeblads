@@ -15,6 +15,7 @@ import Users from "./pages/Users";
 import Operations from "./pages/Operations";
 import CostOverview from "./pages/CostOverview";
 import WorkOrders from "./pages/WorkOrders";
+import Projects from "./pages/Projects";
 import NotFound from "./pages/NotFound";
 
 const AppContent = () => {
@@ -28,6 +29,7 @@ const AppContent = () => {
       <Route path="/components" element={<Components />} />
       <Route path="/work-orders" element={<WorkOrders />} />
       <Route path="/operations" element={<Operations />} />
+      <Route path="/projects" element={<Projects />} />
       <Route path="/cost-overview" element={<CostOverview />} />
       <Route path="/users" element={<Users />} />
       <Route path="*" element={<NotFound />} />
