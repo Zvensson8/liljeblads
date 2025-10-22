@@ -408,8 +408,11 @@ const Dashboard = () => {
                 <div className="lg:col-span-1">
                   <RecentlyVisitedWidget />
                 </div>
-                {/* Ongoing Projects */}
-                <Card className="border-border/50 lg:col-span-1">
+                
+                {/* Projects and Work Orders side by side */}
+                <div className="lg:col-span-2 grid gap-6 md:grid-cols-2">
+                  {/* Ongoing Projects */}
+                  <Card className="border-border/50">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Pågående Projekt</CardTitle>
@@ -438,9 +441,9 @@ const Dashboard = () => {
                             className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
                             onClick={() => navigate(`/projects/${project.id}`)}
                           >
-                            <div className="flex-1">
-                              <div className="font-medium mb-1">{project.name}</div>
-                              <div className="text-sm text-muted-foreground">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium mb-1 truncate">{project.name}</div>
+                              <div className="text-sm text-muted-foreground truncate">
                                 {project.properties?.name}
                               </div>
                               <div className="text-xs text-muted-foreground mt-1">
@@ -448,16 +451,16 @@ const Dashboard = () => {
                                 {project.end_date && ` - ${new Date(project.end_date).toLocaleDateString('sv-SE')}`}
                               </div>
                             </div>
-                            <div>{getStatusBadge(project.status)}</div>
+                            <div className="ml-2 shrink-0">{getStatusBadge(project.status)}</div>
                           </div>
                         ))}
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                  </Card>
 
-                {/* Ongoing Work Orders */}
-                <Card className="border-border/50 lg:col-span-1">
+                  {/* Ongoing Work Orders */}
+                  <Card className="border-border/50">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Pågående Arbetsordrar</CardTitle>
@@ -486,9 +489,9 @@ const Dashboard = () => {
                             className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
                             onClick={() => navigate('/work-orders')}
                           >
-                            <div className="flex-1">
-                              <div className="font-medium mb-1">{wo.action}</div>
-                              <div className="text-sm text-muted-foreground">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium mb-1 truncate">{wo.action}</div>
+                              <div className="text-sm text-muted-foreground truncate">
                                 {wo.properties?.name}
                               </div>
                               <div className="text-xs text-muted-foreground mt-1">
@@ -496,7 +499,7 @@ const Dashboard = () => {
                                 {wo.contractor && ` • ${wo.contractor}`}
                               </div>
                             </div>
-                            <div className="flex flex-col gap-1 items-end">
+                            <div className="flex flex-col gap-1 items-end ml-2 shrink-0">
                               {getStatusBadge(wo.status)}
                               {getPriorityBadge(wo.priority)}
                             </div>
@@ -505,7 +508,8 @@ const Dashboard = () => {
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                  </Card>
+                </div>
               </div>
 
               {/* To-Do List */}
