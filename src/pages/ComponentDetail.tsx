@@ -266,6 +266,7 @@ export default function ComponentDetail() {
                 Ta bort
               </Button>
             </div>
+            </div>
           </header>
 
           <main className="flex-1 p-6">

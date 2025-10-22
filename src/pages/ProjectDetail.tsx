@@ -261,6 +261,7 @@ export default function ProjectDetail() {
                 </Button>
               )}
             </div>
+            </div>
           </header>
 
           <main className="flex-1 p-6">
