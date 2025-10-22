@@ -29,6 +29,7 @@ import { ProjectChecklistManagement } from "@/components/projects/ProjectCheckli
 import { ProjectDocuments } from "@/components/projects/ProjectDocuments";
 import { ProjectSimulation } from "@/components/projects/ProjectSimulation";
 import { ProjectActivityLog } from "@/components/projects/ProjectActivityLog";
+import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
 
 type ProjectStatus = Database["public"]["Enums"]["project_status"];
 type ProjectType = Database["public"]["Enums"]["project_type"];
@@ -62,6 +63,7 @@ export default function ProjectDetail() {
   const navigate = useNavigate();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -197,7 +199,7 @@ export default function ProjectDetail() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => navigate(`/projects?edit=${project.id}`)}>
+              <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(true)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Redigera
               </Button>
@@ -464,6 +466,13 @@ export default function ProjectDetail() {
           </main>
         </SidebarInset>
       </div>
+
+      <ProjectFormDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={fetchProject}
+        editingProject={project}
+      />
     </SidebarProvider>
   );
 }
