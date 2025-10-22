@@ -374,25 +374,37 @@ const Dashboard = () => {
                 </div>
                 <div className="lg:col-span-4 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                   {kpiCards.map((kpi) => (
-                    <Card key={kpi.title} className="border-border/50 hover:shadow-[var(--shadow-elegant)] transition-all">
-                      <CardContent className="pt-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className={`p-3 rounded-lg ${kpi.bgColor}`}>
-                            <kpi.icon className={`h-6 w-6 ${kpi.color}`} />
-                          </div>
-                          {getTrendIcon(kpi.value, kpi.prev) && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              {getTrendIcon(kpi.value, kpi.prev)}
+                    <Card key={kpi.title} className="border-border/50 hover:shadow-[var(--shadow-elegant)] transition-all bg-card">
+                      <CardContent className="pt-6 pb-6">
+                        <div className="space-y-3">
+                          {/* Icon with colored background */}
+                          <div className="flex items-start justify-between">
+                            <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
+                              <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
                             </div>
-                          )}
-                        </div>
-                        <div className="space-y-1">
+                            {getTrendIcon(kpi.value, kpi.prev) && (
+                              <div className="flex items-center gap-1">
+                                {getTrendIcon(kpi.value, kpi.prev)}
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Title */}
                           <p className="text-sm font-medium text-muted-foreground">{kpi.title}</p>
-                          <p className="text-3xl font-bold">{kpi.value}</p>
+                          
+                          {/* Big number */}
+                          <div className="flex items-baseline gap-2">
+                            <p className="text-4xl font-bold">{kpi.value}</p>
+                            <span className="text-sm text-muted-foreground">–</span>
+                          </div>
+                          
+                          {/* Subtitle */}
                           {kpi.subtitle && (
                             <p className="text-sm text-muted-foreground">{kpi.subtitle}</p>
                           )}
-                          <p className="text-xs text-muted-foreground">
+                          
+                          {/* Description */}
+                          <p className="text-sm text-muted-foreground">
                             {kpi.description}
                           </p>
                         </div>
