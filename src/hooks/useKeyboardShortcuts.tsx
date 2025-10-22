@@ -13,6 +13,9 @@ interface ShortcutHandler {
 export const useKeyboardShortcuts = (shortcuts: ShortcutHandler[]) => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if event.key is defined before accessing toLowerCase
+      if (!event.key) return;
+      
       for (const shortcut of shortcuts) {
         const ctrlOrCmd = event.ctrlKey || event.metaKey;
         

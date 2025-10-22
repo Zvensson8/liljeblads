@@ -372,10 +372,10 @@ export function WorkOrderDetailDialog({
       />
 
       <AlertDialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent aria-describedby="convert-description">
           <AlertDialogHeader>
             <AlertDialogTitle>Konvertera till projekt?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription id="convert-description">
               Detta kommer att skapa ett nytt projekt baserat på denna arbetsorder. 
               Arbetsordern kommer att arkiveras automatiskt. 
               Du kan redigera projektdetaljer efter konverteringen.

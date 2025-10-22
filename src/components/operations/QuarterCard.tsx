@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Fragment } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -530,8 +531,8 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
                 </TableHeader>
                 <TableBody>
                   {filteredTasks.map((task) => (
-                    <>
-                      <TableRow key={task.id} className="hover:bg-muted/50">
+                    <Fragment key={task.id}>
+                      <TableRow className="hover:bg-muted/50">
                         {bulkActionMode && (
                           <TableCell>
                             <Checkbox
@@ -740,7 +741,7 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
