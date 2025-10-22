@@ -1,6 +1,8 @@
-import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building } from "lucide-react";
+import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown } from "lucide-react";
+import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
   SidebarContent,
@@ -30,8 +32,28 @@ const navigationItems = [
 
 export function AppSidebar() {
   const { state } = useSidebar();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const isCollapsed = state === "collapsed";
+  const [isFounder, setIsFounder] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      checkFounderRole();
+    }
+  }, [user]);
+
+  const checkFounderRole = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "founder" as any)
+      .single();
+    
+    setIsFounder(!!data);
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -87,6 +109,36 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Founder Admin Section */}
+        {isFounder && (
+          <SidebarGroup>
+            <SidebarGroupLabel className={`text-muted-foreground text-xs uppercase tracking-wider ${isCollapsed ? 'sr-only' : ''}`}>
+              Founder
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild className="hover:bg-sidebar-accent">
+                    <NavLink
+                      to="/founder/admin"
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-sidebar-foreground ${
+                          isActive
+                            ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium shadow-lg'
+                            : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        }`
+                      }
+                    >
+                      <Crown className="h-5 w-5 flex-shrink-0" />
+                      {!isCollapsed && <span>Admin Panel</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       {/* Footer with external link and sign out */}
