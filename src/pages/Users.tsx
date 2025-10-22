@@ -43,6 +43,7 @@ export default function Users() {
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [userProperties, setUserProperties] = useState<string[]>([]);
   const [savingProperties, setSavingProperties] = useState(false);
+  const [isFounder, setIsFounder] = useState(false);
   const [editForm, setEditForm] = useState({
     approved: false,
     profile_role: "user",
@@ -57,10 +58,27 @@ export default function Users() {
 
   useEffect(() => {
     if (user) {
+      checkFounderStatus();
       fetchProfiles();
       fetchProperties();
     }
   }, [user]);
+
+  const checkFounderStatus = async () => {
+    try {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user?.id)
+        .eq("role", "founder" as any)
+        .single();
+
+      setIsFounder(!!data);
+    } catch (error) {
+      console.error("Error checking founder status:", error);
+      setIsFounder(false);
+    }
+  };
 
   const fetchProfiles = async () => {
     try {
@@ -213,6 +231,16 @@ export default function Users() {
   const handleSaveUserEdit = async () => {
     if (!selectedUser) return;
 
+    // Endast founder kan ändra systemroller
+    if (!isFounder) {
+      toast({
+        title: "Åtkomst nekad",
+        description: "Endast founder kan ändra systemroller",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setProcessingId(selectedUser.id);
     try {
       // Uppdatera profiles
@@ -265,7 +293,7 @@ export default function Users() {
       console.error("Error updating user:", error);
       toast({
         title: "Fel",
-        description: "Kunde inte uppdatera användare",
+        description: `Kunde inte uppdatera användare: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -555,6 +583,7 @@ export default function Users() {
               <Select
                 value={editForm.system_role}
                 onValueChange={(value) => setEditForm({ ...editForm, system_role: value })}
+                disabled={!isFounder}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -566,7 +595,9 @@ export default function Users() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Founder har full tillgång till alla funktioner
+                {isFounder 
+                  ? "Founder har full tillgång till alla funktioner"
+                  : "Endast founder kan ändra systemroller"}
               </p>
             </div>
           </div>
