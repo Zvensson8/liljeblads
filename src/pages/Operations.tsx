@@ -160,10 +160,12 @@ export default function Operations() {
 
           <main className="flex-1 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap gap-2 sm:gap-3">
                   <Button
                     variant="outline"
+                    size="sm"
+                    className="flex-1 sm:flex-none"
                     onClick={() => setReportGeneratorOpen(true)}
                     disabled={!selectedProperty}
                   >
@@ -171,6 +173,8 @@ export default function Operations() {
                   </Button>
                   <Button
                     variant="outline"
+                    size="sm"
+                    className="flex-1 sm:flex-none"
                     onClick={() => setTemplateLibraryOpen(true)}
                     disabled={!selectedProperty}
                   >
@@ -178,6 +182,8 @@ export default function Operations() {
                   </Button>
                   <Button
                     variant="outline"
+                    size="sm"
+                    className="flex-1 sm:flex-none"
                     onClick={() => setCategoryDialogOpen(true)}
                     disabled={!selectedProperty}
                   >
@@ -185,20 +191,25 @@ export default function Operations() {
                   </Button>
                   <Button
                     variant="outline"
+                    size="sm"
+                    className="flex-1 sm:flex-none"
                     onClick={handleCopyYear}
                     disabled={loading || !selectedProperty}
                   >
                     {loading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Copy className="h-4 w-4" />
+                      <Copy className="h-4 w-4 mr-2" />
                     )}
-                    Kopiera år
+                    <span className="hidden sm:inline">Kopiera år</span>
+                    <span className="sm:hidden">Kopiera</span>
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="outline"
+                        size="sm"
+                        className="flex-1 sm:flex-none"
                         disabled={!selectedProperty || loading}
                       >
                         <FileSpreadsheet className="h-4 w-4 mr-2" />

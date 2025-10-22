@@ -338,14 +338,14 @@ const Dashboard = () => {
           <main className="flex-1 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
               {/* Header with Property Filter */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-3xl font-bold">Välkommen till {organization?.name || 'NavRitning'}</h2>
+                  <h2 className="text-2xl sm:text-3xl font-bold">Välkommen till {organization?.name || 'NavRitning'}</h2>
                   <p className="text-muted-foreground">
                     Sammanställning av {organization?.name ? 'organisationens' : 'dina'} fastigheter och uppgifter
                   </p>
                 </div>
-                <div className="w-64">
+                <div className="w-full sm:w-64">
                   <Select value={selectedProperty} onValueChange={setSelectedProperty}>
                     <SelectTrigger>
                       <SelectValue placeholder="Välj fastighet" />

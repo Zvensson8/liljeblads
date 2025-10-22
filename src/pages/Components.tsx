@@ -234,13 +234,13 @@ const Components = () => {
                 </TabsList>
 
                 <TabsContent value="components" className="space-y-6">
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                       <p className="text-muted-foreground">
                         Hantera alla komponenter från dina fastigheter
                       </p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
                   <Badge variant="outline" className="text-base px-4 py-2">
                     {components.length} komponenter
                   </Badge>
@@ -248,7 +248,7 @@ const Components = () => {
                   {components.length > 0 && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline">
+                        <Button variant="outline" size="sm">
                           <Download className="h-4 w-4 mr-2" />
                           Exportera
                         </Button>
@@ -263,7 +263,7 @@ const Components = () => {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
-                      <Button onClick={handleNewComponent}>
+                      <Button onClick={handleNewComponent} className="flex-1 sm:flex-none">
                         <Plus className="h-4 w-4 mr-2" />
                         Ny komponent
                       </Button>

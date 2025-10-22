@@ -210,7 +210,7 @@ export default function Projects() {
           <main className="flex-1 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
               <Tabs defaultValue="active" className="w-full" onValueChange={(value) => setShowArchived(value === 'archived')}>
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                   <TabsList>
                     <TabsTrigger value="active">Aktiva projekt</TabsTrigger>
                     <TabsTrigger value="archived">Arkiverade projekt</TabsTrigger>
@@ -294,7 +294,7 @@ export default function Projects() {
                         Projekt ({filteredProjects.length})
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="overflow-x-auto">
                       {filteredProjects.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
                           <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -306,7 +306,7 @@ export default function Projects() {
                           </p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto">
+                        <div className="min-w-[800px]">
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -391,14 +391,14 @@ export default function Projects() {
                         Arkiverade projekt
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="overflow-x-auto">
                       {filteredProjects.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
                           <FolderArchive className="h-12 w-12 mx-auto mb-4 opacity-50" />
                           <p className="text-lg mb-2">Inga arkiverade projekt</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto">
+                        <div className="min-w-[800px]">
                           <Table>
                             <TableHeader>
                               <TableRow>

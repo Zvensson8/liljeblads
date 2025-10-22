@@ -335,11 +335,11 @@ export default function ComponentDetail() {
 
               {/* Main Content Tabs */}
               <Tabs defaultValue="info" className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="info">Information</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+                  <TabsTrigger value="info">Info</TabsTrigger>
                   <TabsTrigger value="maintenance">Underhåll</TabsTrigger>
-                  <TabsTrigger value="costs">Kostnadsanalys</TabsTrigger>
-                  <TabsTrigger value="location">Placering</TabsTrigger>
+                  <TabsTrigger value="costs">Kostnader</TabsTrigger>
+                  <TabsTrigger value="location">Plats</TabsTrigger>
                   <TabsTrigger value="documents">Dokument</TabsTrigger>
                 </TabsList>
 

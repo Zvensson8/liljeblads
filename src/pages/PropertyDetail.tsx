@@ -389,21 +389,21 @@ const PropertyDetail = () => {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full">
               <Button variant="ghost" size="sm" onClick={() => navigate('/properties')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Tillbaka
               </Button>
-              <div className="h-8 w-px bg-border" />
-              <div className="flex items-center gap-3">
+              <div className="h-8 w-px bg-border hidden sm:block" />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
                 <div>
-                  <h1 className="text-2xl font-bold">{property.name}</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold">{property.name}</h1>
                   <p className="text-sm text-muted-foreground">
                     {property.property_number ? `#${property.property_number}` : `#${property.id.substring(0, 5).toUpperCase()}`}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {urgentWorkOrders > 0 && (
                     <Badge variant="destructive" className="gap-1">
                       <AlertCircle className="h-3 w-3" />
@@ -424,9 +424,10 @@ const PropertyDetail = () => {
                 </div>
               </div>
             </div>
-            <Button className="gap-2" onClick={() => setEditDialogOpen(true)}>
+            <Button className="gap-2 w-full sm:w-auto" onClick={() => setEditDialogOpen(true)}>
               <Edit className="h-4 w-4" />
-              Redigera Fastighet
+              <span className="hidden sm:inline">Redigera Fastighet</span>
+              <span className="sm:hidden">Redigera</span>
             </Button>
           </div>
         </div>

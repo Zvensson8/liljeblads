@@ -231,14 +231,14 @@ export default function CostOverview() {
           <main className="flex-1 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
               {/* Welcome and Quick Summary */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-3xl font-bold mb-2">Ekonomisk översikt</h2>
+                  <h2 className="text-2xl sm:text-3xl font-bold mb-2">Ekonomisk översikt</h2>
                   <p className="text-muted-foreground">
                     Fullständig översikt av underhållskostnader
                   </p>
                 </div>
-                <Button onClick={() => setBudgetDialogOpen(true)}>
+                <Button onClick={() => setBudgetDialogOpen(true)} className="w-full sm:w-auto">
                   <Calendar className="mr-2 h-4 w-4" />
                   Skapa budget
                 </Button>
@@ -267,9 +267,9 @@ export default function CostOverview() {
                     <Filter className="h-5 w-5 text-muted-foreground" />
                   </div>
                 </CardHeader>
-                <CardContent className="flex gap-4">
+                <CardContent className="flex flex-col sm:flex-row gap-4">
                   <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-                    <SelectTrigger className="w-[200px]">
+                    <SelectTrigger className="w-full sm:w-[200px]">
                       <SelectValue placeholder="Välj period" />
                     </SelectTrigger>
                     <SelectContent>
