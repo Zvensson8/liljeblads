@@ -1,3 +1,4 @@
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { NotificationsProvider } from "@/hooks/useNotifications";
 import { useGlobalShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { GlobalSearchDialog } from "@/components/GlobalSearchDialog";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import Properties from "./pages/Properties";
@@ -23,9 +25,12 @@ import FounderAdmin from "./pages/FounderAdmin";
 import NotFound from "./pages/NotFound";
 
 const AppContent = () => {
-  useGlobalShortcuts();
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  useGlobalShortcuts(() => setSearchOpen(true));
   return (
-    <Routes>
+    <>
+      <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <Routes>
       <Route path="/" element={<Dashboard />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/properties" element={<Properties />} />
@@ -42,6 +47,7 @@ const AppContent = () => {
       <Route path="/founder/admin" element={<FounderAdmin />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </>
   );
 };
 

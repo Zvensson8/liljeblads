@@ -6,10 +6,12 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrganization } from '@/hooks/useOrganization';
-import { Building2, Wrench, FolderKanban, CheckSquare, Loader2, TrendingUp } from 'lucide-react';
+import { Building2, Wrench, FolderKanban, CheckSquare, Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AttentionRequiredSection } from '@/components/AttentionRequiredSection';
+import { RecentlyVisitedWidget } from '@/components/RecentlyVisitedWidget';
 
 interface DashboardStats {
   totalProperties: number;
@@ -73,6 +75,7 @@ const Dashboard = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [prevStats, setPrevStats] = useState<DashboardStats | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -183,7 +186,7 @@ const Dashboard = () => {
       setProjects(projectsData || []);
       setTodos(todosData || []);
       
-      setStats({
+      const newStats = {
         totalProperties: selectedProperty === "all" ? properties.length : 1,
         totalWorkOrders: totalWO || 0,
         totalProjects: totalProj || 0,
@@ -191,7 +194,10 @@ const Dashboard = () => {
         pendingWorkOrders: pendingWO || 0,
         activeProjects: activeProj || 0,
         completedTodos: completedTodoCount || 0,
-      });
+      };
+      
+      setPrevStats(stats.totalWorkOrders > 0 ? stats : prevStats);
+      setStats(newStats);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -258,10 +264,27 @@ const Dashboard = () => {
     );
   }
 
+  const getTrendIcon = (current: number, previous: number | undefined) => {
+    if (!previous || previous === 0) return null;
+    const change = ((current - previous) / previous) * 100;
+    if (Math.abs(change) < 1) return <Minus className="h-3 w-3 text-muted-foreground" />;
+    if (change > 0) return <TrendingUp className="h-3 w-3 text-green-500" />;
+    return <TrendingDown className="h-3 w-3 text-red-500" />;
+  };
+
+  const getTrendText = (current: number, previous: number | undefined) => {
+    if (!previous || previous === 0) return null;
+    const change = ((current - previous) / previous) * 100;
+    if (Math.abs(change) < 1) return null;
+    const sign = change > 0 ? "+" : "";
+    return `${sign}${change.toFixed(0)}% från förra perioden`;
+  };
+
   const kpiCards = [
     {
       title: 'Fastigheter',
       value: stats.totalProperties,
+      prev: prevStats?.totalProperties,
       icon: Building2,
       description: selectedProperty === "all" ? 'Alla fastigheter' : 'Vald fastighet',
       color: 'text-blue-500',
@@ -270,6 +293,7 @@ const Dashboard = () => {
     {
       title: 'Arbetsordrar',
       value: stats.totalWorkOrders,
+      prev: prevStats?.totalWorkOrders,
       subtitle: `${stats.pendingWorkOrders} pågående`,
       icon: Wrench,
       description: 'Totalt antal arbetsordrar',
@@ -279,6 +303,7 @@ const Dashboard = () => {
     {
       title: 'Projekt',
       value: stats.totalProjects,
+      prev: prevStats?.totalProjects,
       subtitle: `${stats.activeProjects} aktiva`,
       icon: FolderKanban,
       description: 'Totalt antal projekt',
@@ -288,6 +313,7 @@ const Dashboard = () => {
     {
       title: 'Att göra',
       value: stats.totalTodos,
+      prev: prevStats?.totalTodos,
       subtitle: `${stats.completedTodos} klara`,
       icon: CheckSquare,
       description: 'Totalt antal uppgifter',
@@ -336,29 +362,47 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* KPI Cards */}
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                {kpiCards.map((kpi) => (
-                  <Card key={kpi.title} className="border-border/50">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">
-                        {kpi.title}
-                      </CardTitle>
-                      <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
-                        <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold mb-1">{kpi.value}</div>
-                      {kpi.subtitle && (
-                        <p className="text-xs text-muted-foreground mb-1">{kpi.subtitle}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {kpi.description}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
+              {/* Attention Required Section */}
+              <AttentionRequiredSection 
+                propertyId={selectedProperty === "all" ? undefined : selectedProperty} 
+              />
+
+              {/* Recently Visited Widget + KPI Cards */}
+              <div className="grid gap-6 lg:grid-cols-5">
+                <div className="lg:col-span-1">
+                  <RecentlyVisitedWidget />
+                </div>
+                <div className="lg:col-span-4 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  {kpiCards.map((kpi) => (
+                    <Card key={kpi.title} className="border-border/50 hover:shadow-[var(--shadow-elegant)] transition-all">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          {kpi.title}
+                        </CardTitle>
+                        <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
+                          <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <div className="text-3xl font-bold">{kpi.value}</div>
+                          {getTrendIcon(kpi.value, kpi.prev)}
+                        </div>
+                        {getTrendText(kpi.value, kpi.prev) && (
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {getTrendText(kpi.value, kpi.prev)}
+                          </p>
+                        )}
+                        {kpi.subtitle && (
+                          <p className="text-xs text-muted-foreground mb-1">{kpi.subtitle}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {kpi.description}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
 
               {/* Content Grid */}

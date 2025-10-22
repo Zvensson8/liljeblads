@@ -21,6 +21,8 @@ import {
   Archive,
   RefreshCw,
   Download,
+  Home,
+  Building2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -30,6 +32,8 @@ import { ProjectDocuments } from "@/components/projects/ProjectDocuments";
 import { ProjectSimulation } from "@/components/projects/ProjectSimulation";
 import { ProjectActivityLog } from "@/components/projects/ProjectActivityLog";
 import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
 
 type ProjectStatus = Database["public"]["Enums"]["project_status"];
 type ProjectType = Database["public"]["Enums"]["project_type"];
@@ -64,6 +68,7 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const { addRecentItem } = useRecentlyVisited();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -72,6 +77,17 @@ export default function ProjectDetail() {
       fetchProject();
     }
   }, [user, authLoading, id, navigate]);
+
+  useEffect(() => {
+    if (project) {
+      addRecentItem({
+        id: project.id,
+        type: "project",
+        title: project.name,
+        path: `/projects/${project.id}`,
+      });
+    }
+  }, [project]);
 
   const fetchProject = async () => {
     if (!id) return;
@@ -178,7 +194,33 @@ export default function ProjectDetail() {
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
         <SidebarInset className="flex-1">
-          <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+          <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+            <Breadcrumb className="py-3">
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/" className="flex items-center gap-1">
+                    <Home className="h-3 w-3" />
+                    Dashboard
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink href={`/properties/${project.property_id}`} className="flex items-center gap-1">
+                    <Building2 className="h-3 w-3" />
+                    {project.property.name}
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/projects">Projekt</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{project.name}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+            <div className="flex h-12 items-center gap-4">
             <SidebarTrigger />
             <Button
               variant="ghost"

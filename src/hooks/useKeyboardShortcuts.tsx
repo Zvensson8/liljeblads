@@ -33,7 +33,7 @@ export const useKeyboardShortcuts = (shortcuts: ShortcutHandler[]) => {
   }, [shortcuts]);
 };
 
-export const useGlobalShortcuts = () => {
+export const useGlobalShortcuts = (onOpenSearch?: () => void) => {
   const navigate = useNavigate();
 
   const shortcuts: ShortcutHandler[] = [
@@ -41,10 +41,8 @@ export const useGlobalShortcuts = () => {
       key: "k",
       ctrlKey: true,
       handler: () => {
-        const searchInput = document.querySelector('input[type="search"]') as HTMLInputElement;
-        if (searchInput) {
-          searchInput.focus();
-          searchInput.select();
+        if (onOpenSearch) {
+          onOpenSearch();
         }
       },
       description: "Sök",

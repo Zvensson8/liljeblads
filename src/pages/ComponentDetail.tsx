@@ -24,12 +24,16 @@ import {
   DollarSign,
   AlertTriangle,
   CheckCircle2,
+  Home,
+  Building2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { ComponentFormDialog } from "@/components/ComponentFormDialog";
 import { MaintenanceHistoryDialog } from "@/components/MaintenanceHistoryDialog";
 import { ComponentDocuments } from "@/components/component/ComponentDocuments";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
 
 interface Component {
   id: string;
@@ -85,6 +89,7 @@ export default function ComponentDetail() {
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
+  const { addRecentItem } = useRecentlyVisited();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -93,6 +98,17 @@ export default function ComponentDetail() {
       fetchComponentData();
     }
   }, [user, authLoading, id, navigate]);
+
+  useEffect(() => {
+    if (component && floor) {
+      addRecentItem({
+        id: component.id,
+        type: "component",
+        title: component.name,
+        path: `/components/${component.id}`,
+      });
+    }
+  }, [component, floor]);
 
   const fetchComponentData = async () => {
     if (!id) return;
@@ -199,7 +215,33 @@ export default function ComponentDetail() {
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
         <SidebarInset className="flex-1">
-          <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+          <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+            <Breadcrumb className="py-3">
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/" className="flex items-center gap-1">
+                    <Home className="h-3 w-3" />
+                    Dashboard
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink href={`/properties/${property.id}`} className="flex items-center gap-1">
+                    <Building2 className="h-3 w-3" />
+                    {property.name}
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/components">Komponenter</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{component.name}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+            <div className="flex h-12 items-center gap-4">
             <SidebarTrigger />
             <Button
               variant="ghost"

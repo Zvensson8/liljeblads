@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Upload, Trash2, Download, MapPin, Building2, Settings, Wrench, TrendingUp, FileText, CheckSquare, Users, File, Edit, Phone, Mail, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Trash2, Download, MapPin, Building2, Settings, Wrench, TrendingUp, FileText, CheckSquare, Users, File, Edit, Phone, Mail, AlertCircle, Home } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { FloorCanvas } from '@/components/FloorCanvas';
 import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
@@ -25,6 +25,8 @@ import { PropertyEconomy } from '@/components/property/PropertyEconomy';
 import { PropertyMaintenancePlan } from '@/components/property/PropertyMaintenancePlan';
 import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { Badge } from '@/components/ui/badge';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
+import { useRecentlyVisited } from '@/hooks/useRecentlyVisited';
 
 interface Property {
   id: string;
@@ -68,12 +70,24 @@ const PropertyDetail = () => {
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
   const [overdueTodos, setOverdueTodos] = useState(0);
   const [urgentWorkOrders, setUrgentWorkOrders] = useState(0);
+  const { addRecentItem } = useRecentlyVisited();
 
   useEffect(() => {
     if (id) {
       fetchPropertyAndFloors();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (property) {
+      addRecentItem({
+        id: property.id,
+        type: "property",
+        title: property.name,
+        path: `/properties/${property.id}`,
+      });
+    }
+  }, [property]);
 
   const fetchPropertyAndFloors = async () => {
     if (!id) return;
@@ -357,6 +371,24 @@ const PropertyDetail = () => {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-6 py-4">
+          <Breadcrumb className="mb-4">
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/" className="flex items-center gap-1">
+                  <Home className="h-3 w-3" />
+                  Dashboard
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/properties">Fastigheter</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{property.name}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm" onClick={() => navigate('/properties')}>
