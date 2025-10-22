@@ -124,7 +124,7 @@ export default function Projects() {
 
   const getTypeBadge = (type: ProjectType) => {
     const typeConfig = {
-      renovering: { label: "Renovering", className: "bg-purple-500" },
+      investering: { label: "Investering", className: "bg-purple-500" },
       underhall: { label: "Underhåll", className: "bg-blue-500" },
       energi: { label: "Energi", className: "bg-green-500" },
       annat: { label: "Annat", className: "bg-gray-500" },
@@ -230,7 +230,7 @@ export default function Projects() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">Alla typer</SelectItem>
-                            <SelectItem value="renovering">Renovering</SelectItem>
+                            <SelectItem value="investering">Investering</SelectItem>
                             <SelectItem value="underhall">Underhåll</SelectItem>
                             <SelectItem value="energi">Energi</SelectItem>
                             <SelectItem value="annat">Annat</SelectItem>

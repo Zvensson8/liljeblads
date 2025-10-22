@@ -41,7 +41,7 @@ const projectSchema = z.object({
   project_number: z.string().min(1, "Projektnummer krävs"),
   name: z.string().min(1, "Projektnamn krävs").max(200),
   description: z.string().optional(),
-  type: z.enum(["renovering", "underhall", "energi", "annat"]),
+  type: z.enum(["investering", "underhall", "energi", "annat"]),
   status: z.enum(["planerat", "invantar_offert", "offert_finns", "pagaende", "pausat"]),
   project_manager: z.string().optional(),
   start_date: z.date().optional(),
@@ -74,7 +74,7 @@ export function ProjectFormDialog({
       project_number: "",
       name: "",
       description: "",
-      type: "renovering",
+      type: "investering",
       status: "planerat",
       project_manager: "",
       budget: 0,
@@ -84,29 +84,44 @@ export function ProjectFormDialog({
   useEffect(() => {
     if (open) {
       fetchProperties();
-      if (!projectId) {
-        generateProjectNumber();
-      }
+      // Don't auto-generate project number on open, wait for property selection
     }
   }, [open, projectId]);
 
   const fetchProperties = async () => {
     const { data } = await supabase
       .from("properties")
-      .select("id, name")
+      .select("id, name, property_number")
       .order("name");
     setProperties(data || []);
   };
 
-  const generateProjectNumber = async () => {
-    const year = new Date().getFullYear();
+  const generateProjectNumber = async (propertyId: string, projectType: "investering" | "underhall" | "energi" | "annat") => {
+    // Get property to fetch its property_number
+    const { data: property } = await supabase
+      .from("properties")
+      .select("property_number")
+      .eq("id", propertyId)
+      .single();
+
+    if (!property?.property_number) {
+      toast.error("Fastigheten saknar fastighetsnummer");
+      return;
+    }
+
+    // Use + for underhåll (maintenance), - for investering (investment)
+    const suffix = projectType === "underhall" ? "+" : "-";
+    
+    // Count existing projects for this property and type
     const { count } = await supabase
       .from("projects")
       .select("*", { count: "exact", head: true })
-      .like("project_number", `${year}-%`);
+      .eq("property_id", propertyId)
+      .eq("type", projectType);
     
     const nextNumber = (count || 0) + 1;
-    form.setValue("project_number", `${year}-${nextNumber.toString().padStart(4, "0")}`);
+    const projectNumber = `${property.property_number}${suffix}${nextNumber.toString().padStart(2, "0")}`;
+    form.setValue("project_number", projectNumber);
   };
 
   const onSubmit = async (values: ProjectFormValues) => {
@@ -178,7 +193,17 @@ export function ProjectFormDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Fastighet *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      // Generate project number when property and type are selected
+                      const currentType = form.getValues("type");
+                      if (value && currentType) {
+                        generateProjectNumber(value, currentType);
+                      }
+                    }} 
+                    value={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Välj fastighet" />
@@ -266,14 +291,24 @@ export function ProjectFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Typ *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={(value: "investering" | "underhall" | "energi" | "annat") => {
+                        field.onChange(value);
+                        // Generate project number when property and type are selected
+                        const currentProperty = form.getValues("property_id");
+                        if (value && currentProperty) {
+                          generateProjectNumber(currentProperty, value);
+                        }
+                      }} 
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="renovering">Renovering</SelectItem>
+                        <SelectItem value="investering">Investering</SelectItem>
                         <SelectItem value="underhall">Underhåll</SelectItem>
                         <SelectItem value="energi">Energi</SelectItem>
                         <SelectItem value="annat">Annat</SelectItem>

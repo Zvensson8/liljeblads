@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_settings: {
+        Row: {
+          created_at: string
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          setting_key: string
+          setting_value: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       component_geometry: {
         Row: {
           component_id: string
@@ -1401,7 +1425,7 @@ export type Database = {
         | "pagaende"
         | "pausat"
         | "avslutat"
-      project_type: "renovering" | "underhall" | "energi" | "annat"
+      project_type: "investering" | "underhall" | "energi" | "annat"
       quarter_type: "Q1" | "Q2" | "Q3" | "Q4"
       task_status: "completed" | "remaining" | "missing"
       user_role: "admin" | "user" | "reader"
@@ -1577,7 +1601,7 @@ export const Constants = {
         "pausat",
         "avslutat",
       ],
-      project_type: ["renovering", "underhall", "energi", "annat"],
+      project_type: ["investering", "underhall", "energi", "annat"],
       quarter_type: ["Q1", "Q2", "Q3", "Q4"],
       task_status: ["completed", "remaining", "missing"],
       user_role: ["admin", "user", "reader"],

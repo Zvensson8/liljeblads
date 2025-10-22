@@ -42,7 +42,7 @@ export function ProjectDashboard({ projects }: ProjectDashboardProps) {
   };
 
   const projectsByType = {
-    renovering: projects.filter((p) => p.type === "renovering").length,
+    investering: projects.filter((p) => p.type === "investering").length,
     underhall: projects.filter((p) => p.type === "underhall").length,
     energi: projects.filter((p) => p.type === "energi").length,
     annat: projects.filter((p) => p.type === "annat").length,
@@ -155,7 +155,7 @@ export function ProjectDashboard({ projects }: ProjectDashboardProps) {
           <CardContent className="space-y-3">
             {Object.entries(projectsByType).map(([type, count]) => {
               const typeLabels: Record<string, string> = {
-                renovering: "Renovering",
+                investering: "Investering",
                 underhall: "Underhåll",
                 energi: "Energi",
                 annat: "Annat",

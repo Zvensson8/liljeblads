@@ -26,7 +26,8 @@ import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { ProjectCostManagement } from "@/components/projects/ProjectCostManagement";
 import { ProjectChecklistManagement } from "@/components/projects/ProjectChecklistManagement";
-import { ProjectActivityLog } from "@/components/projects/ProjectActivityLog";
+import { ProjectDocuments } from "@/components/projects/ProjectDocuments";
+import { ProjectSimulation } from "@/components/projects/ProjectSimulation";
 
 type ProjectStatus = Database["public"]["Enums"]["project_status"];
 type ProjectType = Database["public"]["Enums"]["project_type"];
@@ -144,7 +145,7 @@ export default function ProjectDetail() {
 
   const getTypeBadge = (type: ProjectType) => {
     const typeConfig = {
-      renovering: { label: "Renovering", className: "bg-purple-500" },
+      investering: { label: "Investering", className: "bg-purple-500" },
       underhall: { label: "Underhåll", className: "bg-blue-500" },
       energi: { label: "Energi", className: "bg-green-500" },
       annat: { label: "Annat", className: "bg-gray-500" },
@@ -286,9 +287,10 @@ export default function ProjectDetail() {
 
               {/* Main Content Tabs */}
               <Tabs defaultValue="info" className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-6">
                   <TabsTrigger value="info">Information</TabsTrigger>
                   <TabsTrigger value="economy">Ekonomi</TabsTrigger>
+                  <TabsTrigger value="simulation">Simulering</TabsTrigger>
                   <TabsTrigger value="documents">Dokument</TabsTrigger>
                   <TabsTrigger value="checklist">Checklista</TabsTrigger>
                   <TabsTrigger value="activity">Aktivitetslogg</TabsTrigger>
@@ -394,15 +396,43 @@ export default function ProjectDetail() {
                   </Card>
                 </TabsContent>
 
+                <TabsContent value="simulation">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Ekonomisimulering</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ProjectSimulation
+                        currentBudget={project.budget}
+                        currentForecast={project.forecast}
+                        currentActualCost={project.actual_cost}
+                        onApply={async (newForecast) => {
+                          try {
+                            const { error } = await supabase
+                              .from("projects")
+                              .update({ forecast: newForecast })
+                              .eq("id", project.id);
+
+                            if (error) throw error;
+
+                            toast.success("Prognos uppdaterad från simulering");
+                            fetchProject();
+                          } catch (error: any) {
+                            toast.error("Kunde inte uppdatera prognos");
+                          }
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
                 <TabsContent value="documents">
                   <Card>
                     <CardHeader>
                       <CardTitle>Dokument</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-muted-foreground">
-                        Dokumenthantering kommer här...
-                      </p>
+                      <ProjectDocuments projectId={project.id} />
                     </CardContent>
                   </Card>
                 </TabsContent>
