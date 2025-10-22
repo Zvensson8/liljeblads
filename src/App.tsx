@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Properties from "./pages/Properties";
 import PropertyDetail from "./pages/PropertyDetail";
 import Components from "./pages/Components";
+import ProjectDetail from "./pages/ProjectDetail";
 import Users from "./pages/Users";
 import Operations from "./pages/Operations";
 import CostOverview from "./pages/CostOverview";
@@ -30,6 +31,7 @@ const AppContent = () => {
       <Route path="/work-orders" element={<WorkOrders />} />
       <Route path="/operations" element={<Operations />} />
       <Route path="/projects" element={<Projects />} />
+      <Route path="/projects/:id" element={<ProjectDetail />} />
       <Route path="/cost-overview" element={<CostOverview />} />
       <Route path="/users" element={<Users />} />
       <Route path="*" element={<NotFound />} />
