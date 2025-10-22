@@ -563,43 +563,42 @@ const Properties = () => {
                           </div>
                         )}
                         <div className="pt-3 mt-3 border-t border-border/50">
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 gap-2"
+                              className="flex-1 gap-1.5 min-w-0"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Create work order - navigate to work orders with property pre-selected
                                 navigate('/work-orders', { state: { propertyId: property.id } });
                               }}
                             >
-                              <Wrench className="h-3.5 w-3.5" />
-                              Arbetsorder
+                              <Wrench className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">Arbetsorder</span>
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 gap-2"
+                              className="flex-1 gap-1.5 min-w-0"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(`/property/${property.id}?tab=drawings`);
                               }}
                             >
-                              <Layers className="h-3.5 w-3.5" />
-                              Ritningar
+                              <Layers className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">Ritningar</span>
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="flex-1 gap-2"
+                              className="flex-1 gap-1.5 min-w-0"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(`/property/${property.id}?tab=notes`);
                               }}
                             >
-                              <StickyNote className="h-3.5 w-3.5" />
-                              Anteckn.
+                              <StickyNote className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">Anteckn.</span>
                             </Button>
                           </div>
                         </div>

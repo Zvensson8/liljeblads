@@ -402,17 +402,13 @@ const Dashboard = () => {
                 ))}
               </div>
 
-              {/* Content Grid with Recently Visited */}
-              <div className="grid gap-6 lg:grid-cols-3">
-                {/* Recently Visited */}
-                <div className="lg:col-span-1">
-                  <RecentlyVisitedWidget />
-                </div>
-                
-                {/* Projects and Work Orders side by side */}
-                <div className="lg:col-span-2 grid gap-6 md:grid-cols-2">
-                  {/* Ongoing Projects */}
-                  <Card className="border-border/50">
+              {/* Recently Visited */}
+              <RecentlyVisitedWidget />
+
+              {/* Projects and Work Orders Grid - Full Width */}
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Ongoing Projects */}
+                <Card className="border-border/50">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Pågående Projekt</CardTitle>
@@ -457,10 +453,10 @@ const Dashboard = () => {
                       </div>
                     )}
                   </CardContent>
-                  </Card>
+                </Card>
 
-                  {/* Ongoing Work Orders */}
-                  <Card className="border-border/50">
+                {/* Ongoing Work Orders */}
+                <Card className="border-border/50">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Pågående Arbetsordrar</CardTitle>
@@ -508,8 +504,7 @@ const Dashboard = () => {
                       </div>
                     )}
                   </CardContent>
-                  </Card>
-                </div>
+                </Card>
               </div>
 
               {/* To-Do List */}
