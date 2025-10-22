@@ -8,10 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, Mail, Calendar, Loader2, Building2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CheckCircle2, XCircle, Mail, Calendar, Loader2, Building2, Settings } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 
 interface Profile {
   id: string;
@@ -20,16 +22,12 @@ interface Profile {
   role: string;
   approved: boolean;
   created_at: string;
+  system_role?: string;
 }
 
 interface Property {
   id: string;
   name: string;
-}
-
-interface PropertyAssignment {
-  property_id: string;
-  user_id: string;
 }
 
 export default function Users() {
@@ -41,9 +39,15 @@ export default function Users() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyDialogOpen, setPropertyDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [userProperties, setUserProperties] = useState<string[]>([]);
   const [savingProperties, setSavingProperties] = useState(false);
+  const [editForm, setEditForm] = useState({
+    approved: false,
+    profile_role: "user",
+    system_role: "user",
+  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -60,13 +64,31 @@ export default function Users() {
 
   const fetchProfiles = async () => {
     try {
+      // Hämta profiler med system_role från user_roles
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setProfiles(data || []);
+
+      // Hämta system roles separat
+      const profilesWithRoles = await Promise.all(
+        (data || []).map(async (profile) => {
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", profile.id)
+            .single();
+
+          return {
+            ...profile,
+            system_role: (roleData?.role as string) || "user",
+          };
+        })
+      );
+
+      setProfiles(profilesWithRoles);
     } catch (error) {
       console.error("Error fetching profiles:", error);
       toast({
@@ -113,6 +135,16 @@ export default function Users() {
     setPropertyDialogOpen(true);
   };
 
+  const handleOpenEditDialog = (profile: Profile) => {
+    setSelectedUser(profile);
+    setEditForm({
+      approved: profile.approved,
+      profile_role: profile.role,
+      system_role: profile.system_role || "user",
+    });
+    setEditDialogOpen(true);
+  };
+
   const handleToggleProperty = (propertyId: string) => {
     setUserProperties(prev =>
       prev.includes(propertyId)
@@ -126,7 +158,6 @@ export default function Users() {
 
     setSavingProperties(true);
     try {
-      // Fetch current assignments
       const { data: currentAssignments, error: fetchError } = await supabase
         .from("property_users")
         .select("property_id")
@@ -136,11 +167,9 @@ export default function Users() {
 
       const currentPropertyIds = currentAssignments?.map(a => a.property_id) || [];
       
-      // Determine which to add and which to remove
       const toAdd = userProperties.filter(id => !currentPropertyIds.includes(id));
       const toRemove = currentPropertyIds.filter(id => !userProperties.includes(id));
 
-      // Add new assignments
       if (toAdd.length > 0) {
         const { error: insertError } = await supabase
           .from("property_users")
@@ -152,7 +181,6 @@ export default function Users() {
         if (insertError) throw insertError;
       }
 
-      // Remove old assignments
       if (toRemove.length > 0) {
         const { error: deleteError } = await supabase
           .from("property_users")
@@ -179,6 +207,69 @@ export default function Users() {
       });
     } finally {
       setSavingProperties(false);
+    }
+  };
+
+  const handleSaveUserEdit = async () => {
+    if (!selectedUser) return;
+
+    setProcessingId(selectedUser.id);
+    try {
+      // Uppdatera profiles
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          approved: editForm.approved,
+          role: editForm.profile_role as any,
+        })
+        .eq("id", selectedUser.id);
+
+      if (profileError) throw profileError;
+
+      // Kolla om user_roles post finns
+      const { data: existingRole } = await supabase
+        .from("user_roles")
+        .select("*")
+        .eq("user_id", selectedUser.id)
+        .single();
+
+      if (existingRole) {
+        // Uppdatera befintlig roll
+        const { error: roleError } = await supabase
+          .from("user_roles")
+          .update({ role: editForm.system_role as any })
+          .eq("user_id", selectedUser.id);
+
+        if (roleError) throw roleError;
+      } else {
+        // Skapa ny roll
+        const { error: roleError } = await supabase
+          .from("user_roles")
+          .insert({
+            user_id: selectedUser.id,
+            role: editForm.system_role as any,
+          });
+
+        if (roleError) throw roleError;
+      }
+
+      toast({
+        title: "Användare uppdaterad",
+        description: "Användarinställningar har sparats",
+      });
+
+      setEditDialogOpen(false);
+      setSelectedUser(null);
+      fetchProfiles();
+    } catch (error: any) {
+      console.error("Error updating user:", error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte uppdatera användare",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -212,6 +303,21 @@ export default function Users() {
     }
   };
 
+  const getRoleBadgeVariant = (role: string) => {
+    if (role === "founder") return "default";
+    if (role === "admin") return "secondary";
+    return "outline";
+  };
+
+  const getRoleLabel = (role: string) => {
+    const labels: Record<string, string> = {
+      founder: "Founder",
+      admin: "Admin",
+      user: "Användare",
+    };
+    return labels[role] || role;
+  };
+
   if (authLoading || loading) {
     return (
       <SidebarProvider>
@@ -236,7 +342,6 @@ export default function Users() {
         <AppSidebar />
         <SidebarInset>
           <main className="flex-1 p-6 md:p-8 space-y-8">
-            {/* Header */}
             <div>
               <h1 className="text-3xl font-bold mb-2">Användarhantering</h1>
               <p className="text-muted-foreground">
@@ -264,7 +369,11 @@ export default function Users() {
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {pendingUsers.map((profile) => (
-                    <Card key={profile.id} className="border-destructive/50">
+                    <Card 
+                      key={profile.id} 
+                      className="border-destructive/50 cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleOpenEditDialog(profile)}
+                    >
                       <CardHeader>
                         <CardTitle className="text-lg flex items-center gap-2">
                           {profile.full_name || "Ej angivet"}
@@ -281,8 +390,13 @@ export default function Users() {
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-2">
-                        <Badge variant="outline">{profile.role}</Badge>
                         <div className="flex gap-2">
+                          <Badge variant="outline">{profile.role}</Badge>
+                          <Badge variant={getRoleBadgeVariant(profile.system_role || "user")}>
+                            {getRoleLabel(profile.system_role || "user")}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                           <Button
                             onClick={() => handleApprove(profile.id, true)}
                             disabled={processingId === profile.id}
@@ -315,7 +429,11 @@ export default function Users() {
               <h2 className="text-2xl font-semibold mb-4">Godkända användare</h2>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {approvedUsers.map((profile) => (
-                  <Card key={profile.id}>
+                  <Card 
+                    key={profile.id}
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => handleOpenEditDialog(profile)}
+                  >
                     <CardHeader>
                       <CardTitle className="text-lg flex items-center gap-2">
                         {profile.full_name || "Ej angivet"}
@@ -336,8 +454,13 @@ export default function Users() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      <Badge variant="outline">{profile.role}</Badge>
-                      <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Badge variant="outline">{profile.role}</Badge>
+                        <Badge variant={getRoleBadgeVariant(profile.system_role || "user")}>
+                          {getRoleLabel(profile.system_role || "user")}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                         <Button
                           onClick={() => handleOpenPropertyDialog(profile)}
                           variant="outline"
@@ -369,9 +492,106 @@ export default function Users() {
         </SidebarInset>
       </div>
 
+      {/* Edit User Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Redigera användare</DialogTitle>
+            <DialogDescription>
+              {selectedUser?.full_name || selectedUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label>Godkännandestatus</Label>
+              <Select
+                value={editForm.approved ? "approved" : "pending"}
+                onValueChange={(value) => setEditForm({ ...editForm, approved: value === "approved" })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="approved">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      Godkänd
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="pending">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-4 w-4 text-orange-600" />
+                      Väntande
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label>Profilroll (Deprecated)</Label>
+              <Select
+                value={editForm.profile_role}
+                onValueChange={(value) => setEditForm({ ...editForm, profile_role: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">Användare</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Denna roll används inte längre. Använd systemroll istället.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Systemroll</Label>
+              <Select
+                value={editForm.system_role}
+                onValueChange={(value) => setEditForm({ ...editForm, system_role: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">Användare</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="founder">Founder</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Founder har full tillgång till alla funktioner
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Avbryt
+            </Button>
+            <Button onClick={handleSaveUserEdit} disabled={processingId === selectedUser?.id}>
+              {processingId === selectedUser?.id ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sparar...
+                </>
+              ) : (
+                "Spara ändringar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Property Assignment Dialog */}
       <Dialog open={propertyDialogOpen} onOpenChange={setPropertyDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]" aria-describedby="property-assignment-description">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
               Hantera fastigheter för {selectedUser?.full_name || selectedUser?.email}
@@ -408,7 +628,7 @@ export default function Users() {
               </div>
             )}
           </div>
-          <div className="flex gap-2 justify-end">
+          <DialogFooter>
             <Button
               variant="outline"
               onClick={() => setPropertyDialogOpen(false)}
@@ -429,7 +649,7 @@ export default function Users() {
                 "Spara"
               )}
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </SidebarProvider>
