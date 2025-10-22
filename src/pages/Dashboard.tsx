@@ -367,50 +367,49 @@ const Dashboard = () => {
                 propertyId={selectedProperty === "all" ? undefined : selectedProperty} 
               />
 
-              {/* Recently Visited + KPI Cards */}
-              <div className="grid gap-6 lg:grid-cols-5">
+              {/* KPI Cards - Full Width */}
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                {kpiCards.map((kpi) => (
+                  <Card key={kpi.title} className="border-border/50 hover:shadow-[var(--shadow-elegant)] transition-all">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
+                            <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+                          </div>
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            {kpi.title}
+                          </CardTitle>
+                        </div>
+                        {getTrendIcon(kpi.value, kpi.prev)}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold mb-2">{kpi.value}</div>
+                      {getTrendText(kpi.value, kpi.prev) && (
+                        <p className="text-xs text-muted-foreground mb-1">
+                          {getTrendText(kpi.value, kpi.prev)}
+                        </p>
+                      )}
+                      {kpi.subtitle && (
+                        <p className="text-sm text-muted-foreground mb-1">{kpi.subtitle}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {kpi.description}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Content Grid with Recently Visited */}
+              <div className="grid gap-6 lg:grid-cols-3">
+                {/* Recently Visited */}
                 <div className="lg:col-span-1">
                   <RecentlyVisitedWidget />
                 </div>
-                <div className="lg:col-span-4 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                  {kpiCards.map((kpi) => (
-                    <Card key={kpi.title} className="border-border/50 hover:shadow-[var(--shadow-elegant)] transition-all">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
-                              <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-                            </div>
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                              {kpi.title}
-                            </CardTitle>
-                          </div>
-                          {getTrendIcon(kpi.value, kpi.prev)}
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-3xl font-bold mb-2">{kpi.value}</div>
-                        {getTrendText(kpi.value, kpi.prev) && (
-                          <p className="text-xs text-muted-foreground mb-1">
-                            {getTrendText(kpi.value, kpi.prev)}
-                          </p>
-                        )}
-                        {kpi.subtitle && (
-                          <p className="text-sm text-muted-foreground mb-1">{kpi.subtitle}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                          {kpi.description}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              {/* Content Grid */}
-              <div className="grid gap-6 lg:grid-cols-2">
                 {/* Ongoing Projects */}
-                <Card className="border-border/50">
+                <Card className="border-border/50 lg:col-span-1">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Pågående Projekt</CardTitle>
@@ -458,7 +457,7 @@ const Dashboard = () => {
                 </Card>
 
                 {/* Ongoing Work Orders */}
-                <Card className="border-border/50">
+                <Card className="border-border/50 lg:col-span-1">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Pågående Arbetsordrar</CardTitle>
