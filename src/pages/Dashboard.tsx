@@ -5,79 +5,254 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, Package, AlertTriangle, TrendingUp, Activity } from 'lucide-react';
+import { Building2, Wrench, FolderKanban, CheckSquare, Loader2, TrendingUp } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
-import { ComponentsChart } from '@/components/dashboard/ComponentsChart';
-import { OperationsProgress } from '@/components/dashboard/OperationsProgress';
-import { CostAnalysis } from '@/components/dashboard/CostAnalysis';
-import { WorkOrdersChart } from '@/components/dashboard/WorkOrdersChart';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface DashboardStats {
   totalProperties: number;
-  totalComponents: number;
-  maintenanceComponents: number;
-  inactiveComponents: number;
+  totalWorkOrders: number;
+  totalProjects: number;
+  totalTodos: number;
+  pendingWorkOrders: number;
+  activeProjects: number;
+  completedTodos: number;
+}
+
+interface Property {
+  id: string;
+  name: string;
+}
+
+interface WorkOrder {
+  id: string;
+  action: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  contractor: string | null;
+  due_date: string | null;
+  properties: { name: string };
+}
+
+interface Project {
+  id: string;
+  name: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  properties: { name: string };
+}
+
+interface Todo {
+  id: string;
+  title: string;
+  completed: boolean;
+  due_date: string;
+  properties: { name: string };
 }
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const [selectedProperty, setSelectedProperty] = useState<string>("all");
+  const [properties, setProperties] = useState<Property[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     totalProperties: 0,
-    totalComponents: 0,
-    maintenanceComponents: 0,
-    inactiveComponents: 0,
+    totalWorkOrders: 0,
+    totalProjects: 0,
+    totalTodos: 0,
+    pendingWorkOrders: 0,
+    activeProjects: 0,
+    completedTodos: 0,
   });
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
     } else if (user) {
-      fetchStats();
+      fetchProperties();
     }
   }, [user, authLoading, navigate]);
 
-  const fetchStats = async () => {
-    // Fetch properties count
-    const { count: propertiesCount } = await supabase
-      .from('properties')
-      .select('*', { count: 'exact', head: true });
+  useEffect(() => {
+    if (properties.length > 0) {
+      fetchDashboardData();
+    }
+  }, [selectedProperty, properties]);
 
-    // Fetch components count
-    const { count: componentsCount } = await supabase
-      .from('components')
-      .select('*', { count: 'exact', head: true });
+  const fetchProperties = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('id, name')
+        .order('name');
 
-    // Fetch maintenance components
-    const { count: maintenanceCount } = await supabase
-      .from('components')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'maintenance');
+      if (error) throw error;
+      setProperties(data || []);
+    } catch (error) {
+      console.error('Error fetching properties:', error);
+    }
+  };
 
-    // Fetch inactive components
-    const { count: inactiveCount } = await supabase
-      .from('components')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'inactive');
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
 
-    setStats({
-      totalProperties: propertiesCount || 0,
-      totalComponents: componentsCount || 0,
-      maintenanceComponents: maintenanceCount || 0,
-      inactiveComponents: inactiveCount || 0,
-    });
+      const propertyFilter = selectedProperty === "all" 
+        ? properties.map(p => p.id)
+        : [selectedProperty];
 
-    setLoading(false);
+      // Fetch work orders
+      const { data: workOrdersData, error: woError } = await supabase
+        .from('work_orders')
+        .select('*, properties(name)')
+        .in('property_id', propertyFilter)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (woError) throw woError;
+
+      // Fetch projects
+      const { data: projectsData, error: projError } = await supabase
+        .from('projects')
+        .select('*, properties(name)')
+        .in('property_id', propertyFilter)
+        .order('start_date', { ascending: false })
+        .limit(5);
+
+      if (projError) throw projError;
+
+      // Fetch todos
+      const { data: todosData, error: todosError } = await supabase
+        .from('property_todos')
+        .select('*, properties(name)')
+        .in('property_id', propertyFilter)
+        .order('due_date', { ascending: true })
+        .limit(10);
+
+      if (todosError) throw todosError;
+
+      // Count all work orders
+      const { count: totalWO } = await supabase
+        .from('work_orders')
+        .select('*', { count: 'exact', head: true })
+        .in('property_id', propertyFilter);
+
+      // Count pending work orders (not_started + awaiting_quote + ordered)
+      const { count: pendingWO } = await supabase
+        .from('work_orders')
+        .select('*', { count: 'exact', head: true })
+        .in('property_id', propertyFilter)
+        .in('status', ['not_started', 'awaiting_quote', 'ordered']);
+
+      // Count all projects
+      const { count: totalProj } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
+        .in('property_id', propertyFilter);
+
+      // Count active projects (pagaende)
+      const { count: activeProj } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
+        .in('property_id', propertyFilter)
+        .eq('status', 'pagaende');
+
+      // Count all todos
+      const { count: totalTodoCount } = await supabase
+        .from('property_todos')
+        .select('*', { count: 'exact', head: true })
+        .in('property_id', propertyFilter);
+
+      // Count completed todos
+      const { count: completedTodoCount } = await supabase
+        .from('property_todos')
+        .select('*', { count: 'exact', head: true })
+        .in('property_id', propertyFilter)
+        .eq('completed', true);
+
+      setWorkOrders(workOrdersData || []);
+      setProjects(projectsData || []);
+      setTodos(todosData || []);
+      
+      setStats({
+        totalProperties: selectedProperty === "all" ? properties.length : 1,
+        totalWorkOrders: totalWO || 0,
+        totalProjects: totalProj || 0,
+        totalTodos: totalTodoCount || 0,
+        pendingWorkOrders: pendingWO || 0,
+        activeProjects: activeProj || 0,
+        completedTodos: completedTodoCount || 0,
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      not_started: "outline",
+      awaiting_quote: "secondary",
+      ordered: "default",
+      completed: "secondary",
+      archived: "outline",
+      planerat: "outline",
+      invantar_offert: "secondary",
+      offert_finns: "secondary",
+      pagaende: "default",
+      pausat: "outline",
+      avslutat: "secondary",
+    };
+    const labels: Record<string, string> = {
+      not_started: "Ej påbörjad",
+      awaiting_quote: "Inväntar offert",
+      ordered: "Beställd",
+      completed: "Klar",
+      archived: "Arkiverad",
+      planerat: "Planerad",
+      invantar_offert: "Inväntar offert",
+      offert_finns: "Offert finns",
+      pagaende: "Pågående",
+      pausat: "Pausad",
+      avslutat: "Avslutad",
+    };
+    return <Badge variant={variants[status] || "outline"}>{labels[status] || status}</Badge>;
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      low: "outline",
+      medium: "secondary",
+      high: "destructive",
+    };
+    const labels: Record<string, string> = {
+      low: "Låg",
+      medium: "Medel",
+      high: "Hög",
+    };
+    return <Badge variant={variants[priority] || "outline"}>{labels[priority] || priority}</Badge>;
   };
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <SidebarProvider>
+        <div className="flex min-h-screen w-full">
+          <AppSidebar />
+          <SidebarInset>
+            <div className="flex items-center justify-center h-screen">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
     );
   }
 
@@ -86,37 +261,36 @@ const Dashboard = () => {
       title: 'Fastigheter',
       value: stats.totalProperties,
       icon: Building2,
-      description: 'Totalt antal fastigheter',
+      description: selectedProperty === "all" ? 'Alla fastigheter' : 'Vald fastighet',
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/10',
-      action: () => navigate('/properties'),
     },
     {
-      title: 'Komponenter',
-      value: stats.totalComponents,
-      icon: Package,
-      description: 'Totalt antal komponenter',
+      title: 'Arbetsordrar',
+      value: stats.totalWorkOrders,
+      subtitle: `${stats.pendingWorkOrders} pågående`,
+      icon: Wrench,
+      description: 'Totalt antal arbetsordrar',
+      color: 'text-orange-500',
+      bgColor: 'bg-orange-500/10',
+    },
+    {
+      title: 'Projekt',
+      value: stats.totalProjects,
+      subtitle: `${stats.activeProjects} aktiva`,
+      icon: FolderKanban,
+      description: 'Totalt antal projekt',
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-500/10',
+    },
+    {
+      title: 'Att göra',
+      value: stats.totalTodos,
+      subtitle: `${stats.completedTodos} klara`,
+      icon: CheckSquare,
+      description: 'Totalt antal uppgifter',
       color: 'text-green-500',
       bgColor: 'bg-green-500/10',
-      action: () => navigate('/components'),
-    },
-    {
-      title: 'Kräver underhåll',
-      value: stats.maintenanceComponents,
-      icon: AlertTriangle,
-      description: 'Komponenter som behöver service',
-      color: 'text-yellow-500',
-      bgColor: 'bg-yellow-500/10',
-      action: () => navigate('/components'),
-    },
-    {
-      title: 'Inaktiva',
-      value: stats.inactiveComponents,
-      icon: Activity,
-      description: 'Inaktiva komponenter',
-      color: 'text-red-500',
-      bgColor: 'bg-red-500/10',
-      action: () => navigate('/components'),
     },
   ];
 
@@ -134,36 +308,49 @@ const Dashboard = () => {
           </header>
 
           <main className="flex-1 p-6">
-            <div className="max-w-7xl mx-auto space-y-8">
-              {/* Welcome Section */}
-              <div className="animate-fade-in">
-                <h2 className="text-3xl font-bold mb-2">
-                  Välkommen till NavRitning
-                </h2>
-                <p className="text-muted-foreground text-lg">
-                  Hantera dina fastigheter och komponenter effektivt
-                </p>
+            <div className="max-w-7xl mx-auto space-y-6">
+              {/* Header with Property Filter */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-3xl font-bold">Översikt</h2>
+                  <p className="text-muted-foreground">
+                    Sammanställning av dina fastigheter och uppgifter
+                  </p>
+                </div>
+                <div className="w-64">
+                  <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Välj fastighet" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Alla fastigheter</SelectItem>
+                      {properties.map((property) => (
+                        <SelectItem key={property.id} value={property.id}>
+                          {property.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* KPI Cards */}
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-                {kpiCards.map((kpi, index) => (
-                  <Card
-                    key={kpi.title}
-                    className="group hover:shadow-[var(--shadow-elegant)] transition-all duration-300 cursor-pointer hover-scale border-border/50"
-                    onClick={kpi.action}
-                    style={{ animationDelay: `${0.1 + index * 0.1}s` }}
-                  >
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                {kpiCards.map((kpi) => (
+                  <Card key={kpi.title} className="border-border/50">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         {kpi.title}
                       </CardTitle>
-                      <div className={`p-2 rounded-lg ${kpi.bgColor} group-hover:scale-110 transition-transform duration-300`}>
+                      <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
                         <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
                       </div>
                     </CardHeader>
                     <CardContent>
                       <div className="text-3xl font-bold mb-1">{kpi.value}</div>
+                      {kpi.subtitle && (
+                        <p className="text-xs text-muted-foreground mb-1">{kpi.subtitle}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         {kpi.description}
                       </p>
@@ -172,99 +359,152 @@ const Dashboard = () => {
                 ))}
               </div>
 
-              {/* Tabs for Analytics and Cost */}
-              <Tabs defaultValue="overview" className="space-y-6 animate-fade-in" style={{ animationDelay: '0.6s' }}>
-                <TabsList>
-                  <TabsTrigger value="overview">Översikt</TabsTrigger>
-                  <TabsTrigger value="cost">Kostnadsanalys</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="overview" className="space-y-6">
-                  {/* Analytics Section */}
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    <ComponentsChart />
-                    <WorkOrdersChart />
-                  </div>
-
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    <OperationsProgress />
-                  </div>
-
-                  {/* Activity Feed and Quick Actions */}
-                  <div className="grid gap-6 lg:grid-cols-3">
-                    <div className="lg:col-span-2">
-                      <ActivityFeed />
+              {/* Content Grid */}
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Ongoing Projects */}
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Pågående Projekt</CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigate('/projects')}
+                      >
+                        Visa alla
+                      </Button>
                     </div>
-                    <Card className="border-border/50">
-                      <CardHeader>
-                        <CardTitle>Snabbåtgärder</CardTitle>
-                        <CardDescription>
-                          Vanliga uppgifter
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
-                          onClick={() => navigate('/properties')}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-blue-500/10">
-                              <Building2 className="h-5 w-5 text-blue-500" />
-                            </div>
-                            <div className="text-left">
-                              <div className="font-semibold text-sm">Hantera fastigheter</div>
-                              <div className="text-xs text-muted-foreground">
-                                Lägg till eller redigera
+                    <CardDescription>
+                      Senaste projekten för {selectedProperty === "all" ? "alla fastigheter" : "vald fastighet"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {projects.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        Inga projekt
+                      </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {projects.map((project) => (
+                          <div
+                            key={project.id}
+                            className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                            onClick={() => navigate(`/projects/${project.id}`)}
+                          >
+                            <div className="flex-1">
+                              <div className="font-medium mb-1">{project.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {project.properties?.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {project.start_date && new Date(project.start_date).toLocaleDateString('sv-SE')}
+                                {project.end_date && ` - ${new Date(project.end_date).toLocaleDateString('sv-SE')}`}
                               </div>
                             </div>
+                            <div>{getStatusBadge(project.status)}</div>
                           </div>
-                        </Button>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
-                          onClick={() => navigate('/components')}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-green-500/10">
-                              <Package className="h-5 w-5 text-green-500" />
-                            </div>
-                            <div className="text-left">
-                              <div className="font-semibold text-sm">Se komponenter</div>
-                              <div className="text-xs text-muted-foreground">
-                                Översikt och hantering
+                {/* Ongoing Work Orders */}
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Pågående Arbetsordrar</CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigate('/work-orders')}
+                      >
+                        Visa alla
+                      </Button>
+                    </div>
+                    <CardDescription>
+                      Senaste arbetsordrar för {selectedProperty === "all" ? "alla fastigheter" : "vald fastighet"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {workOrders.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        Inga arbetsordrar
+                      </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {workOrders.map((wo) => (
+                          <div
+                            key={wo.id}
+                            className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                            onClick={() => navigate('/work-orders')}
+                          >
+                            <div className="flex-1">
+                              <div className="font-medium mb-1">{wo.action}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {wo.properties?.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {new Date(wo.created_at).toLocaleDateString('sv-SE')}
+                                {wo.contractor && ` • ${wo.contractor}`}
                               </div>
                             </div>
+                            <div className="flex flex-col gap-1 items-end">
+                              {getStatusBadge(wo.status)}
+                              {getPriorityBadge(wo.priority)}
+                            </div>
                           </div>
-                        </Button>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start h-auto py-3 px-4 hover:bg-primary/10 hover:border-primary transition-all"
-                          onClick={() => navigate('/operations')}
+              {/* To-Do List */}
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle>Att göra</CardTitle>
+                  <CardDescription>
+                    Kommande uppgifter för {selectedProperty === "all" ? "alla fastigheter" : "vald fastighet"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {todos.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Inga uppgifter
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {todos.map((todo) => (
+                        <div
+                          key={todo.id}
+                          className={`flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors ${
+                            todo.completed ? 'opacity-50' : ''
+                          }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-purple-500/10">
-                              <Activity className="h-5 w-5 text-purple-500" />
+                          <div className={`h-4 w-4 rounded border ${
+                            todo.completed ? 'bg-primary border-primary' : 'border-muted-foreground'
+                          }`}>
+                            {todo.completed && (
+                              <CheckSquare className="h-4 w-4 text-primary-foreground" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className={`font-medium ${todo.completed ? 'line-through' : ''}`}>
+                              {todo.title}
                             </div>
-                            <div className="text-left">
-                              <div className="font-semibold text-sm">Driftuppgifter</div>
-                              <div className="text-xs text-muted-foreground">
-                                Hantera kvartalsuppgifter
-                              </div>
+                            <div className="text-sm text-muted-foreground">
+                              {todo.properties?.name}
+                              {todo.due_date && ` • Förfaller ${new Date(todo.due_date).toLocaleDateString('sv-SE')}`}
                             </div>
                           </div>
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="cost">
-                  <CostAnalysis />
-                </TabsContent>
-              </Tabs>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </main>
         </SidebarInset>
