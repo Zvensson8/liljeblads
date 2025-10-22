@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, Compass, Sparkles, MapPin, Layers, Trash2, MoreVertical, Search, Filter, Wrench, FileText, StickyNote } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -408,9 +408,12 @@ const Properties = () => {
                       Ny Fastighet
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px]">
+                  <DialogContent className="sm:max-w-[500px]" aria-describedby="create-property-description">
                     <DialogHeader>
                       <DialogTitle>Skapa ny fastighet</DialogTitle>
+                      <DialogDescription id="create-property-description" className="sr-only">
+                        Formulär för att skapa en ny fastighet i systemet
+                      </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleCreateProperty} className="space-y-4">
                       <div className="space-y-2">

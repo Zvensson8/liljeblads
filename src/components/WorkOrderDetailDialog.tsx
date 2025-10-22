@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -206,7 +207,7 @@ export function WorkOrderDetailDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby="work-order-detail-description">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="text-2xl">Arbetsorder Detaljer</DialogTitle>
@@ -229,6 +230,9 @@ export function WorkOrderDetailDialog({
                 </Button>
               </div>
             </div>
+            <DialogDescription id="work-order-detail-description" className="sr-only">
+              Detaljerad vy av arbetsorder med information och filer
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6">

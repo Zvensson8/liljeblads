@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -110,9 +111,12 @@ export function PropertyEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" aria-describedby="edit-property-description">
         <DialogHeader>
           <DialogTitle>Redigera Fastighet</DialogTitle>
+          <DialogDescription id="edit-property-description" className="sr-only">
+            Formulär för att redigera fastighetsinformation
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
