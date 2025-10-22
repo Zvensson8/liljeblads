@@ -374,40 +374,33 @@ const Dashboard = () => {
                 </div>
                 <div className="lg:col-span-4 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                   {kpiCards.map((kpi) => (
-                    <Card key={kpi.title} className="border-border/50 hover:shadow-[var(--shadow-elegant)] transition-all bg-card">
-                      <CardContent className="pt-6 pb-6">
-                        <div className="space-y-3">
-                          {/* Icon with colored background */}
-                          <div className="flex items-start justify-between">
+                    <Card key={kpi.title} className="border-border/50 hover:shadow-[var(--shadow-elegant)] transition-all">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
                             <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
-                              <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
+                              <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
                             </div>
-                            {getTrendIcon(kpi.value, kpi.prev) && (
-                              <div className="flex items-center gap-1">
-                                {getTrendIcon(kpi.value, kpi.prev)}
-                              </div>
-                            )}
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                              {kpi.title}
+                            </CardTitle>
                           </div>
-                          
-                          {/* Title */}
-                          <p className="text-sm font-medium text-muted-foreground">{kpi.title}</p>
-                          
-                          {/* Big number */}
-                          <div className="flex items-baseline gap-2">
-                            <p className="text-4xl font-bold">{kpi.value}</p>
-                            <span className="text-sm text-muted-foreground">–</span>
-                          </div>
-                          
-                          {/* Subtitle */}
-                          {kpi.subtitle && (
-                            <p className="text-sm text-muted-foreground">{kpi.subtitle}</p>
-                          )}
-                          
-                          {/* Description */}
-                          <p className="text-sm text-muted-foreground">
-                            {kpi.description}
-                          </p>
+                          {getTrendIcon(kpi.value, kpi.prev)}
                         </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold mb-2">{kpi.value}</div>
+                        {getTrendText(kpi.value, kpi.prev) && (
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {getTrendText(kpi.value, kpi.prev)}
+                          </p>
+                        )}
+                        {kpi.subtitle && (
+                          <p className="text-sm text-muted-foreground mb-1">{kpi.subtitle}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {kpi.description}
+                        </p>
                       </CardContent>
                     </Card>
                   ))}
