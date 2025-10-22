@@ -159,18 +159,8 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      {/* Footer with external link and sign out */}
-      <SidebarFooter className="border-t border-border p-4 space-y-2">
-        <Button
-          variant="ghost"
-          asChild
-          className={`w-full ${isCollapsed ? 'px-2' : 'justify-start'}`}
-        >
-          <a href="https://liljeblads.abacusai.app/dashboard" target="_blank" rel="noopener noreferrer">
-            <Home className="h-5 w-5" />
-            {!isCollapsed && <span className="ml-3">Hem</span>}
-          </a>
-        </Button>
+      {/* Footer with sign out */}
+      <SidebarFooter className="border-t border-border p-4">
         <Button
           variant="ghost"
           onClick={signOut}

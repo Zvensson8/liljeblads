@@ -367,7 +367,7 @@ const Dashboard = () => {
                 propertyId={selectedProperty === "all" ? undefined : selectedProperty} 
               />
 
-              {/* Recently Visited Widget + KPI Cards */}
+              {/* Recently Visited + KPI Cards */}
               <div className="grid gap-6 lg:grid-cols-5">
                 <div className="lg:col-span-1">
                   <RecentlyVisitedWidget />
@@ -375,30 +375,27 @@ const Dashboard = () => {
                 <div className="lg:col-span-4 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                   {kpiCards.map((kpi) => (
                     <Card key={kpi.title} className="border-border/50 hover:shadow-[var(--shadow-elegant)] transition-all">
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                          {kpi.title}
-                        </CardTitle>
-                        <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
-                          <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+                      <CardContent className="pt-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className={`p-3 rounded-lg ${kpi.bgColor}`}>
+                            <kpi.icon className={`h-6 w-6 ${kpi.color}`} />
+                          </div>
+                          {getTrendIcon(kpi.value, kpi.prev) && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              {getTrendIcon(kpi.value, kpi.prev)}
+                            </div>
+                          )}
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <div className="text-3xl font-bold">{kpi.value}</div>
-                          {getTrendIcon(kpi.value, kpi.prev)}
-                        </div>
-                        {getTrendText(kpi.value, kpi.prev) && (
-                          <p className="text-xs text-muted-foreground mb-1">
-                            {getTrendText(kpi.value, kpi.prev)}
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-muted-foreground">{kpi.title}</p>
+                          <p className="text-3xl font-bold">{kpi.value}</p>
+                          {kpi.subtitle && (
+                            <p className="text-sm text-muted-foreground">{kpi.subtitle}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {kpi.description}
                           </p>
-                        )}
-                        {kpi.subtitle && (
-                          <p className="text-xs text-muted-foreground mb-1">{kpi.subtitle}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                          {kpi.description}
-                        </p>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
