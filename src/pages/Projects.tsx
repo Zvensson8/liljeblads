@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Database } from "@/integrations/supabase/types";
 import {
   SidebarProvider,
@@ -62,6 +62,7 @@ interface Project {
 export default function Projects() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [formDialogOpen, setFormDialogOpen] = useState(false);
@@ -79,8 +80,37 @@ export default function Projects() {
     } else if (user) {
       fetchProjects(showArchived);
       fetchProperties();
+      
+      // Check if we should open edit dialog from URL
+      const editId = searchParams.get('edit');
+      if (editId && !formDialogOpen) {
+        handleEditFromUrl(editId);
+      }
     }
-  }, [user, authLoading, navigate, showArchived]);
+  }, [user, authLoading, navigate, showArchived, searchParams]);
+
+  const handleEditFromUrl = async (projectId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("projects")
+        .select(`
+          *,
+          property:properties(name)
+        `)
+        .eq("id", projectId)
+        .single();
+
+      if (error) throw error;
+      
+      setEditingProject(data as any);
+      setFormDialogOpen(true);
+      
+      // Remove edit parameter from URL
+      setSearchParams({});
+    } catch (error: any) {
+      toast.error("Kunde inte hämta projekt för redigering");
+    }
+  };
 
   const fetchProjects = async (archived = false) => {
     setLoading(true);
