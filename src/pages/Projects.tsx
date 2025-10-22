@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Filter, FolderArchive, Briefcase } from "lucide-react";
+import { Plus, Search, Filter, FolderArchive, Briefcase, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
 import { ProjectDashboard } from "@/components/projects/ProjectDashboard";
@@ -65,6 +65,8 @@ export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [formDialogOpen, setFormDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -75,12 +77,12 @@ export default function Projects() {
     if (!authLoading && !user) {
       navigate("/auth");
     } else if (user) {
-      fetchProjects();
+      fetchProjects(showArchived);
       fetchProperties();
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, showArchived]);
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (archived = false) => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -89,7 +91,7 @@ export default function Projects() {
           *,
           property:properties(name)
         `)
-        .eq("is_archived", false)
+        .eq("is_archived", archived)
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
@@ -177,13 +179,14 @@ export default function Projects() {
 
           <main className="flex-1 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <Tabs defaultValue="active" className="w-full">
+              <Tabs defaultValue="active" className="w-full" onValueChange={(value) => setShowArchived(value === 'archived')}>
                 <div className="flex items-center justify-between mb-6">
                   <TabsList>
                     <TabsTrigger value="active">Aktiva projekt</TabsTrigger>
+                    <TabsTrigger value="archived">Arkiverade projekt</TabsTrigger>
                     <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                   </TabsList>
-                  <Button onClick={() => setFormDialogOpen(true)}>
+                  <Button onClick={() => { setEditingProject(null); setFormDialogOpen(true); }}>
                     <Plus className="h-4 w-4 mr-2" />
                     Nytt projekt
                   </Button>
@@ -286,6 +289,7 @@ export default function Projects() {
                                 <TableHead className="text-right">Budget</TableHead>
                                 <TableHead className="text-right">Utfall</TableHead>
                                 <TableHead className="text-right">Avvikelse</TableHead>
+                                <TableHead>Åtgärder</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -317,6 +321,90 @@ export default function Projects() {
                                     <TableCell className="text-right">
                                       {project.actual_cost.toLocaleString("sv-SE")} kr
                                     </TableCell>
+                                   <TableCell
+                                      className={`text-right font-medium ${getBudgetVarianceColor(
+                                        project.budget,
+                                        project.actual_cost
+                                      )}`}
+                                    >
+                                      {variance !== 0 ? `${variance > 0 ? "+" : ""}${variance.toFixed(1)}%` : "-"}
+                                    </TableCell>
+                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setEditingProject(project);
+                                          setFormDialogOpen(true);
+                                        }}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="archived" className="space-y-6">
+                  {/* Same filters for archived */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <FolderArchive className="h-4 w-4" />
+                        Arkiverade projekt
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {filteredProjects.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <FolderArchive className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p className="text-lg mb-2">Inga arkiverade projekt</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Projektnr</TableHead>
+                                <TableHead>Namn</TableHead>
+                                <TableHead>Fastighet</TableHead>
+                                <TableHead>Typ</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Budget</TableHead>
+                                <TableHead className="text-right">Utfall</TableHead>
+                                <TableHead className="text-right">Avvikelse</TableHead>
+                                <TableHead>Åtgärder</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {filteredProjects.map((project) => {
+                                const variance = project.budget > 0
+                                  ? ((project.actual_cost - project.budget) / project.budget) * 100
+                                  : 0;
+                                return (
+                                  <TableRow
+                                    key={project.id}
+                                    className="cursor-pointer hover:bg-muted/50"
+                                    onClick={() => navigate(`/projects/${project.id}`)}
+                                  >
+                                    <TableCell className="font-medium">{project.project_number}</TableCell>
+                                    <TableCell>{project.name}</TableCell>
+                                    <TableCell>{project.property.name}</TableCell>
+                                    <TableCell>{getTypeBadge(project.type)}</TableCell>
+                                    <TableCell>{getStatusBadge(project.status)}</TableCell>
+                                    <TableCell className="text-right">
+                                      {project.budget.toLocaleString("sv-SE")} kr
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {project.actual_cost.toLocaleString("sv-SE")} kr
+                                    </TableCell>
                                     <TableCell
                                       className={`text-right font-medium ${getBudgetVarianceColor(
                                         project.budget,
@@ -324,6 +412,15 @@ export default function Projects() {
                                       )}`}
                                     >
                                       {variance !== 0 ? `${variance > 0 ? "+" : ""}${variance.toFixed(1)}%` : "-"}
+                                    </TableCell>
+                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => navigate(`/projects/${project.id}`)}
+                                      >
+                                        Visa
+                                      </Button>
                                     </TableCell>
                                   </TableRow>
                                 );
@@ -347,8 +444,15 @@ export default function Projects() {
 
       <ProjectFormDialog
         open={formDialogOpen}
-        onOpenChange={setFormDialogOpen}
-        onSuccess={fetchProjects}
+        onOpenChange={(open) => {
+          setFormDialogOpen(open);
+          if (!open) setEditingProject(null);
+        }}
+        onSuccess={() => {
+          fetchProjects(showArchived);
+          setEditingProject(null);
+        }}
+        editingProject={editingProject}
       />
     </SidebarProvider>
   );

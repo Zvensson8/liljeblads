@@ -55,14 +55,14 @@ interface ProjectFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
-  projectId?: string;
+  editingProject?: any;
 }
 
 export function ProjectFormDialog({
   open,
   onOpenChange,
   onSuccess,
-  projectId,
+  editingProject,
 }: ProjectFormDialogProps) {
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -84,9 +84,22 @@ export function ProjectFormDialog({
   useEffect(() => {
     if (open) {
       fetchProperties();
-      // Don't auto-generate project number on open, wait for property selection
+      if (editingProject) {
+        form.reset({
+          property_id: editingProject.property_id,
+          project_number: editingProject.project_number,
+          name: editingProject.name,
+          description: editingProject.description || '',
+          type: editingProject.type,
+          status: editingProject.status,
+          project_manager: editingProject.project_manager || '',
+          start_date: editingProject.start_date ? new Date(editingProject.start_date) : undefined,
+          end_date: editingProject.end_date ? new Date(editingProject.end_date) : undefined,
+          budget: editingProject.budget,
+        });
+      }
     }
-  }, [open, projectId]);
+  }, [open, editingProject]);
 
   const fetchProperties = async () => {
     const { data } = await supabase
@@ -134,45 +147,37 @@ export function ProjectFormDialog({
         forecast: values.budget,
       };
 
-      const { data: project, error } = await supabase
-        .from("projects")
-        .insert([projectData])
-        .select()
-        .single();
+      if (editingProject) {
+        const { error } = await supabase
+          .from("projects")
+          .update(projectData)
+          .eq("id", editingProject.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success("Projekt uppdaterat");
+      } else {
+        const { data: project, error } = await supabase
+          .from("projects")
+          .insert([projectData])
+          .select()
+          .single();
 
-      // Load checklist templates for the project type
-      const { data: templates } = await supabase
-        .from("project_checklist_templates")
-        .select("items")
-        .eq("project_type", values.type)
-        .single();
+        if (error) throw error;
 
-      if (templates?.items) {
-        const checklistItems = (templates.items as any[]).map((item) => ({
+        await supabase.from("project_activity_log").insert({
           project_id: project.id,
-          title: item.title,
-          description: item.description,
-          order_index: item.order,
-        }));
+          activity_type: "status_change",
+          description: "Projekt skapat",
+        });
 
-        await supabase.from("project_checklist_items").insert(checklistItems);
+        toast.success("Projekt skapat");
       }
 
-      // Log activity
-      await supabase.from("project_activity_log").insert({
-        project_id: project.id,
-        activity_type: "status_change",
-        description: "Projekt skapat",
-      });
-
-      toast.success("Projekt skapat");
       form.reset();
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
-      toast.error(error.message || "Kunde inte skapa projekt");
+      toast.error(error.message || editingProject ? "Kunde inte uppdatera projekt" : "Kunde inte skapa projekt");
     } finally {
       setLoading(false);
     }
@@ -182,7 +187,7 @@ export function ProjectFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Skapa nytt projekt</DialogTitle>
+          <DialogTitle>{editingProject ? 'Redigera projekt' : 'Skapa nytt projekt'}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>

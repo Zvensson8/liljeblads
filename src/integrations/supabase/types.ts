@@ -1193,6 +1193,50 @@ export type Database = {
           },
         ]
       }
+      property_recurring_costs: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string
+          frequency: string
+          id: string
+          next_due_date: string | null
+          property_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          description: string
+          frequency: string
+          id?: string
+          next_due_date?: string | null
+          property_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string
+          frequency?: string
+          id?: string
+          next_due_date?: string | null
+          property_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_recurring_costs_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_todos: {
         Row: {
           completed: boolean

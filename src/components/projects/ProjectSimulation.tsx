@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Calculator, RotateCcw, AlertCircle } from "lucide-react";
+import { CalendarIcon, Loader2, Plus, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ProjectSimulationProps {
@@ -23,21 +23,34 @@ export function ProjectSimulation({
   const [simulatedBudget, setSimulatedBudget] = useState(currentBudget);
   const [simulatedForecast, setSimulatedForecast] = useState(currentForecast);
   const [simulatedActualCost, setSimulatedActualCost] = useState(currentActualCost);
-  const [additionalCosts, setAdditionalCosts] = useState(0);
+  const [additionalCosts, setAdditionalCosts] = useState<{id: string; description: string; amount: number}[]>([]);
 
   useEffect(() => {
-    // Reset simulation when real values change
     setSimulatedBudget(currentBudget);
     setSimulatedForecast(currentForecast);
     setSimulatedActualCost(currentActualCost);
-    setAdditionalCosts(0);
+    setAdditionalCosts([]);
   }, [currentBudget, currentForecast, currentActualCost]);
 
   const handleReset = () => {
     setSimulatedBudget(currentBudget);
     setSimulatedForecast(currentForecast);
     setSimulatedActualCost(currentActualCost);
-    setAdditionalCosts(0);
+    setAdditionalCosts([]);
+  };
+
+  const handleAddCost = () => {
+    setAdditionalCosts([...additionalCosts, { id: crypto.randomUUID(), description: '', amount: 0 }]);
+  };
+
+  const handleRemoveCost = (id: string) => {
+    setAdditionalCosts(additionalCosts.filter(cost => cost.id !== id));
+  };
+
+  const handleUpdateCost = (id: string, field: 'description' | 'amount', value: string | number) => {
+    setAdditionalCosts(additionalCosts.map(cost => 
+      cost.id === id ? { ...cost, [field]: value } : cost
+    ));
   };
 
   const handleApplySimulation = () => {
@@ -46,8 +59,8 @@ export function ProjectSimulation({
     }
   };
 
-  // Calculate simulated total with additional costs
-  const simulatedTotal = simulatedActualCost + additionalCosts;
+  const totalAdditionalCosts = additionalCosts.reduce((sum, cost) => sum + cost.amount, 0);
+  const simulatedTotal = simulatedActualCost + totalAdditionalCosts;
   const variance = simulatedBudget > 0
     ? ((simulatedTotal - simulatedBudget) / simulatedBudget) * 100
     : 0;
@@ -65,7 +78,7 @@ export function ProjectSimulation({
     simulatedBudget !== currentBudget ||
     simulatedForecast !== currentForecast ||
     simulatedActualCost !== currentActualCost ||
-    additionalCosts !== 0;
+    additionalCosts.length > 0;
 
   return (
     <div className="space-y-6">
@@ -141,17 +154,34 @@ export function ProjectSimulation({
               />
             </div>
 
-            <div>
-              <Label htmlFor="additional-costs">Tillkommande kostnader (kr)</Label>
-              <Input
-                id="additional-costs"
-                type="number"
-                value={additionalCosts}
-                onChange={(e) => setAdditionalCosts(parseFloat(e.target.value) || 0)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Lägg till kostnader som ännu inte är registrerade
-              </p>
+            <div className="space-y-2 md:col-span-2">
+              <div className="flex items-center justify-between">
+                <Label>Tillkommande kostnader</Label>
+                <Button type="button" variant="outline" size="sm" onClick={handleAddCost}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Lägg till
+                </Button>
+              </div>
+              {additionalCosts.map((cost) => (
+                <div key={cost.id} className="flex gap-2">
+                  <Input
+                    placeholder="Beskrivning"
+                    value={cost.description}
+                    onChange={(e) => handleUpdateCost(cost.id, 'description', e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Belopp"
+                    value={cost.amount || ''}
+                    onChange={(e) => handleUpdateCost(cost.id, 'amount', Number(e.target.value))}
+                    className="w-32"
+                  />
+                  <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCost(cost.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
             </div>
           </div>
 
