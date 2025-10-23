@@ -134,7 +134,7 @@ export function PropertyOverview({
               <span className="text-foreground">{property.loa || '-'}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Area: </span>
+              <span className="text-muted-foreground">Tomtarea: </span>
               <span className="text-foreground">{property.area_sqm ? `${property.area_sqm} m²` : '-'}</span>
             </div>
           </CardContent>

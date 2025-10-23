@@ -164,9 +164,9 @@ export function PropertyEditDialog({
                 control={form.control}
                 name="area_sqm"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Area (m²)</FormLabel>
-                    <FormControl>
+                <FormItem>
+                  <FormLabel>Tomtarea (m²)</FormLabel>
+                  <FormControl>
                       <Input
                         type="number"
                         placeholder="t.ex. 5000"
