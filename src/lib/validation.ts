@@ -64,6 +64,8 @@ export const propertySchema = z.object({
 export const componentSchema = z.object({
   name: nameSchema,
   type: z.string().min(1, { message: "Välj en komponenttyp" }),
+  property_id: z.string().uuid({ message: "Fastighet krävs" }),
+  floor_id: z.string().uuid().optional().nullable(),
   manufacturer: z.string().trim().max(100).optional(),
   model: z.string().trim().max(100).optional(),
   serial_number: z.string().trim().max(100).optional(),

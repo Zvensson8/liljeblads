@@ -75,8 +75,8 @@ export const SelectPropertyFloorDialog = ({
   };
 
   const handleContinue = () => {
-    if (selectedProperty && selectedFloor) {
-      onSelect(selectedProperty, selectedFloor);
+    if (selectedProperty) {
+      onSelect(selectedProperty, selectedFloor || '');
       resetForm();
     }
   };
@@ -91,8 +91,8 @@ export const SelectPropertyFloorDialog = ({
       <DialogContent className="sm:max-w-[500px]" aria-describedby="select-floor-description">
         <DialogHeader>
           <DialogTitle>Välj fastighet och våning</DialogTitle>
-          <DialogDescription id="select-floor-description" className="sr-only">
-            Välj vilken fastighet och våning komponenten ska placeras på
+          <DialogDescription id="select-floor-description">
+            Välj vilken fastighet komponenten ska knytas till. Våning är valfritt och kan läggas till senare.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -118,24 +118,27 @@ export const SelectPropertyFloorDialog = ({
           {selectedProperty && (
             <div className="space-y-2">
               <Label htmlFor="floor">
-                Våning <span className="text-destructive">*</span>
+                Våning (valfritt)
               </Label>
               <Select value={selectedFloor} onValueChange={setSelectedFloor}>
                 <SelectTrigger id="floor">
-                  <SelectValue placeholder="Välj våning" />
+                  <SelectValue placeholder="Välj våning eller lämna tomt" />
                 </SelectTrigger>
                 <SelectContent>
                   {floors.length === 0 ? (
                     <div className="p-2 text-sm text-muted-foreground text-center">
-                      Inga våningar tillgängliga
+                      Inga våningar tillgängliga - komponenten knyts direkt till fastigheten
                     </div>
                   ) : (
-                    floors.map((floor) => (
-                      <SelectItem key={floor.id} value={floor.id}>
-                        {floor.name}
-                        {floor.level !== null && ` (Våning ${floor.level})`}
-                      </SelectItem>
-                    ))
+                    <>
+                      <SelectItem value="">Ingen våning</SelectItem>
+                      {floors.map((floor) => (
+                        <SelectItem key={floor.id} value={floor.id}>
+                          {floor.name}
+                          {floor.level !== null && ` (Våning ${floor.level})`}
+                        </SelectItem>
+                      ))}
+                    </>
                   )}
                 </SelectContent>
               </Select>
@@ -155,7 +158,7 @@ export const SelectPropertyFloorDialog = ({
             </Button>
             <Button 
               onClick={handleContinue}
-              disabled={!selectedProperty || !selectedFloor}
+              disabled={!selectedProperty}
             >
               Fortsätt
             </Button>

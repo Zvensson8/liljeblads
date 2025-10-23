@@ -147,7 +147,8 @@ export const ComponentFormDialog = ({
         refrigerant_amount_kg: refrigerantAmount ? parseFloat(refrigerantAmount) : null,
         refrigerant_type: refrigerantType.trim() || null,
         status: 'active' as const,
-        floor_id: floorId,
+        floor_id: floorId || null,
+        property_id: propertyId,
       };
 
       if (editingComponent) {

@@ -131,6 +131,7 @@ interface ValidationResult {
   message: string;
   data: any;
   floorId?: string;
+  propertyId?: string;
   floorName: string;
   propertyName?: string;
 }
@@ -230,9 +231,11 @@ export const validateAndMatchComponents = async (
       componentSchema.parse(mappedData);
 
       let floorId: string | undefined;
+      let propId: string | undefined;
 
       if (propertyId) {
         // Single property mode
+        propId = propertyId;
         floorId = floorMap.get(mappedData.floorName.toLowerCase());
         if (!floorId) {
           result.status = 'error';
@@ -251,7 +254,7 @@ export const validateAndMatchComponents = async (
           continue;
         }
 
-        const propId = propertyMap!.get(mappedData.propertyName.toLowerCase());
+        propId = propertyMap!.get(mappedData.propertyName.toLowerCase());
         if (!propId) {
           result.status = 'error';
           result.message = `Fastighet "${mappedData.propertyName}" finns inte`;
@@ -285,6 +288,7 @@ export const validateAndMatchComponents = async (
 
       result.data = mappedData;
       result.floorId = floorId;
+      result.propertyId = propId;
       results.push(result);
     } catch (error: any) {
       result.status = 'error';
@@ -304,17 +308,18 @@ export const importComponents = async (
   let failed = 0;
 
   for (const component of validatedComponents) {
-    if (component.status !== 'valid' || !component.floorId) {
+    if (component.status !== 'valid' || !component.floorId || !component.propertyId) {
       failed++;
       continue;
     }
 
-    const { data, floorId } = component;
+    const { data, floorId, propertyId } = component;
 
     const { error } = await supabase.from('components').insert({
       name: data.name,
       type: data.type,
       floor_id: floorId,
+      property_id: propertyId,
       registration_number: data.registration_number,
       installation_year: data.installation_year,
       manufacturer: data.manufacturer,

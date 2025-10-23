@@ -234,7 +234,7 @@ export type Database = {
           aff_code: string | null
           cost_center: string | null
           created_at: string
-          floor_id: string
+          floor_id: string | null
           id: string
           installation_year: number | null
           manufacturer: string | null
@@ -243,6 +243,7 @@ export type Database = {
           next_service_date: string | null
           notes: string | null
           priority: number | null
+          property_id: string
           refrigerant_amount_kg: number | null
           refrigerant_code: string | null
           refrigerant_type: string | null
@@ -258,7 +259,7 @@ export type Database = {
           aff_code?: string | null
           cost_center?: string | null
           created_at?: string
-          floor_id: string
+          floor_id?: string | null
           id?: string
           installation_year?: number | null
           manufacturer?: string | null
@@ -267,6 +268,7 @@ export type Database = {
           next_service_date?: string | null
           notes?: string | null
           priority?: number | null
+          property_id: string
           refrigerant_amount_kg?: number | null
           refrigerant_code?: string | null
           refrigerant_type?: string | null
@@ -282,7 +284,7 @@ export type Database = {
           aff_code?: string | null
           cost_center?: string | null
           created_at?: string
-          floor_id?: string
+          floor_id?: string | null
           id?: string
           installation_year?: number | null
           manufacturer?: string | null
@@ -291,6 +293,7 @@ export type Database = {
           next_service_date?: string | null
           notes?: string | null
           priority?: number | null
+          property_id?: string
           refrigerant_amount_kg?: number | null
           refrigerant_code?: string | null
           refrigerant_type?: string | null
@@ -308,6 +311,13 @@ export type Database = {
             columns: ["floor_id"]
             isOneToOne: false
             referencedRelation: "floors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "components_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]

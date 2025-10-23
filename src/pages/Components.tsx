@@ -67,13 +67,12 @@ const Components = () => {
         floors:floor_id (
           id,
           name,
-          level,
-          property_id,
-          properties:property_id (
-            id,
-            name,
-            address
-          )
+          level
+        ),
+        properties:property_id (
+          id,
+          name,
+          address
         )
       `)
       .order('created_at', { ascending: false });
@@ -89,9 +88,8 @@ const Components = () => {
         ...comp,
         floor_name: comp.floors?.name,
         floor_level: comp.floors?.level,
-        property_id: comp.floors?.properties?.id,
-        property_name: comp.floors?.properties?.name,
-        property_address: comp.floors?.properties?.address,
+        property_name: comp.properties?.name,
+        property_address: comp.properties?.address,
       }));
       setComponents(formattedData);
     }
@@ -341,12 +339,19 @@ const Components = () => {
                               <span className="text-xs">{component.property_address}</span>
                             </div>
                           )}
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span className="text-xs">
-                              {component.floor_name}
-                              {component.floor_level !== null && ` (Våning ${component.floor_level})`}
-                            </span>
-                          </div>
+                          {component.floor_name && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <span className="text-xs">
+                                {component.floor_name}
+                                {component.floor_level !== null && ` (Våning ${component.floor_level})`}
+                              </span>
+                            </div>
+                          )}
+                          {!component.floor_name && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <span className="text-xs italic">Ingen våning vald</span>
+                            </div>
+                          )}
                           <div className="flex flex-col gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <div className="flex gap-2">
                               <div onClick={(e) => e.stopPropagation()} className="flex-1">
