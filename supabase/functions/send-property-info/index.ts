@@ -34,8 +34,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Sending property info email to:', recipient_email);
 
+    // Parse invoice address to get company name and org number (first two lines)
+    const invoiceLines = invoice_address ? invoice_address.split('\n').filter(line => line.trim()) : [];
+    const companyInfo = invoiceLines.slice(0, 2).join(' - ');
+    
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
+      <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6;">
         <p style="margin-bottom: 20px;">Hej,</p>
         
         ${main_contact ? `
@@ -50,8 +54,9 @@ const handler = async (req: Request): Promise<Response> => {
         <p style="margin: 0;"><strong>Fakturaadress:</strong></p>
         <p style="margin: 0; white-space: pre-line;">${invoice_address || ''}</p>
         
-        <p style="margin-top: 20px; margin-bottom: 5px;"><strong>Bolag:</strong> ${property_name}</p>
-        <p style="margin: 0; margin-bottom: 20px;"><strong>Fastighet:</strong> ${property_name}</p>
+        <p style="margin-top: 20px; margin-bottom: 5px;"><strong>Bolag:</strong> ${companyInfo}</p>
+        <p style="margin: 0; margin-bottom: 5px;"><strong>Fastighet:</strong> ${property_name}</p>
+        <p style="margin: 0; margin-bottom: 20px;"><strong>Märkning:</strong> ${property_name} + Kontonummer</p>
         
         <p style="margin: 0;">Faktura skickas till Scanning@retta.se</p>
       </div>
