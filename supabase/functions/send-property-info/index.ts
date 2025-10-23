@@ -35,55 +35,32 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Sending property info email to:', recipient_email);
 
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #333; border-bottom: 2px solid #0066cc; padding-bottom: 10px;">
-          Fastighetsinformation: ${property_name}
-        </h1>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
+        <p style="margin-bottom: 20px;">Hej,</p>
         
-        <div style="margin: 20px 0;">
-          <h2 style="color: #0066cc; font-size: 18px;">Fastighetsadress</h2>
-          <p style="color: #666; line-height: 1.6;">
-            ${property_address || 'Ingen adress registrerad'}
-          </p>
-        </div>
-
-        <div style="margin: 20px 0;">
-          <h2 style="color: #0066cc; font-size: 18px;">Fakturaadress</h2>
-          <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; white-space: pre-wrap; color: #333;">
-${invoice_address || 'Ingen fakturaadress registrerad'}
-          </div>
-        </div>
-
         ${main_contact ? `
-        <div style="margin: 20px 0;">
-          <h2 style="color: #0066cc; font-size: 18px;">Huvudkontakt</h2>
-          <div style="background: #f5f5f5; padding: 15px; border-radius: 5px;">
-            <p style="margin: 5px 0; color: #333;"><strong>Namn:</strong> ${main_contact.name}</p>
-            ${main_contact.role ? `<p style="margin: 5px 0; color: #333;"><strong>Roll:</strong> ${main_contact.role}</p>` : ''}
-            ${main_contact.company ? `<p style="margin: 5px 0; color: #333;"><strong>Företag:</strong> ${main_contact.company}</p>` : ''}
-            ${main_contact.phone ? `<p style="margin: 5px 0; color: #333;"><strong>Telefon:</strong> ${main_contact.phone}</p>` : ''}
-            ${main_contact.email ? `<p style="margin: 5px 0; color: #333;"><strong>E-post:</strong> ${main_contact.email}</p>` : ''}
-          </div>
-        </div>
-        ` : `
-        <div style="margin: 20px 0;">
-          <h2 style="color: #0066cc; font-size: 18px;">Huvudkontakt</h2>
-          <p style="color: #666;">Ingen kontaktperson registrerad</p>
-        </div>
-        `}
-
-        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
-          <p style="color: #999; font-size: 12px;">
-            Denna information skickades automatiskt från ditt fastighetssystem.
-          </p>
-        </div>
+        <p style="margin: 0;"><strong>Kontaktuppgifter Drifttekniker:</strong></p>
+        <p style="margin: 0;">${main_contact.name || ''}</p>
+        <p style="margin: 0;">${main_contact.phone || ''}</p>
+        <p style="margin: 0; margin-bottom: 20px;">${main_contact.email || ''}</p>
+        ` : ''}
+        
+        <p style="margin-bottom: 20px;"><strong>Fastighetens Adress:</strong> ${property_address || ''}</p>
+        
+        <p style="margin: 0;"><strong>Fakturaadress:</strong></p>
+        <p style="margin: 0; white-space: pre-line;">${invoice_address || ''}</p>
+        
+        <p style="margin-top: 20px; margin-bottom: 5px;"><strong>Bolag:</strong> ${property_name}</p>
+        <p style="margin: 0; margin-bottom: 20px;"><strong>Fastighet:</strong> ${property_name}</p>
+        
+        <p style="margin: 0;">Faktura skickas till Scanning@retta.se</p>
       </div>
     `;
 
     const emailResponse = await resend.emails.send({
       from: "Fastighetssystem <onboarding@resend.dev>",
       to: [recipient_email],
-      subject: `Fastighetsinformation - ${property_name}`,
+      subject: `Kontaktuppgifter - ${property_name}`,
       html: emailHtml,
     });
 
