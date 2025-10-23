@@ -20,8 +20,8 @@ export const SelectPropertyFloorDialog = ({
   const { toast } = useToast();
   const [properties, setProperties] = useState<any[]>([]);
   const [floors, setFloors] = useState<any[]>([]);
-  const [selectedProperty, setSelectedProperty] = useState('');
-  const [selectedFloor, setSelectedFloor] = useState('');
+  const [selectedProperty, setSelectedProperty] = useState<string | undefined>(undefined);
+  const [selectedFloor, setSelectedFloor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export const SelectPropertyFloorDialog = ({
       fetchFloors(selectedProperty);
     } else {
       setFloors([]);
-      setSelectedFloor('');
+      setSelectedFloor(undefined);
     }
   }, [selectedProperty]);
 
@@ -76,14 +76,16 @@ export const SelectPropertyFloorDialog = ({
 
   const handleContinue = () => {
     if (selectedProperty) {
-      onSelect(selectedProperty, selectedFloor || '');
+      // If "no-floor" is selected, treat it as empty string (no floor)
+      const floorId = selectedFloor === 'no-floor' ? '' : (selectedFloor || '');
+      onSelect(selectedProperty, floorId);
       resetForm();
     }
   };
 
   const resetForm = () => {
-    setSelectedProperty('');
-    setSelectedFloor('');
+    setSelectedProperty(undefined);
+    setSelectedFloor(undefined);
   };
 
   return (
@@ -131,7 +133,7 @@ export const SelectPropertyFloorDialog = ({
                     </div>
                   ) : (
                     <>
-                      <SelectItem value="">Ingen våning</SelectItem>
+                      <SelectItem value="no-floor">Ingen våning</SelectItem>
                       {floors.map((floor) => (
                         <SelectItem key={floor.id} value={floor.id}>
                           {floor.name}
