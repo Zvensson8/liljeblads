@@ -32,6 +32,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/hooks/useAuth";
 
 const workOrderSchema = z.object({
   action: z.string().min(1, "Åtgärd krävs").max(200, "Max 200 tecken"),
@@ -43,6 +45,9 @@ const workOrderSchema = z.object({
   contractor: z.string().max(100, "Max 100 tecken").optional(),
   quarter: z.string().max(10, "Max 10 tecken").optional(),
   comments: z.string().max(1000, "Max 1000 tecken").optional(),
+  reminder_enabled: z.boolean().default(false),
+  reminder_frequency: z.enum(["weekly", "biweekly", "triweekly", "monthly", "none"]).default("weekly"),
+  reminder_recipient_email: z.string().email("Ogiltig e-postadress").optional().or(z.literal("")),
 });
 
 type WorkOrderFormData = z.infer<typeof workOrderSchema>;
@@ -62,6 +67,8 @@ export function WorkOrderDialog({
   onSuccess,
   propertyId,
 }: WorkOrderDialogProps) {
+  const { user } = useAuth();
+  
   const form = useForm<WorkOrderFormData>({
     resolver: zodResolver(workOrderSchema),
     defaultValues: {
@@ -74,6 +81,9 @@ export function WorkOrderDialog({
       quarter: "",
       comments: "",
       due_date: "",
+      reminder_enabled: false,
+      reminder_frequency: "weekly",
+      reminder_recipient_email: user?.email || "",
     },
   });
 
@@ -101,6 +111,9 @@ export function WorkOrderDialog({
         quarter: order.quarter || "",
         comments: order.comments || "",
         due_date: order.due_date || "",
+        reminder_enabled: order.reminder_enabled || false,
+        reminder_frequency: order.reminder_frequency || "weekly",
+        reminder_recipient_email: order.reminder_recipient_email || user?.email || "",
       });
     } else if (propertyId) {
       form.reset({
@@ -113,9 +126,12 @@ export function WorkOrderDialog({
         quarter: "",
         comments: "",
         due_date: "",
+        reminder_enabled: false,
+        reminder_frequency: "weekly",
+        reminder_recipient_email: user?.email || "",
       });
     }
-  }, [order, propertyId, form]);
+  }, [order, propertyId, form, user?.email]);
 
   const onSubmit = async (data: WorkOrderFormData) => {
     const payload = {
@@ -128,6 +144,9 @@ export function WorkOrderDialog({
       quarter: data.quarter || null,
       comments: data.comments || null,
       due_date: data.due_date || null,
+      reminder_enabled: data.reminder_enabled,
+      reminder_frequency: data.reminder_frequency,
+      reminder_recipient_email: data.reminder_recipient_email || null,
     };
 
     if (order) {
@@ -347,6 +366,82 @@ export function WorkOrderDialog({
                 </FormItem>
               )}
             />
+
+            <div className="border-t pt-4 space-y-4">
+              <h3 className="text-sm font-semibold">E-postpåminnelser</h3>
+              
+              <FormField
+                control={form.control}
+                name="reminder_enabled"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Aktivera påminnelser när status är "Beställt"
+                      </FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        Få regelbundna påminnelser om att följa upp arbetsorderns status
+                      </p>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              {form.watch("reminder_enabled") && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="reminder_frequency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Påminnelsefrekvens</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="weekly">Varje vecka</SelectItem>
+                            <SelectItem value="biweekly">Varannan vecka</SelectItem>
+                            <SelectItem value="triweekly">Var tredje vecka</SelectItem>
+                            <SelectItem value="monthly">Varje månad</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="reminder_recipient_email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>E-postadress för påminnelser</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="email"
+                            placeholder="din.email@exempel.se"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
+            </div>
 
             <Alert className="bg-blue-500/10 border-blue-500/20">
               <Info className="h-4 w-4 text-blue-500" />

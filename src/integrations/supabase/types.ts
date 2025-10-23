@@ -1607,10 +1607,14 @@ export type Database = {
           created_at: string
           due_date: string | null
           id: string
+          last_reminder_sent: string | null
           price: number | null
           priority: Database["public"]["Enums"]["work_order_priority"]
           property_id: string
           quarter: string | null
+          reminder_enabled: boolean | null
+          reminder_frequency: string | null
+          reminder_recipient_email: string | null
           status: Database["public"]["Enums"]["work_order_status"]
           updated_at: string
         }
@@ -1621,10 +1625,14 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          last_reminder_sent?: string | null
           price?: number | null
           priority?: Database["public"]["Enums"]["work_order_priority"]
           property_id: string
           quarter?: string | null
+          reminder_enabled?: boolean | null
+          reminder_frequency?: string | null
+          reminder_recipient_email?: string | null
           status?: Database["public"]["Enums"]["work_order_status"]
           updated_at?: string
         }
@@ -1635,10 +1643,14 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          last_reminder_sent?: string | null
           price?: number | null
           priority?: Database["public"]["Enums"]["work_order_priority"]
           property_id?: string
           quarter?: string | null
+          reminder_enabled?: boolean | null
+          reminder_frequency?: string | null
+          reminder_recipient_email?: string | null
           status?: Database["public"]["Enums"]["work_order_status"]
           updated_at?: string
         }
@@ -1661,10 +1673,7 @@ export type Database = {
         Args: { planned: number; reported: number }
         Returns: Database["public"]["Enums"]["task_status"]
       }
-      get_user_organization_id: {
-        Args: { _user_id: string }
-        Returns: string
-      }
+      get_user_organization_id: { Args: { _user_id: string }; Returns: string }
       has_organization_role: {
         Args: { _org_id: string; _role: string; _user_id: string }
         Returns: boolean

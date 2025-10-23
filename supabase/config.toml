@@ -1,1 +1,4 @@
 project_id = "vfwxpbffadedpvhdxntm"
+
+[functions.send-work-order-reminders]
+verify_jwt = false
