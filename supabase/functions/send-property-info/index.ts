@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -9,13 +10,30 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-interface PropertyInfoRequest {
-  property_name: string;
-  property_number: string | null;
-  property_address: string | null;
-  invoice_address: string | null;
-  main_contact: any;
-  recipient_email: string;
+// Validation schema
+const propertyInfoSchema = z.object({
+  property_name: z.string().trim().min(1).max(200),
+  property_number: z.string().trim().max(50).nullable(),
+  property_address: z.string().trim().max(500).nullable(),
+  invoice_address: z.string().trim().max(1000).nullable(),
+  recipient_email: z.string().email().max(255),
+  main_contact: z.object({
+    name: z.string().trim().max(100).nullable(),
+    phone: z.string().trim().max(50).nullable(),
+    email: z.string().email().max(255).nullable()
+  }).nullable()
+});
+
+type PropertyInfoRequest = z.infer<typeof propertyInfoSchema>;
+
+// HTML escaping function to prevent injection
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -25,6 +43,10 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Validate input data
+    const rawData = await req.json();
+    const validatedData = propertyInfoSchema.parse(rawData);
+    
     const { 
       property_name,
       property_number,
@@ -32,13 +54,13 @@ const handler = async (req: Request): Promise<Response> => {
       invoice_address, 
       main_contact,
       recipient_email 
-    }: PropertyInfoRequest = await req.json();
+    } = validatedData;
 
     console.log('Sending property info email to:', recipient_email);
 
     // Parse invoice address to get company name and org number (first two lines)
     const invoiceLines = invoice_address ? invoice_address.split('\n').filter(line => line.trim()) : [];
-    const companyInfo = invoiceLines.slice(0, 2).join(' - ');
+    const companyInfo = escapeHtml(invoiceLines.slice(0, 2).join(' - '));
     
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6;">
@@ -46,19 +68,19 @@ const handler = async (req: Request): Promise<Response> => {
         
         ${main_contact ? `
         <p style="margin: 0;"><strong>Kontaktuppgifter Drifttekniker:</strong></p>
-        <p style="margin: 0;">${main_contact.name || ''}</p>
-        <p style="margin: 0;">${main_contact.phone || ''}</p>
-        <p style="margin: 0; margin-bottom: 20px;">${main_contact.email || ''}</p>
+        <p style="margin: 0;">${escapeHtml(main_contact.name || '')}</p>
+        <p style="margin: 0;">${escapeHtml(main_contact.phone || '')}</p>
+        <p style="margin: 0; margin-bottom: 20px;">${escapeHtml(main_contact.email || '')}</p>
         ` : ''}
         
-        <p style="margin-bottom: 20px;"><strong>Fastighetens Adress:</strong> ${property_address || ''}</p>
+        <p style="margin-bottom: 20px;"><strong>Fastighetens Adress:</strong> ${escapeHtml(property_address || '')}</p>
         
         <p style="margin: 0;"><strong>Fakturaadress:</strong></p>
-        <p style="margin: 0; white-space: pre-line;">${invoice_address || ''}</p>
+        <p style="margin: 0; white-space: pre-line;">${escapeHtml(invoice_address || '')}</p>
         
         <p style="margin-top: 20px; margin-bottom: 5px;"><strong>Bolag:</strong> ${companyInfo}</p>
-        <p style="margin: 0; margin-bottom: 5px;"><strong>Fastighet:</strong> ${property_name}</p>
-        <p style="margin: 0; margin-bottom: 20px;"><strong>Märkning:</strong> ${property_number || property_name} + Kontonummer</p>
+        <p style="margin: 0; margin-bottom: 5px;"><strong>Fastighet:</strong> ${escapeHtml(property_name)}</p>
+        <p style="margin: 0; margin-bottom: 20px;"><strong>Märkning:</strong> ${escapeHtml(property_number || property_name)} + Kontonummer</p>
         
         <p style="margin: 0;">Faktura skickas till Scanning@retta.se</p>
       </div>
@@ -67,7 +89,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "Fastighetssystem <onboarding@resend.dev>",
       to: [recipient_email],
-      subject: `Kontaktuppgifter - ${property_name}`,
+      subject: `Kontaktuppgifter - ${escapeHtml(property_name)}`,
       html: emailHtml,
     });
 
@@ -82,6 +104,18 @@ const handler = async (req: Request): Promise<Response> => {
     });
   } catch (error: any) {
     console.error("Error in send-property-info function:", error);
+    
+    // Handle validation errors specifically
+    if (error instanceof z.ZodError) {
+      return new Response(
+        JSON.stringify({ error: "Invalid input data", details: error.errors }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error.message }),
       {
