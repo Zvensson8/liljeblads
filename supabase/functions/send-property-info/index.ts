@@ -11,6 +11,7 @@ const corsHeaders = {
 
 interface PropertyInfoRequest {
   property_name: string;
+  property_number: string | null;
   property_address: string | null;
   invoice_address: string | null;
   main_contact: any;
@@ -25,7 +26,8 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const { 
-      property_name, 
+      property_name,
+      property_number,
       property_address, 
       invoice_address, 
       main_contact,
@@ -56,7 +58,7 @@ const handler = async (req: Request): Promise<Response> => {
         
         <p style="margin-top: 20px; margin-bottom: 5px;"><strong>Bolag:</strong> ${companyInfo}</p>
         <p style="margin: 0; margin-bottom: 5px;"><strong>Fastighet:</strong> ${property_name}</p>
-        <p style="margin: 0; margin-bottom: 20px;"><strong>Märkning:</strong> ${property_name} + Kontonummer</p>
+        <p style="margin: 0; margin-bottom: 20px;"><strong>Märkning:</strong> ${property_number || property_name} + Kontonummer</p>
         
         <p style="margin: 0;">Faktura skickas till Scanning@retta.se</p>
       </div>

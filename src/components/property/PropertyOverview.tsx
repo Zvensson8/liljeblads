@@ -45,6 +45,7 @@ export function PropertyOverview({
       const { error } = await supabase.functions.invoke('send-property-info', {
         body: {
           property_name: property.name,
+          property_number: property.property_number,
           property_address: property.address,
           invoice_address: property.invoice_address,
           main_contact: mainContact,
