@@ -33,7 +33,6 @@ const propertySchema = z.object({
   property_type: z.string().max(100, "Max 100 tecken").optional(),
   loa: z.string().max(100, "Max 100 tecken").optional(),
   invoice_address: z.string().max(500, "Max 500 tecken").optional(),
-  description: z.string().max(1000, "Max 1000 tecken").optional(),
 });
 
 type PropertyFormData = z.infer<typeof propertySchema>;
@@ -62,7 +61,6 @@ export function PropertyEditDialog({
       property_type: "",
       loa: "",
       invoice_address: "",
-      description: "",
     },
   });
 
@@ -77,7 +75,6 @@ export function PropertyEditDialog({
         property_type: property.property_type || "",
         loa: property.loa || "",
         invoice_address: property.invoice_address || "",
-        description: property.description || "",
       });
     }
   }, [property, form]);
@@ -92,7 +89,6 @@ export function PropertyEditDialog({
       property_type: data.property_type || null,
       loa: data.loa || null,
       invoice_address: data.invoice_address || null,
-      description: data.description || null,
     };
 
     const { error } = await supabase
@@ -255,24 +251,6 @@ export function PropertyEditDialog({
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Beskrivning</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Ytterligare information om fastigheten..."
-                      className="min-h-[100px]"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <div className="flex gap-2 justify-end pt-4">
               <Button

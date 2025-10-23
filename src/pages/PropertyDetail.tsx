@@ -21,6 +21,7 @@ import { PropertyNotes } from '@/components/property/PropertyNotes';
 import { PropertyTodos } from '@/components/property/PropertyTodos';
 import { PropertyContacts } from '@/components/property/PropertyContacts';
 import { PropertyDocuments } from '@/components/property/PropertyDocuments';
+import { PropertyOverview } from '@/components/property/PropertyOverview';
 import { PropertyEconomy } from '@/components/property/PropertyEconomy';
 import { PropertyMaintenancePlan } from '@/components/property/PropertyMaintenancePlan';
 import { ActivityTimeline } from '@/components/ActivityTimeline';
@@ -32,7 +33,6 @@ interface Property {
   id: string;
   name: string;
   address: string | null;
-  description: string | null;
   area_sqm: number | null;
   construction_year: number | null;
   property_type: string | null;
@@ -433,156 +433,60 @@ const PropertyDetail = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8">
-        <div className="grid gap-6 mb-8">
-          {/* Top Cards Row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Property Information */}
-            <Card className="hover:shadow-[var(--shadow-elegant)] transition-all">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">Fastighetsinformation</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">{property.address || 'Ingen adress'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">📅</span>
-                  <span className="text-muted-foreground">Byggår: {property.construction_year || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Typ: </span>
-                  <span className="text-foreground">{property.property_type || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">LOA: </span>
-                  <span className="text-foreground">{property.loa || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Area: </span>
-                  <span className="text-foreground">{property.area_sqm ? `${property.area_sqm} m²` : '-'}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Components */}
-            <Card className="hover:shadow-[var(--shadow-elegant)] transition-all">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">Komponenter</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold mb-1">{components.length}</div>
-                <p className="text-sm text-muted-foreground">Totalt antal komponenter</p>
-              </CardContent>
-            </Card>
-
-            {/* Work Orders */}
-            <Card className="hover:shadow-[var(--shadow-elegant)] transition-all">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <Wrench className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">Arbetsordrar</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold mb-1">{workOrders.length}</div>
-                <p className="text-sm text-muted-foreground">Aktiva arbetsordrar</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Economic Overview */}
-          <Card className="hover:shadow-[var(--shadow-elegant)] transition-all">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                <CardTitle>Ekonomisk översikt</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Månadskostnad</p>
-                  <p className="text-2xl font-bold">- kr</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Årskostnad</p>
-                  <p className="text-2xl font-bold">- kr</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Antal konton</p>
-                  <p className="text-2xl font-bold">-</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Tabs Navigation - Sticky under header */}
+      <div className="sticky top-[73px] z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="h-12 w-full justify-start rounded-none border-0 bg-transparent p-0">
+              <TabsTrigger value="overview" className="gap-2">
+                <Home className="h-4 w-4" />
+                Översikt
+              </TabsTrigger>
+              <TabsTrigger value="components" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Komponenter
+              </TabsTrigger>
+              <TabsTrigger value="drawings" className="gap-2">
+                <MapPin className="h-4 w-4" />
+                Ritningar
+              </TabsTrigger>
+              <TabsTrigger value="workorders" className="gap-2">
+                <Wrench className="h-4 w-4" />
+                Arbetsordrar
+              </TabsTrigger>
+              <TabsTrigger value="maintenance" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Underhållsplan
+              </TabsTrigger>
+              <TabsTrigger value="notes" className="gap-2">
+                <FileText className="h-4 w-4" />
+                Anteckningar
+              </TabsTrigger>
+              <TabsTrigger value="contacts" className="gap-2">
+                <Users className="h-4 w-4" />
+                Kontakter
+              </TabsTrigger>
+              <TabsTrigger value="documents" className="gap-2">
+                <File className="h-4 w-4" />
+                Dokument
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
+      </div>
 
-        {/* Tabs for different sections */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="flex-wrap h-auto">
-            <TabsTrigger value="overview">Översikt</TabsTrigger>
-            <TabsTrigger value="components">Komponenter</TabsTrigger>
-            <TabsTrigger value="drawings">Ritningar</TabsTrigger>
-            <TabsTrigger value="workorders">Arbetsordrar</TabsTrigger>
-            <TabsTrigger value="economy">Ekonomi</TabsTrigger>
-            <TabsTrigger value="maintenance">Underhållsplan</TabsTrigger>
-            <TabsTrigger value="notes">Anteckningar</TabsTrigger>
-            <TabsTrigger value="todo">Att-göra</TabsTrigger>
-            <TabsTrigger value="invoicing">Fakturering</TabsTrigger>
-            <TabsTrigger value="contacts">Kontakter</TabsTrigger>
-            <TabsTrigger value="documents">Dokument</TabsTrigger>
-          </TabsList>
-
+      <main className="container mx-auto px-6 py-8">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Activity Timeline */}
-              <ActivityTimeline propertyId={property.id} />
-              
-              {/* Description */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-primary" />
-                    <CardTitle>Beskrivning</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm">
-                    {property.description || 'Ingen beskrivning tillgänglig'}
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* Quick Stats */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Snabbstatistik</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Våningar:</span>
-                    <span className="font-medium">{floors.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Komponenter:</span>
-                    <span className="font-medium">{components.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Arbetsordrar:</span>
-                    <span className="font-medium">{workOrders.length}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          <TabsContent value="overview">
+            <PropertyOverview 
+              property={property}
+              components={components}
+              workOrders={workOrders}
+              floors={floors}
+              overdueTodos={overdueTodos}
+              urgentWorkOrders={urgentWorkOrders}
+            />
           </TabsContent>
 
           {/* Components Tab */}
@@ -803,11 +707,6 @@ const PropertyDetail = () => {
             </div>
           </TabsContent>
 
-          {/* Economy Tab */}
-          <TabsContent value="economy">
-            <PropertyEconomy propertyId={property.id} />
-          </TabsContent>
-
           {/* Maintenance Plan Tab */}
           <TabsContent value="maintenance">
             <PropertyMaintenancePlan propertyId={property.id} />
@@ -888,29 +787,6 @@ const PropertyDetail = () => {
             </Card>
           </TabsContent>
 
-          {/* Invoicing Tab */}
-          <TabsContent value="invoicing">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  <CardTitle>Fakturaadress</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {property.invoice_address ? (
-                  <div className="whitespace-pre-wrap border rounded-lg p-4 bg-muted/30">
-                    {property.invoice_address}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    Ingen fakturaadress registrerad. Lägg till via "Redigera Fastighet".
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Contacts Tab */}
           <TabsContent value="contacts">
             <Card>
@@ -952,21 +828,6 @@ const PropertyDetail = () => {
               </CardHeader>
               <CardContent>
                 <PropertyNotes propertyId={property.id} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Todo Tab */}
-          <TabsContent value="todo">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <CheckSquare className="h-5 w-5 text-primary" />
-                  <CardTitle>Att-göra lista</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <PropertyTodos propertyId={property.id} />
               </CardContent>
             </Card>
           </TabsContent>

@@ -12,9 +12,10 @@ import { sv } from "date-fns/locale";
 
 interface PropertyTodosProps {
   propertyId: string;
+  compact?: boolean;
 }
 
-export function PropertyTodos({ propertyId }: PropertyTodosProps) {
+export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProps) {
   const [newTodo, setNewTodo] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
 
@@ -81,30 +82,35 @@ export function PropertyTodos({ propertyId }: PropertyTodosProps) {
     }
   };
 
+  // If compact mode, only show first 3 todos
+  const displayTodos = compact ? (todos?.slice(0, 3) || []) : (todos || []);
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <Input
-          placeholder="Ny uppgift..."
-          value={newTodo}
-          onChange={(e) => setNewTodo(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
-        />
-        <Input
-          type="date"
-          value={newDueDate}
-          onChange={(e) => setNewDueDate(e.target.value)}
-          className="w-40"
-        />
-        <Button onClick={handleAddTodo} disabled={!newTodo.trim()}>
-          <Plus className="h-4 w-4 mr-2" />
-          Lägg till
-        </Button>
-      </div>
+      {!compact && (
+        <div className="flex gap-2">
+          <Input
+            placeholder="Ny uppgift..."
+            value={newTodo}
+            onChange={(e) => setNewTodo(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
+          />
+          <Input
+            type="date"
+            value={newDueDate}
+            onChange={(e) => setNewDueDate(e.target.value)}
+            className="w-40"
+          />
+          <Button onClick={handleAddTodo} disabled={!newTodo.trim()}>
+            <Plus className="h-4 w-4 mr-2" />
+            Lägg till
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-2">
-        {todos && todos.length > 0 ? (
-          todos.map((todo) => (
+        {displayTodos && displayTodos.length > 0 ? (
+          displayTodos.map((todo: any) => (
             <Card key={todo.id} className={todo.completed ? "opacity-60" : ""}>
               <CardContent className="pt-4">
                 <div className="flex items-center gap-3">
@@ -123,13 +129,15 @@ export function PropertyTodos({ propertyId }: PropertyTodosProps) {
                       </div>
                     )}
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => handleDeleteTodo(todo.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {!compact && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleDeleteTodo(todo.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
