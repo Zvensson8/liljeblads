@@ -280,9 +280,9 @@ export const ComponentFormDialog = ({
               </Label>
               <Select value={selectedProperty} onValueChange={setSelectedProperty} disabled>
                 <SelectTrigger id="property">
-                  <SelectValue placeholder="Välj fastighet" />
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-popover z-50">
                   {properties.map((property) => (
                     <SelectItem key={property.id} value={property.id}>
                       {property.name}
@@ -296,11 +296,11 @@ export const ComponentFormDialog = ({
               <Label htmlFor="componentType">
                 Komponenttyp <span className="text-destructive">*</span>
               </Label>
-              <Select value={componentType} onValueChange={setComponentType} required>
+              <Select value={componentType} onValueChange={setComponentType}>
                 <SelectTrigger id="componentType">
                   <SelectValue placeholder="Välj komponenttyp" />
                 </SelectTrigger>
-                <SelectContent className="bg-popover z-50">
+                <SelectContent className="bg-popover z-50 max-h-[300px] overflow-y-auto">
                   <SelectItem value="SC1">Styr och övervakningssystem</SelectItem>
                   <SelectItem value="SC2.1.1">Takbeläggningar och Tätskikt</SelectItem>
                   <SelectItem value="SC2.3">Entréer Portar mm</SelectItem>
