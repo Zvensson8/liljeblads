@@ -55,8 +55,8 @@ export const ComponentFormDialog = ({
   // Form fields
   const [designation, setDesignation] = useState('');
   const [registrationNumber, setRegistrationNumber] = useState('');
-  const [selectedProperty, setSelectedProperty] = useState('');
-  const [componentType, setComponentType] = useState('');
+  const [selectedProperty, setSelectedProperty] = useState<string | undefined>(undefined);
+  const [componentType, setComponentType] = useState<string | undefined>(undefined);
   const [installationYear, setInstallationYear] = useState('');
   const [manufacturer, setManufacturer] = useState('');
   const [model, setModel] = useState('');
@@ -229,7 +229,7 @@ export const ComponentFormDialog = ({
   const resetForm = () => {
     setDesignation('');
     setRegistrationNumber('');
-    setComponentType('');
+    setComponentType(undefined);
     setInstallationYear('');
     setManufacturer('');
     setModel('');
