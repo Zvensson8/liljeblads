@@ -27,6 +27,7 @@ const navigationItems = [
   { title: "Arbetsordrar", url: "/work-orders", icon: Wrench },
   { title: "Driftuppföljning", url: "/operations", icon: ClipboardList },
   { title: "Projekthantering", url: "/projects", icon: Briefcase },
+  { title: "Återkommande kostnader", url: "/recurring-costs", icon: DollarSign },
   { title: "Användare", url: "/users", icon: Users },
   { title: "Organisation", url: "/organization/settings", icon: Building },
 ];

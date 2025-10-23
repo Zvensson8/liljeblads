@@ -23,6 +23,7 @@ import Projects from "./pages/Projects";
 import OrganizationSettings from "./pages/OrganizationSettings";
 import FounderAdmin from "./pages/FounderAdmin";
 import NotFound from "./pages/NotFound";
+import RecurringCosts from "./pages/RecurringCosts";
 
 const AppContent = () => {
   const [searchOpen, setSearchOpen] = React.useState(false);
@@ -42,6 +43,7 @@ const AppContent = () => {
       <Route path="/projects" element={<Projects />} />
       <Route path="/projects/:id" element={<ProjectDetail />} />
       <Route path="/cost-overview" element={<CostOverview />} />
+      <Route path="/recurring-costs" element={<RecurringCosts />} />
       <Route path="/users" element={<Users />} />
       <Route path="/organization/settings" element={<OrganizationSettings />} />
       <Route path="/founder/admin" element={<FounderAdmin />} />

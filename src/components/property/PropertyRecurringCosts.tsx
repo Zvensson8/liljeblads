@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingUp, Calendar } from "lucide-react";
+import { Plus, Trash2, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface RecurringCost {
@@ -16,10 +16,19 @@ interface RecurringCost {
   property_id: string;
   description: string;
   amount: number;
-  frequency: 'monthly' | 'quarterly' | 'yearly';
-  category: string;
-  next_due_date: string | null;
-  created_at: string;
+  base_interval_months: number;
+  interval_variation_months?: number;
+  account_code_id?: string;
+  contractor_name?: string;
+  contact_person?: string;
+  last_payment_date?: string;
+  calculated_quarter_start?: string;
+  calculated_quarter_end?: string;
+  user_selected_date?: string;
+  account_code?: {
+    code: string;
+    description: string;
+  };
 }
 
 interface PropertyRecurringCostsProps {
@@ -30,26 +39,57 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
   const [costs, setCosts] = useState<RecurringCost[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [accountCodes, setAccountCodes] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     description: '',
     amount: 0,
-    frequency: 'monthly' as 'monthly' | 'quarterly' | 'yearly',
-    category: 'drift',
-    next_due_date: '',
+    base_interval_months: 12,
+    interval_variation_months: 0,
+    account_code_id: '',
+    contractor_name: '',
+    contact_person: '',
+    last_payment_date: '',
   });
 
   useEffect(() => {
     fetchCosts();
+    fetchAccountCodes();
   }, [propertyId]);
+
+  const fetchAccountCodes = async () => {
+    try {
+      const { data: property } = await supabase
+        .from('properties')
+        .select('organization_id')
+        .eq('id', propertyId)
+        .single();
+
+      if (property) {
+        const { data, error } = await supabase
+          .from('account_codes')
+          .select('*')
+          .eq('organization_id', property.organization_id)
+          .order('code');
+
+        if (error) throw error;
+        setAccountCodes(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching account codes:', error);
+    }
+  };
 
   const fetchCosts = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('property_recurring_costs')
-        .select('*')
+        .select(`
+          *,
+          account_code:account_codes(code, description)
+        `)
         .eq('property_id', propertyId)
-        .order('next_due_date', { ascending: true });
+        .order('last_payment_date', { ascending: false });
 
       if (error) throw error;
       setCosts((data || []) as RecurringCost[]);
@@ -79,9 +119,12 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
       setFormData({
         description: '',
         amount: 0,
-        frequency: 'monthly',
-        category: 'drift',
-        next_due_date: '',
+        base_interval_months: 12,
+        interval_variation_months: 0,
+        account_code_id: '',
+        contractor_name: '',
+        contact_person: '',
+        last_payment_date: '',
       });
       fetchCosts();
     } catch (error: any) {
@@ -107,27 +150,15 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
     }
   };
 
-  const getFrequencyLabel = (frequency: string) => {
-    switch (frequency) {
-      case 'monthly': return 'Månadsvis';
-      case 'quarterly': return 'Kvartalsvis';
-      case 'yearly': return 'Årsvis';
-      default: return frequency;
-    }
-  };
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'drift': return 'bg-blue-500';
-      case 'underhall': return 'bg-green-500';
-      case 'energi': return 'bg-yellow-500';
-      case 'forsakring': return 'bg-purple-500';
-      default: return 'bg-gray-500';
-    }
+  const getIntervalLabel = (months: number, variation?: number) => {
+    if (months === 1) return "Månatlig";
+    if (months === 3) return "Kvartalsvis";
+    if (months === 12) return "Årlig";
+    return `Var ${months} månad${variation ? ` (±${variation} mån)` : ""}`;
   };
 
   const totalMonthly = costs.reduce((sum, cost) => {
-    const multiplier = cost.frequency === 'monthly' ? 1 : cost.frequency === 'quarterly' ? 1/3 : 1/12;
+    const multiplier = 1 / (cost.base_interval_months || 12);
     return sum + (cost.amount * multiplier);
   }, 0);
 
@@ -193,10 +224,10 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
               <TableHeader>
                 <TableRow>
                   <TableHead>Beskrivning</TableHead>
-                  <TableHead>Kategori</TableHead>
+                  <TableHead>Konto</TableHead>
                   <TableHead>Belopp</TableHead>
-                  <TableHead>Frekvens</TableHead>
-                  <TableHead>Nästa förfallodatum</TableHead>
+                  <TableHead>Intervall</TableHead>
+                  <TableHead>Senaste betalning</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -205,15 +236,20 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
                   <TableRow key={cost.id}>
                     <TableCell className="font-medium">{cost.description}</TableCell>
                     <TableCell>
-                      <Badge className={getCategoryColor(cost.category)}>
-                        {cost.category}
-                      </Badge>
+                      {cost.account_code ? (
+                        <div className="text-sm">
+                          <div className="font-medium">{cost.account_code.code}</div>
+                          <div className="text-muted-foreground text-xs">{cost.account_code.description}</div>
+                        </div>
+                      ) : '-'}
                     </TableCell>
                     <TableCell>{cost.amount.toLocaleString('sv-SE')} kr</TableCell>
-                    <TableCell>{getFrequencyLabel(cost.frequency)}</TableCell>
                     <TableCell>
-                      {cost.next_due_date 
-                        ? new Date(cost.next_due_date).toLocaleDateString('sv-SE')
+                      {getIntervalLabel(cost.base_interval_months, cost.interval_variation_months)}
+                    </TableCell>
+                    <TableCell>
+                      {cost.last_payment_date 
+                        ? new Date(cost.last_payment_date).toLocaleDateString('sv-SE')
                         : '-'
                       }
                     </TableCell>
@@ -235,7 +271,7 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Lägg till återkommande kostnad</DialogTitle>
           </DialogHeader>
@@ -251,22 +287,41 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
             </div>
 
             <div>
-              <Label htmlFor="category">Kategori</Label>
+              <Label htmlFor="account_code_id">Konto</Label>
               <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
+                value={formData.account_code_id}
+                onValueChange={(value) => setFormData({ ...formData, account_code_id: value })}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Välj kontokod" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="drift">Drift</SelectItem>
-                  <SelectItem value="underhall">Underhåll</SelectItem>
-                  <SelectItem value="energi">Energi</SelectItem>
-                  <SelectItem value="forsakring">Försäkring</SelectItem>
-                  <SelectItem value="annat">Annat</SelectItem>
+                  {accountCodes.map((code) => (
+                    <SelectItem key={code.id} value={code.id}>
+                      {code.code} - {code.description}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="contractor_name">Avtalspart</Label>
+                <Input
+                  id="contractor_name"
+                  value={formData.contractor_name}
+                  onChange={(e) => setFormData({ ...formData, contractor_name: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="contact_person">Kontaktperson</Label>
+                <Input
+                  id="contact_person"
+                  value={formData.contact_person}
+                  onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+                />
+              </div>
             </div>
 
             <div>
@@ -281,30 +336,40 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
               />
             </div>
 
-            <div>
-              <Label htmlFor="frequency">Frekvens</Label>
-              <Select
-                value={formData.frequency}
-                onValueChange={(value: any) => setFormData({ ...formData, frequency: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Månadsvis</SelectItem>
-                  <SelectItem value="quarterly">Kvartalsvis</SelectItem>
-                  <SelectItem value="yearly">Årsvis</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="base_interval_months">Basintervall (månader)</Label>
+                <Input
+                  id="base_interval_months"
+                  type="number"
+                  min="1"
+                  max="120"
+                  value={formData.base_interval_months}
+                  onChange={(e) => setFormData({ ...formData, base_interval_months: Number(e.target.value) })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="interval_variation_months">Variation (±månader)</Label>
+                <Input
+                  id="interval_variation_months"
+                  type="number"
+                  min="0"
+                  max="12"
+                  value={formData.interval_variation_months}
+                  onChange={(e) => setFormData({ ...formData, interval_variation_months: Number(e.target.value) })}
+                />
+              </div>
             </div>
 
             <div>
-              <Label htmlFor="next_due_date">Nästa förfallodatum</Label>
+              <Label htmlFor="last_payment_date">Senaste betalning</Label>
               <Input
-                id="next_due_date"
+                id="last_payment_date"
                 type="date"
-                value={formData.next_due_date}
-                onChange={(e) => setFormData({ ...formData, next_due_date: e.target.value })}
+                value={formData.last_payment_date}
+                onChange={(e) => setFormData({ ...formData, last_payment_date: e.target.value })}
+                required
               />
             </div>
 

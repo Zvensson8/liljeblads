@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_codes: {
+        Row: {
+          code: string
+          created_at: string
+          description: string
+          id: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description: string
+          id?: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string
+          id?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_codes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_settings: {
         Row: {
           created_at: string
@@ -1431,39 +1466,67 @@ export type Database = {
       }
       property_recurring_costs: {
         Row: {
+          account_code_id: string | null
           amount: number
-          category: string
+          base_interval_months: number | null
+          calculated_quarter_end: string | null
+          calculated_quarter_start: string | null
+          contact_person: string | null
+          contractor_name: string | null
           created_at: string
           description: string
-          frequency: string
           id: string
+          interval_variation_months: number | null
+          last_payment_date: string | null
           next_due_date: string | null
           property_id: string
           updated_at: string
+          user_selected_date: string | null
         }
         Insert: {
+          account_code_id?: string | null
           amount: number
-          category: string
+          base_interval_months?: number | null
+          calculated_quarter_end?: string | null
+          calculated_quarter_start?: string | null
+          contact_person?: string | null
+          contractor_name?: string | null
           created_at?: string
           description: string
-          frequency: string
           id?: string
+          interval_variation_months?: number | null
+          last_payment_date?: string | null
           next_due_date?: string | null
           property_id: string
           updated_at?: string
+          user_selected_date?: string | null
         }
         Update: {
+          account_code_id?: string | null
           amount?: number
-          category?: string
+          base_interval_months?: number | null
+          calculated_quarter_end?: string | null
+          calculated_quarter_start?: string | null
+          contact_person?: string | null
+          contractor_name?: string | null
           created_at?: string
           description?: string
-          frequency?: string
           id?: string
+          interval_variation_months?: number | null
+          last_payment_date?: string | null
           next_due_date?: string | null
           property_id?: string
           updated_at?: string
+          user_selected_date?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "property_recurring_costs_account_code_id_fkey"
+            columns: ["account_code_id"]
+            isOneToOne: false
+            referencedRelation: "account_codes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "property_recurring_costs_property_id_fkey"
             columns: ["property_id"]
@@ -1536,6 +1599,44 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_cost_history: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          payment_date: string
+          recurring_cost_id: string
+          was_actual_payment: boolean
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_date: string
+          recurring_cost_id: string
+          was_actual_payment?: boolean
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          recurring_cost_id?: string
+          was_actual_payment?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_cost_history_recurring_cost_id_fkey"
+            columns: ["recurring_cost_id"]
+            isOneToOne: false
+            referencedRelation: "property_recurring_costs"
             referencedColumns: ["id"]
           },
         ]
