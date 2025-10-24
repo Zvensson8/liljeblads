@@ -1,19 +1,18 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
+import { CheckSquare, Calendar as CalendarIcon, Paperclip } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
-import { CheckSquare, Calendar as CalendarIcon, Bell, Mail, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { TodoPriorityBadge } from "@/components/todos/TodoPriorityBadge";
+import { TodoCategoryBadge } from "@/components/todos/TodoCategoryBadge";
+import { TodoProgressBar } from "@/components/todos/TodoProgressBar";
+import { TodoDetailDialog } from "@/components/todos/TodoDetailDialog";
+import { toast } from "sonner";
 
 interface Todo {
   id: string;
@@ -24,10 +23,15 @@ interface Todo {
   notes?: string | null;
   reminder_date?: string | null;
   reminder_email?: string | null;
-  properties: { 
+  priority?: string;
+  category?: string | null;
+  parent_todo_id?: string | null;
+  properties: {
     id: string;
-    name: string 
+    name: string;
   };
+  subtasks?: any[];
+  attachments?: any[];
 }
 
 interface TodoWidgetProps {
@@ -35,25 +39,23 @@ interface TodoWidgetProps {
 }
 
 export function TodoWidget({ propertyId }: TodoWidgetProps) {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(false);
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [notes, setNotes] = useState("");
-  const [reminderDate, setReminderDate] = useState<Date>();
-  const [reminderEmail, setReminderEmail] = useState("");
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
-  useEffect(() => {
-    fetchTodos();
-  }, [propertyId]);
-
-  const fetchTodos = async () => {
-    setLoading(true);
-    try {
+  const { data: todos, isLoading, refetch } = useQuery({
+    queryKey: ["todos-widget", propertyId],
+    queryFn: async () => {
       let query = supabase
         .from("property_todos")
-        .select("*, properties(id, name)")
+        .select(`
+          *,
+          properties(id, name),
+          subtasks:property_todos!parent_todo_id(count),
+          attachments:todo_attachments(count)
+        `)
         .eq("completed", false)
+        .is("parent_todo_id", null)
+        .order("priority", { ascending: false })
         .order("due_date", { ascending: true })
         .limit(10);
 
@@ -62,68 +64,66 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
       }
 
       const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: subtasksData } = useQuery({
+    queryKey: ["subtasks-widget", todos?.map(t => t.id)],
+    enabled: !!todos && todos.length > 0,
+    queryFn: async () => {
+      if (!todos || todos.length === 0) return {};
+
+      const todoIds = todos.map(t => t.id);
+      const { data, error } = await supabase
+        .from("property_todos")
+        .select("*")
+        .in("parent_todo_id", todoIds);
 
       if (error) throw error;
-      setTodos(data || []);
-    } catch (error: any) {
-      console.error("Error fetching todos:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleToggleComplete = async (todo: Todo) => {
+      const grouped: Record<string, any[]> = {};
+      data?.forEach(subtask => {
+        if (!grouped[subtask.parent_todo_id]) {
+          grouped[subtask.parent_todo_id] = [];
+        }
+        grouped[subtask.parent_todo_id].push(subtask);
+      });
+
+      return grouped;
+    },
+  });
+
+  const handleToggleComplete = async (id: string, completed: boolean) => {
     try {
       const { error } = await supabase
         .from("property_todos")
-        .update({ completed: !todo.completed })
-        .eq("id", todo.id);
+        .update({ completed: !completed })
+        .eq("id", id);
 
       if (error) throw error;
 
-      fetchTodos();
-      toast.success(todo.completed ? "Markerad som ej klar" : "Markerad som klar");
+      refetch();
+      toast.success(completed ? "Markerad som ej klar" : "Markerad som klar");
     } catch (error: any) {
       toast.error("Kunde inte uppdatera uppgift");
     }
   };
 
-  const handleOpenDetails = (todo: Todo) => {
+  const openDetailDialog = (todo: Todo) => {
     setSelectedTodo(todo);
-    setNotes(todo.notes || "");
-    setReminderDate(todo.reminder_date ? new Date(todo.reminder_date) : undefined);
-    setReminderEmail(todo.reminder_email || "");
-    setDetailsOpen(true);
+    setDetailDialogOpen(true);
   };
 
-  const handleSaveDetails = async () => {
-    if (!selectedTodo) return;
-
-    try {
-      const { error } = await supabase
-        .from("property_todos")
-        .update({
-          notes,
-          reminder_date: reminderDate?.toISOString().split("T")[0] || null,
-          reminder_email: reminderEmail || null,
-        })
-        .eq("id", selectedTodo.id);
-
-      if (error) throw error;
-
-      toast.success("Uppgift uppdaterad");
-      setDetailsOpen(false);
-      fetchTodos();
-    } catch (error: any) {
-      toast.error("Kunde inte uppdatera uppgift");
+  const groupedByCategory = todos?.reduce((acc, todo) => {
+    const category = todo.category || "Okategoriserad";
+    if (!acc[category]) {
+      acc[category] = [];
     }
-  };
-
-  const setReminderPreset = (days: number) => {
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    setReminderDate(date);
-  };
+    acc[category].push(todo);
+    return acc;
+  }, {} as Record<string, typeof todos>);
 
   return (
     <>
@@ -137,187 +137,91 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : todos.length === 0 ? (
+          ) : !todos || todos.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               Inga uppgifter
             </p>
           ) : (
-            <div className="space-y-2">
-              {todos.map((todo) => (
-                <div
-                  key={todo.id}
-                  className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
-                  onClick={() => handleOpenDetails(todo)}
-                >
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={todo.completed}
-                      onCheckedChange={() => handleToggleComplete(todo)}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className={cn(
-                      "font-medium text-sm",
-                      todo.completed && "line-through text-muted-foreground"
-                    )}>
-                      {todo.title}
+            <Accordion type="multiple" defaultValue={Object.keys(groupedByCategory || {})} className="w-full">
+              {Object.entries(groupedByCategory || {}).map(([category, categoryTodos]) => (
+                <AccordionItem key={category} value={category}>
+                  <AccordionTrigger className="text-sm font-medium">
+                    {category} ({categoryTodos.length})
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-2">
+                      {categoryTodos.map((todo) => {
+                        const hasSubtasks = (todo.subtasks?.[0]?.count || 0) > 0;
+                        const todoSubtasks = subtasksData?.[todo.id] || [];
+                        const completedSubtasks = todoSubtasks.filter((s: any) => s.completed).length;
+                        const hasAttachments = (todo.attachments?.[0]?.count || 0) > 0;
+
+                        return (
+                          <div
+                            key={todo.id}
+                            className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                            onClick={() => openDetailDialog(todo)}
+                          >
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={todo.completed}
+                                onCheckedChange={() => handleToggleComplete(todo.id, todo.completed)}
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0 space-y-2">
+                              <div className="flex items-start gap-2 flex-wrap">
+                                <p className={cn(
+                                  "text-sm flex-1",
+                                  todo.completed && "line-through text-muted-foreground"
+                                )}>
+                                  {todo.title}
+                                </p>
+                                <div className="flex gap-1">
+                                  <TodoPriorityBadge priority={todo.priority as any || "medium"} />
+                                  {hasAttachments && <Paperclip className="h-4 w-4 text-muted-foreground" />}
+                                </div>
+                              </div>
+
+                              <div className="text-xs text-muted-foreground truncate">
+                                {todo.properties?.name}
+                              </div>
+
+                              {todo.due_date && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <CalendarIcon className="h-3 w-3" />
+                                  {format(new Date(todo.due_date), "PPP", { locale: sv })}
+                                </div>
+                              )}
+
+                              {hasSubtasks && (
+                                <TodoProgressBar
+                                  completed={completedSubtasks}
+                                  total={todoSubtasks.length}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {todo.properties?.name}
-                    </div>
-                    {todo.due_date && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                        <CalendarIcon className="h-3 w-3" />
-                        {format(new Date(todo.due_date), "PPP", { locale: sv })}
-                      </div>
-                    )}
-                    {todo.reminder_date && (
-                      <div className="flex items-center gap-1 text-xs text-amber-600 mt-1">
-                        <Bell className="h-3 w-3" />
-                        Påminnelse: {format(new Date(todo.reminder_date), "PPP", { locale: sv })}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                  </AccordionContent>
+                </AccordionItem>
               ))}
-            </div>
+            </Accordion>
           )}
         </CardContent>
       </Card>
 
-      {/* Todo Details Dialog */}
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{selectedTodo?.title}</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <Label>Fastighet</Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                {selectedTodo?.properties?.name}
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="notes">Anteckningar</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Lägg till anteckningar..."
-                rows={4}
-              />
-            </div>
-
-            <div>
-              <Label>E-postpåminnelse</Label>
-              <Input
-                type="email"
-                value={reminderEmail}
-                onChange={(e) => setReminderEmail(e.target.value)}
-                placeholder="din@email.com"
-                className="mt-2"
-              />
-            </div>
-
-            <div>
-              <Label>Påminnelsedatum</Label>
-              <div className="flex gap-2 mt-2 flex-wrap">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setReminderPreset(1)}
-                >
-                  Imorgon
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setReminderPreset(7)}
-                >
-                  Om 1 vecka
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setReminderPreset(14)}
-                >
-                  Om 2 veckor
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setReminderPreset(30)}
-                >
-                  Om 1 månad
-                </Button>
-              </div>
-
-              <Popover modal={true}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal mt-2",
-                      !reminderDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {reminderDate ? (
-                      format(reminderDate, "PPP", { locale: sv })
-                    ) : (
-                      "Välj datum"
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[200]" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={reminderDate}
-                    onSelect={setReminderDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-
-              {reminderDate && reminderEmail && (
-                <div className="flex items-start gap-2 mt-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg">
-                  <Mail className="h-4 w-4 text-amber-600 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-amber-900 dark:text-amber-100">
-                      E-postpåminnelse aktiv
-                    </p>
-                    <p className="text-amber-700 dark:text-amber-300">
-                      Ett mail skickas till {reminderEmail} den{" "}
-                      {format(reminderDate, "PPP", { locale: sv })}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailsOpen(false)}>
-              Avbryt
-            </Button>
-            <Button onClick={handleSaveDetails}>
-              Spara
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TodoDetailDialog
+        todo={selectedTodo}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        onUpdate={refetch}
+      />
     </>
   );
 }
