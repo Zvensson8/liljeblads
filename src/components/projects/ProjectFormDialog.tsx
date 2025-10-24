@@ -255,11 +255,11 @@ export function ProjectFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="project-form-description">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editingProject ? 'Redigera projekt' : 'Skapa nytt projekt'}</DialogTitle>
-          <DialogDescription id="project-form-description" className="sr-only">
-            Formulär för att {editingProject ? 'redigera' : 'skapa'} projekt
+          <DialogDescription>
+            Fyll i projektinformation. Projektnumret sätts automatiskt till fastighetsnumret men kan redigeras manuellt.
           </DialogDescription>
         </DialogHeader>
 
