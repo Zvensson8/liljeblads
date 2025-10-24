@@ -13,6 +13,7 @@ import { OrganizationMembers } from "@/components/organization/OrganizationMembe
 import { OrganizationInvitations } from "@/components/organization/OrganizationInvitations";
 import { OrganizationSubscription } from "@/components/organization/OrganizationSubscription";
 import { OrganizationBranding } from "@/components/organization/OrganizationBranding";
+import { OrganizationDataExport } from "@/components/organization/OrganizationDataExport";
 
 interface Organization {
   id: string;
@@ -196,6 +197,7 @@ export default function OrganizationSettings() {
                 {isAdmin && <TabsTrigger value="invitations">Inbjudningar</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="subscription">Prenumeration</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="branding">Varumärke</TabsTrigger>}
+                {isAdmin && <TabsTrigger value="export">Data Export</TabsTrigger>}
               </TabsList>
 
               <TabsContent value="info">
@@ -236,6 +238,12 @@ export default function OrganizationSettings() {
                     organization={organization}
                     onUpdate={fetchOrganizationData}
                   />
+                </TabsContent>
+              )}
+
+              {isAdmin && (
+                <TabsContent value="export">
+                  <OrganizationDataExport organizationId={organization.id} />
                 </TabsContent>
               )}
             </Tabs>
