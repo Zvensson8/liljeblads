@@ -43,7 +43,7 @@ const projectSchema = z.object({
   name: z.string().min(1, "Projektnamn krävs").max(200),
   description: z.string().optional(),
   type: z.enum(["investering", "underhall", "energi", "annat"]),
-  status: z.enum(["planerat", "invantar_offert", "offert_finns", "pagaende", "pausat"]),
+  status: z.enum(["planerat", "invantar_offert", "offert_finns", "pagaende", "pausat", "avslutat"]),
   project_manager: z.string().optional(),
   year: z.number().min(2020, "År måste vara minst 2020").max(2050, "År måste vara max 2050"),
   start_quarter: z.number().min(1).max(4),
@@ -407,6 +407,7 @@ export function ProjectFormDialog({
                         <SelectItem value="offert_finns">Offert finns</SelectItem>
                         <SelectItem value="pagaende">Pågående</SelectItem>
                         <SelectItem value="pausat">Pausat</SelectItem>
+                        <SelectItem value="avslutat">Avslutat</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
