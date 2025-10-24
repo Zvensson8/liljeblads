@@ -66,8 +66,9 @@ export function ProjectFormDialog({
   onSuccess,
   editingProject,
 }: ProjectFormDialogProps) {
-  const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
+  const [properties, setProperties] = useState<{ id: string; name: string; property_number: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [userName, setUserName] = useState<string>("");
 
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -89,6 +90,7 @@ export function ProjectFormDialog({
   useEffect(() => {
     if (open) {
       fetchProperties();
+      fetchUserName();
       if (editingProject) {
         form.reset({
           property_id: editingProject.property_id,
@@ -103,9 +105,12 @@ export function ProjectFormDialog({
           end_quarter: editingProject.end_quarter || 4,
           budget: editingProject.budget,
         });
+      } else {
+        // Set project manager to current user's name for new projects
+        form.setValue("project_manager", userName);
       }
     }
-  }, [open, editingProject]);
+  }, [open, editingProject, userName]);
 
   const fetchProperties = async () => {
     const { data } = await supabase
@@ -115,32 +120,26 @@ export function ProjectFormDialog({
     setProperties(data || []);
   };
 
-  const generateProjectNumber = async (propertyId: string, projectType: "investering" | "underhall" | "energi" | "annat") => {
-    // Get property to fetch its property_number
-    const { data: property } = await supabase
-      .from("properties")
-      .select("property_number")
-      .eq("id", propertyId)
-      .single();
-
-    if (!property?.property_number) {
-      toast.error("Fastigheten saknar fastighetsnummer");
-      return;
+  const fetchUserName = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+      
+      if (profile?.full_name) {
+        setUserName(profile.full_name);
+      }
     }
+  };
 
-    // Use + for underhåll (maintenance), - for investering (investment)
-    const suffix = projectType === "underhall" ? "+" : "-";
-    
-    // Count existing projects for this property and type
-    const { count } = await supabase
-      .from("projects")
-      .select("*", { count: "exact", head: true })
-      .eq("property_id", propertyId)
-      .eq("type", projectType);
-    
-    const nextNumber = (count || 0) + 1;
-    const projectNumber = `${property.property_number}${suffix}${nextNumber.toString().padStart(2, "0")}`;
-    form.setValue("project_number", projectNumber);
+  const setPropertyNumber = (propertyId: string) => {
+    const property = properties.find(p => p.id === propertyId);
+    if (property?.property_number) {
+      form.setValue("project_number", property.property_number);
+    }
   };
 
   const onSubmit = async (values: ProjectFormValues) => {
@@ -275,10 +274,9 @@ export function ProjectFormDialog({
                   <Select 
                     onValueChange={(value) => {
                       field.onChange(value);
-                      // Generate project number when property and type are selected
-                      const currentType = form.getValues("type");
-                      if (value && currentType) {
-                        generateProjectNumber(value, currentType);
+                      // Set project number to property number
+                      if (value) {
+                        setPropertyNumber(value);
                       }
                     }} 
                     value={field.value}
@@ -309,7 +307,7 @@ export function ProjectFormDialog({
                   <FormItem>
                     <FormLabel>Projektnummer *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="2025-0001" />
+                      <Input {...field} placeholder="Ange projektnummer" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -371,14 +369,7 @@ export function ProjectFormDialog({
                   <FormItem>
                     <FormLabel>Typ *</FormLabel>
                     <Select 
-                      onValueChange={(value: "investering" | "underhall" | "energi" | "annat") => {
-                        field.onChange(value);
-                        // Generate project number when property and type are selected
-                        const currentProperty = form.getValues("property_id");
-                        if (value && currentProperty) {
-                          generateProjectNumber(currentProperty, value);
-                        }
-                      }} 
+                      onValueChange={field.onChange} 
                       value={field.value}
                     >
                       <FormControl>
