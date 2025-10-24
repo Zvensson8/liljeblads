@@ -115,7 +115,7 @@ export default function ComponentDetail() {
     
     setLoading(true);
     try {
-      // Fetch component
+      // Fetch component with both floor and direct property relationships
       const { data: componentData, error: componentError } = await supabase
         .from("components")
         .select(`
@@ -130,6 +130,11 @@ export default function ComponentDetail() {
               name,
               address
             )
+          ),
+          direct_property:property_id (
+            id,
+            name,
+            address
           )
         `)
         .eq("id", id)
@@ -137,7 +142,19 @@ export default function ComponentDetail() {
 
       if (componentError) throw componentError;
       setComponent(componentData);
-      setFloor(componentData.floors as any);
+      
+      // Set floor if it exists, otherwise create a mock floor object from direct property
+      if (componentData.floors) {
+        setFloor(componentData.floors as any);
+      } else if (componentData.direct_property) {
+        setFloor({
+          id: '',
+          name: 'Ingen våning',
+          level: null,
+          property_id: componentData.direct_property.id,
+          properties: componentData.direct_property
+        } as any);
+      }
 
       // Fetch maintenance history
       const { data: maintenanceData, error: maintenanceError } = await supabase
@@ -526,8 +543,14 @@ export default function ComponentDetail() {
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Våningsplan</p>
                         <p className="text-base">
-                          {floor.name}
-                          {floor.level !== null && ` (Våning ${floor.level})`}
+                          {floor.id ? (
+                            <>
+                              {floor.name}
+                              {floor.level !== null && ` (Våning ${floor.level})`}
+                            </>
+                          ) : (
+                            <span className="italic text-muted-foreground">Ingen våning vald</span>
+                          )}
                         </p>
                       </div>
                       {component.room_zone && (
