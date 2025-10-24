@@ -1596,11 +1596,15 @@ export type Database = {
       }
       property_todos: {
         Row: {
+          category: string | null
           completed: boolean
           created_at: string
           due_date: string | null
           id: string
           notes: string | null
+          order: number | null
+          parent_todo_id: string | null
+          priority: string | null
           property_id: string | null
           reminder_date: string | null
           reminder_email: string | null
@@ -1608,11 +1612,15 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category?: string | null
           completed?: boolean
           created_at?: string
           due_date?: string | null
           id?: string
           notes?: string | null
+          order?: number | null
+          parent_todo_id?: string | null
+          priority?: string | null
           property_id?: string | null
           reminder_date?: string | null
           reminder_email?: string | null
@@ -1620,11 +1628,15 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string | null
           completed?: boolean
           created_at?: string
           due_date?: string | null
           id?: string
           notes?: string | null
+          order?: number | null
+          parent_todo_id?: string | null
+          priority?: string | null
           property_id?: string | null
           reminder_date?: string | null
           reminder_email?: string | null
@@ -1632,6 +1644,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "property_todos_parent_todo_id_fkey"
+            columns: ["parent_todo_id"]
+            isOneToOne: false
+            referencedRelation: "property_todos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "property_todos_property_id_fkey"
             columns: ["property_id"]
@@ -1837,6 +1856,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_todo_progress: { Args: { todo_id: string }; Returns: Json }
       get_task_status: {
         Args: { planned: number; reported: number }
         Returns: Database["public"]["Enums"]["task_status"]
