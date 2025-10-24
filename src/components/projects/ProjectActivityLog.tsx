@@ -267,24 +267,30 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
                           )}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 shrink-0">
                         <Button
                           variant="ghost"
-                          size="sm"
-                          onClick={() => {
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditingActivity(activity);
                             setEditDialogOpen(true);
                           }}
+                          title="Redigera"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
-                          size="sm"
-                          onClick={() => {
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setActivityToDelete(activity.id);
                             setDeleteDialogOpen(true);
                           }}
+                          title="Radera"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

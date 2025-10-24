@@ -266,6 +266,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
+                    type="button"
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal mt-2",
@@ -280,12 +281,12 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 z-50" align="start">
                   <CalendarComponent
                     mode="single"
                     selected={reminderDate}
                     onSelect={setReminderDate}
-                    locale={sv}
+                    initialFocus
                   />
                 </PopoverContent>
               </Popover>
