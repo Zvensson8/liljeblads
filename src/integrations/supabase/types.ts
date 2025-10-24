@@ -1601,7 +1601,7 @@ export type Database = {
           due_date: string | null
           id: string
           notes: string | null
-          property_id: string
+          property_id: string | null
           reminder_date: string | null
           reminder_email: string | null
           title: string
@@ -1613,7 +1613,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           notes?: string | null
-          property_id: string
+          property_id?: string | null
           reminder_date?: string | null
           reminder_email?: string | null
           title: string
@@ -1625,7 +1625,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           notes?: string | null
-          property_id?: string
+          property_id?: string | null
           reminder_date?: string | null
           reminder_email?: string | null
           title?: string
