@@ -100,6 +100,14 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
 
     setLoading(true);
     try {
+      // Get current session to ensure we have auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error("Du måste vara inloggad för att exportera data");
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("export-organization-data", {
         body: {
           organizationId,
