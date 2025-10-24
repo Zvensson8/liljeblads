@@ -119,9 +119,13 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
 
       if (error) throw error;
 
-      // Download the JSON file directly
-      const jsonString = JSON.stringify(data.data, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
+      // Download the ZIP file
+      const binaryString = atob(data.zipData);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'application/zip' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -131,7 +135,7 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast.success(`Data exporterad! Totalt ${data.data.summary.properties_count} fastigheter, ${data.data.summary.components_count} komponenter, ${data.data.summary.projects_count} projekt`);
+      toast.success(`Data exporterad! Totalt ${data.summary.properties_count} fastigheter, ${data.summary.components_count} komponenter, ${data.summary.projects_count} projekt`);
     } catch (error: any) {
       console.error("Export error:", error);
       toast.error("Kunde inte exportera data: " + error.message);

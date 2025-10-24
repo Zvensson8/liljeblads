@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import JSZip from 'https://esm.sh/jszip@3.10.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -286,29 +287,53 @@ Deno.serve(async (req) => {
 
     // Convert to JSON string
     const jsonData = JSON.stringify(exportData, null, 2);
-    const jsonBlob = new Blob([jsonData], { type: 'application/json' });
 
     // Create filename
     const timestamp = new Date().toISOString().split('T')[0];
-    let filename: string;
+    let baseFilename: string;
     
     if (exportType === 'properties' && requestPropertyIds && requestPropertyIds.length > 0) {
       const propCount = requestPropertyIds.length;
-      filename = `${orgData?.name || 'organization'}_${propCount}_properties_${timestamp}.json`;
+      baseFilename = `${orgData?.name || 'organization'}_${propCount}_properties_${timestamp}`;
     } else if (exportType === 'user' && userId) {
-      filename = `${orgData?.name || 'organization'}_user_data_${timestamp}.json`;
+      baseFilename = `${orgData?.name || 'organization'}_user_data_${timestamp}`;
     } else {
-      filename = `${orgData?.name || 'organization'}_full_export_${timestamp}.json`;
+      baseFilename = `${orgData?.name || 'organization'}_full_export_${timestamp}`;
     }
 
     console.log(`Export completed. Total properties: ${exportData.properties?.length || 0}`);
 
-    // Return the JSON data directly
+    // Create ZIP file
+    const zip = new JSZip();
+    zip.file(`${baseFilename}.json`, jsonData);
+    
+    // Add a README file
+    const readmeContent = `Data Export från ${orgData?.name || 'Organization'}
+Exporterad: ${new Date().toISOString()}
+Export-typ: ${exportType === 'all' ? 'All data' : exportType === 'user' ? 'Användardata' : 'Valda fastigheter'}
+
+Innehåll:
+- Fastigheter: ${exportData.properties?.length || 0}
+- Våningsplan: ${exportData.floors?.length || 0}
+- Komponenter: ${exportData.components?.length || 0}
+- Projekt: ${exportData.projects?.length || 0}
+- Arbetsordrar: ${exportData.work_orders?.length || 0}
+- Dokument: ${exportData.summary.documents_count || 0}
+
+Data finns i filen: ${baseFilename}.json
+`;
+    zip.file('README.txt', readmeContent);
+
+    // Generate ZIP as base64
+    const zipBase64 = await zip.generateAsync({ type: 'base64' });
+
+    // Return the ZIP file
     return new Response(
       JSON.stringify({
         success: true,
-        data: exportData,
-        filename: filename,
+        zipData: zipBase64,
+        filename: `${baseFilename}.zip`,
+        summary: exportData.summary,
       }),
       {
         headers: {
