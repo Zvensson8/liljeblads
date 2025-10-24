@@ -28,6 +28,7 @@ import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { Badge } from '@/components/ui/badge';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { useRecentlyVisited } from '@/hooks/useRecentlyVisited';
+import { PropertyTechnicalInfo } from '@/components/property-info/PropertyTechnicalInfo';
 
 interface Property {
   id: string;
@@ -493,6 +494,10 @@ const PropertyDetail = () => {
                 <File className="h-4 w-4" />
                 Dokument
               </TabsTrigger>
+              <TabsTrigger value="technical-info" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Teknisk info
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -868,6 +873,11 @@ const PropertyDetail = () => {
                 <PropertyTodos propertyId={property.id} />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Technical Info Tab */}
+          <TabsContent value="technical-info">
+            <PropertyTechnicalInfo propertyId={property.id} />
           </TabsContent>
         </Tabs>
       </main>

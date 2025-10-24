@@ -1499,6 +1499,142 @@ export type Database = {
           },
         ]
       }
+      property_info_categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          name: string
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_info_categories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_info_fields: {
+        Row: {
+          category_id: string
+          created_at: string | null
+          display_order: number | null
+          field_name: string
+          field_type: string
+          help_text: string | null
+          id: string
+          options: Json | null
+          placeholder: string | null
+          required: boolean | null
+          unit: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string | null
+          display_order?: number | null
+          field_name: string
+          field_type: string
+          help_text?: string | null
+          id?: string
+          options?: Json | null
+          placeholder?: string | null
+          required?: boolean | null
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string | null
+          display_order?: number | null
+          field_name?: string
+          field_type?: string
+          help_text?: string | null
+          id?: string
+          options?: Json | null
+          placeholder?: string | null
+          required?: boolean | null
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_info_fields_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "property_info_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_info_values: {
+        Row: {
+          field_id: string
+          id: string
+          property_id: string
+          updated_at: string | null
+          updated_by: string | null
+          value: string | null
+        }
+        Insert: {
+          field_id: string
+          id?: string
+          property_id: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value?: string | null
+        }
+        Update: {
+          field_id?: string
+          id?: string
+          property_id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_info_values_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "property_info_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_info_values_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_notes: {
         Row: {
           content: string
@@ -1885,6 +2021,10 @@ export type Database = {
       is_organization_member: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
+      }
+      seed_default_property_info_categories: {
+        Args: { org_id: string }
+        Returns: undefined
       }
     }
     Enums: {
