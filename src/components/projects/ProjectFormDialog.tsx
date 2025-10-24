@@ -45,8 +45,9 @@ const projectSchema = z.object({
   type: z.enum(["investering", "underhall", "energi", "annat"]),
   status: z.enum(["planerat", "invantar_offert", "offert_finns", "pagaende", "pausat"]),
   project_manager: z.string().optional(),
-  start_date: z.date().optional(),
-  end_date: z.date().optional(),
+  year: z.number().min(2020, "År måste vara minst 2020").max(2050, "År måste vara max 2050"),
+  start_quarter: z.number().min(1).max(4),
+  end_quarter: z.number().min(1).max(4),
   budget: z.number().min(0, "Budget måste vara positiv"),
 });
 
@@ -78,6 +79,9 @@ export function ProjectFormDialog({
       type: "investering",
       status: "planerat",
       project_manager: "",
+      year: new Date().getFullYear(),
+      start_quarter: 1,
+      end_quarter: 4,
       budget: 0,
     },
   });
@@ -94,8 +98,9 @@ export function ProjectFormDialog({
           type: editingProject.type,
           status: editingProject.status,
           project_manager: editingProject.project_manager || '',
-          start_date: editingProject.start_date ? new Date(editingProject.start_date) : undefined,
-          end_date: editingProject.end_date ? new Date(editingProject.end_date) : undefined,
+          year: editingProject.year || new Date().getFullYear(),
+          start_quarter: editingProject.start_quarter || 1,
+          end_quarter: editingProject.end_quarter || 4,
           budget: editingProject.budget,
         });
       }
@@ -143,8 +148,6 @@ export function ProjectFormDialog({
     try {
       const projectData: any = {
         ...values,
-        start_date: values.start_date?.toISOString().split("T")[0] || null,
-        end_date: values.end_date?.toISOString().split("T")[0] || null,
         forecast: values.budget,
       };
 
@@ -204,29 +207,14 @@ export function ProjectFormDialog({
         if (values.budget !== editingProject.budget) {
           changes.push(`Budget ändrad från ${editingProject.budget.toLocaleString("sv-SE")} kr till ${values.budget.toLocaleString("sv-SE")} kr`);
         }
-        
-        const oldStartDate = editingProject.start_date ? new Date(editingProject.start_date).toISOString().split("T")[0] : null;
-        const newStartDate = values.start_date?.toISOString().split("T")[0] || null;
-        if (oldStartDate !== newStartDate) {
-          if (newStartDate && !oldStartDate) {
-            changes.push(`Startdatum satt till ${format(values.start_date!, "PPP", { locale: sv })}`);
-          } else if (!newStartDate && oldStartDate) {
-            changes.push(`Startdatum borttaget (tidigare: ${format(new Date(editingProject.start_date), "PPP", { locale: sv })})`);
-          } else if (newStartDate && oldStartDate) {
-            changes.push(`Startdatum ändrat från ${format(new Date(editingProject.start_date), "PPP", { locale: sv })} till ${format(values.start_date!, "PPP", { locale: sv })}`);
-          }
+        if (values.year !== editingProject.year) {
+          changes.push(`År ändrat från ${editingProject.year} till ${values.year}`);
         }
-        
-        const oldEndDate = editingProject.end_date ? new Date(editingProject.end_date).toISOString().split("T")[0] : null;
-        const newEndDate = values.end_date?.toISOString().split("T")[0] || null;
-        if (oldEndDate !== newEndDate) {
-          if (newEndDate && !oldEndDate) {
-            changes.push(`Slutdatum satt till ${format(values.end_date!, "PPP", { locale: sv })}`);
-          } else if (!newEndDate && oldEndDate) {
-            changes.push(`Slutdatum borttaget (tidigare: ${format(new Date(editingProject.end_date), "PPP", { locale: sv })})`);
-          } else if (newEndDate && oldEndDate) {
-            changes.push(`Slutdatum ändrat från ${format(new Date(editingProject.end_date), "PPP", { locale: sv })} till ${format(values.end_date!, "PPP", { locale: sv })}`);
-          }
+        if (values.start_quarter !== editingProject.start_quarter) {
+          changes.push(`Startkvartal ändrat från Q${editingProject.start_quarter} till Q${values.start_quarter}`);
+        }
+        if (values.end_quarter !== editingProject.end_quarter) {
+          changes.push(`Slutkvartal ändrat från Q${editingProject.end_quarter} till Q${values.end_quarter}`);
         }
 
         if (changes.length > 0) {
@@ -436,43 +424,30 @@ export function ProjectFormDialog({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
-                name="start_date"
+                name="year"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Startdatum</FormLabel>
-                    <Popover modal={true}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className={cn(
-                              "pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP", { locale: sv })
-                            ) : (
-                              <span>Välj datum</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 z-[200]" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          locale={sv}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                  <FormItem>
+                    <FormLabel>År *</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      value={field.value?.toString()}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Välj år" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Array.from({ length: 31 }, (_, i) => 2020 + i).map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -480,40 +455,53 @@ export function ProjectFormDialog({
 
               <FormField
                 control={form.control}
-                name="end_date"
+                name="start_quarter"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Slutdatum</FormLabel>
-                    <Popover modal={true}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className={cn(
-                              "pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP", { locale: sv })
-                            ) : (
-                              <span>Välj datum</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 z-[200]" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          locale={sv}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                  <FormItem>
+                    <FormLabel>Startkvartal *</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      value={field.value?.toString()}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Q1" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="1">Q1</SelectItem>
+                        <SelectItem value="2">Q2</SelectItem>
+                        <SelectItem value="3">Q3</SelectItem>
+                        <SelectItem value="4">Q4</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="end_quarter"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Slutkvartal *</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      value={field.value?.toString()}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Q4" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="1">Q1</SelectItem>
+                        <SelectItem value="2">Q2</SelectItem>
+                        <SelectItem value="3">Q3</SelectItem>
+                        <SelectItem value="4">Q4</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

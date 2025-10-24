@@ -1267,6 +1267,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           end_date: string | null
+          end_quarter: number | null
           forecast: number | null
           id: string
           is_archived: boolean | null
@@ -1275,9 +1276,11 @@ export type Database = {
           project_number: string
           property_id: string
           start_date: string | null
+          start_quarter: number | null
           status: Database["public"]["Enums"]["project_status"]
           type: Database["public"]["Enums"]["project_type"]
           updated_at: string | null
+          year: number | null
         }
         Insert: {
           actors?: string[] | null
@@ -1287,6 +1290,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           end_date?: string | null
+          end_quarter?: number | null
           forecast?: number | null
           id?: string
           is_archived?: boolean | null
@@ -1295,9 +1299,11 @@ export type Database = {
           project_number: string
           property_id: string
           start_date?: string | null
+          start_quarter?: number | null
           status?: Database["public"]["Enums"]["project_status"]
           type: Database["public"]["Enums"]["project_type"]
           updated_at?: string | null
+          year?: number | null
         }
         Update: {
           actors?: string[] | null
@@ -1307,6 +1313,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           end_date?: string | null
+          end_quarter?: number | null
           forecast?: number | null
           id?: string
           is_archived?: boolean | null
@@ -1315,9 +1322,11 @@ export type Database = {
           project_number?: string
           property_id?: string
           start_date?: string | null
+          start_quarter?: number | null
           status?: Database["public"]["Enums"]["project_status"]
           type?: Database["public"]["Enums"]["project_type"]
           updated_at?: string | null
+          year?: number | null
         }
         Relationships: [
           {
