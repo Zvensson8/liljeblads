@@ -67,12 +67,12 @@ const Components = () => {
         floors:floor_id (
           id,
           name,
-          level
-        ),
-        properties:property_id (
-          id,
-          name,
-          address
+          level,
+          properties:property_id (
+            id,
+            name,
+            address
+          )
         )
       `)
       .order('created_at', { ascending: false });
@@ -88,8 +88,8 @@ const Components = () => {
         ...comp,
         floor_name: comp.floors?.name,
         floor_level: comp.floors?.level,
-        property_name: comp.properties?.name,
-        property_address: comp.properties?.address,
+        property_name: comp.floors?.properties?.name,
+        property_address: comp.floors?.properties?.address,
       }));
       setComponents(formattedData);
     }
