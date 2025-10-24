@@ -179,7 +179,15 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
   const handleAddTodo = async () => {
     if (!newTodo.trim()) return;
 
-    const { error } = await (supabase as any)
+    console.log("Adding todo with data:", {
+      property_id: newPropertyId === "none" ? null : newPropertyId || null,
+      title: newTodo,
+      due_date: newDueDate || null,
+      priority: newPriority,
+      category: newCategory === "none" ? null : newCategory || null,
+    });
+
+    const { data, error } = await (supabase as any)
       .from("property_todos")
       .insert([{
         property_id: newPropertyId === "none" ? null : newPropertyId || null,
@@ -187,11 +195,14 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
         due_date: newDueDate || null,
         priority: newPriority,
         category: newCategory === "none" ? null : newCategory || null,
-      }]);
+      }])
+      .select();
 
     if (error) {
-      toast.error("Kunde inte lägga till uppgift");
+      console.error("Error adding todo:", error);
+      toast.error(`Kunde inte lägga till uppgift: ${error.message}`);
     } else {
+      console.log("Todo added successfully:", data);
       toast.success("Uppgift tillagd");
       setNewTodo("");
       setNewPropertyId("none");
