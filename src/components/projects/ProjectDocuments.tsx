@@ -111,9 +111,8 @@ export function ProjectDocuments({ projectId }: ProjectDocumentsProps) {
       const nextVersion = existingDocs.length > 0 ? Math.max(...existingDocs.map(d => d.version || 1)) + 1 : 1;
 
       const fileExt = file.name.split(".").pop();
-      // URL encode the folder name to handle special characters
-      const encodedFolder = encodeURIComponent(selectedFolder);
-      const filePath = `${projectId}/${encodedFolder}/${Date.now()}.${fileExt}`;
+      // Use flat structure: projectId-folder-timestamp.ext
+      const filePath = `${projectId}-${selectedFolder.replace(/[^a-zA-Z0-9]/g, '_')}-${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("project-documents")
