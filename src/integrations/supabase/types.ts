@@ -80,8 +80,11 @@ export type Database = {
           file_size: number | null
           file_url: string
           id: string
+          is_latest: boolean | null
           mime_type: string | null
           name: string
+          parent_version_id: string | null
+          version: number | null
         }
         Insert: {
           component_id: string
@@ -89,8 +92,11 @@ export type Database = {
           file_size?: number | null
           file_url: string
           id?: string
+          is_latest?: boolean | null
           mime_type?: string | null
           name: string
+          parent_version_id?: string | null
+          version?: number | null
         }
         Update: {
           component_id?: string
@@ -98,8 +104,11 @@ export type Database = {
           file_size?: number | null
           file_url?: string
           id?: string
+          is_latest?: boolean | null
           mime_type?: string | null
           name?: string
+          parent_version_id?: string | null
+          version?: number | null
         }
         Relationships: [
           {
@@ -107,6 +116,13 @@ export type Database = {
             columns: ["component_id"]
             isOneToOne: false
             referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "component_documents_parent_version_id_fkey"
+            columns: ["parent_version_id"]
+            isOneToOne: false
+            referencedRelation: "component_documents"
             referencedColumns: ["id"]
           },
         ]
@@ -1154,10 +1170,13 @@ export type Database = {
           file_url: string
           folder: string | null
           id: string
+          is_latest: boolean | null
           mime_type: string | null
           name: string
+          parent_version_id: string | null
           project_id: string
           uploaded_by: string | null
+          version: number | null
         }
         Insert: {
           created_at?: string | null
@@ -1165,10 +1184,13 @@ export type Database = {
           file_url: string
           folder?: string | null
           id?: string
+          is_latest?: boolean | null
           mime_type?: string | null
           name: string
+          parent_version_id?: string | null
           project_id: string
           uploaded_by?: string | null
+          version?: number | null
         }
         Update: {
           created_at?: string | null
@@ -1176,12 +1198,22 @@ export type Database = {
           file_url?: string
           folder?: string | null
           id?: string
+          is_latest?: boolean | null
           mime_type?: string | null
           name?: string
+          parent_version_id?: string | null
           project_id?: string
           uploaded_by?: string | null
+          version?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "project_documents_parent_version_id_fkey"
+            columns: ["parent_version_id"]
+            isOneToOne: false
+            referencedRelation: "project_documents"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "project_documents_project_id_fkey"
             columns: ["project_id"]
@@ -1410,29 +1442,45 @@ export type Database = {
           file_size: number | null
           file_url: string
           id: string
+          is_latest: boolean | null
           mime_type: string | null
           name: string
+          parent_version_id: string | null
           property_id: string
+          version: number | null
         }
         Insert: {
           created_at?: string
           file_size?: number | null
           file_url: string
           id?: string
+          is_latest?: boolean | null
           mime_type?: string | null
           name: string
+          parent_version_id?: string | null
           property_id: string
+          version?: number | null
         }
         Update: {
           created_at?: string
           file_size?: number | null
           file_url?: string
           id?: string
+          is_latest?: boolean | null
           mime_type?: string | null
           name?: string
+          parent_version_id?: string | null
           property_id?: string
+          version?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "property_documents_parent_version_id_fkey"
+            columns: ["parent_version_id"]
+            isOneToOne: false
+            referencedRelation: "property_documents"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "property_documents_property_id_fkey"
             columns: ["property_id"]
