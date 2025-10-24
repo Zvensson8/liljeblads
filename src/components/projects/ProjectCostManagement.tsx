@@ -98,6 +98,14 @@ export function ProjectCostManagement({
           .eq("id", editingCost.id);
 
         if (error) throw error;
+
+        // Log activity
+        await supabase.from("project_activity_log").insert({
+          project_id: projectId,
+          activity_type: "cost_updated",
+          description: `Kostnad uppdaterad: "${formData.description}" (${parseFloat(formData.amount).toLocaleString("sv-SE")} kr)`,
+        });
+
         toast.success("Kostnad uppdaterad");
       } else {
         const { error } = await supabase.from("project_cost_items").insert({
@@ -110,6 +118,14 @@ export function ProjectCostManagement({
         });
 
         if (error) throw error;
+
+        // Log activity
+        await supabase.from("project_activity_log").insert({
+          project_id: projectId,
+          activity_type: "cost_added",
+          description: `Kostnad tillagd: "${formData.description}" (${parseFloat(formData.amount).toLocaleString("sv-SE")} kr)`,
+        });
+
         toast.success("Kostnad registrerad");
       }
 
@@ -145,12 +161,25 @@ export function ProjectCostManagement({
     if (!confirm("Är du säker på att du vill ta bort denna kostnad?")) return;
 
     try {
+      // Get cost details before deleting for logging
+      const costToDelete = costs.find(c => c.id === id);
+
       const { error } = await supabase
         .from("project_cost_items")
         .delete()
         .eq("id", id);
 
       if (error) throw error;
+
+      // Log activity
+      if (costToDelete) {
+        await supabase.from("project_activity_log").insert({
+          project_id: projectId,
+          activity_type: "cost_deleted",
+          description: `Kostnad borttagen: "${costToDelete.description}" (${costToDelete.amount.toLocaleString("sv-SE")} kr)`,
+        });
+      }
+
       toast.success("Kostnad borttagen");
       fetchCosts();
       onCostUpdate();
