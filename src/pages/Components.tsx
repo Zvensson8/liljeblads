@@ -73,6 +73,11 @@ const Components = () => {
             name,
             address
           )
+        ),
+        direct_property:property_id (
+          id,
+          name,
+          address
         )
       `)
       .order('created_at', { ascending: false });
@@ -88,8 +93,8 @@ const Components = () => {
         ...comp,
         floor_name: comp.floors?.name,
         floor_level: comp.floors?.level,
-        property_name: comp.floors?.properties?.name,
-        property_address: comp.floors?.properties?.address,
+        property_name: comp.floors?.properties?.name || comp.direct_property?.name,
+        property_address: comp.floors?.properties?.address || comp.direct_property?.address,
       }));
       setComponents(formattedData);
     }

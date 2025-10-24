@@ -126,14 +126,14 @@ const PropertyDetail = () => {
       setFloors(floorsData || []);
     }
 
-    // Fetch components for this property
+    // Fetch components for this property (either via floor or direct property link)
     const { data: componentsData } = await supabase
       .from('components')
       .select(`
         *,
-        floors!inner(property_id, name)
+        floors(id, name, property_id)
       `)
-      .eq('floors.property_id', id);
+      .or(`property_id.eq.${id},floors.property_id.eq.${id}`);
     
     setComponents(componentsData || []);
 

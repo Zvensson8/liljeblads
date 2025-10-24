@@ -148,7 +148,7 @@ export const ComponentFormDialog = ({
         refrigerant_type: refrigerantType.trim() || null,
         status: 'active' as const,
         floor_id: floorId || null,
-        property_id: propertyId,
+        property_id: selectedProperty || propertyId || null,
       };
 
       if (editingComponent) {
