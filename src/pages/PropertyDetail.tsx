@@ -476,6 +476,15 @@ const PropertyDetail = () => {
                 <FileText className="h-4 w-4" />
                 Anteckningar
               </TabsTrigger>
+              <TabsTrigger value="todos" className="gap-2">
+                <CheckSquare className="h-4 w-4" />
+                Att-göra
+                {overdueTodos > 0 && (
+                  <Badge variant="destructive" className="ml-1 h-5 px-1.5">
+                    {overdueTodos}
+                  </Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="contacts" className="gap-2">
                 <Users className="h-4 w-4" />
                 Kontakter
@@ -842,6 +851,21 @@ const PropertyDetail = () => {
               </CardHeader>
               <CardContent>
                 <PropertyNotes propertyId={property.id} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Todos Tab */}
+          <TabsContent value="todos">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <CheckSquare className="h-5 w-5 text-primary" />
+                  <CardTitle>Att-göra</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <PropertyTodos propertyId={property.id} />
               </CardContent>
             </Card>
           </TabsContent>

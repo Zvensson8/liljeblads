@@ -211,7 +211,7 @@ export function PropertyOverview({
 
         {/* Att-göra Widget */}
         <Card className="hover:shadow-[var(--shadow-elegant)] transition-all">
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
             <CardTitle className="text-lg">Att-göra</CardTitle>
           </CardHeader>
           <CardContent>

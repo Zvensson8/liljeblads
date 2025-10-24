@@ -198,7 +198,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
 
   return (
     <div className="space-y-4">
-      {!compact && (
+      {!compact ? (
         <>
           <div className="flex gap-2">
             <Select value={categoryFilter || "all"} onValueChange={(v) => setCategoryFilter(v === "all" ? null : v)}>
@@ -271,6 +271,19 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
             </Button>
           </div>
         </>
+      ) : (
+        <div className="flex gap-2 mb-2">
+          <Input
+            placeholder="Snabblägg till uppgift..."
+            value={newTodo}
+            onChange={(e) => setNewTodo(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleAddTodo()}
+            className="flex-1"
+          />
+          <Button onClick={handleAddTodo} disabled={!newTodo.trim()} size="sm">
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       )}
 
       <div className="space-y-2">
