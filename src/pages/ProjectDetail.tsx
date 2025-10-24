@@ -34,6 +34,7 @@ import { ProjectActivityLog } from "@/components/projects/ProjectActivityLog";
 import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
+import { exportProjectToZip } from "@/lib/zipExport";
 
 type ProjectStatus = Database["public"]["Enums"]["project_status"];
 type ProjectType = Database["public"]["Enums"]["project_type"];
@@ -68,6 +69,7 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const { addRecentItem } = useRecentlyVisited();
 
   useEffect(() => {
@@ -146,6 +148,20 @@ export default function ProjectDetail() {
       fetchProject();
     } catch (error: any) {
       toast.error("Kunde inte återaktivera projekt");
+    }
+  };
+
+  const handleExport = async () => {
+    if (!project) return;
+    
+    setExporting(true);
+    try {
+      await exportProjectToZip(project.id);
+      toast.success("Projekt exporterat");
+    } catch (error: any) {
+      toast.error(error.message || "Kunde inte exportera projekt");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -245,9 +261,9 @@ export default function ProjectDetail() {
                 <Edit className="h-4 w-4 mr-2" />
                 Redigera
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
                 <Download className="h-4 w-4 mr-2" />
-                Exportera
+                {exporting ? "Exporterar..." : "Exportera"}
               </Button>
               {project.is_archived ? (
                 <Button variant="outline" size="sm" onClick={handleReactivate}>

@@ -26,12 +26,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, Trash2, Download, Edit2, FolderKanban, Eye } from "lucide-react";
+import { Upload, FileText, Trash2, Download, Edit2, FolderKanban, Eye, FileArchive } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { WorkOrderDialog } from "./WorkOrderDialog";
 import { DocumentPreviewDialog } from "./documents/DocumentPreviewDialog";
+import { exportWorkOrderToZip } from "@/lib/zipExport";
 
 interface WorkOrderDetailDialogProps {
   open: boolean;
@@ -53,6 +54,7 @@ export function WorkOrderDetailDialog({
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [converting, setConverting] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<any>(null);
+  const [exporting, setExporting] = useState(false);
 
   const { data: files, refetch: refetchFiles } = useQuery({
     queryKey: ["work-order-files", workOrder?.id],
@@ -204,6 +206,20 @@ export function WorkOrderDetailDialog({
     }
   };
 
+  const handleExport = async () => {
+    if (!workOrder) return;
+    
+    setExporting(true);
+    try {
+      await exportWorkOrderToZip(workOrder.id);
+      toast.success("Arbetsorder exporterad");
+    } catch (error: any) {
+      toast.error(error.message || "Kunde inte exportera arbetsorder");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (!workOrder) return null;
 
   return (
@@ -214,6 +230,15 @@ export function WorkOrderDetailDialog({
             <div className="flex items-center justify-between">
               <DialogTitle className="text-2xl">Arbetsorder Detaljer</DialogTitle>
               <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExport}
+                  disabled={exporting}
+                >
+                  <FileArchive className="h-4 w-4 mr-2" />
+                  {exporting ? "Exporterar..." : "Exportera"}
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
