@@ -114,7 +114,7 @@ export function PropertyMaintenancePlan({ propertyId }: PropertyMaintenancePlanP
             selected={selectedDate}
             onSelect={setSelectedDate}
             locale={sv}
-            className="rounded-md border"
+            className="rounded-md border pointer-events-auto"
             modifiers={modifiers}
             modifiersStyles={modifiersStyles}
           />

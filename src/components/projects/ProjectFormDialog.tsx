@@ -377,7 +377,7 @@ export function ProjectFormDialog({
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Startdatum</FormLabel>
-                    <Popover>
+                    <Popover modal={true}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
@@ -397,7 +397,7 @@ export function ProjectFormDialog({
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
+                      <PopoverContent className="w-auto p-0 z-[200]" align="start">
                         <Calendar
                           mode="single"
                           selected={field.value}
@@ -418,7 +418,7 @@ export function ProjectFormDialog({
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Slutdatum</FormLabel>
-                    <Popover>
+                    <Popover modal={true}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
@@ -438,7 +438,7 @@ export function ProjectFormDialog({
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
+                      <PopoverContent className="w-auto p-0 z-[200]" align="start">
                         <Calendar
                           mode="single"
                           selected={field.value}

@@ -282,7 +282,7 @@ export default function CostOverview() {
                   </Select>
 
                   {timeRange === 'custom' && (
-                    <Popover>
+                    <Popover modal={true}>
                       <PopoverTrigger asChild>
                         <Button
                           type="button"
@@ -307,7 +307,7 @@ export default function CostOverview() {
                           )}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
+                      <PopoverContent className="w-auto p-0 z-[200]" align="start">
                         <CalendarComponent
                           initialFocus
                           mode="range"
@@ -315,7 +315,6 @@ export default function CostOverview() {
                           selected={dateRange}
                           onSelect={setDateRange}
                           numberOfMonths={2}
-                          className={cn("p-3 pointer-events-auto")}
                         />
                       </PopoverContent>
                     </Popover>

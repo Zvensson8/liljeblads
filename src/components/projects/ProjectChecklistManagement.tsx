@@ -329,7 +329,7 @@ export function ProjectChecklistManagement({
 
             <div>
               <label className="text-sm font-medium mb-2 block">Deadline</label>
-              <Popover>
+              <Popover modal={true}>
                 <PopoverTrigger asChild>
                   <Button
                     type="button"
@@ -343,7 +343,7 @@ export function ProjectChecklistManagement({
                     {newDeadline ? format(newDeadline, "PPP", { locale: sv }) : "Välj datum"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 pointer-events-auto z-50" align="start">
+                <PopoverContent className="w-auto p-0 z-[200]" align="start">
                   <CalendarComponent
                     mode="single"
                     selected={newDeadline}

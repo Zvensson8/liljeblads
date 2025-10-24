@@ -263,7 +263,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                 </Button>
               </div>
 
-              <Popover>
+              <Popover modal={true}>
                 <PopoverTrigger asChild>
                   <Button
                     type="button"
@@ -281,7 +281,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 pointer-events-auto z-50" align="start">
+                <PopoverContent className="w-auto p-0 z-[200]" align="start">
                   <CalendarComponent
                     mode="single"
                     selected={reminderDate}
