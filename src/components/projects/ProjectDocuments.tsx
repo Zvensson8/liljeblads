@@ -111,7 +111,9 @@ export function ProjectDocuments({ projectId }: ProjectDocumentsProps) {
       const nextVersion = existingDocs.length > 0 ? Math.max(...existingDocs.map(d => d.version || 1)) + 1 : 1;
 
       const fileExt = file.name.split(".").pop();
-      const filePath = `${projectId}/${selectedFolder}/${Date.now()}.${fileExt}`;
+      // URL encode the folder name to handle special characters
+      const encodedFolder = encodeURIComponent(selectedFolder);
+      const filePath = `${projectId}/${encodedFolder}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("project-documents")
