@@ -15,6 +15,7 @@ import { OrganizationSubscription } from "@/components/organization/Organization
 import { OrganizationBranding } from "@/components/organization/OrganizationBranding";
 import { OrganizationDataExport } from "@/components/organization/OrganizationDataExport";
 import { PropertyInfoCategoryManager } from "@/components/property-info/PropertyInfoCategoryManager";
+import { NotificationSettings } from "@/components/organization/NotificationSettings";
 
 interface Organization {
   id: string;
@@ -199,6 +200,7 @@ export default function OrganizationSettings() {
                 {isAdmin && <TabsTrigger value="subscription">Prenumeration</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="branding">Varumärke</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="property-info">Fastighetsinformation</TabsTrigger>}
+                <TabsTrigger value="notifications">Rapporter</TabsTrigger>
                 {isAdmin && <TabsTrigger value="export">Data Export</TabsTrigger>}
               </TabsList>
 
@@ -248,6 +250,10 @@ export default function OrganizationSettings() {
                   <PropertyInfoCategoryManager />
                 </TabsContent>
               )}
+
+              <TabsContent value="notifications">
+                <NotificationSettings />
+              </TabsContent>
 
               {isAdmin && (
                 <TabsContent value="export">

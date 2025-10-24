@@ -185,7 +185,7 @@ serve(async (req) => {
             <div class="stat-label">Utfall hittills</div>
           </div>
           <div class="stat">
-            <div class="stat-value" style="color: ${parseFloat(budgetDeviation) > 0 ? '#dc2626' : '#16a34a'}">${budgetDeviation > 0 ? '+' : ''}${budgetDeviation}%</div>
+            <div class="stat-value" style="color: ${parseFloat(budgetDeviation) > 0 ? '#dc2626' : '#16a34a'}">${parseFloat(budgetDeviation) > 0 ? '+' : ''}${budgetDeviation}%</div>
             <div class="stat-label">Budgetavvikelse</div>
           </div>
         </div>
