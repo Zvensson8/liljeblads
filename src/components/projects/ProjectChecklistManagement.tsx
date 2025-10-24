@@ -41,10 +41,12 @@ export function ProjectChecklistManagement({
   const [newResponsible, setNewResponsible] = useState("");
   const [newDeadline, setNewDeadline] = useState<Date>();
   const [submitting, setSubmitting] = useState(false);
+  const [existingTodos, setExistingTodos] = useState<string[]>([]);
 
   useEffect(() => {
     fetchChecklistItems();
-  }, [projectId]);
+    fetchExistingTodos();
+  }, [projectId, propertyId]);
 
   const fetchChecklistItems = async () => {
     setLoading(true);
@@ -61,6 +63,21 @@ export function ProjectChecklistManagement({
       toast.error("Kunde inte hämta checklista");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchExistingTodos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("property_todos")
+        .select("title")
+        .eq("property_id", propertyId)
+        .eq("completed", false);
+
+      if (error) throw error;
+      setExistingTodos(data?.map(todo => todo.title) || []);
+    } catch (error: any) {
+      console.error("Kunde inte hämta todos:", error);
     }
   };
 
@@ -159,9 +176,14 @@ export function ProjectChecklistManagement({
       if (error) throw error;
 
       toast.success("Tillagd i att göra-listan");
+      fetchExistingTodos(); // Uppdatera listan över befintliga todos
     } catch (error: any) {
       toast.error("Kunde inte lägga till i att göra-listan");
     }
+  };
+
+  const isTodoAlreadyAdded = (title: string) => {
+    return existingTodos.includes(title);
   };
 
   const completedCount = items.filter((i) => i.completed).length;
@@ -279,10 +301,12 @@ export function ProjectChecklistManagement({
                     variant="outline"
                     size="sm"
                     onClick={() => handleAddToPropertyTodos(item)}
-                    disabled={item.completed}
+                    disabled={item.completed || isTodoAlreadyAdded(item.title)}
                   >
                     <ListTodo className="h-4 w-4 mr-2" />
-                    Lägg till i att göra-lista
+                    {isTodoAlreadyAdded(item.title) 
+                      ? "Redan tillagd i att göra-lista" 
+                      : "Lägg till i att göra-lista"}
                   </Button>
                 </div>
               </div>
