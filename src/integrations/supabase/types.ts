@@ -1872,6 +1872,68 @@ export type Database = {
           },
         ]
       }
+      user_notification_preferences: {
+        Row: {
+          created_at: string | null
+          id: string
+          maintenance_history_annual: boolean | null
+          maintenance_history_previewed: boolean | null
+          maintenance_reminders: boolean | null
+          maintenance_reminders_previewed: boolean | null
+          monthly_project_summary: boolean | null
+          monthly_workorder_summary: boolean | null
+          notification_email: string | null
+          organization_id: string
+          preferred_day: string | null
+          project_summary_previewed: boolean | null
+          updated_at: string | null
+          user_id: string
+          workorder_summary_previewed: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          maintenance_history_annual?: boolean | null
+          maintenance_history_previewed?: boolean | null
+          maintenance_reminders?: boolean | null
+          maintenance_reminders_previewed?: boolean | null
+          monthly_project_summary?: boolean | null
+          monthly_workorder_summary?: boolean | null
+          notification_email?: string | null
+          organization_id: string
+          preferred_day?: string | null
+          project_summary_previewed?: boolean | null
+          updated_at?: string | null
+          user_id: string
+          workorder_summary_previewed?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          maintenance_history_annual?: boolean | null
+          maintenance_history_previewed?: boolean | null
+          maintenance_reminders?: boolean | null
+          maintenance_reminders_previewed?: boolean | null
+          monthly_project_summary?: boolean | null
+          monthly_workorder_summary?: boolean | null
+          notification_email?: string | null
+          organization_id?: string
+          preferred_day?: string | null
+          project_summary_previewed?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+          workorder_summary_previewed?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notification_preferences_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
