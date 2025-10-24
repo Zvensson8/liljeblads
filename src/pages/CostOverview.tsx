@@ -285,6 +285,7 @@ export default function CostOverview() {
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
+                          type="button"
                           variant="outline"
                           className={cn(
                             "justify-start text-left font-normal",

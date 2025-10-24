@@ -381,6 +381,7 @@ export function ProjectFormDialog({
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
+                            type="button"
                             variant="outline"
                             className={cn(
                               "pl-3 text-left font-normal",
@@ -421,6 +422,7 @@ export function ProjectFormDialog({
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
+                            type="button"
                             variant="outline"
                             className={cn(
                               "pl-3 text-left font-normal",
