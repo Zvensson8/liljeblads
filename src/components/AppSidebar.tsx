@@ -1,4 +1,4 @@
-import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown } from "lucide-react";
+import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown, Search } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,6 +19,7 @@ import {
 import { Button } from "./ui/button";
 import { NotificationBell } from "./NotificationBell";
 import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 const navigationItems = [
   { title: "Dashboard", url: "/", icon: Home },
@@ -32,7 +33,11 @@ const navigationItems = [
   { title: "Organisation", url: "/organization/settings", icon: Building },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  onOpenSearch?: () => void;
+}
+
+export function AppSidebar({ onOpenSearch }: AppSidebarProps = {}) {
   const { state } = useSidebar();
   const { signOut, user } = useAuth();
   const { organization, loading: orgLoading } = useOrganization();
@@ -92,6 +97,21 @@ export function AppSidebar() {
           </div>
           {!isCollapsed && (
             <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onOpenSearch}
+                    className="h-9 w-9"
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Sök (Ctrl+K)</p>
+                </TooltipContent>
+              </Tooltip>
               <NotificationBell />
               <KeyboardShortcutsDialog />
             </div>

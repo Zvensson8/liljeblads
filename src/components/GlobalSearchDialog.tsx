@@ -69,22 +69,37 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
           );
         }
 
-        // Search components
+        // Search components (both floor-linked and property-linked)
         const { data: components } = await supabase
           .from("components")
-          .select("id, name, type, floors!inner(property_id, properties(name))")
+          .select(`
+            id, 
+            name, 
+            type,
+            floors:floor_id(
+              property_id,
+              properties(name)
+            ),
+            direct_property:property_id(
+              id,
+              name
+            )
+          `)
           .ilike("name", `%${searchQuery}%`)
           .limit(5);
 
         if (components) {
           allResults.push(
-            ...components.map((c: any) => ({
-              id: c.id,
-              type: "component" as const,
-              title: c.name,
-              subtitle: `${c.type} - ${c.floors?.properties?.name || ""}`,
-              path: `/components/${c.id}`,
-            }))
+            ...components.map((c: any) => {
+              const propertyName = c.floors?.properties?.name || c.direct_property?.name || "";
+              return {
+                id: c.id,
+                type: "component" as const,
+                title: c.name,
+                subtitle: `${c.type}${propertyName ? ` - ${propertyName}` : ""}`,
+                path: `/components/${c.id}`,
+              };
+            })
           );
         }
 
