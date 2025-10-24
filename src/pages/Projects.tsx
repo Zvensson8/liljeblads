@@ -209,12 +209,12 @@ export default function Projects() {
 
           <main className="flex-1 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <Tabs defaultValue="active" className="w-full" onValueChange={(value) => setShowArchived(value === 'archived')}>
+              <Tabs defaultValue="dashboard" className="w-full" onValueChange={(value) => setShowArchived(value === 'archived')}>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                   <TabsList>
+                    <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                     <TabsTrigger value="active">Aktiva projekt</TabsTrigger>
                     <TabsTrigger value="archived">Arkiverade projekt</TabsTrigger>
-                    <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                   </TabsList>
                   <Button onClick={() => { setEditingProject(null); setFormDialogOpen(true); }}>
                     <Plus className="h-4 w-4 mr-2" />
