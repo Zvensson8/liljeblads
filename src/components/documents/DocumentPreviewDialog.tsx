@@ -148,21 +148,31 @@ export function DocumentPreviewDialog({
                 </div>
               ))}
             </div>
-          ) : isPreviewable ? (
+          ) : isImage ? (
             <div className="h-full overflow-auto bg-muted/30 rounded-lg flex items-center justify-center">
-              {isImage ? (
-                <img
-                  src={document.file_url}
-                  alt={document.name}
-                  className="max-w-full max-h-full object-contain"
-                />
-              ) : isPdf ? (
-                <iframe
-                  src={document.file_url}
-                  className="w-full h-[60vh] border-0 rounded-lg"
-                  title={document.name}
-                />
-              ) : null}
+              <img
+                src={document.file_url}
+                alt={document.name}
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+          ) : isPdf ? (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-center gap-4">
+              <div className="p-4 bg-muted rounded-full">
+                <ExternalLink className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium mb-2">PDF-förhandsvisning</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Öppna PDF-filen i en ny flik för att visa den
+                </p>
+                <Button
+                  onClick={() => window.open(document.file_url, "_blank")}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Öppna PDF
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-[60vh] text-center gap-4">

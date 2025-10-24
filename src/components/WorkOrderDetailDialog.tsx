@@ -26,11 +26,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, Trash2, Download, Edit2, FolderKanban } from "lucide-react";
+import { Upload, FileText, Trash2, Download, Edit2, FolderKanban, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { WorkOrderDialog } from "./WorkOrderDialog";
+import { DocumentPreviewDialog } from "./documents/DocumentPreviewDialog";
 
 interface WorkOrderDetailDialogProps {
   open: boolean;
@@ -51,6 +52,7 @@ export function WorkOrderDetailDialog({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState<any>(null);
 
   const { data: files, refetch: refetchFiles } = useQuery({
     queryKey: ["work-order-files", workOrder?.id],
@@ -339,6 +341,13 @@ export function WorkOrderDetailDialog({
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => setPreviewDocument(file)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => window.open(file.file_url, "_blank")}
                           >
                             <Download className="h-4 w-4" />
@@ -373,6 +382,12 @@ export function WorkOrderDetailDialog({
           onUpdate();
           setEditDialogOpen(false);
         }}
+      />
+
+      <DocumentPreviewDialog
+        open={!!previewDocument}
+        onOpenChange={(open) => !open && setPreviewDocument(null)}
+        document={previewDocument}
       />
 
       <AlertDialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
