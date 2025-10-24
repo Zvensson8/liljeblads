@@ -40,6 +40,8 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<string>("medium");
   const [category, setCategory] = useState("none");
+  const [reminderEmail, setReminderEmail] = useState("");
+  const [reminderDate, setReminderDate] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   const { data: subtaskCount } = useQuery({
@@ -77,6 +79,8 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
       setDueDate(todo.due_date || "");
       setPriority(todo.priority || "medium");
       setCategory(todo.category || "none");
+      setReminderEmail(todo.reminder_email || "");
+      setReminderDate(todo.reminder_date || "");
     }
   }, [todo]);
 
@@ -93,6 +97,8 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
         due_date: dueDate || null,
         priority,
         category: category === "none" ? null : category || null,
+        reminder_email: reminderEmail || null,
+        reminder_date: reminderDate || null,
       })
       .eq("id", todo.id);
 
@@ -218,6 +224,29 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-4 pt-4 border-t">
+              <div className="space-y-2">
+                <Label htmlFor="reminder_email">E-postpåminnelse</Label>
+                <Input
+                  id="reminder_email"
+                  type="email"
+                  value={reminderEmail}
+                  onChange={(e) => setReminderEmail(e.target.value)}
+                  placeholder="epost@exempel.se"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reminder_date">Påminnelsedatum</Label>
+                <Input
+                  id="reminder_date"
+                  type="date"
+                  value={reminderDate}
+                  onChange={(e) => setReminderDate(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="pt-4 border-t space-y-1">

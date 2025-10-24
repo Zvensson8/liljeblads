@@ -2,3 +2,6 @@ project_id = "vfwxpbffadedpvhdxntm"
 
 [functions.send-work-order-reminders]
 verify_jwt = true
+
+[functions.send-todo-reminders]
+verify_jwt = true
