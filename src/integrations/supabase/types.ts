@@ -1600,7 +1600,10 @@ export type Database = {
           created_at: string
           due_date: string | null
           id: string
+          notes: string | null
           property_id: string
+          reminder_date: string | null
+          reminder_email: string | null
           title: string
           updated_at: string
         }
@@ -1609,7 +1612,10 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          notes?: string | null
           property_id: string
+          reminder_date?: string | null
+          reminder_email?: string | null
           title: string
           updated_at?: string
         }
@@ -1618,7 +1624,10 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          notes?: string | null
           property_id?: string
+          reminder_date?: string | null
+          reminder_email?: string | null
           title?: string
           updated_at?: string
         }

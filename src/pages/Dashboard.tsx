@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AttentionRequiredSection } from '@/components/AttentionRequiredSection';
 import { RecentlyVisitedWidget } from '@/components/RecentlyVisitedWidget';
+import { TodoWidget } from '@/components/TodoWidget';
 
 interface DashboardStats {
   totalProperties: number;
@@ -402,6 +403,9 @@ const Dashboard = () => {
                 ))}
               </div>
 
+              {/* To-Do List - replaced with TodoWidget */}
+              <TodoWidget propertyId={selectedProperty === "all" ? undefined : selectedProperty} />
+
               {/* Recently Visited */}
               <RecentlyVisitedWidget />
 
@@ -506,51 +510,6 @@ const Dashboard = () => {
                   </CardContent>
                 </Card>
               </div>
-
-              {/* To-Do List */}
-              <Card className="border-border/50">
-                <CardHeader>
-                  <CardTitle>Att göra</CardTitle>
-                  <CardDescription>
-                    Kommande uppgifter för {selectedProperty === "all" ? "alla fastigheter" : "vald fastighet"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {todos.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      Inga uppgifter
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {todos.map((todo) => (
-                        <div
-                          key={todo.id}
-                          className={`flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors ${
-                            todo.completed ? 'opacity-50' : ''
-                          }`}
-                        >
-                          <div className={`h-4 w-4 rounded border ${
-                            todo.completed ? 'bg-primary border-primary' : 'border-muted-foreground'
-                          }`}>
-                            {todo.completed && (
-                              <CheckSquare className="h-4 w-4 text-primary-foreground" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className={`font-medium ${todo.completed ? 'line-through' : ''}`}>
-                              {todo.title}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {todo.properties?.name}
-                              {todo.due_date && ` • Förfaller ${new Date(todo.due_date).toLocaleDateString('sv-SE')}`}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </div>
           </main>
         </SidebarInset>
