@@ -19,7 +19,14 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Create client with service role to bypass RLS for data export
     const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
+    // Create a separate client with user's auth to verify permissions
+    const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
@@ -33,11 +40,14 @@ Deno.serve(async (req) => {
     const {
       data: { user },
       error: userError,
-    } = await supabaseClient.auth.getUser();
+    } = await userClient.auth.getUser();
 
     if (userError || !user) {
+      console.error('Auth error:', userError);
       throw new Error('Unauthorized');
     }
+
+    console.log(`User authenticated: ${user.id}`);
 
     const { organizationId, exportType, userId, propertyIds: requestPropertyIds }: ExportRequest = await req.json();
 
@@ -52,8 +62,11 @@ Deno.serve(async (req) => {
       .single();
 
     if (memberError || !memberData) {
+      console.error('Member verification error:', memberError);
       throw new Error('Not a member of this organization');
     }
+
+    console.log(`User is ${memberData.role} of organization`);
 
     // Prepare export data structure
     const exportData: any = {
