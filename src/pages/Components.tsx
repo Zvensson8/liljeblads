@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download, Upload } from 'lucide-react';
+import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download, Upload, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
 import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
 import { SelectPropertyFloorDialog } from '@/components/SelectPropertyFloorDialog';
@@ -50,6 +50,7 @@ const Components = () => {
   const [selectPropertyDialogOpen, setSelectPropertyDialogOpen] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
   const [selectedFloorId, setSelectedFloorId] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -244,6 +245,26 @@ const Components = () => {
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                  <div className="flex gap-1 border border-border rounded-lg p-1">
+                    <Button
+                      variant={viewMode === "cards" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("cards")}
+                      className="h-8"
+                    >
+                      <LayoutGrid className="h-4 w-4 mr-2" />
+                      Kort
+                    </Button>
+                    <Button
+                      variant={viewMode === "table" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("table")}
+                      className="h-8"
+                    >
+                      <TableIcon className="h-4 w-4 mr-2" />
+                      Tabell
+                    </Button>
+                  </div>
                   <Badge variant="outline" className="text-base px-4 py-2">
                     {components.length} komponenter
                   </Badge>
@@ -288,7 +309,7 @@ const Components = () => {
                         </Button>
                       </CardContent>
                     </Card>
-                  ) : (
+                  ) : viewMode === 'cards' ? (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {components.map((component) => (
                         <Card
@@ -395,6 +416,95 @@ const Components = () => {
                       </Card>
                     ))}
                   </div>
+                ) : (
+                  <Card>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b text-sm text-muted-foreground">
+                              <th className="text-left py-3 px-4 font-medium">Komponent</th>
+                              <th className="text-left py-3 px-4 font-medium">Typ</th>
+                              <th className="text-left py-3 px-4 font-medium">Tillverkare</th>
+                              <th className="text-left py-3 px-4 font-medium">Modell</th>
+                              <th className="text-left py-3 px-4 font-medium">Installerad</th>
+                              <th className="text-left py-3 px-4 font-medium">Fastighet</th>
+                              <th className="text-left py-3 px-4 font-medium">Våning</th>
+                              <th className="text-left py-3 px-4 font-medium">Status</th>
+                              <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {components.map((component) => (
+                              <tr 
+                                key={component.id} 
+                                className="border-b hover:bg-muted/50 cursor-pointer"
+                                onClick={() => navigate(`/components/${component.id}`)}
+                              >
+                                <td className="py-3 px-4">
+                                  <div className="font-medium">{component.name}</div>
+                                  {component.room_zone && (
+                                    <div className="text-xs text-muted-foreground">{component.room_zone}</div>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-sm">{component.type}</td>
+                                <td className="py-3 px-4 text-sm">{component.manufacturer || '-'}</td>
+                                <td className="py-3 px-4 text-sm">{component.model || '-'}</td>
+                                <td className="py-3 px-4 text-sm">{component.installation_year || '-'}</td>
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Building2 className="h-4 w-4 text-primary" />
+                                    <span>{component.property_name}</span>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-sm">
+                                  {component.floor_name ? (
+                                    <span>
+                                      {component.floor_name}
+                                      {component.floor_level !== null && ` (${component.floor_level})`}
+                                    </span>
+                                  ) : (
+                                    <span className="italic text-muted-foreground">Ingen våning</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Badge className={getStatusColor(component.status)}>
+                                    {getStatusText(component.status)}
+                                  </Badge>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/components/${component.id}`);
+                                      }}
+                                    >
+                                      <span>✏️</span>
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteComponent(component.id, component.name);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
               </TabsContent>
 

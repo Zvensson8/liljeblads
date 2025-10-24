@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, Compass, Sparkles, MapPin, Layers, Trash2, MoreVertical, Search, Filter, Wrench, FileText, StickyNote } from 'lucide-react';
+import { Building2, Plus, Compass, Sparkles, MapPin, Layers, Trash2, MoreVertical, Search, Filter, Wrench, FileText, StickyNote, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PropertyFilterChips } from '@/components/PropertyFilterChips';
 import {
@@ -65,6 +65,7 @@ const Properties = () => {
   const [filters, setFilters] = useState<Array<{ id: string; label: string; value: any }>>([]);
   const [filterType, setFilterType] = useState<string>('');
   const [filterValue, setFilterValue] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const { toast } = useToast();
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
@@ -394,7 +395,27 @@ const Properties = () => {
               </div>
 
               {/* Page Actions */}
-              <div className="flex justify-end mb-8">
+              <div className="flex justify-between items-center mb-8">
+                <div className="flex gap-1 border border-border rounded-lg p-1">
+                  <Button
+                    variant={viewMode === "cards" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("cards")}
+                    className="h-8"
+                  >
+                    <LayoutGrid className="h-4 w-4 mr-2" />
+                    Kort
+                  </Button>
+                  <Button
+                    variant={viewMode === "table" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("table")}
+                    className="h-8"
+                  >
+                    <TableIcon className="h-4 w-4 mr-2" />
+                    Tabell
+                  </Button>
+                </div>
                 
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
@@ -479,7 +500,7 @@ const Properties = () => {
                     </Button>
                   </CardContent>
                 </Card>
-              ) : (
+              ) : viewMode === 'cards' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
                   {filteredProperties.map((property, index) => (
                     <Card 
@@ -604,6 +625,97 @@ const Properties = () => {
                     </Card>
                   ))}
                 </div>
+              ) : (
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b text-sm text-muted-foreground">
+                            <th className="text-left py-3 px-4 font-medium">Fastighet</th>
+                            <th className="text-left py-3 px-4 font-medium">Adress</th>
+                            <th className="text-left py-3 px-4 font-medium">Typ</th>
+                            <th className="text-left py-3 px-4 font-medium">Byggår</th>
+                            <th className="text-left py-3 px-4 font-medium">Tomtarea</th>
+                            <th className="text-left py-3 px-4 font-medium">Våningar</th>
+                            <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredProperties.map((property) => (
+                            <tr 
+                              key={property.id} 
+                              className="border-b hover:bg-muted/50 cursor-pointer"
+                              onClick={() => navigate(`/property/${property.id}`)}
+                            >
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="h-4 w-4 text-primary" />
+                                  <div>
+                                    <div className="font-medium">{property.name}</div>
+                                    {property.property_number && (
+                                      <div className="text-xs text-muted-foreground font-mono">
+                                        {property.property_number}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                {property.address ? (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                                    <span>{property.address}</span>
+                                  </div>
+                                ) : (
+                                  '-'
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-sm">{property.property_type || '-'}</td>
+                              <td className="py-3 px-4 text-sm">{property.construction_year || '-'}</td>
+                              <td className="py-3 px-4 text-sm">
+                                {property.area_sqm ? `${property.area_sqm} m²` : '-'}
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <Layers className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-sm">{property.floors?.length || 0}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/property/${property.id}`);
+                                    }}
+                                  >
+                                    <span>✏️</span>
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPropertyToDelete(property);
+                                      setDeleteDialogOpen(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </div>
           </main>
