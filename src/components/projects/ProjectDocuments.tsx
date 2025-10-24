@@ -142,7 +142,8 @@ export function ProjectDocuments({ projectId }: ProjectDocumentsProps) {
       setUploadDialogOpen(false);
       fetchDocuments();
     } catch (error: any) {
-      toast.error("Kunde inte ladda upp dokument");
+      console.error("Upload error:", error);
+      toast.error(`Kunde inte ladda upp dokument: ${error.message}`);
     } finally {
       setUploading(false);
     }
