@@ -285,8 +285,256 @@ Deno.serve(async (req) => {
         (exportData.component_documents?.length || 0),
     };
 
-    // Convert to JSON string
-    const jsonData = JSON.stringify(exportData, null, 2);
+    console.log(`Export completed. Total properties: ${exportData.properties?.length || 0}`);
+
+    // Create ZIP file with readable text files
+    const zip = new JSZip();
+    
+    // Add README file
+    const exportTimestamp = new Date().toISOString();
+    const readmeContent = `DATA EXPORT FRÅN ${orgData?.name || 'ORGANIZATION'}
+${'='.repeat(60)}
+
+Exporterad: ${exportTimestamp}
+Export-typ: ${exportType === 'all' ? 'All data' : exportType === 'user' ? 'Användardata' : 'Valda fastigheter'}
+
+SAMMANFATTNING:
+- Fastigheter: ${exportData.properties?.length || 0}
+- Våningsplan: ${exportData.floors?.length || 0}
+- Komponenter: ${exportData.components?.length || 0}
+- Projekt: ${exportData.projects?.length || 0}
+- Arbetsordrar: ${exportData.work_orders?.length || 0}
+- Dokument: ${exportData.summary.documents_count || 0}
+
+INNEHÅLL:
+Denna export innehåller följande filer:
+- README.txt (denna fil)
+- organization.txt (organisationsinformation)
+- properties.txt (fastigheter och adresser)
+- components.txt (komponenter och serviceinformation)
+- projects.txt (projekt och kostnader)
+- work_orders.txt (arbetsordrar)
+- documents.txt (dokumentlistor)
+- maintenance.txt (underhållshistorik)
+- recurring_costs.txt (återkommande kostnader)
+- drift_operations.txt (drift och underhåll)
+`;
+    zip.file('README.txt', readmeContent);
+
+    // Organization info
+    if (orgData) {
+      const orgContent = `ORGANISATIONSINFORMATION
+${'='.repeat(60)}
+
+Namn: ${orgData.name}
+ID: ${orgData.id}
+Skapad: ${orgData.created_at}
+Uppdaterad: ${orgData.updated_at}
+
+PRENUMERATION:
+Nivå: ${orgData.subscription_tier || 'Ingen'}
+Betalningsstatus: ${orgData.payment_status || 'Okänd'}
+Faktureringscykel: ${orgData.billing_cycle || 'Ingen'}
+Max fastigheter: ${orgData.max_properties || 0}
+Max användare: ${orgData.max_users || 0}
+
+KONTAKT:
+Faktura-email: ${orgData.invoice_email || 'Ingen'}
+Faktureringskontakt: ${orgData.billing_contact || 'Ingen'}
+
+ANTECKNINGAR:
+${orgData.notes || 'Inga anteckningar'}
+`;
+      zip.file('organization.txt', orgContent);
+    }
+
+    // Properties
+    if (exportData.properties && exportData.properties.length > 0) {
+      let propContent = `FASTIGHETER (${exportData.properties.length})
+${'='.repeat(60)}\n\n`;
+      
+      exportData.properties.forEach((prop: any, index: number) => {
+        propContent += `${index + 1}. ${prop.name || 'Namnlös fastighet'}
+${'-'.repeat(60)}
+ID: ${prop.id}
+Adress: ${prop.address || 'Ingen adress'}
+Postnummer: ${prop.postal_code || 'Inget'}
+Stad: ${prop.city || 'Ingen'}
+Area (m²): ${prop.area || 'Okänd'}
+Byggnadsår: ${prop.construction_year || 'Okänt'}
+Typ: ${prop.property_type || 'Okänd'}
+Ägare: ${prop.owner_id || 'Ingen'}
+Skapad: ${prop.created_at || 'Okänd'}
+Beskrivning: ${prop.description || 'Ingen beskrivning'}
+
+`;
+      });
+      zip.file('properties.txt', propContent);
+    }
+
+    // Components
+    if (exportData.components && exportData.components.length > 0) {
+      let compContent = `KOMPONENTER (${exportData.components.length})
+${'='.repeat(60)}\n\n`;
+      
+      exportData.components.forEach((comp: any, index: number) => {
+        compContent += `${index + 1}. ${comp.name || 'Namnlös komponent'}
+${'-'.repeat(60)}
+ID: ${comp.id}
+Typ: ${comp.type || 'Okänd'}
+Kategori: ${comp.category || 'Ingen'}
+Serienummer: ${comp.serial_number || 'Inget'}
+Registreringsnummer: ${comp.registration_number || 'Inget'}
+Installationsdatum: ${comp.installation_date || 'Okänt'}
+Förväntad livslängd (år): ${comp.expected_lifetime || 'Okänd'}
+Nästa servicedatum: ${comp.next_service_date || 'Inget planerat'}
+Servicekostnad: ${comp.service_cost || 0} kr
+Serviceintervall (år): ${comp.service_interval || 'Inget'}
+Position (x, y): ${comp.position_x || 0}, ${comp.position_y || 0}
+Placering: ${comp.placement || 'Ingen'}
+Beskrivning: ${comp.description || 'Ingen beskrivning'}
+Anteckningar: ${comp.notes || 'Inga anteckningar'}
+
+`;
+      });
+      zip.file('components.txt', compContent);
+    }
+
+    // Projects
+    if (exportData.projects && exportData.projects.length > 0) {
+      let projContent = `PROJEKT (${exportData.projects.length})
+${'='.repeat(60)}\n\n`;
+      
+      exportData.projects.forEach((proj: any, index: number) => {
+        projContent += `${index + 1}. ${proj.name || 'Namnlöst projekt'}
+${'-'.repeat(60)}
+ID: ${proj.id}
+Status: ${proj.status || 'Okänd'}
+Prioritet: ${proj.priority || 'Normal'}
+Budgeterad kostnad: ${proj.budgeted_cost || 0} kr
+Faktisk kostnad: ${proj.actual_cost || 0} kr
+Startdatum: ${proj.start_date || 'Inget'}
+Slutdatum: ${proj.end_date || 'Inget'}
+Förväntad slutdatum: ${proj.expected_completion_date || 'Inget'}
+Typ: ${proj.project_type || 'Okänd'}
+Beskrivning: ${proj.description || 'Ingen beskrivning'}
+Anteckningar: ${proj.notes || 'Inga anteckningar'}
+
+`;
+      });
+      zip.file('projects.txt', projContent);
+    }
+
+    // Work Orders
+    if (exportData.work_orders && exportData.work_orders.length > 0) {
+      let woContent = `ARBETSORDRAR (${exportData.work_orders.length})
+${'='.repeat(60)}\n\n`;
+      
+      exportData.work_orders.forEach((wo: any, index: number) => {
+        woContent += `${index + 1}. Arbetsorder
+${'-'.repeat(60)}
+ID: ${wo.id}
+Åtgärd: ${wo.action || 'Ingen åtgärd'}
+Status: ${wo.status || 'Okänd'}
+Prioritet: ${wo.priority || 'Normal'}
+Kategori: ${wo.category || 'Ingen'}
+Planerat datum: ${wo.scheduled_date || 'Inget'}
+Slutfört datum: ${wo.completed_date || 'Ej slutfört'}
+Uppskattad kostnad: ${wo.estimated_cost || 0} kr
+Faktisk kostnad: ${wo.actual_cost || 0} kr
+Leverantör: ${wo.supplier || 'Ingen'}
+Kontaktperson: ${wo.contact_person || 'Ingen'}
+Beskrivning: ${wo.description || 'Ingen beskrivning'}
+Anteckningar: ${wo.notes || 'Inga anteckningar'}
+
+`;
+      });
+      zip.file('work_orders.txt', woContent);
+    }
+
+    // Maintenance History
+    if (exportData.maintenance_history && exportData.maintenance_history.length > 0) {
+      let maintContent = `UNDERHÅLLSHISTORIK (${exportData.maintenance_history.length})
+${'='.repeat(60)}\n\n`;
+      
+      exportData.maintenance_history.forEach((maint: any, index: number) => {
+        maintContent += `${index + 1}. Underhållshändelse
+${'-'.repeat(60)}
+ID: ${maint.id}
+Typ: ${maint.maintenance_type || 'Okänd'}
+Datum: ${maint.maintenance_date || 'Okänt'}
+Kostnad: ${maint.cost || 0} kr
+Utförd av: ${maint.performed_by || 'Okänd'}
+Beskrivning: ${maint.description || 'Ingen beskrivning'}
+Anteckningar: ${maint.notes || 'Inga anteckningar'}
+
+`;
+      });
+      zip.file('maintenance.txt', maintContent);
+    }
+
+    // Recurring Costs
+    if (exportData.recurring_costs && exportData.recurring_costs.length > 0) {
+      let rcContent = `ÅTERKOMMANDE KOSTNADER (${exportData.recurring_costs.length})
+${'='.repeat(60)}\n\n`;
+      
+      exportData.recurring_costs.forEach((rc: any, index: number) => {
+        rcContent += `${index + 1}. ${rc.description || 'Namnlös kostnad'}
+${'-'.repeat(60)}
+ID: ${rc.id}
+Kategori: ${rc.category || 'Ingen'}
+Belopp: ${rc.amount || 0} kr
+Frekvens: ${rc.frequency || 'Okänd'}
+Startdatum: ${rc.start_date || 'Inget'}
+Slutdatum: ${rc.end_date || 'Inget'}
+Nästa faktureringsdatum: ${rc.next_billing_date || 'Inget'}
+Leverantör: ${rc.supplier || 'Ingen'}
+Kontonummer: ${rc.account_code || 'Inget'}
+Beskrivning: ${rc.description || 'Ingen beskrivning'}
+
+`;
+      });
+      zip.file('recurring_costs.txt', rcContent);
+    }
+
+    // Drift Operations
+    if (exportData.drift_tasks && exportData.drift_tasks.length > 0) {
+      let driftContent = `DRIFT OCH UNDERHÅLL (${exportData.drift_tasks.length})
+${'='.repeat(60)}\n\n`;
+      
+      exportData.drift_tasks.forEach((task: any, index: number) => {
+        driftContent += `${index + 1}. ${task.title || 'Namnlös uppgift'}
+${'-'.repeat(60)}
+ID: ${task.id}
+Kategori: ${task.category_id || 'Ingen'}
+Kvartal: ${task.quarter || 'Inget'}
+År: ${task.year || 'Inget'}
+Prioritet: ${task.priority || 'Normal'}
+Planerat antal: ${task.planned_count || 0}
+Rapporterat antal: ${task.reported_count || 0}
+Status: ${task.status || 'Okänd'}
+Deadline: ${task.deadline || 'Ingen'}
+Beskrivning: ${task.description || 'Ingen beskrivning'}
+
+`;
+      });
+      zip.file('drift_operations.txt', driftContent);
+    }
+
+    // Documents summary
+    const docContent = `DOKUMENT ÖVERSIKT
+${'='.repeat(60)}
+
+FASTIGHETS DOKUMENT: ${exportData.property_documents?.length || 0}
+PROJEKT DOKUMENT: ${exportData.project_documents?.length || 0}
+KOMPONENT DOKUMENT: ${exportData.component_documents?.length || 0}
+
+Total antal dokument: ${exportData.summary.documents_count || 0}
+
+Observera: Endast metadata för dokument exporteras. 
+Själva dokumentfilerna finns kvar i systemet.
+`;
+    zip.file('documents.txt', docContent);
 
     // Create filename
     const timestamp = new Date().toISOString().split('T')[0];
@@ -300,29 +548,6 @@ Deno.serve(async (req) => {
     } else {
       baseFilename = `${orgData?.name || 'organization'}_full_export_${timestamp}`;
     }
-
-    console.log(`Export completed. Total properties: ${exportData.properties?.length || 0}`);
-
-    // Create ZIP file
-    const zip = new JSZip();
-    zip.file(`${baseFilename}.json`, jsonData);
-    
-    // Add a README file
-    const readmeContent = `Data Export från ${orgData?.name || 'Organization'}
-Exporterad: ${new Date().toISOString()}
-Export-typ: ${exportType === 'all' ? 'All data' : exportType === 'user' ? 'Användardata' : 'Valda fastigheter'}
-
-Innehåll:
-- Fastigheter: ${exportData.properties?.length || 0}
-- Våningsplan: ${exportData.floors?.length || 0}
-- Komponenter: ${exportData.components?.length || 0}
-- Projekt: ${exportData.projects?.length || 0}
-- Arbetsordrar: ${exportData.work_orders?.length || 0}
-- Dokument: ${exportData.summary.documents_count || 0}
-
-Data finns i filen: ${baseFilename}.json
-`;
-    zip.file('README.txt', readmeContent);
 
     // Generate ZIP as base64
     const zipBase64 = await zip.generateAsync({ type: 'base64' });
