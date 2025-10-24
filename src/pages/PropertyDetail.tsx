@@ -127,15 +127,29 @@ const PropertyDetail = () => {
     }
 
     // Fetch components for this property (either via floor or direct property link)
-    const { data: componentsData } = await supabase
+    const { data: componentsViaProperty } = await supabase
+      .from('components')
+      .select('*')
+      .eq('property_id', id);
+    
+    const { data: componentsViaFloor } = await supabase
       .from('components')
       .select(`
         *,
-        floors(id, name, property_id)
+        floors!inner(id, name, property_id)
       `)
-      .or(`property_id.eq.${id},floors.property_id.eq.${id}`);
+      .eq('floors.property_id', id);
     
-    setComponents(componentsData || []);
+    // Combine both results and remove duplicates
+    const allComponents = [
+      ...(componentsViaProperty || []),
+      ...(componentsViaFloor || [])
+    ];
+    const uniqueComponents = Array.from(
+      new Map(allComponents.map(c => [c.id, c])).values()
+    );
+    
+    setComponents(uniqueComponents);
 
     // Fetch work orders for this property
     const { data: workOrdersData } = await supabase
