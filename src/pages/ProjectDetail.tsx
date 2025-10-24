@@ -32,6 +32,7 @@ import { ProjectDocuments } from "@/components/projects/ProjectDocuments";
 import { ProjectSimulation } from "@/components/projects/ProjectSimulation";
 import { ProjectActivityLog } from "@/components/projects/ProjectActivityLog";
 import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
+import { ProjectEconomyOverview } from "@/components/projects/ProjectEconomyOverview";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
 import { exportProjectToZip } from "@/lib/zipExport";
@@ -458,10 +459,18 @@ export default function ProjectDetail() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="economy">
+                <TabsContent value="economy" className="space-y-4">
+                  <ProjectEconomyOverview
+                    projectId={project.id}
+                    budget={project.budget}
+                    forecast={project.forecast}
+                    actualCost={project.actual_cost}
+                    onUpdate={fetchProject}
+                  />
+                  
                   <Card>
                     <CardHeader>
-                      <CardTitle>Ekonomi</CardTitle>
+                      <CardTitle>Kostnadshantering</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <ProjectCostManagement
