@@ -162,7 +162,15 @@ export function ProjectFormDialog({
           changes.push(`Namn ändrat från "${editingProject.name}" till "${values.name}"`);
         }
         if (values.description !== editingProject.description) {
-          changes.push(`Beskrivning uppdaterad`);
+          const oldDesc = editingProject.description || '(ingen beskrivning)';
+          const newDesc = values.description || '(tom beskrivning)';
+          if (!editingProject.description && values.description) {
+            changes.push(`Beskrivning tillagd: "${values.description.substring(0, 50)}${values.description.length > 50 ? '...' : ''}"`);
+          } else if (editingProject.description && !values.description) {
+            changes.push(`Beskrivning borttagen`);
+          } else {
+            changes.push(`Beskrivning uppdaterad`);
+          }
         }
         if (values.type !== editingProject.type) {
           const typeLabels: Record<string, string> = {
@@ -171,7 +179,7 @@ export function ProjectFormDialog({
             energi: "Energi",
             annat: "Annat",
           };
-          changes.push(`Typ ändrad till ${typeLabels[values.type]}`);
+          changes.push(`Typ ändrad från ${typeLabels[editingProject.type]} till ${typeLabels[values.type]}`);
         }
         if (values.status !== editingProject.status) {
           const statusLabels: Record<string, string> = {
@@ -182,15 +190,15 @@ export function ProjectFormDialog({
             pausat: "Pausat",
             avslutat: "Avslutat",
           };
-          changes.push(`Status ändrad till ${statusLabels[values.status]}`);
+          changes.push(`Status ändrad från ${statusLabels[editingProject.status]} till ${statusLabels[values.status]}`);
         }
         if (values.project_manager !== editingProject.project_manager) {
           if (values.project_manager && !editingProject.project_manager) {
             changes.push(`Projektledare tillagd: ${values.project_manager}`);
           } else if (!values.project_manager && editingProject.project_manager) {
-            changes.push(`Projektledare borttagen`);
+            changes.push(`Projektledare borttagen (tidigare: ${editingProject.project_manager})`);
           } else {
-            changes.push(`Projektledare ändrad till ${values.project_manager}`);
+            changes.push(`Projektledare ändrad från ${editingProject.project_manager} till ${values.project_manager}`);
           }
         }
         if (values.budget !== editingProject.budget) {
@@ -203,9 +211,9 @@ export function ProjectFormDialog({
           if (newStartDate && !oldStartDate) {
             changes.push(`Startdatum satt till ${format(values.start_date!, "PPP", { locale: sv })}`);
           } else if (!newStartDate && oldStartDate) {
-            changes.push(`Startdatum borttaget`);
+            changes.push(`Startdatum borttaget (tidigare: ${format(new Date(editingProject.start_date), "PPP", { locale: sv })})`);
           } else if (newStartDate && oldStartDate) {
-            changes.push(`Startdatum ändrat till ${format(values.start_date!, "PPP", { locale: sv })}`);
+            changes.push(`Startdatum ändrat från ${format(new Date(editingProject.start_date), "PPP", { locale: sv })} till ${format(values.start_date!, "PPP", { locale: sv })}`);
           }
         }
         
@@ -215,9 +223,9 @@ export function ProjectFormDialog({
           if (newEndDate && !oldEndDate) {
             changes.push(`Slutdatum satt till ${format(values.end_date!, "PPP", { locale: sv })}`);
           } else if (!newEndDate && oldEndDate) {
-            changes.push(`Slutdatum borttaget`);
+            changes.push(`Slutdatum borttaget (tidigare: ${format(new Date(editingProject.end_date), "PPP", { locale: sv })})`);
           } else if (newEndDate && oldEndDate) {
-            changes.push(`Slutdatum ändrat till ${format(values.end_date!, "PPP", { locale: sv })}`);
+            changes.push(`Slutdatum ändrat från ${format(new Date(editingProject.end_date), "PPP", { locale: sv })} till ${format(values.end_date!, "PPP", { locale: sv })}`);
           }
         }
 
