@@ -7,7 +7,9 @@ const corsHeaders = {
 
 interface ExportRequest {
   organizationId: string;
+  exportType: "all" | "user" | "properties";
   userId?: string | null;
+  propertyIds?: string[] | null;
 }
 
 Deno.serve(async (req) => {
@@ -37,9 +39,9 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { organizationId, userId }: ExportRequest = await req.json();
+    const { organizationId, exportType, userId, propertyIds: requestPropertyIds }: ExportRequest = await req.json();
 
-    console.log(`Starting export for organization: ${organizationId}, user: ${userId || 'all'}`);
+    console.log(`Starting export for organization: ${organizationId}, type: ${exportType}, user: ${userId || 'none'}, properties: ${requestPropertyIds?.length || 0}`);
 
     // Verify user has access to this organization
     const { data: memberData, error: memberError } = await supabaseClient
@@ -57,7 +59,9 @@ Deno.serve(async (req) => {
     const exportData: any = {
       exported_at: new Date().toISOString(),
       organization_id: organizationId,
-      user_id: userId || 'all',
+      export_type: exportType,
+      user_id: userId || null,
+      property_ids: requestPropertyIds || null,
     };
 
     // Fetch organization info
@@ -69,14 +73,16 @@ Deno.serve(async (req) => {
 
     exportData.organization = orgData;
 
-    // Fetch properties
-    const propertiesQuery = supabaseClient
+    // Fetch properties based on export type
+    let propertiesQuery = supabaseClient
       .from('properties')
       .select('*')
       .eq('organization_id', organizationId);
 
-    if (userId) {
-      propertiesQuery.eq('owner_id', userId);
+    if (exportType === 'user' && userId) {
+      propertiesQuery = propertiesQuery.eq('owner_id', userId);
+    } else if (exportType === 'properties' && requestPropertyIds && requestPropertyIds.length > 0) {
+      propertiesQuery = propertiesQuery.in('id', requestPropertyIds);
     }
 
     const { data: properties } = await propertiesQuery;
@@ -261,9 +267,16 @@ Deno.serve(async (req) => {
 
     // Create filename
     const timestamp = new Date().toISOString().split('T')[0];
-    const filename = userId 
-      ? `${orgData?.name || 'organization'}_user_data_${timestamp}.json`
-      : `${orgData?.name || 'organization'}_full_export_${timestamp}.json`;
+    let filename: string;
+    
+    if (exportType === 'properties' && requestPropertyIds && requestPropertyIds.length > 0) {
+      const propCount = requestPropertyIds.length;
+      filename = `${orgData?.name || 'organization'}_${propCount}_properties_${timestamp}.json`;
+    } else if (exportType === 'user' && userId) {
+      filename = `${orgData?.name || 'organization'}_user_data_${timestamp}.json`;
+    } else {
+      filename = `${orgData?.name || 'organization'}_full_export_${timestamp}.json`;
+    }
 
     console.log(`Export completed. Total properties: ${exportData.properties?.length || 0}`);
 
