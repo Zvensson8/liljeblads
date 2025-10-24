@@ -47,15 +47,9 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
     queryFn: async () => {
       let query = supabase
         .from("property_todos")
-        .select(`
-          *,
-          properties(id, name),
-          subtasks:property_todos!parent_todo_id(count),
-          attachments:todo_attachments(count)
-        `)
+        .select("*, properties(id, name)")
         .eq("completed", false)
         .is("parent_todo_id", null)
-        .order("priority", { ascending: false })
         .order("due_date", { ascending: true })
         .limit(10);
 
@@ -65,18 +59,18 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+      return (data || []) as any[];
     },
   });
 
   const { data: subtasksData } = useQuery({
-    queryKey: ["subtasks-widget", todos?.map(t => t.id)],
+    queryKey: ["subtasks-widget", todos?.map(t => (t as any).id)],
     enabled: !!todos && todos.length > 0,
     queryFn: async () => {
       if (!todos || todos.length === 0) return {};
 
-      const todoIds = todos.map(t => t.id);
-      const { data, error } = await supabase
+      const todoIds = todos.map(t => (t as any).id);
+      const { data, error } = await (supabase as any)
         .from("property_todos")
         .select("*")
         .in("parent_todo_id", todoIds);
@@ -84,7 +78,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
       if (error) throw error;
 
       const grouped: Record<string, any[]> = {};
-      data?.forEach(subtask => {
+      data?.forEach((subtask: any) => {
         if (!grouped[subtask.parent_todo_id]) {
           grouped[subtask.parent_todo_id] = [];
         }
@@ -92,6 +86,52 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
       });
 
       return grouped;
+    },
+  });
+
+  const { data: subtaskCounts } = useQuery({
+    queryKey: ["subtask-counts-widget", todos?.map(t => (t as any).id)],
+    enabled: !!todos && todos.length > 0,
+    queryFn: async () => {
+      if (!todos || todos.length === 0) return {};
+
+      const todoIds = todos.map(t => (t as any).id);
+      const { data, error } = await (supabase as any)
+        .from("property_todos")
+        .select("parent_todo_id")
+        .in("parent_todo_id", todoIds);
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      data?.forEach((item: any) => {
+        counts[item.parent_todo_id] = (counts[item.parent_todo_id] || 0) + 1;
+      });
+
+      return counts;
+    },
+  });
+
+  const { data: attachmentCounts } = useQuery({
+    queryKey: ["attachment-counts-widget", todos?.map(t => (t as any).id)],
+    enabled: !!todos && todos.length > 0,
+    queryFn: async () => {
+      if (!todos || todos.length === 0) return {};
+
+      const todoIds = todos.map(t => (t as any).id);
+      const { data, error } = await (supabase as any)
+        .from("todo_attachments")
+        .select("todo_id")
+        .in("todo_id", todoIds);
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      data?.forEach((item: any) => {
+        counts[item.todo_id] = (counts[item.todo_id] || 0) + 1;
+      });
+
+      return counts;
     },
   });
 
@@ -116,14 +156,14 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
     setDetailDialogOpen(true);
   };
 
-  const groupedByCategory = todos?.reduce((acc, todo) => {
+  const groupedByCategory = (todos || []).reduce((acc: Record<string, any[]>, todo: any) => {
     const category = todo.category || "Okategoriserad";
     if (!acc[category]) {
       acc[category] = [];
     }
     acc[category].push(todo);
     return acc;
-  }, {} as Record<string, typeof todos>);
+  }, {} as Record<string, any[]>);
 
   return (
     <>
@@ -146,19 +186,19 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
               Inga uppgifter
             </p>
           ) : (
-            <Accordion type="multiple" defaultValue={Object.keys(groupedByCategory || {})} className="w-full">
-              {Object.entries(groupedByCategory || {}).map(([category, categoryTodos]) => (
+            <Accordion type="multiple" defaultValue={Object.keys(groupedByCategory)} className="w-full">
+              {Object.entries(groupedByCategory).map(([category, categoryTodos]: [string, any[]]) => (
                 <AccordionItem key={category} value={category}>
                   <AccordionTrigger className="text-sm font-medium">
                     {category} ({categoryTodos.length})
                   </AccordionTrigger>
                   <AccordionContent>
                     <div className="space-y-2">
-                      {categoryTodos.map((todo) => {
-                        const hasSubtasks = (todo.subtasks?.[0]?.count || 0) > 0;
+                      {categoryTodos.map((todo: any) => {
+                        const hasSubtasks = (subtaskCounts?.[todo.id] || 0) > 0;
                         const todoSubtasks = subtasksData?.[todo.id] || [];
                         const completedSubtasks = todoSubtasks.filter((s: any) => s.completed).length;
-                        const hasAttachments = (todo.attachments?.[0]?.count || 0) > 0;
+                        const hasAttachments = (attachmentCounts?.[todo.id] || 0) > 0;
 
                         return (
                           <div
@@ -181,7 +221,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                                   {todo.title}
                                 </p>
                                 <div className="flex gap-1">
-                                  <TodoPriorityBadge priority={todo.priority as any || "medium"} />
+                                  <TodoPriorityBadge priority={(todo.priority || "medium") as any} />
                                   {hasAttachments && <Paperclip className="h-4 w-4 text-muted-foreground" />}
                                 </div>
                               </div>

@@ -19,13 +19,13 @@ export function TodoAttachments({ todoId, onUpdate }: TodoAttachmentsProps) {
     queryKey: ["todo-attachments", todoId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("todo_attachments")
+        .from("todo_attachments" as any)
         .select("*")
         .eq("todo_id", todoId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 
@@ -53,14 +53,14 @@ export function TodoAttachments({ todoId, onUpdate }: TodoAttachmentsProps) {
         .getPublicUrl(filePath);
 
       const { error: dbError } = await supabase
-        .from('todo_attachments')
+        .from('todo_attachments' as any)
         .insert({
           todo_id: todoId,
           file_name: file.name,
           file_url: filePath,
           file_size: file.size,
           mime_type: file.type,
-        });
+        } as any);
 
       if (dbError) throw dbError;
 
@@ -103,7 +103,7 @@ export function TodoAttachments({ todoId, onUpdate }: TodoAttachmentsProps) {
       if (storageError) throw storageError;
 
       const { error: dbError } = await supabase
-        .from('todo_attachments')
+        .from('todo_attachments' as any)
         .delete()
         .eq('id', attachment.id);
 

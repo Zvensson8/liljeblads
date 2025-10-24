@@ -40,13 +40,9 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
   const { data: todos, refetch } = useQuery({
     queryKey: ["property-todos", propertyId, categoryFilter, priorityFilter],
     queryFn: async () => {
-      let query = supabase
+      let query: any = supabase
         .from("property_todos")
-        .select(`
-          *,
-          subtasks:property_todos!parent_todo_id(count),
-          attachments:todo_attachments(count)
-        `)
+        .select("*")
         .eq("property_id", propertyId)
         .is("parent_todo_id", null);
 
@@ -59,12 +55,11 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
 
       query = query
         .order("completed")
-        .order("priority", { ascending: false })
         .order("due_date");
 
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 
@@ -72,7 +67,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
     queryKey: ["subtasks-list", propertyId, Array.from(expandedTodos)],
     enabled: expandedTodos.size > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("property_todos")
         .select("*")
         .in("parent_todo_id", Array.from(expandedTodos))
@@ -80,7 +75,53 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
         .order("created_at");
 
       if (error) throw error;
-      return data;
+      return data as any[];
+    },
+  });
+
+  const { data: subtaskCounts } = useQuery({
+    queryKey: ["subtask-counts", todos?.map(t => (t as any).id)],
+    enabled: !!todos && todos.length > 0,
+    queryFn: async () => {
+      if (!todos || todos.length === 0) return {};
+
+      const todoIds = todos.map(t => (t as any).id);
+      const { data, error } = await (supabase as any)
+        .from("property_todos")
+        .select("parent_todo_id")
+        .in("parent_todo_id", todoIds);
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      data?.forEach((item: any) => {
+        counts[item.parent_todo_id] = (counts[item.parent_todo_id] || 0) + 1;
+      });
+
+      return counts;
+    },
+  });
+
+  const { data: attachmentCounts } = useQuery({
+    queryKey: ["attachment-counts", todos?.map(t => (t as any).id)],
+    enabled: !!todos && todos.length > 0,
+    queryFn: async () => {
+      if (!todos || todos.length === 0) return {};
+
+      const todoIds = todos.map(t => (t as any).id);
+      const { data, error } = await (supabase as any)
+        .from("todo_attachments")
+        .select("todo_id")
+        .in("todo_id", todoIds);
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      data?.forEach((item: any) => {
+        counts[item.todo_id] = (counts[item.todo_id] || 0) + 1;
+      });
+
+      return counts;
     },
   });
 
@@ -235,11 +276,11 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
       <div className="space-y-2">
         {displayTodos && displayTodos.length > 0 ? (
           displayTodos.map((todo: any) => {
-            const hasSubtasks = (todo.subtasks?.[0]?.count || 0) > 0;
+            const hasSubtasks = (subtaskCounts?.[todo.id] || 0) > 0;
             const isExpanded = expandedTodos.has(todo.id);
             const todoSubtasks = subtasks?.filter((s: any) => s.parent_todo_id === todo.id) || [];
             const completedSubtasks = todoSubtasks.filter((s: any) => s.completed).length;
-            const hasAttachments = (todo.attachments?.[0]?.count || 0) > 0;
+            const hasAttachments = (attachmentCounts?.[todo.id] || 0) > 0;
 
             return (
               <div key={todo.id}>
