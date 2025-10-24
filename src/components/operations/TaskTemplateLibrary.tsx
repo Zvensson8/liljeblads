@@ -239,16 +239,16 @@ export function TaskTemplateLibrary({
               <div>
                 <Label htmlFor="category">Kategori</Label>
                 <Select
-                  value={form.watch("category_id") || ""}
+                  value={form.watch("category_id") || "none"}
                   onValueChange={(value) =>
-                    form.setValue("category_id", value || undefined)
+                    form.setValue("category_id", value === "none" ? undefined : value || undefined)
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Välj kategori" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Ingen kategori</SelectItem>
+                    <SelectItem value="none">Ingen kategori</SelectItem>
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}

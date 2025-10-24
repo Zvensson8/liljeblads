@@ -45,9 +45,9 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [newTodo, setNewTodo] = useState("");
-  const [newPropertyId, setNewPropertyId] = useState<string>("");
+  const [newPropertyId, setNewPropertyId] = useState<string>("none");
   const [newPriority, setNewPriority] = useState("medium");
-  const [newCategory, setNewCategory] = useState("");
+  const [newCategory, setNewCategory] = useState("none");
   const [newDueDate, setNewDueDate] = useState("");
 
   const { data: properties } = useQuery({
@@ -182,11 +182,11 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
     const { error } = await (supabase as any)
       .from("property_todos")
       .insert([{
-        property_id: newPropertyId || null,
+        property_id: newPropertyId === "none" ? null : newPropertyId || null,
         title: newTodo,
         due_date: newDueDate || null,
         priority: newPriority,
-        category: newCategory || null,
+        category: newCategory === "none" ? null : newCategory || null,
       }]);
 
     if (error) {
@@ -194,9 +194,9 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
     } else {
       toast.success("Uppgift tillagd");
       setNewTodo("");
-      setNewPropertyId("");
+      setNewPropertyId("none");
       setNewPriority("medium");
-      setNewCategory("");
+      setNewCategory("none");
       setNewDueDate("");
       refetch();
     }
@@ -266,7 +266,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                     <SelectValue placeholder="Välj fastighet (valfritt)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Ingen fastighet</SelectItem>
+                    <SelectItem value="none">Ingen fastighet</SelectItem>
                     {properties?.map((property) => (
                       <SelectItem key={property.id} value={property.id}>
                         {property.name}
@@ -279,7 +279,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                     <SelectValue placeholder="Kategori" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Ingen</SelectItem>
+                    <SelectItem value="none">Ingen</SelectItem>
                     <SelectItem value="Brandskydd">Brandskydd</SelectItem>
                     <SelectItem value="Underhåll">Underhåll</SelectItem>
                     <SelectItem value="Dokumentation">Dokumentation</SelectItem>

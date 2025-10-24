@@ -30,7 +30,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
   const [newTodo, setNewTodo] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
   const [newPriority, setNewPriority] = useState("medium");
-  const [newCategory, setNewCategory] = useState("");
+  const [newCategory, setNewCategory] = useState("none");
   const [expandedTodos, setExpandedTodos] = useState<Set<string>>(new Set());
   const [selectedTodo, setSelectedTodo] = useState<any>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -135,7 +135,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
         title: newTodo,
         due_date: newDueDate || null,
         priority: newPriority,
-        category: newCategory || null,
+        category: newCategory === "none" ? null : newCategory || null,
       }]);
 
     if (error) {
@@ -145,7 +145,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
       setNewTodo("");
       setNewDueDate("");
       setNewPriority("medium");
-      setNewCategory("");
+      setNewCategory("none");
       refetch();
     }
   };
@@ -252,7 +252,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
                 <SelectValue placeholder="Kategori" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Ingen</SelectItem>
+                <SelectItem value="none">Ingen</SelectItem>
                 <SelectItem value="Brandskydd">Brandskydd</SelectItem>
                 <SelectItem value="Underhåll">Underhåll</SelectItem>
                 <SelectItem value="Dokumentation">Dokumentation</SelectItem>

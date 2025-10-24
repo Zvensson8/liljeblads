@@ -39,7 +39,7 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
   const [notes, setNotes] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<string>("medium");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState("none");
   const [isSaving, setIsSaving] = useState(false);
 
   const { data: subtaskCount } = useQuery({
@@ -76,7 +76,7 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
       setNotes(todo.notes || "");
       setDueDate(todo.due_date || "");
       setPriority(todo.priority || "medium");
-      setCategory(todo.category || "");
+      setCategory(todo.category || "none");
     }
   }, [todo]);
 
@@ -92,7 +92,7 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
         notes,
         due_date: dueDate || null,
         priority,
-        category: category || null,
+        category: category === "none" ? null : category || null,
       })
       .eq("id", todo.id);
 
@@ -200,7 +200,7 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
                     <SelectValue placeholder="Välj kategori" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Ingen kategori</SelectItem>
+                    <SelectItem value="none">Ingen kategori</SelectItem>
                     <SelectItem value="Brandskydd">Brandskydd</SelectItem>
                     <SelectItem value="Underhåll">Underhåll</SelectItem>
                     <SelectItem value="Dokumentation">Dokumentation</SelectItem>
