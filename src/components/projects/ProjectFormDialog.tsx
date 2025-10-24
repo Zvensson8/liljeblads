@@ -156,12 +156,70 @@ export function ProjectFormDialog({
 
         if (error) throw error;
 
-        // Log the update
+        // Log the update with detailed changes
         const changes: string[] = [];
-        if (values.name !== editingProject.name) changes.push(`Namn ändrat till "${values.name}"`);
-        if (values.status !== editingProject.status) changes.push(`Status ändrad`);
-        if (values.project_manager !== editingProject.project_manager) changes.push(`Projektledare ändrad`);
-        if (values.budget !== editingProject.budget) changes.push(`Budget uppdaterad`);
+        if (values.name !== editingProject.name) {
+          changes.push(`Namn ändrat från "${editingProject.name}" till "${values.name}"`);
+        }
+        if (values.description !== editingProject.description) {
+          changes.push(`Beskrivning uppdaterad`);
+        }
+        if (values.type !== editingProject.type) {
+          const typeLabels: Record<string, string> = {
+            investering: "Investering",
+            underhall: "Underhåll",
+            energi: "Energi",
+            annat: "Annat",
+          };
+          changes.push(`Typ ändrad till ${typeLabels[values.type]}`);
+        }
+        if (values.status !== editingProject.status) {
+          const statusLabels: Record<string, string> = {
+            planerat: "Planerat",
+            invantar_offert: "Inväntar offert",
+            offert_finns: "Offert finns",
+            pagaende: "Pågående",
+            pausat: "Pausat",
+            avslutat: "Avslutat",
+          };
+          changes.push(`Status ändrad till ${statusLabels[values.status]}`);
+        }
+        if (values.project_manager !== editingProject.project_manager) {
+          if (values.project_manager && !editingProject.project_manager) {
+            changes.push(`Projektledare tillagd: ${values.project_manager}`);
+          } else if (!values.project_manager && editingProject.project_manager) {
+            changes.push(`Projektledare borttagen`);
+          } else {
+            changes.push(`Projektledare ändrad till ${values.project_manager}`);
+          }
+        }
+        if (values.budget !== editingProject.budget) {
+          changes.push(`Budget ändrad från ${editingProject.budget.toLocaleString("sv-SE")} kr till ${values.budget.toLocaleString("sv-SE")} kr`);
+        }
+        
+        const oldStartDate = editingProject.start_date ? new Date(editingProject.start_date).toISOString().split("T")[0] : null;
+        const newStartDate = values.start_date?.toISOString().split("T")[0] || null;
+        if (oldStartDate !== newStartDate) {
+          if (newStartDate && !oldStartDate) {
+            changes.push(`Startdatum satt till ${format(values.start_date!, "PPP", { locale: sv })}`);
+          } else if (!newStartDate && oldStartDate) {
+            changes.push(`Startdatum borttaget`);
+          } else if (newStartDate && oldStartDate) {
+            changes.push(`Startdatum ändrat till ${format(values.start_date!, "PPP", { locale: sv })}`);
+          }
+        }
+        
+        const oldEndDate = editingProject.end_date ? new Date(editingProject.end_date).toISOString().split("T")[0] : null;
+        const newEndDate = values.end_date?.toISOString().split("T")[0] || null;
+        if (oldEndDate !== newEndDate) {
+          if (newEndDate && !oldEndDate) {
+            changes.push(`Slutdatum satt till ${format(values.end_date!, "PPP", { locale: sv })}`);
+          } else if (!newEndDate && oldEndDate) {
+            changes.push(`Slutdatum borttaget`);
+          } else if (newEndDate && oldEndDate) {
+            changes.push(`Slutdatum ändrat till ${format(values.end_date!, "PPP", { locale: sv })}`);
+          }
+        }
 
         if (changes.length > 0) {
           await supabase.from("project_activity_log").insert({
