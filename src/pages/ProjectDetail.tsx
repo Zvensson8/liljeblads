@@ -23,6 +23,8 @@ import {
   Download,
   Home,
   Building2,
+  Mail,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -71,6 +73,7 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [sendingDraft, setSendingDraft] = useState(false);
   const { addRecentItem } = useRecentlyVisited();
 
   useEffect(() => {
@@ -180,6 +183,25 @@ export default function ProjectDetail() {
     }
   };
 
+  const handleSendOrderDraft = async () => {
+    if (!project) return;
+    
+    setSendingDraft(true);
+    try {
+      const { error } = await supabase.functions.invoke('send-project-order-draft', {
+        body: { projectId: project.id }
+      });
+      
+      if (error) throw error;
+      
+      toast.success("Beställningsutkast skickat till din e-post");
+    } catch (error: any) {
+      toast.error(error.message || "Kunde inte skicka beställningsutkast");
+    } finally {
+      setSendingDraft(false);
+    }
+  };
+
   const getStatusBadge = (status: ProjectStatus) => {
     const statusConfig = {
       planerat: { label: "Planerat", className: "bg-gray-500" },
@@ -275,6 +297,24 @@ export default function ProjectDetail() {
               <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(true)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Redigera
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleSendOrderDraft}
+                disabled={sendingDraft}
+              >
+                {sendingDraft ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Skickar...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4 mr-2" />
+                    Beställningsutkast
+                  </>
+                )}
               </Button>
               <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
                 <Download className="h-4 w-4 mr-2" />

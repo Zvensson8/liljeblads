@@ -32,7 +32,8 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Loader2, Mail } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,9 @@ export function ProjectFormDialog({
   const [properties, setProperties] = useState<{ id: string; name: string; property_number: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [userName, setUserName] = useState<string>("");
+  const [showOrderDraftOption, setShowOrderDraftOption] = useState(false);
+  const [sendingDraft, setSendingDraft] = useState(false);
+  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
 
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -241,8 +245,14 @@ export function ProjectFormDialog({
         });
 
         toast.success("Projekt skapat");
+        
+        // Visa option att skicka beställningsutkast
+        setCreatedProjectId(project.id);
+        setShowOrderDraftOption(true);
+        return; // Stanna här och visa optionen
       }
 
+      // Vid uppdatering, stäng direkt
       form.reset();
       onOpenChange(false);
       onSuccess();
@@ -251,6 +261,38 @@ export function ProjectFormDialog({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSendOrderDraft = async () => {
+    if (!createdProjectId) return;
+    
+    setSendingDraft(true);
+    try {
+      const { error } = await supabase.functions.invoke('send-project-order-draft', {
+        body: { projectId: createdProjectId }
+      });
+      
+      if (error) throw error;
+      
+      toast.success("Beställningsutkast skickat till din e-post");
+      setShowOrderDraftOption(false);
+      setCreatedProjectId(null);
+      form.reset();
+      onOpenChange(false);
+      onSuccess();
+    } catch (error: any) {
+      toast.error(error.message || "Kunde inte skicka beställningsutkast");
+    } finally {
+      setSendingDraft(false);
+    }
+  };
+
+  const handleSkipDraft = () => {
+    setShowOrderDraftOption(false);
+    setCreatedProjectId(null);
+    form.reset();
+    onOpenChange(false);
+    onSuccess();
   };
 
   return (
@@ -524,17 +566,58 @@ export function ProjectFormDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={loading}
+                disabled={loading || showOrderDraftOption}
               >
                 Avbryt
               </Button>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading || showOrderDraftOption}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Skapa projekt
+                {editingProject ? 'Uppdatera projekt' : 'Skapa projekt'}
               </Button>
             </DialogFooter>
           </form>
         </Form>
+
+        {showOrderDraftOption && (
+          <div className="px-6 pb-6">
+            <Alert>
+              <Mail className="h-4 w-4" />
+              <AlertTitle>Vill du skicka ett beställningsutkast?</AlertTitle>
+              <AlertDescription className="space-y-3">
+                <p className="text-sm">Ett e-postutkast med all projektinformation skickas till dig som du kan redigera och vidarebefodra.</p>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleSendOrderDraft} 
+                    disabled={sendingDraft}
+                    size="sm"
+                    type="button"
+                  >
+                    {sendingDraft ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Skickar...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-4 w-4 mr-2" />
+                        Skicka beställningsutkast
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleSkipDraft}
+                    size="sm"
+                    type="button"
+                    disabled={sendingDraft}
+                  >
+                    Hoppa över
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
