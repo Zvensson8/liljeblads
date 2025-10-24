@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get authorization header
+    // Get authorization header and extract JWT token
     const authHeader = req.headers.get('Authorization');
     console.log('Authorization header present:', !!authHeader);
     
@@ -34,33 +34,22 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Extract JWT token from Bearer header
+    const jwt = authHeader.replace('Bearer ', '');
+
     // Create client with service role to bypass RLS for data export
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // Create a separate client with user's auth to verify permissions
-    const userClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    );
-
-    // Get the user
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser();
+    // Verify JWT token and get user
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(jwt);
 
     if (userError || !user) {
       console.error('Auth error:', userError);
       return new Response(
-        JSON.stringify({ error: 'Unauthorized: ' + (userError?.message || 'Unknown error') }),
+        JSON.stringify({ error: 'Unauthorized: ' + (userError?.message || 'Invalid token') }),
         {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
