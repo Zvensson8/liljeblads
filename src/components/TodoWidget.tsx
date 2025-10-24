@@ -3,7 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckSquare, Calendar as CalendarIcon, Paperclip } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CheckSquare, Calendar as CalendarIcon, Paperclip, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -41,6 +44,23 @@ interface TodoWidgetProps {
 export function TodoWidget({ propertyId }: TodoWidgetProps) {
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [newTodo, setNewTodo] = useState("");
+  const [newPropertyId, setNewPropertyId] = useState<string>("");
+  const [newPriority, setNewPriority] = useState("medium");
+  const [newCategory, setNewCategory] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
+
+  const { data: properties } = useQuery({
+    queryKey: ["properties-for-todos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: todos, isLoading, refetch } = useQuery({
     queryKey: ["todos-widget", propertyId],
@@ -156,6 +176,46 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
     setDetailDialogOpen(true);
   };
 
+  const handleAddTodo = async () => {
+    if (!newTodo.trim()) return;
+
+    const { error } = await (supabase as any)
+      .from("property_todos")
+      .insert([{
+        property_id: newPropertyId || null,
+        title: newTodo,
+        due_date: newDueDate || null,
+        priority: newPriority,
+        category: newCategory || null,
+      }]);
+
+    if (error) {
+      toast.error("Kunde inte lägga till uppgift");
+    } else {
+      toast.success("Uppgift tillagd");
+      setNewTodo("");
+      setNewPropertyId("");
+      setNewPriority("medium");
+      setNewCategory("");
+      setNewDueDate("");
+      refetch();
+    }
+  };
+
+  const handleDeleteTodo = async (id: string) => {
+    const { error } = await (supabase as any)
+      .from("property_todos")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Kunde inte ta bort uppgift");
+    } else {
+      toast.success("Uppgift borttagen");
+      refetch();
+    }
+  };
+
   const groupedByCategory = (todos || []).reduce((acc: Record<string, any[]>, todo: any) => {
     const category = todo.category || "Okategoriserad";
     if (!acc[category]) {
@@ -176,7 +236,70 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
             </CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Add Todo Form */}
+          {!propertyId && (
+            <div className="space-y-2 pb-4 border-b">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Ny uppgift..."
+                  value={newTodo}
+                  onChange={(e) => setNewTodo(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleAddTodo()}
+                  className="flex-1"
+                />
+                <Select value={newPriority} onValueChange={setNewPriority}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Låg</SelectItem>
+                    <SelectItem value="medium">Medel</SelectItem>
+                    <SelectItem value="high">Hög</SelectItem>
+                    <SelectItem value="critical">Kritisk</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2">
+                <Select value={newPropertyId} onValueChange={setNewPropertyId}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Välj fastighet (valfritt)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Ingen fastighet</SelectItem>
+                    {properties?.map((property) => (
+                      <SelectItem key={property.id} value={property.id}>
+                        {property.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={newCategory} onValueChange={setNewCategory}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Ingen</SelectItem>
+                    <SelectItem value="Brandskydd">Brandskydd</SelectItem>
+                    <SelectItem value="Underhåll">Underhåll</SelectItem>
+                    <SelectItem value="Dokumentation">Dokumentation</SelectItem>
+                    <SelectItem value="Besiktning">Besiktning</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="date"
+                  value={newDueDate}
+                  onChange={(e) => setNewDueDate(e.target.value)}
+                  className="w-40"
+                />
+                <Button onClick={handleAddTodo} disabled={!newTodo.trim()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Lägg till
+                </Button>
+              </div>
+            </div>
+          )}
+
           {isLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -203,8 +326,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                         return (
                           <div
                             key={todo.id}
-                            className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
-                            onClick={() => openDetailDialog(todo)}
+                            className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                           >
                             <div onClick={(e) => e.stopPropagation()}>
                               <Checkbox
@@ -212,7 +334,10 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                                 onCheckedChange={() => handleToggleComplete(todo.id, todo.completed)}
                               />
                             </div>
-                            <div className="flex-1 min-w-0 space-y-2">
+                            <div 
+                              className="flex-1 min-w-0 space-y-2 cursor-pointer"
+                              onClick={() => openDetailDialog(todo)}
+                            >
                               <div className="flex items-start gap-2 flex-wrap">
                                 <p className={cn(
                                   "text-sm flex-1",
@@ -226,9 +351,11 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                                 </div>
                               </div>
 
-                              <div className="text-xs text-muted-foreground truncate">
-                                {todo.properties?.name}
-                              </div>
+                              {todo.properties?.name && (
+                                <div className="text-xs text-muted-foreground truncate">
+                                  📍 {todo.properties?.name}
+                                </div>
+                              )}
 
                               {todo.due_date && (
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -244,6 +371,18 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                                 />
                               )}
                             </div>
+                            
+                            {!propertyId && (
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteTodo(todo.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
