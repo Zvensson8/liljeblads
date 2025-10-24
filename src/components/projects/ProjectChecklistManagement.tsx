@@ -3,10 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
-import { CheckCircle2, Circle, Calendar } from "lucide-react";
+import { CheckCircle2, Circle, Calendar, Plus, ListTodo, CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ChecklistItem {
   id: string;
@@ -20,13 +26,21 @@ interface ChecklistItem {
 
 interface ProjectChecklistManagementProps {
   projectId: string;
+  propertyId: string;
 }
 
 export function ProjectChecklistManagement({
   projectId,
+  propertyId,
 }: ProjectChecklistManagementProps) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newResponsible, setNewResponsible] = useState("");
+  const [newDeadline, setNewDeadline] = useState<Date>();
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchChecklistItems();
@@ -68,11 +82,85 @@ export function ProjectChecklistManagement({
         )
       );
 
+      // Log activity
+      await supabase.from("project_activity_log").insert({
+        project_id: projectId,
+        activity_type: "checklist_update",
+        description: `Checklistpunkt "${item.title}" markerad som ${!item.completed ? "klar" : "ej klar"}`,
+      });
+
       toast.success(
         !item.completed ? "Markerad som klar" : "Markerad som ej klar"
       );
     } catch (error: any) {
       toast.error("Kunde inte uppdatera checklista");
+    }
+  };
+
+  const handleAddItem = async () => {
+    if (!newTitle.trim()) {
+      toast.error("Titel krävs");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const maxOrder = items.length > 0 ? Math.max(...items.map(i => i.order_index)) : 0;
+      
+      const { data, error } = await supabase
+        .from("project_checklist_items")
+        .insert({
+          project_id: projectId,
+          title: newTitle,
+          description: newDescription || null,
+          responsible: newResponsible || null,
+          deadline: newDeadline ? newDeadline.toISOString().split("T")[0] : null,
+          order_index: maxOrder + 1,
+          completed: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setItems(prev => [...prev, data]);
+
+      // Log activity
+      await supabase.from("project_activity_log").insert({
+        project_id: projectId,
+        activity_type: "checklist_update",
+        description: `Ny checklistpunkt tillagd: "${newTitle}"`,
+      });
+
+      toast.success("Checklistpunkt tillagd");
+      setAddDialogOpen(false);
+      setNewTitle("");
+      setNewDescription("");
+      setNewResponsible("");
+      setNewDeadline(undefined);
+    } catch (error: any) {
+      toast.error("Kunde inte lägga till checklistpunkt");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAddToPropertyTodos = async (item: ChecklistItem) => {
+    try {
+      const { error } = await supabase
+        .from("property_todos")
+        .insert({
+          property_id: propertyId,
+          title: item.title,
+          due_date: item.deadline,
+          completed: false,
+        });
+
+      if (error) throw error;
+
+      toast.success("Tillagd i att göra-listan");
+    } catch (error: any) {
+      toast.error("Kunde inte lägga till i att göra-listan");
     }
   };
 
@@ -99,9 +187,15 @@ export function ProjectChecklistManagement({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Framsteg</h3>
-          <span className="text-sm text-muted-foreground">
-            {completedCount} av {totalCount} klara
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">
+              {completedCount} av {totalCount} klara
+            </span>
+            <Button size="sm" onClick={() => setAddDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Lägg till punkt
+            </Button>
+          </div>
         </div>
         <Progress value={progress} className="h-2" />
       </div>
@@ -179,11 +273,101 @@ export function ProjectChecklistManagement({
                     </span>
                   )}
                 </div>
+
+                <div className="mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleAddToPropertyTodos(item)}
+                    disabled={item.completed}
+                  >
+                    <ListTodo className="h-4 w-4 mr-2" />
+                    Lägg till i att göra-lista
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Add Item Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lägg till checklistpunkt</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Titel *</label>
+              <Input
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="T.ex. Granska ritningar"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Beskrivning</label>
+              <Textarea
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                placeholder="Detaljerad beskrivning..."
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Ansvarig</label>
+              <Input
+                value={newResponsible}
+                onChange={(e) => setNewResponsible(e.target.value)}
+                placeholder="Namn på ansvarig"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Deadline</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !newDeadline && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newDeadline ? format(newDeadline, "PPP", { locale: sv }) : "Välj datum"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={newDeadline}
+                    onSelect={setNewDeadline}
+                    locale={sv}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAddDialogOpen(false)}
+              disabled={submitting}
+            >
+              Avbryt
+            </Button>
+            <Button onClick={handleAddItem} disabled={submitting}>
+              {submitting ? "Lägger till..." : "Lägg till"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -126,6 +126,13 @@ export default function ProjectDetail() {
 
       if (error) throw error;
 
+      // Log activity
+      await supabase.from("project_activity_log").insert({
+        project_id: project.id,
+        activity_type: "status_change",
+        description: "Projekt arkiverat",
+      });
+
       toast.success("Projekt arkiverat");
       navigate("/projects");
     } catch (error: any) {
@@ -143,6 +150,13 @@ export default function ProjectDetail() {
         .eq("id", project.id);
 
       if (error) throw error;
+
+      // Log activity
+      await supabase.from("project_activity_log").insert({
+        project_id: project.id,
+        activity_type: "status_change",
+        description: "Projekt återaktiverat",
+      });
 
       toast.success("Projekt återaktiverat");
       fetchProject();
@@ -494,7 +508,10 @@ export default function ProjectDetail() {
                       <CardTitle>Dokument</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <ProjectDocuments projectId={project.id} />
+                      <ProjectDocuments 
+                        projectId={project.id} 
+                        onDocumentUpload={fetchProject}
+                      />
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -505,7 +522,10 @@ export default function ProjectDetail() {
                       <CardTitle>Checklista</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <ProjectChecklistManagement projectId={project.id} />
+                      <ProjectChecklistManagement 
+                        projectId={project.id}
+                        propertyId={project.property_id}
+                      />
                     </CardContent>
                   </Card>
                 </TabsContent>

@@ -1,15 +1,25 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -18,17 +28,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import {
-  Activity,
+  Plus,
   FileText,
   DollarSign,
   CheckSquare,
   AlertCircle,
   Archive,
   RefreshCw,
-  Plus,
+  Activity,
+  Edit,
+  Trash2,
 } from "lucide-react";
 
 interface ActivityLogEntry {
@@ -49,8 +62,10 @@ const activityIcons = {
   cost_updated: DollarSign,
   cost_deleted: DollarSign,
   document_added: FileText,
+  document_upload: FileText,
   document_deleted: FileText,
   checklist_updated: CheckSquare,
+  checklist_update: CheckSquare,
   archived: Archive,
   reactivated: RefreshCw,
   budget_updated: DollarSign,
@@ -63,8 +78,10 @@ const activityColors = {
   cost_updated: "text-yellow-600 bg-yellow-100",
   cost_deleted: "text-red-600 bg-red-100",
   document_added: "text-purple-600 bg-purple-100",
+  document_upload: "text-purple-600 bg-purple-100",
   document_deleted: "text-red-600 bg-red-100",
   checklist_updated: "text-blue-600 bg-blue-100",
+  checklist_update: "text-blue-600 bg-blue-100",
   archived: "text-gray-600 bg-gray-100",
   reactivated: "text-green-600 bg-green-100",
   budget_updated: "text-orange-600 bg-orange-100",
@@ -78,6 +95,10 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
   const [newActivityType, setNewActivityType] = useState("manual_entry");
   const [newActivityDescription, setNewActivityDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<ActivityLogEntry | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchActivities();
@@ -127,6 +148,55 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
       toast.error("Kunde inte lägga till aktivitet");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleEditActivity = async () => {
+    if (!editingActivity || !editingActivity.description.trim()) {
+      toast.error("Beskrivning krävs");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from("project_activity_log")
+        .update({
+          activity_type: editingActivity.activity_type,
+          description: editingActivity.description,
+        })
+        .eq("id", editingActivity.id);
+
+      if (error) throw error;
+
+      toast.success("Aktivitet uppdaterad");
+      setEditDialogOpen(false);
+      setEditingActivity(null);
+      fetchActivities();
+    } catch (error: any) {
+      toast.error("Kunde inte uppdatera aktivitet");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteActivity = async () => {
+    if (!activityToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("project_activity_log")
+        .delete()
+        .eq("id", activityToDelete);
+
+      if (error) throw error;
+
+      toast.success("Aktivitet raderad");
+      setDeleteDialogOpen(false);
+      setActivityToDelete(null);
+      fetchActivities();
+    } catch (error: any) {
+      toast.error("Kunde inte radera aktivitet");
     }
   };
 
@@ -187,7 +257,7 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
                   {/* Content */}
                   <div className="flex-1 pt-1">
                     <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-1">
+                      <div className="flex-1 space-y-1">
                         <p className="font-medium">{activity.description}</p>
                         <p className="text-sm text-muted-foreground">
                           {format(
@@ -196,6 +266,28 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
                             { locale: sv }
                           )}
                         </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingActivity(activity);
+                            setEditDialogOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setActivityToDelete(activity.id);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
 
@@ -265,6 +357,96 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Activity Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Redigera aktivitet</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Typ</Label>
+              <Select
+                value={editingActivity?.activity_type}
+                onValueChange={(value) =>
+                  setEditingActivity(
+                    editingActivity
+                      ? { ...editingActivity, activity_type: value }
+                      : null
+                  )
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual_entry">Allmän anteckning</SelectItem>
+                  <SelectItem value="status_change">Statusändring</SelectItem>
+                  <SelectItem value="budget_updated">Budgetändring</SelectItem>
+                  <SelectItem value="document_added">Dokument tillagt</SelectItem>
+                  <SelectItem value="document_upload">Dokument uppladdad</SelectItem>
+                  <SelectItem value="checklist_updated">Checklista uppdaterad</SelectItem>
+                  <SelectItem value="checklist_update">Checklista uppdaterad</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Beskrivning</Label>
+              <Textarea
+                value={editingActivity?.description || ""}
+                onChange={(e) =>
+                  setEditingActivity(
+                    editingActivity
+                      ? { ...editingActivity, description: e.target.value }
+                      : null
+                  )
+                }
+                placeholder="Beskriv aktiviteten..."
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditDialogOpen(false);
+                setEditingActivity(null);
+              }}
+              disabled={submitting}
+            >
+              Avbryt
+            </Button>
+            <Button onClick={handleEditActivity} disabled={submitting}>
+              {submitting ? "Sparar..." : "Spara"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Radera aktivitet?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Är du säker på att du vill radera denna aktivitet? Detta går inte att ångra.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setActivityToDelete(null)}>
+              Avbryt
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteActivity}>
+              Radera
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

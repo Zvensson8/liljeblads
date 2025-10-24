@@ -155,6 +155,22 @@ export function ProjectFormDialog({
           .eq("id", editingProject.id);
 
         if (error) throw error;
+
+        // Log the update
+        const changes: string[] = [];
+        if (values.name !== editingProject.name) changes.push(`Namn ändrat till "${values.name}"`);
+        if (values.status !== editingProject.status) changes.push(`Status ändrad`);
+        if (values.project_manager !== editingProject.project_manager) changes.push(`Projektledare ändrad`);
+        if (values.budget !== editingProject.budget) changes.push(`Budget uppdaterad`);
+
+        if (changes.length > 0) {
+          await supabase.from("project_activity_log").insert({
+            project_id: editingProject.id,
+            activity_type: "status_change",
+            description: `Projekt uppdaterat: ${changes.join(", ")}`,
+          });
+        }
+
         toast.success("Projekt uppdaterat");
       } else {
         const { data: project, error } = await supabase

@@ -33,6 +33,7 @@ import { DocumentUploadZone } from "@/components/documents/DocumentUploadZone";
 
 interface ProjectDocumentsProps {
   projectId: string;
+  onDocumentUpload?: () => void;
 }
 
 interface Document {
@@ -56,7 +57,7 @@ const FOLDERS = [
   "Kommunikation",
 ];
 
-export function ProjectDocuments({ projectId }: ProjectDocumentsProps) {
+export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumentsProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -139,9 +140,20 @@ export function ProjectDocuments({ projectId }: ProjectDocumentsProps) {
 
       if (dbError) throw dbError;
 
+      // Log activity
+      await supabase.from("project_activity_log").insert({
+        project_id: projectId,
+        activity_type: "document_upload",
+        description: `Dokument uppladdad: "${file.name}" i mappen "${selectedFolder}"${nextVersion > 1 ? ` (version ${nextVersion})` : ""}`,
+      });
+
       toast.success(nextVersion > 1 ? `Ny version (v${nextVersion}) uppladdad` : "Dokument uppladdat");
       setUploadDialogOpen(false);
       fetchDocuments();
+      
+      if (onDocumentUpload) {
+        onDocumentUpload();
+      }
     } catch (error: any) {
       console.error("Upload error:", error);
       toast.error(`Kunde inte ladda upp dokument: ${error.message}`);
