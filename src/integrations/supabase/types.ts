@@ -1877,52 +1877,76 @@ export type Database = {
           created_at: string | null
           id: string
           maintenance_history_annual: boolean | null
+          maintenance_history_frequency: string | null
           maintenance_history_previewed: boolean | null
+          maintenance_history_time: string | null
           maintenance_reminders: boolean | null
+          maintenance_reminders_frequency: string | null
           maintenance_reminders_previewed: boolean | null
+          maintenance_reminders_time: string | null
           monthly_project_summary: boolean | null
           monthly_workorder_summary: boolean | null
           notification_email: string | null
           organization_id: string
           preferred_day: string | null
+          project_summary_frequency: string | null
           project_summary_previewed: boolean | null
+          project_summary_time: string | null
           updated_at: string | null
           user_id: string
+          workorder_summary_frequency: string | null
           workorder_summary_previewed: boolean | null
+          workorder_summary_time: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
           maintenance_history_annual?: boolean | null
+          maintenance_history_frequency?: string | null
           maintenance_history_previewed?: boolean | null
+          maintenance_history_time?: string | null
           maintenance_reminders?: boolean | null
+          maintenance_reminders_frequency?: string | null
           maintenance_reminders_previewed?: boolean | null
+          maintenance_reminders_time?: string | null
           monthly_project_summary?: boolean | null
           monthly_workorder_summary?: boolean | null
           notification_email?: string | null
           organization_id: string
           preferred_day?: string | null
+          project_summary_frequency?: string | null
           project_summary_previewed?: boolean | null
+          project_summary_time?: string | null
           updated_at?: string | null
           user_id: string
+          workorder_summary_frequency?: string | null
           workorder_summary_previewed?: boolean | null
+          workorder_summary_time?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
           maintenance_history_annual?: boolean | null
+          maintenance_history_frequency?: string | null
           maintenance_history_previewed?: boolean | null
+          maintenance_history_time?: string | null
           maintenance_reminders?: boolean | null
+          maintenance_reminders_frequency?: string | null
           maintenance_reminders_previewed?: boolean | null
+          maintenance_reminders_time?: string | null
           monthly_project_summary?: boolean | null
           monthly_workorder_summary?: boolean | null
           notification_email?: string | null
           organization_id?: string
           preferred_day?: string | null
+          project_summary_frequency?: string | null
           project_summary_previewed?: boolean | null
+          project_summary_time?: string | null
           updated_at?: string | null
           user_id?: string
+          workorder_summary_frequency?: string | null
           workorder_summary_previewed?: boolean | null
+          workorder_summary_time?: string | null
         }
         Relationships: [
           {

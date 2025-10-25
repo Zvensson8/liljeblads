@@ -12,6 +12,14 @@ export interface UserNotificationPreferences {
   workorder_summary_previewed: boolean;
   maintenance_reminders_previewed: boolean;
   maintenance_history_previewed: boolean;
+  project_summary_frequency: string;
+  project_summary_time: string;
+  workorder_summary_frequency: string;
+  workorder_summary_time: string;
+  maintenance_reminders_frequency: string;
+  maintenance_reminders_time: string;
+  maintenance_history_frequency: string;
+  maintenance_history_time: string;
   created_at: string;
   updated_at: string;
 }
