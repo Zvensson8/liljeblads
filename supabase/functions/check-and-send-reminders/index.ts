@@ -19,6 +19,14 @@ interface UserPreferences {
   workorder_summary_previewed: boolean;
   maintenance_reminders_previewed: boolean;
   maintenance_history_previewed: boolean;
+  project_summary_frequency: string;
+  project_summary_time: string;
+  workorder_summary_frequency: string;
+  workorder_summary_time: string;
+  maintenance_reminders_frequency: string;
+  maintenance_reminders_time: string;
+  maintenance_history_frequency: string;
+  maintenance_history_time: string;
   profiles: {
     email: string;
   };
@@ -57,6 +65,14 @@ serve(async (req) => {
         workorder_summary_previewed,
         maintenance_reminders_previewed,
         maintenance_history_previewed,
+        project_summary_frequency,
+        project_summary_time,
+        workorder_summary_frequency,
+        workorder_summary_time,
+        maintenance_reminders_frequency,
+        maintenance_reminders_time,
+        maintenance_history_frequency,
+        maintenance_history_time,
         profiles!inner(email)
       `);
 
@@ -74,11 +90,35 @@ serve(async (req) => {
     for (const pref of typedPrefs) {
       const userEmail = pref.notification_email || pref.profiles.email;
 
-      // Check maintenance reminders (every Monday)
+      // Helper function to check if it's time to send based on frequency
+      const shouldSendBasedOnFrequency = (frequency: string, scheduledTime: string): boolean => {
+        // Check if time matches (within 5 minute window)
+        const [schedHour, schedMin] = scheduledTime.split(':').map(Number);
+        const scheduleMinutes = schedHour * 60 + schedMin;
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const timeDiff = Math.abs(currentMinutes - scheduleMinutes);
+        
+        if (timeDiff > 5) return false; // Not within time window
+
+        switch (frequency) {
+          case 'daily':
+            return true;
+          case 'weekly':
+            return dayOfWeek === 1; // Monday
+          case 'monthly':
+            return dayOfMonth <= 7 && pref.preferred_day === getDayName(dayOfWeek); // First week, preferred day
+          case 'yearly':
+            return month === 0 && dayOfMonth === 1; // January 1st
+          default:
+            return false;
+        }
+      };
+
+      // Check maintenance reminders
       if (
-        dayOfWeek === 1 &&
         pref.maintenance_reminders &&
-        pref.maintenance_reminders_previewed
+        pref.maintenance_reminders_previewed &&
+        shouldSendBasedOnFrequency(pref.maintenance_reminders_frequency, pref.maintenance_reminders_time)
       ) {
         try {
           const response = await fetch(`${supabaseUrl}/functions/v1/send-maintenance-reminders`, {
@@ -105,72 +145,73 @@ serve(async (req) => {
         }
       }
 
-      // Check monthly reports (first Monday of the month, or preferred day)
-      const isFirstWeekOfMonth = dayOfMonth <= 7;
-      const dayMatches = pref.preferred_day === getDayName(dayOfWeek);
-
-      if (isFirstWeekOfMonth && dayMatches) {
-        // Project summary
-        if (pref.monthly_project_summary && pref.project_summary_previewed) {
-          try {
-            const response = await fetch(`${supabaseUrl}/functions/v1/send-monthly-project-summary`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseKey}`
-              },
-              body: JSON.stringify({
-                userId: pref.user_id,
-                userEmail,
-                organizationId: pref.organization_id
-              })
-            });
-            
-            if (response.ok) {
-              totalSent++;
-              results.push({ user: userEmail, report: 'project_summary', status: 'sent' });
-              console.log(`Sent project summary to ${userEmail}`);
-            }
-          } catch (error) {
-            console.error(`Failed to send project summary to ${userEmail}:`, error);
-            results.push({ user: userEmail, report: 'project_summary', status: 'failed' });
+      // Check project summary
+      if (
+        pref.monthly_project_summary &&
+        pref.project_summary_previewed &&
+        shouldSendBasedOnFrequency(pref.project_summary_frequency, pref.project_summary_time)
+      ) {
+        try {
+          const response = await fetch(`${supabaseUrl}/functions/v1/send-monthly-project-summary`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseKey}`
+            },
+            body: JSON.stringify({
+              userId: pref.user_id,
+              userEmail,
+              organizationId: pref.organization_id
+            })
+          });
+          
+          if (response.ok) {
+            totalSent++;
+            results.push({ user: userEmail, report: 'project_summary', status: 'sent' });
+            console.log(`Sent project summary to ${userEmail}`);
           }
-        }
-
-        // Work order summary
-        if (pref.monthly_workorder_summary && pref.workorder_summary_previewed) {
-          try {
-            const response = await fetch(`${supabaseUrl}/functions/v1/send-monthly-workorder-summary`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseKey}`
-              },
-              body: JSON.stringify({
-                userId: pref.user_id,
-                userEmail,
-                organizationId: pref.organization_id
-              })
-            });
-            
-            if (response.ok) {
-              totalSent++;
-              results.push({ user: userEmail, report: 'workorder_summary', status: 'sent' });
-              console.log(`Sent work order summary to ${userEmail}`);
-            }
-          } catch (error) {
-            console.error(`Failed to send work order summary to ${userEmail}:`, error);
-            results.push({ user: userEmail, report: 'workorder_summary', status: 'failed' });
-          }
+        } catch (error) {
+          console.error(`Failed to send project summary to ${userEmail}:`, error);
+          results.push({ user: userEmail, report: 'project_summary', status: 'failed' });
         }
       }
 
-      // Check annual maintenance history (January 1st)
+      // Check work order summary
       if (
-        month === 0 &&
-        dayOfMonth === 1 &&
+        pref.monthly_workorder_summary &&
+        pref.workorder_summary_previewed &&
+        shouldSendBasedOnFrequency(pref.workorder_summary_frequency, pref.workorder_summary_time)
+      ) {
+        try {
+          const response = await fetch(`${supabaseUrl}/functions/v1/send-monthly-workorder-summary`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseKey}`
+            },
+            body: JSON.stringify({
+              userId: pref.user_id,
+              userEmail,
+              organizationId: pref.organization_id
+            })
+          });
+          
+          if (response.ok) {
+            totalSent++;
+            results.push({ user: userEmail, report: 'workorder_summary', status: 'sent' });
+            console.log(`Sent work order summary to ${userEmail}`);
+          }
+        } catch (error) {
+          console.error(`Failed to send work order summary to ${userEmail}:`, error);
+          results.push({ user: userEmail, report: 'workorder_summary', status: 'failed' });
+        }
+      }
+
+      // Check annual maintenance history
+      if (
         pref.maintenance_history_annual &&
-        pref.maintenance_history_previewed
+        pref.maintenance_history_previewed &&
+        shouldSendBasedOnFrequency(pref.maintenance_history_frequency, pref.maintenance_history_time)
       ) {
         try {
           const response = await fetch(`${supabaseUrl}/functions/v1/send-maintenance-history-annual`, {
