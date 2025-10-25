@@ -97,11 +97,11 @@ export function AppSidebar() {
               <KeyboardShortcutsDialog />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" className="hover:bg-accent">
                     <UserCog className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="z-50">
                   <DropdownMenuItem onClick={() => window.location.href = '/user/settings'}>
                     <UserCog className="h-4 w-4 mr-2" />
                     Mina inställningar
