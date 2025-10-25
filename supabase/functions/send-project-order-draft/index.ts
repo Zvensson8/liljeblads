@@ -150,7 +150,7 @@ const handler = async (req: Request): Promise<Response> => {
     
     <div class="section">
       <p><strong>Fakturering sker till:</strong></p>
-      <p>${project.property.invoice_address || project.property.address || 'Ej angiven'}</p>
+      <p style="white-space: pre-line;">${project.property.invoice_address || project.property.address || 'Ej angiven'}</p>
       
       <p><strong>Märkning:</strong> ${project.property.property_number || 'Ej angivet'} + Kontonummer</p>
       <p><strong>Faktura skickas till:</strong> scanning@retta.se</p>
