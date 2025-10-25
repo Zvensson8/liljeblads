@@ -30,6 +30,8 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { useRecentlyVisited } from '@/hooks/useRecentlyVisited';
 import { PropertyTechnicalInfo } from '@/components/property-info/PropertyTechnicalInfo';
 import { PropertyInfoCategoryManager } from '@/components/property-info/PropertyInfoCategoryManager';
+import { AppSidebar } from '@/components/AppSidebar';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 
 interface Property {
   id: string;
@@ -384,74 +386,80 @@ const PropertyDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-6 py-4">
-          <Breadcrumb className="mb-4">
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/" className="flex items-center gap-1">
-                  <Home className="h-3 w-3" />
-                  Dashboard
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/properties">Fastigheter</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>{property.name}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/properties')}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Tillbaka
-              </Button>
-              <div className="h-8 w-px bg-border hidden sm:block" />
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold">{property.name}</h1>
-                  <p className="text-sm text-muted-foreground">
-                    {property.property_number ? `#${property.property_number}` : `#${property.id.substring(0, 5).toUpperCase()}`}
-                  </p>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background">
+        <AppSidebar />
+        <SidebarInset className="flex-1">
+          <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="container mx-auto px-6 py-4">
+              <div className="flex items-center gap-4 mb-4">
+                <SidebarTrigger className="md:hidden" />
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem>
+                      <BreadcrumbLink href="/" className="flex items-center gap-1">
+                        <Home className="h-3 w-3" />
+                        Dashboard
+                      </BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbLink href="/properties">Fastigheter</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage>{property.name}</BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full">
+                  <Button variant="ghost" size="sm" onClick={() => navigate('/properties')}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Tillbaka
+                  </Button>
+                  <div className="h-8 w-px bg-border hidden sm:block" />
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
+                    <div>
+                      <h1 className="text-xl sm:text-2xl font-bold">{property.name}</h1>
+                      <p className="text-sm text-muted-foreground">
+                        {property.property_number ? `#${property.property_number}` : `#${property.id.substring(0, 5).toUpperCase()}`}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {urgentWorkOrders > 0 && (
+                        <Badge variant="destructive" className="gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {urgentWorkOrders} brådskande
+                        </Badge>
+                      )}
+                      {overdueTodos > 0 && (
+                        <Badge variant="outline" className="gap-1 border-orange-500 text-orange-500">
+                          <AlertCircle className="h-3 w-3" />
+                          {overdueTodos} överfälliga
+                        </Badge>
+                      )}
+                      {urgentWorkOrders === 0 && overdueTodos === 0 && (
+                        <Badge variant="outline" className="gap-1 border-green-500 text-green-500">
+                          ✓ Allt OK
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {urgentWorkOrders > 0 && (
-                    <Badge variant="destructive" className="gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {urgentWorkOrders} brådskande
-                    </Badge>
-                  )}
-                  {overdueTodos > 0 && (
-                    <Badge variant="outline" className="gap-1 border-orange-500 text-orange-500">
-                      <AlertCircle className="h-3 w-3" />
-                      {overdueTodos} överfälliga
-                    </Badge>
-                  )}
-                  {urgentWorkOrders === 0 && overdueTodos === 0 && (
-                    <Badge variant="outline" className="gap-1 border-green-500 text-green-500">
-                      ✓ Allt OK
-                    </Badge>
-                  )}
-                </div>
+                <Button className="gap-2 w-full sm:w-auto" onClick={() => setEditDialogOpen(true)}>
+                  <Edit className="h-4 w-4" />
+                  <span className="hidden sm:inline">Redigera Fastighet</span>
+                  <span className="sm:hidden">Redigera</span>
+                </Button>
               </div>
             </div>
-            <Button className="gap-2 w-full sm:w-auto" onClick={() => setEditDialogOpen(true)}>
-              <Edit className="h-4 w-4" />
-              <span className="hidden sm:inline">Redigera Fastighet</span>
-              <span className="sm:hidden">Redigera</span>
-            </Button>
-          </div>
-        </div>
-      </header>
+          </header>
 
-      {/* Tabs Navigation - Sticky under header */}
-      <div className="sticky top-[73px] z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-6">
+          {/* Tabs Navigation - Sticky under header */}
+          <div className="sticky top-[73px] z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="container mx-auto px-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="h-12 w-full justify-start rounded-none border-0 bg-transparent p-0">
               <TabsTrigger value="overview" className="gap-2">
@@ -499,12 +507,13 @@ const PropertyDetail = () => {
                 <Settings className="h-4 w-4" />
                 Teknisk info
               </TabsTrigger>
-            </TabsList>
-          </Tabs>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
-      </div>
 
-      <main className="container mx-auto px-6 py-8">
+        {/* Main Content */}
+        <main className="container mx-auto px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           {/* Overview Tab */}
           <TabsContent value="overview">
@@ -904,7 +913,9 @@ const PropertyDetail = () => {
           setWorkOrderDialogOpen(false);
         }}
       />
-    </div>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
   );
 };
 
