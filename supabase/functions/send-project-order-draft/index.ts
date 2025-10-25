@@ -19,25 +19,38 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
-        },
-      }
-    );
-
     const { projectId }: ProjectOrderRequest = await req.json();
 
     if (!projectId) {
       throw new Error("Project ID är obligatoriskt");
     }
 
-    // Hämta användare
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    // Använd service role key för att kunna läsa data
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Hämta användare från authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Ingen authorization header");
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    );
+
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) {
+      console.error("User error:", userError);
       throw new Error("Användare inte inloggad");
     }
 
