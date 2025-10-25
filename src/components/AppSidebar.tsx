@@ -36,13 +36,6 @@ const navigationItems = [
 
 export function AppSidebar() {
   const isMobile = useIsMobile();
-  
-  // Hide sidebar on mobile - use bottom navigation instead
-  // IMPORTANT: Early return MUST come before other hooks to avoid React hooks violation
-  if (isMobile) {
-    return null;
-  }
-  
   const { state } = useSidebar();
   const { signOut, user } = useAuth();
   const { organization, loading: orgLoading } = useOrganization();
@@ -68,6 +61,11 @@ export function AppSidebar() {
     
     setIsFounder(!!data);
   };
+
+  // Hide sidebar on mobile - use bottom navigation instead
+  if (isMobile) {
+    return null;
+  }
 
   // Använd organisationens namn eller fallback till NavRitning
   const appName = organization?.name || "NavRitning";
