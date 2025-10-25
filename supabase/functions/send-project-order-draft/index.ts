@@ -101,7 +101,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const organization = project.property.organization || { name: "Er organisation", logo_url: null };
 
-    // Skapa HTML-mall
+    // Skapa HTML-mall med enkel vänsterjusterad layout
     const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -110,222 +110,71 @@ const handler = async (req: Request): Promise<Response> => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      font-family: Arial, sans-serif;
       line-height: 1.6;
-      color: #1f2937;
+      color: #000000;
       max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-      background-color: #f9fafb;
-    }
-    .container {
-      background: white;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-    }
-    .header {
-      text-align: center;
-      padding: 32px 20px;
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-      color: white;
-    }
-    .header img {
-      max-height: 60px;
-      margin-bottom: 16px;
-    }
-    .header h1 {
       margin: 0;
-      font-size: 28px;
-      font-weight: 600;
+      padding: 20px;
+      background-color: #ffffff;
     }
     .content {
-      padding: 32px;
-    }
-    h2 {
-      color: #1f2937;
-      font-size: 20px;
-      font-weight: 600;
-      margin-top: 32px;
-      margin-bottom: 16px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #e5e7eb;
-    }
-    h2:first-child {
-      margin-top: 0;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 24px;
-    }
-    th {
-      background: #f3f4f6;
       text-align: left;
-      padding: 12px;
-      font-weight: 600;
-      color: #374151;
-      width: 40%;
     }
-    td {
-      padding: 12px;
-      border-bottom: 1px solid #e5e7eb;
+    p {
+      margin: 0 0 16px 0;
     }
-    tr:last-child td {
-      border-bottom: none;
+    .section {
+      margin: 24px 0;
     }
-    .description-box {
-      padding: 16px;
-      background: #f9fafb;
-      border-left: 4px solid #3b82f6;
-      border-radius: 4px;
-      margin-bottom: 24px;
-      white-space: pre-wrap;
-    }
-    .footer {
-      margin-top: 32px;
-      padding: 24px;
-      background: #f3f4f6;
-      text-align: center;
-      border-top: 1px solid #e5e7eb;
-    }
-    .footer p {
-      margin: 4px 0;
-      color: #6b7280;
-      font-size: 14px;
-    }
-    .footer .timestamp {
-      font-size: 12px;
-      color: #9ca3af;
-    }
-    @media only screen and (max-width: 600px) {
-      body {
-        padding: 10px;
-      }
-      .content {
-        padding: 20px;
-      }
-      th, td {
-        padding: 8px;
-        font-size: 14px;
-      }
-      h2 {
-        font-size: 18px;
-      }
+    strong {
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      ${organization.logo_url ? `<img src="${organization.logo_url}" alt="${organization.name}" />` : ''}
-      <h1>Projektbeställning</h1>
+  <div class="content">
+    <p>Hej,</p>
+    <p>Hoppas allt är bra!</p>
+    
+    <p>Vi önskar härmed beställa arbetet avseende <strong>${project.name}</strong> på fastigheten <strong>${project.property.name}${project.property.address ? ', ' + project.property.address : ''}</strong>.</p>
+    
+    ${project.description ? `<p>Åtgärden omfattar ${project.description}.</p>` : ''}
+    
+    <p>Arbetet planeras att utföras under <strong>${project.year || 'ej angivet'} Q${project.start_quarter || '?'}</strong>.</p>
+    
+    <div class="section">
+      <p><strong>Projektnamn:</strong> ${project.name}</p>
+      <p><strong>Projektnummer:</strong> ${project.project_number || 'Ej tilldelat'}</p>
     </div>
     
-    <div class="content">
-      <h2>Projektinformation</h2>
-      <table>
-        <tr>
-          <th>Projektnummer</th>
-          <td>${project.project_number || 'Ej tilldelat'}</td>
-        </tr>
-        <tr>
-          <th>Projektnamn</th>
-          <td>${project.name}</td>
-        </tr>
-        <tr>
-          <th>Projekttyp</th>
-          <td>${typeLabel}</td>
-        </tr>
-        <tr>
-          <th>År och period</th>
-          <td>${project.year || 'Ej angivet'} (Q${project.start_quarter || '?'} - Q${project.end_quarter || '?'})</td>
-        </tr>
-        <tr>
-          <th>Projektledare</th>
-          <td>${project.project_manager || 'Ej tilldelad'}</td>
-        </tr>
-      </table>
-
-      <h2>Fastighetsinformation</h2>
-      <table>
-        <tr>
-          <th>Fastighet</th>
-          <td>${project.property.name}</td>
-        </tr>
-        <tr>
-          <th>Fastighetsnummer</th>
-          <td>${project.property.property_number || 'Ej angivet'}</td>
-        </tr>
-        <tr>
-          <th>Adress</th>
-          <td>${project.property.address || 'Ej angiven'}</td>
-        </tr>
-        <tr>
-          <th>Fakturaadress</th>
-          <td>${project.property.invoice_address || project.property.address || 'Ej angiven'}</td>
-        </tr>
-      </table>
-
-      ${contact ? `
-      <h2>Kontaktuppgifter</h2>
-      <table>
-        <tr>
-          <th>Namn</th>
-          <td>${contact.name}</td>
-        </tr>
-        ${contact.role ? `
-        <tr>
-          <th>Roll</th>
-          <td>${contact.role}</td>
-        </tr>
-        ` : ''}
-        ${contact.company ? `
-        <tr>
-          <th>Företag</th>
-          <td>${contact.company}</td>
-        </tr>
-        ` : ''}
-        ${contact.phone ? `
-        <tr>
-          <th>Telefon</th>
-          <td>${contact.phone}</td>
-        </tr>
-        ` : ''}
-        ${contact.email ? `
-        <tr>
-          <th>E-post</th>
-          <td><a href="mailto:${contact.email}">${contact.email}</a></td>
-        </tr>
-        ` : ''}
-      </table>
-      ` : ''}
-
-      <h2>Ekonomi</h2>
-      <table>
-        <tr>
-          <th>Budget</th>
-          <td>${formatAmount(project.budget)}</td>
-        </tr>
-        <tr>
-          <th>Prognos</th>
-          <td>${formatAmount(project.forecast)}</td>
-        </tr>
-        <tr>
-          <th>Tidsperiod</th>
-          <td>${project.year || 'Ej angivet'} Q${project.start_quarter || '?'} - Q${project.end_quarter || '?'}</td>
-        </tr>
-      </table>
-
-      ${project.description ? `
-      <h2>Omfattning och beskrivning</h2>
-      <div class="description-box">${project.description}</div>
-      ` : ''}
+    <div class="section">
+      <p><strong>Fakturering sker till:</strong></p>
+      <p>${project.property.invoice_address || project.property.address || 'Ej angiven'}</p>
+      
+      <p><strong>Märkning:</strong> ${project.property.property_number || 'Ej angivet'} + Kontonummer</p>
+      <p><strong>Faktura skickas till:</strong> scanning@retta.se</p>
     </div>
-
-    <div class="footer">
-      <p>Detta utkast är genererat från <strong>${organization.name}</strong></p>
-      <p class="timestamp">Genererat ${timestamp}</p>
+    
+    ${contact ? `
+    <div class="section">
+      <p><strong>För frågor kring det praktiska arbetet eller tillgång till fastigheten, vänligen kontakta:</strong></p>
+      <p>${contact.name}${contact.role ? ' (' + contact.role + ')' : ''}</p>
+      ${contact.phone ? `<p><strong>Telefon:</strong> ${contact.phone}</p>` : ''}
+      ${contact.email ? `<p><strong>E-post:</strong> <a href="mailto:${contact.email}">${contact.email}</a></p>` : ''}
+    </div>
+    ` : ''}
+    
+    <div class="section">
+      <p>Vänligen bekräfta mottagandet av denna beställning samt återkom med preliminärt startdatum och planerad tidsåtgång.</p>
+      <p>Arbetet ska utföras enligt gällande rutiner och säkerhetsföreskrifter.</p>
+    </div>
+    
+    <p>Tack på förhand.</p>
+    
+    <div class="section" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
+      <p>Detta meddelande är skickat från ${organization.name}</p>
+      <p>Genererat ${timestamp}</p>
     </div>
   </div>
 </body>
@@ -337,7 +186,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "Fastighetssystem <onboarding@resend.dev>",
       to: [userEmail],
-      subject: `Projektbeställning - ${project.project_number || project.name}`,
+      subject: `Beställning – ${project.description || project.name} ${project.property.name} ${project.project_number || ''}`,
       html: htmlContent,
     });
 
