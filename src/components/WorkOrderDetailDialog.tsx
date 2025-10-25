@@ -26,7 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, Trash2, Download, Edit2, FolderKanban, Eye, FileArchive } from "lucide-react";
+import { Upload, FileText, Trash2, Download, Edit2, FolderKanban, Eye, FileArchive, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -55,6 +55,7 @@ export function WorkOrderDetailDialog({
   const [converting, setConverting] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<any>(null);
   const [exporting, setExporting] = useState(false);
+  const [sendingDraft, setSendingDraft] = useState(false);
 
   const { data: files, refetch: refetchFiles } = useQuery({
     queryKey: ["work-order-files", workOrder?.id],
@@ -220,6 +221,34 @@ export function WorkOrderDetailDialog({
     }
   };
 
+  const handleSendDraft = async () => {
+    if (!workOrder) return;
+    
+    setSendingDraft(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user?.email) {
+        throw new Error("Kunde inte hämta användarens e-post");
+      }
+      
+      const { error } = await supabase.functions.invoke('send-work-order-draft', {
+        body: { 
+          workOrderId: workOrder.id,
+          userEmail: user.email
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast.success("Beställningsutkast skickat till din e-post");
+    } catch (error: any) {
+      toast.error(error.message || "Kunde inte skicka beställningsutkast");
+    } finally {
+      setSendingDraft(false);
+    }
+  };
+
   if (!workOrder) return null;
 
   return (
@@ -230,6 +259,15 @@ export function WorkOrderDetailDialog({
             <div className="flex items-center justify-between">
               <DialogTitle className="text-2xl">Arbetsorder Detaljer</DialogTitle>
               <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSendDraft}
+                  disabled={sendingDraft}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  {sendingDraft ? "Skickar..." : "Skicka beställningsutkast"}
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
