@@ -188,8 +188,13 @@ export default function ProjectDetail() {
     
     setSendingDraft(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
       const { error } = await supabase.functions.invoke('send-project-order-draft', {
-        body: { projectId: project.id }
+        body: { projectId: project.id },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        }
       });
       
       if (error) throw error;
