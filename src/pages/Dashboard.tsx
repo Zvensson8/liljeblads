@@ -114,87 +114,28 @@ const Dashboard = () => {
         ? properties.map(p => p.id)
         : [selectedProperty];
 
-      // Fetch work orders
-      const { data: workOrdersData, error: woError } = await supabase
-        .from('work_orders')
-        .select('*, properties(name)')
-        .in('property_id', propertyFilter)
-        .order('created_at', { ascending: false })
-        .limit(5);
+      // Use new optimized RPC function - 1 query instead of 8+
+      const { data: dashboardData, error } = await supabase
+        .rpc('get_dashboard_stats', {
+          property_ids: propertyFilter
+        });
 
-      if (woError) throw woError;
+      if (error) throw error;
 
-      // Fetch projects
-      const { data: projectsData, error: projError } = await supabase
-        .from('projects')
-        .select('*, properties(name)')
-        .in('property_id', propertyFilter)
-        .order('start_date', { ascending: false })
-        .limit(5);
-
-      if (projError) throw projError;
-
-      // Fetch todos
-      const { data: todosData, error: todosError } = await supabase
-        .from('property_todos')
-        .select('*, properties(name)')
-        .in('property_id', propertyFilter)
-        .order('due_date', { ascending: true })
-        .limit(10);
-
-      if (todosError) throw todosError;
-
-      // Count all work orders
-      const { count: totalWO } = await supabase
-        .from('work_orders')
-        .select('*', { count: 'exact', head: true })
-        .in('property_id', propertyFilter);
-
-      // Count pending work orders (not_started + awaiting_quote + ordered)
-      const { count: pendingWO } = await supabase
-        .from('work_orders')
-        .select('*', { count: 'exact', head: true })
-        .in('property_id', propertyFilter)
-        .in('status', ['not_started', 'awaiting_quote', 'ordered']);
-
-      // Count all projects
-      const { count: totalProj } = await supabase
-        .from('projects')
-        .select('*', { count: 'exact', head: true })
-        .in('property_id', propertyFilter);
-
-      // Count active projects (pagaende)
-      const { count: activeProj } = await supabase
-        .from('projects')
-        .select('*', { count: 'exact', head: true })
-        .in('property_id', propertyFilter)
-        .eq('status', 'pagaende');
-
-      // Count all todos
-      const { count: totalTodoCount } = await supabase
-        .from('property_todos')
-        .select('*', { count: 'exact', head: true })
-        .in('property_id', propertyFilter);
-
-      // Count completed todos
-      const { count: completedTodoCount } = await supabase
-        .from('property_todos')
-        .select('*', { count: 'exact', head: true })
-        .in('property_id', propertyFilter)
-        .eq('completed', true);
-
-      setWorkOrders(workOrdersData || []);
-      setProjects(projectsData || []);
-      setTodos(todosData || []);
+      const data = dashboardData as any;
+      
+      setWorkOrders(data.recent_work_orders || []);
+      setProjects(data.recent_projects || []);
+      setTodos(data.recent_todos || []);
       
       const newStats = {
         totalProperties: selectedProperty === "all" ? properties.length : 1,
-        totalWorkOrders: totalWO || 0,
-        totalProjects: totalProj || 0,
-        totalTodos: totalTodoCount || 0,
-        pendingWorkOrders: pendingWO || 0,
-        activeProjects: activeProj || 0,
-        completedTodos: completedTodoCount || 0,
+        totalWorkOrders: data.total_work_orders || 0,
+        totalProjects: data.total_projects || 0,
+        totalTodos: data.total_todos || 0,
+        pendingWorkOrders: data.pending_work_orders || 0,
+        activeProjects: data.active_projects || 0,
+        completedTodos: data.completed_todos || 0,
       };
       
       setPrevStats(stats.totalWorkOrders > 0 ? stats : prevStats);

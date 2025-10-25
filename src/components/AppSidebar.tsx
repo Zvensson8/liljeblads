@@ -4,6 +4,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Sidebar,
   SidebarContent,
@@ -38,8 +39,14 @@ export function AppSidebar() {
   const { signOut, user } = useAuth();
   const { organization, loading: orgLoading } = useOrganization();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const isCollapsed = state === "collapsed";
   const [isFounder, setIsFounder] = useState(false);
+  
+  // Hide sidebar on mobile - use bottom navigation instead
+  if (isMobile) {
+    return null;
+  }
 
   useEffect(() => {
     if (user) {
