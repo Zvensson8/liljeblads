@@ -482,7 +482,14 @@ const PropertyDetail = () => {
         <main className="container mx-auto px-6 py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsContent value="overview">
-              <PropertyOverview property={property} floors={floors} components={components} />
+              <PropertyOverview 
+                property={property} 
+                components={components}
+                workOrders={workOrders}
+                floors={floors}
+                overdueTodos={overdueTodos}
+                urgentWorkOrders={urgentWorkOrders}
+              />
             </TabsContent>
             <TabsContent value="notes">
               <PropertyNotes propertyId={property.id} />
@@ -509,7 +516,7 @@ const PropertyDetail = () => {
               <PropertyTechnicalInfo propertyId={property.id} />
             </TabsContent>
             <TabsContent value="info-categories">
-              <PropertyInfoCategoryManager propertyId={property.id} />
+              <PropertyInfoCategoryManager />
             </TabsContent>
           </Tabs>
         </main>
@@ -628,7 +635,14 @@ const PropertyDetail = () => {
                   <TabsTrigger value="info-categories">Info-kategorier</TabsTrigger>
                 </TabsList>
                 <TabsContent value="overview">
-                  <PropertyOverview property={property} floors={floors} components={components} />
+                  <PropertyOverview 
+                    property={property} 
+                    components={components}
+                    workOrders={workOrders}
+                    floors={floors}
+                    overdueTodos={overdueTodos}
+                    urgentWorkOrders={urgentWorkOrders}
+                  />
                 </TabsContent>
                 <TabsContent value="notes">
                   <PropertyNotes propertyId={property.id} />
@@ -655,7 +669,7 @@ const PropertyDetail = () => {
                   <PropertyTechnicalInfo propertyId={property.id} />
                 </TabsContent>
                 <TabsContent value="info-categories">
-                  <PropertyInfoCategoryManager propertyId={property.id} />
+                  <PropertyInfoCategoryManager />
                 </TabsContent>
               </Tabs>
             </div>
