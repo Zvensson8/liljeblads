@@ -1,6 +1,6 @@
 import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown, UserCog, User } from "lucide-react";
 import { useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +37,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const { signOut, user } = useAuth();
   const { organization, loading: orgLoading } = useOrganization();
+  const navigate = useNavigate();
   const isCollapsed = state === "collapsed";
   const [isFounder, setIsFounder] = useState(false);
 
@@ -102,7 +103,7 @@ export function AppSidebar() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="z-50">
-                  <DropdownMenuItem onClick={() => window.location.href = '/user/settings'}>
+                  <DropdownMenuItem onClick={() => navigate('/user/settings')}>
                     <UserCog className="h-4 w-4 mr-2" />
                     Mina inställningar
                   </DropdownMenuItem>
