@@ -58,7 +58,7 @@ serve(async (req) => {
         properties(name)
       `)
       .eq('properties.organization_id', organizationId)
-      .in('status', ['planerat', 'pågående'])
+      .in('status', ['planerat', 'pagaende'])
       .order('created_at', { ascending: false });
 
     if (projectsError) {
@@ -103,8 +103,8 @@ serve(async (req) => {
         ? Math.min(100, (project.actual_cost / project.budget * 100))
         : 0;
       
-      const statusClass = project.status === 'pågående' ? 'success' : 'warning';
-      const statusLabel = project.status === 'pågående' ? 'Pågående' : 'Planerat';
+      const statusClass = project.status === 'pagaende' ? 'success' : 'warning';
+      const statusLabel = project.status === 'pagaende' ? 'Pågående' : 'Planerat';
 
       return `
         <tr>
