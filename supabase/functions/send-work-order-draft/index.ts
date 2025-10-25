@@ -71,25 +71,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Skickar arbetsorderutkast till:", userEmail);
 
-    // Översätt status och prioritet
-    const statusLabels: Record<string, string> = {
-      "not_started": "Ej påbörjad",
-      "ordered": "Beställd",
-      "awaiting_quote": "Inväntar offert",
-      "in_progress": "Pågående",
-      "completed": "Slutförd",
-      "cancelled": "Avbruten"
-    };
-    const statusLabel = statusLabels[workOrder.status as string] || workOrder.status;
-
-    const priorityLabels: Record<string, string> = {
-      "low": "Låg",
-      "medium": "Normal",
-      "high": "Hög",
-      "urgent": "Akut"
-    };
-    const priorityLabel = priorityLabels[workOrder.priority as string] || workOrder.priority;
-
     // Formatera datum
     const timestamp = new Date().toLocaleString("sv-SE", {
       year: "numeric",
@@ -156,8 +137,6 @@ const handler = async (req: Request): Promise<Response> => {
     
     <div class="section">
       <p><strong>Åtgärd:</strong> ${workOrder.action}</p>
-      ${workOrder.contractor ? `<p><strong>Entreprenör:</strong> ${workOrder.contractor}</p>` : ''}
-      <p><strong>Prioritet:</strong> ${priorityLabel}</p>
       ${workOrder.price ? `<p><strong>Estimerat pris:</strong> ${formatAmount(workOrder.price)}</p>` : ''}
     </div>
     
