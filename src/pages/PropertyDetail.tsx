@@ -376,6 +376,7 @@ const PropertyDetail = () => {
     }
   };
 
+  // Render loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -384,11 +385,12 @@ const PropertyDetail = () => {
     );
   }
 
+  // Render null if no property
   if (!property) {
     return null;
   }
 
-  // Mobile layout - no sidebar
+  // Render mobile layout
   if (isMobile) {
     return (
       <div className="flex min-h-screen w-full flex-col bg-background pb-16">
@@ -458,10 +460,10 @@ const PropertyDetail = () => {
           </div>
         </header>
 
-        {/* Tabs Navigation - Sticky under header */}
-        <div className="sticky top-[73px] z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto px-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          {/* Tabs Navigation - Sticky under header */}
+          <div className="sticky top-[73px] z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="container mx-auto px-6">
               <TabsList className="h-12 w-full justify-start rounded-none border-0 bg-transparent p-0 overflow-x-auto">
                 <TabsTrigger value="overview">Översikt</TabsTrigger>
                 <TabsTrigger value="notes">Anteckningar</TabsTrigger>
@@ -474,13 +476,11 @@ const PropertyDetail = () => {
                 <TabsTrigger value="technical-info">Teknisk info</TabsTrigger>
                 <TabsTrigger value="info-categories">Info-kategorier</TabsTrigger>
               </TabsList>
-            </Tabs>
+            </div>
           </div>
-        </div>
 
-        {/* Main Content */}
-        <main className="container mx-auto px-6 py-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          {/* Main Content */}
+          <main className="container mx-auto px-6 py-6">
             <TabsContent value="overview">
               <PropertyOverview 
                 property={property} 
@@ -518,8 +518,8 @@ const PropertyDetail = () => {
             <TabsContent value="info-categories">
               <PropertyInfoCategoryManager />
             </TabsContent>
-          </Tabs>
-        </main>
+          </main>
+        </Tabs>
 
         {/* Dialogs */}
         <PropertyEditDialog
