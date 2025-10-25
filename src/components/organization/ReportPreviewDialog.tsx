@@ -30,24 +30,39 @@ export function ReportPreviewDialog({ open, onOpenChange, reportType, onMarkAsPr
     
     if (isOpen && reportType) {
       setLoading(true);
+      setHtmlContent('');
       try {
+        console.log('Fetching preview for report type:', reportType);
+        
         const { data: { user } } = await supabase.auth.getUser();
         
         if (!user) {
+          console.error('No user found');
           toast.error('Du måste vara inloggad');
           return;
         }
 
+        console.log('Calling preview-report function with userId:', user.id);
         const { data, error } = await supabase.functions.invoke('preview-report', {
           body: { reportType, userId: user.id }
         });
 
-        if (error) throw error;
+        console.log('Preview response:', { data, error });
 
+        if (error) {
+          console.error('Supabase function error:', error);
+          throw error;
+        }
+
+        if (!data?.html) {
+          throw new Error('Ingen HTML returnerad från förhandsvisningen');
+        }
+
+        console.log('Setting HTML content, length:', data.html.length);
         setHtmlContent(data.html);
       } catch (error: any) {
         console.error('Error generating preview:', error);
-        toast.error('Kunde inte generera förhandsvisning');
+        toast.error(`Kunde inte generera förhandsvisning: ${error.message || 'Okänt fel'}`);
       } finally {
         setLoading(false);
       }

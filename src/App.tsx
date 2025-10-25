@@ -21,6 +21,7 @@ import CostOverview from "./pages/CostOverview";
 import WorkOrders from "./pages/WorkOrders";
 import Projects from "./pages/Projects";
 import OrganizationSettings from "./pages/OrganizationSettings";
+import UserSettings from "./pages/UserSettings";
 import FounderAdmin from "./pages/FounderAdmin";
 import NotFound from "./pages/NotFound";
 import RecurringCosts from "./pages/RecurringCosts";
@@ -45,6 +46,7 @@ const AppContent = () => {
         <Route path="/cost-overview" element={<CostOverview />} />
         <Route path="/recurring-costs" element={<RecurringCosts />} />
         <Route path="/users" element={<Users />} />
+        <Route path="/user/settings" element={<UserSettings />} />
         <Route path="/organization/settings" element={<OrganizationSettings />} />
         <Route path="/founder/admin" element={<FounderAdmin />} />
         <Route path="*" element={<NotFound />} />
