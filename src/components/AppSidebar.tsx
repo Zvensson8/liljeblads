@@ -1,4 +1,4 @@
-import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown, UserCog } from "lucide-react";
+import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown, UserCog, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,6 +19,7 @@ import {
 import { Button } from "./ui/button";
 import { NotificationBell } from "./NotificationBell";
 import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
 const navigationItems = [
   { title: "Dashboard", url: "/", icon: Home },
@@ -28,7 +29,6 @@ const navigationItems = [
   { title: "Driftuppföljning", url: "/operations", icon: ClipboardList },
   { title: "Projekthantering", url: "/projects", icon: Briefcase },
   { title: "Återkommande kostnader", url: "/recurring-costs", icon: DollarSign },
-  { title: "Mina inställningar", url: "/user/settings", icon: UserCog },
   { title: "Användare", url: "/users", icon: Users },
   { title: "Organisation", url: "/organization/settings", icon: Building },
 ];
@@ -95,6 +95,19 @@ export function AppSidebar() {
             <div className="flex items-center gap-1">
               <NotificationBell />
               <KeyboardShortcutsDialog />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <UserCog className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => window.location.href = '/user/settings'}>
+                    <UserCog className="h-4 w-4 mr-2" />
+                    Mina inställningar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </div>

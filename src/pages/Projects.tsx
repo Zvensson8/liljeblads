@@ -209,10 +209,13 @@ export default function Projects() {
 
           <main className="flex-1 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <Tabs defaultValue="dashboard" className="w-full" onValueChange={(value) => setShowArchived(value === 'archived')}>
+              <Tabs value={showArchived ? 'archived' : 'active'} className="w-full" onValueChange={(value) => {
+                const shouldShowArchived = value === 'archived';
+                setShowArchived(shouldShowArchived);
+                fetchProjects(shouldShowArchived);
+              }}>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                   <TabsList>
-                    <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                     <TabsTrigger value="active">Aktiva projekt</TabsTrigger>
                     <TabsTrigger value="archived">Arkiverade projekt</TabsTrigger>
                   </TabsList>
@@ -315,7 +318,7 @@ export default function Projects() {
                                 <TableHead>Fastighet</TableHead>
                                 <TableHead>Typ</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>Datum</TableHead>
+                                <TableHead>Kvartal</TableHead>
                                 <TableHead className="text-right">Budget</TableHead>
                                 <TableHead className="text-right">Utfall</TableHead>
                                 <TableHead className="text-right">Avvikelse</TableHead>
@@ -341,8 +344,8 @@ export default function Projects() {
                                     <TableCell>{getTypeBadge(project.type)}</TableCell>
                                     <TableCell>{getStatusBadge(project.status)}</TableCell>
                                     <TableCell className="text-sm text-muted-foreground">
-                                      {project.start_date && project.end_date
-                                        ? `${format(new Date(project.start_date), "MMM yy", { locale: sv })} - ${format(new Date(project.end_date), "MMM yy", { locale: sv })}`
+                                      {project.start_date 
+                                        ? `Q${Math.ceil((new Date(project.start_date).getMonth() + 1) / 3)} ${new Date(project.start_date).getFullYear()}`
                                         : "-"}
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -407,6 +410,7 @@ export default function Projects() {
                                 <TableHead>Fastighet</TableHead>
                                 <TableHead>Typ</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead>Kvartal</TableHead>
                                 <TableHead className="text-right">Budget</TableHead>
                                 <TableHead className="text-right">Utfall</TableHead>
                                 <TableHead className="text-right">Avvikelse</TableHead>
@@ -429,6 +433,11 @@ export default function Projects() {
                                     <TableCell>{project.property.name}</TableCell>
                                     <TableCell>{getTypeBadge(project.type)}</TableCell>
                                     <TableCell>{getStatusBadge(project.status)}</TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">
+                                      {project.start_date 
+                                        ? `Q${Math.ceil((new Date(project.start_date).getMonth() + 1) / 3)} ${new Date(project.start_date).getFullYear()}`
+                                        : "-"}
+                                    </TableCell>
                                     <TableCell className="text-right">
                                       {project.budget.toLocaleString("sv-SE")} kr
                                     </TableCell>
@@ -463,9 +472,6 @@ export default function Projects() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="dashboard">
-                  <ProjectDashboard projects={projects} />
-                </TabsContent>
               </Tabs>
             </div>
           </main>

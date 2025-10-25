@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { useRecentlyVisited } from '@/hooks/useRecentlyVisited';
 import { PropertyTechnicalInfo } from '@/components/property-info/PropertyTechnicalInfo';
+import { PropertyInfoCategoryManager } from '@/components/property-info/PropertyInfoCategoryManager';
 
 interface Property {
   id: string;
@@ -876,8 +877,9 @@ const PropertyDetail = () => {
           </TabsContent>
 
           {/* Technical Info Tab */}
-          <TabsContent value="technical-info">
+          <TabsContent value="technical-info" className="space-y-6">
             <PropertyTechnicalInfo propertyId={property.id} />
+            <PropertyInfoCategoryManager />
           </TabsContent>
         </Tabs>
       </main>
