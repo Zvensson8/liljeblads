@@ -98,23 +98,90 @@ const handler = async (req: Request): Promise<Response> => {
         };
 
         try {
+          const priorityColors: Record<string, { bg: string, text: string }> = {
+            low: { bg: '#dcfce7', text: '#166534' },
+            medium: { bg: '#fef3c7', text: '#92400e' },
+            high: { bg: '#fee2e2', text: '#991b1b' },
+            critical: { bg: '#fecaca', text: '#7f1d1d' }
+          };
+          const priorityColor = priorityColors[todo.priority] || priorityColors.medium;
+
           const { error: emailError } = await resend.emails.send({
             from: "Påminnelse <onboarding@resend.dev>",
             to: [todo.reminder_email],
             subject: `Påminnelse: ${todo.title}`,
             html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #333;">Påminnelse om uppgift</h2>
-                <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                  <h3 style="margin-top: 0;">${todo.title}</h3>
-                  <p><strong>Prioritet:</strong> ${priorityLabels[todo.priority] || todo.priority}</p>
-                  ${todo.category ? `<p><strong>Kategori:</strong> ${todo.category}</p>` : ''}
-                  ${dueDateInfo}
-                  ${propertyInfo}
-                  ${notesInfo}
-                </div>
-                <p style="color: #666; font-size: 14px;">Detta är en automatisk påminnelse från ditt fastighetssystem.</p>
-              </div>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #f3f4f6; }
+    .container { max-width: 700px; margin: 0 auto; background: white; }
+    .header { text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; }
+    .header h1 { margin: 0 0 10px 0; font-size: 28px; }
+    .content { padding: 40px 30px; }
+    .todo-box { background: #f9fafb; padding: 25px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #8b5cf6; }
+    .priority-badge { display: inline-block; padding: 6px 16px; border-radius: 12px; font-size: 13px; font-weight: 600; background: ${priorityColor.bg}; color: ${priorityColor.text}; }
+    .info-row { margin: 12px 0; padding: 12px; background: white; border-radius: 4px; }
+    .footer { text-align: center; padding: 30px; background: #f9fafb; color: #6b7280; font-size: 14px; }
+    h2 { color: #111827; margin-top: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📌 Påminnelse: Uppgift</h1>
+      <p>Du har en uppgift som kräver uppmärksamhet</p>
+    </div>
+    
+    <div class="content">
+      <div class="todo-box">
+        <h2>${todo.title}</h2>
+        
+        <div class="info-row">
+          <strong>🎯 Prioritet:</strong> <span class="priority-badge">${priorityLabels[todo.priority] || todo.priority}</span>
+        </div>
+
+        ${todo.category ? `
+        <div class="info-row">
+          <strong>📂 Kategori:</strong> ${todo.category}
+        </div>
+        ` : ''}
+
+        ${todo.due_date ? `
+        <div class="info-row">
+          <strong>📅 Förfallodatum:</strong> ${new Date(todo.due_date).toLocaleDateString('sv-SE')}
+        </div>
+        ` : ''}
+
+        ${todo.properties ? `
+        <div class="info-row">
+          <strong>🏢 Fastighet:</strong> ${todo.properties.name}<br>
+          <span style="color: #6b7280; font-size: 14px;">${todo.properties.address}</span>
+        </div>
+        ` : ''}
+
+        ${todo.notes ? `
+        <div class="info-row">
+          <strong>📝 Anteckningar:</strong><br>
+          <span style="color: #374151;">${todo.notes}</span>
+        </div>
+        ` : ''}
+      </div>
+
+      <p style="background: #fef3c7; padding: 15px; border-radius: 4px; color: #92400e; border-left: 4px solid #f59e0b; margin: 20px 0;">
+        <strong>⚠️ Påminnelse:</strong> Denna uppgift har nått sitt påminnelsedatum. Vänligen vidta nödvändiga åtgärder.
+      </p>
+    </div>
+    
+    <div class="footer">
+      <p>Detta är en automatisk påminnelse från ditt fastighetssystem</p>
+      <p style="font-size: 12px; color: #9ca3af;">Genererad ${new Date().toLocaleDateString('sv-SE')} ${new Date().toLocaleTimeString('sv-SE')}</p>
+    </div>
+  </div>
+</body>
+</html>
             `,
           });
 

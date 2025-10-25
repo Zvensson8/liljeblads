@@ -80,30 +80,74 @@ serve(async (req) => {
         const daysSinceCreated = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
 
         const emailHtml = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">Påminnelse: Uppföljning av arbetsorder</h2>
-            
-            <p>Hej,</p>
-            <p>Hoppas allt är bra!</p>
-            
-            <p>Det har nu gått <strong>${daysSinceCreated} dagar</strong> sedan arbetet med <strong>${order.action}</strong> påbörjades.</p>
-            
-            <p>Dags för uppföljning av arbetet.</p>
-            
-            <p>Är det slutfört, vänligen ändra status till avslutat.</p>
-            
-            <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-left: 4px solid #2563eb;">
-              <h3 style="margin-top: 0; color: #2563eb;">Mall för uppföljning:</h3>
-              <p style="margin: 0;">Hej,</p>
-              <p>Hoppas allt är bra!</p>
-              <p>Vill bara följa upp status avseende arbetet med <strong>${order.action}</strong> på <strong>${order.properties.name}</strong>.</p>
-              <p style="margin-bottom: 0;">Ha en bra dag!</p>
-            </div>
-            
-            <p style="color: #666; font-size: 12px; margin-top: 30px;">
-              För att sluta få dessa påminnelser, ändra status på arbetsordern eller stäng av påminnelser i arbetsordern.
-            </p>
-          </div>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #f3f4f6; }
+    .container { max-width: 700px; margin: 0 auto; background: white; }
+    .header { text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+    .header h1 { margin: 0 0 10px 0; font-size: 28px; }
+    .content { padding: 40px 30px; }
+    .alert-box { background: #fef3c7; padding: 25px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b; }
+    .info-box { background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0; }
+    .stat { text-align: center; background: #fef3c7; padding: 20px; border-radius: 8px; margin: 15px 0; }
+    .stat-value { font-size: 36px; font-weight: bold; color: #d97706; margin-bottom: 5px; }
+    .stat-label { font-size: 14px; color: #92400e; }
+    .template-box { background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb; }
+    .footer { text-align: center; padding: 30px; background: #f9fafb; color: #6b7280; font-size: 14px; }
+    h2 { color: #111827; margin-top: 0; }
+    h3 { color: #2563eb; margin-top: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⏰ Påminnelse: Arbetsorder</h1>
+      <p>Uppföljning behövs</p>
+    </div>
+    
+    <div class="content">
+      <div class="alert-box">
+        <h2 style="color: #92400e;">Dags för uppföljning!</h2>
+        <p style="margin: 0; color: #78350f;">Det har nu gått <strong>${daysSinceCreated} dagar</strong> sedan arbetet med <strong>${order.action}</strong> påbörjades på <strong>${order.properties.name}</strong>.</p>
+      </div>
+
+      <div class="stat">
+        <div class="stat-value">${daysSinceCreated}</div>
+        <div class="stat-label">Dagar sedan beställning</div>
+      </div>
+
+      <div class="info-box">
+        <h2>📋 Arbetsorderinformation</h2>
+        <p><strong>Åtgärd:</strong> ${order.action}</p>
+        <p><strong>Fastighet:</strong> ${order.properties.name}</p>
+        <p style="margin-bottom: 0;"><strong>Status:</strong> Beställd</p>
+      </div>
+
+      <div class="template-box">
+        <h3>📧 Föreslagen uppföljningsmall</h3>
+        <div style="background: white; padding: 15px; border-radius: 4px; margin-top: 15px;">
+          <p style="margin: 0 0 10px 0;">Hej,</p>
+          <p style="margin: 0 0 10px 0;">Hoppas allt är bra!</p>
+          <p style="margin: 0 0 10px 0;">Vill bara följa upp status avseende arbetet med <strong>${order.action}</strong> på <strong>${order.properties.name}</strong>.</p>
+          <p style="margin: 0;">Ha en bra dag!</p>
+        </div>
+      </div>
+
+      <p style="background: #ecfdf5; padding: 15px; border-radius: 4px; color: #047857; border-left: 4px solid #10b981;">
+        <strong>💡 Tips:</strong> När arbetet är slutfört, kom ihåg att ändra status till "Avslutat" i systemet.
+      </p>
+    </div>
+    
+    <div class="footer">
+      <p>Detta är en automatisk påminnelse från ditt fastighetssystem</p>
+      <p style="font-size: 12px; color: #9ca3af;">För att sluta få påminnelser: ändra status på arbetsordern eller stäng av påminnelser</p>
+    </div>
+  </div>
+</body>
+</html>
         `;
 
         try {
