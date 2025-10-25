@@ -91,24 +91,42 @@ serve(async (req) => {
       const userEmail = pref.notification_email || pref.profiles.email;
 
       // Helper function to check if it's time to send based on frequency
-      const shouldSendBasedOnFrequency = (frequency: string, scheduledTime: string): boolean => {
-        // Check if time matches (within 5 minute window)
-        const [schedHour, schedMin] = scheduledTime.split(':').map(Number);
+      const shouldSendBasedOnFrequency = (frequency: string, scheduledTime: string, reportName: string): boolean => {
+        // Parse scheduled time (format: HH:MM:SS or HH:MM)
+        const timeParts = scheduledTime.split(':').map(Number);
+        const schedHour = timeParts[0];
+        const schedMin = timeParts[1] || 0;
+        
+        // Convert UTC time to Swedish time (UTC+1 or UTC+2 depending on DST)
+        const swedishTime = new Date(now.getTime() + (60 * 60 * 1000)); // Add 1 hour for now (simplified)
         const scheduleMinutes = schedHour * 60 + schedMin;
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const currentMinutes = swedishTime.getHours() * 60 + swedishTime.getMinutes();
         const timeDiff = Math.abs(currentMinutes - scheduleMinutes);
         
-        if (timeDiff > 5) return false; // Not within time window
+        console.log(`[${reportName}] Checking time: scheduled=${scheduledTime} (${scheduleMinutes}min), current=${swedishTime.getHours()}:${swedishTime.getMinutes()} (${currentMinutes}min), diff=${timeDiff}min`);
+        
+        if (timeDiff > 5) {
+          console.log(`[${reportName}] Time diff too large: ${timeDiff} minutes`);
+          return false; // Not within time window
+        }
 
         switch (frequency) {
           case 'daily':
+            console.log(`[${reportName}] Daily check passed!`);
             return true;
           case 'weekly':
-            return dayOfWeek === 1; // Monday
+            const isMonday = dayOfWeek === 1;
+            console.log(`[${reportName}] Weekly check: isMonday=${isMonday}`);
+            return isMonday; // Monday
           case 'monthly':
-            return dayOfMonth <= 7 && pref.preferred_day === getDayName(dayOfWeek); // First week, preferred day
+            const isFirstWeek = dayOfMonth <= 7;
+            const isPreferredDay = pref.preferred_day === getDayName(dayOfWeek);
+            console.log(`[${reportName}] Monthly check: isFirstWeek=${isFirstWeek}, isPreferredDay=${isPreferredDay}`);
+            return isFirstWeek && isPreferredDay; // First week, preferred day
           case 'yearly':
-            return month === 0 && dayOfMonth === 1; // January 1st
+            const isJanFirst = month === 0 && dayOfMonth === 1;
+            console.log(`[${reportName}] Yearly check: isJanFirst=${isJanFirst}`);
+            return isJanFirst; // January 1st
           default:
             return false;
         }
@@ -118,7 +136,7 @@ serve(async (req) => {
       if (
         pref.maintenance_reminders &&
         pref.maintenance_reminders_previewed &&
-        shouldSendBasedOnFrequency(pref.maintenance_reminders_frequency, pref.maintenance_reminders_time)
+        shouldSendBasedOnFrequency(pref.maintenance_reminders_frequency, pref.maintenance_reminders_time, 'maintenance_reminders')
       ) {
         try {
           const response = await fetch(`${supabaseUrl}/functions/v1/send-maintenance-reminders`, {
@@ -149,7 +167,7 @@ serve(async (req) => {
       if (
         pref.monthly_project_summary &&
         pref.project_summary_previewed &&
-        shouldSendBasedOnFrequency(pref.project_summary_frequency, pref.project_summary_time)
+        shouldSendBasedOnFrequency(pref.project_summary_frequency, pref.project_summary_time, 'project_summary')
       ) {
         try {
           const response = await fetch(`${supabaseUrl}/functions/v1/send-monthly-project-summary`, {
@@ -180,7 +198,7 @@ serve(async (req) => {
       if (
         pref.monthly_workorder_summary &&
         pref.workorder_summary_previewed &&
-        shouldSendBasedOnFrequency(pref.workorder_summary_frequency, pref.workorder_summary_time)
+        shouldSendBasedOnFrequency(pref.workorder_summary_frequency, pref.workorder_summary_time, 'workorder_summary')
       ) {
         try {
           const response = await fetch(`${supabaseUrl}/functions/v1/send-monthly-workorder-summary`, {
@@ -211,7 +229,7 @@ serve(async (req) => {
       if (
         pref.maintenance_history_annual &&
         pref.maintenance_history_previewed &&
-        shouldSendBasedOnFrequency(pref.maintenance_history_frequency, pref.maintenance_history_time)
+        shouldSendBasedOnFrequency(pref.maintenance_history_frequency, pref.maintenance_history_time, 'maintenance_history')
       ) {
         try {
           const response = await fetch(`${supabaseUrl}/functions/v1/send-maintenance-history-annual`, {
