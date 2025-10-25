@@ -9,6 +9,7 @@ const corsHeaders = {
 
 interface ProjectOrderRequest {
   projectId: string;
+  userEmail: string;
 }
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
@@ -19,40 +20,17 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { projectId }: ProjectOrderRequest = await req.json();
+    const { projectId, userEmail }: ProjectOrderRequest = await req.json();
 
-    if (!projectId) {
-      throw new Error("Project ID är obligatoriskt");
+    if (!projectId || !userEmail) {
+      throw new Error("Project ID och användarens e-post är obligatoriska");
     }
 
-    // Använd service role key för att kunna läsa data
+    // Använd service role key för att hämta data
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
-
-    // Hämta användare från authorization header
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("Ingen authorization header");
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    );
-
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-    if (userError || !user) {
-      console.error("User error:", userError);
-      throw new Error("Användare inte inloggad");
-    }
 
     // Hämta projekt med fastighet och organisation
     const { data: project, error: projectError } = await supabaseClient
@@ -91,17 +69,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const contact = contacts && contacts.length > 0 ? contacts[0] : null;
 
-    // Hämta användares e-post från profiles
-    const { data: profile } = await supabaseClient
-      .from("profiles")
-      .select("email, full_name")
-      .eq("id", user.id)
-      .single();
-
-    const recipientEmail = profile?.email || user.email;
-    if (!recipientEmail) {
-      throw new Error("Ingen e-postadress hittades för användaren");
-    }
+    console.log("Skickar beställningsutkast till:", userEmail);
 
     // Översätt projekttyp
     const typeLabels: Record<string, string> = {
@@ -364,11 +332,11 @@ const handler = async (req: Request): Promise<Response> => {
 </html>
     `;
 
-    console.log("Skickar projektbeställning till:", recipientEmail);
+    console.log("Skickar projektbeställning till:", userEmail);
 
     const emailResponse = await resend.emails.send({
       from: "Fastighetssystem <onboarding@resend.dev>",
-      to: [recipientEmail],
+      to: [userEmail],
       subject: `Projektbeställning - ${project.project_number || project.name}`,
       html: htmlContent,
     });

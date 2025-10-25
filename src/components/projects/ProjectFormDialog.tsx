@@ -268,12 +268,16 @@ export function ProjectFormDialog({
     
     setSendingDraft(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user?.email) {
+        throw new Error("Kunde inte hämta användarens e-post");
+      }
       
       const { error } = await supabase.functions.invoke('send-project-order-draft', {
-        body: { projectId: createdProjectId },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`
+        body: { 
+          projectId: createdProjectId,
+          userEmail: user.email
         }
       });
       
