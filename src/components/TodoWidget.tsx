@@ -49,6 +49,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
   const [newPriority, setNewPriority] = useState("medium");
   const [newCategory, setNewCategory] = useState("none");
   const [newDueDate, setNewDueDate] = useState("");
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const { data: properties } = useQuery({
     queryKey: ["properties-for-todos"],
@@ -63,15 +64,17 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
   });
 
   const { data: todos, isLoading, refetch } = useQuery({
-    queryKey: ["todos-widget", propertyId],
+    queryKey: ["todos-widget", propertyId, showCompleted],
     queryFn: async () => {
       let query = supabase
         .from("property_todos")
         .select("*, properties(id, name)")
-        .eq("completed", false)
         .is("parent_todo_id", null)
-        .order("due_date", { ascending: true })
-        .limit(10);
+        .order("due_date", { ascending: true });
+
+      if (!showCompleted) {
+        query = query.eq("completed", false);
+      }
 
       if (propertyId) {
         query = query.eq("property_id", propertyId);
@@ -165,7 +168,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
       if (error) throw error;
 
       refetch();
-      toast.success(completed ? "Markerad som ej klar" : "Markerad som klar");
+      toast.success(completed ? "Uppgift återaktiverad" : "Uppgift slutförd");
     } catch (error: any) {
       toast.error("Kunde inte uppdatera uppgift");
     }
@@ -245,6 +248,13 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
               <CheckSquare className="h-5 w-5 text-primary" />
               Att göra
             </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCompleted(!showCompleted)}
+            >
+              {showCompleted ? "Dölj slutförda" : "Visa slutförda"}
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -337,7 +347,10 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                         return (
                           <div
                             key={todo.id}
-                            className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                            className={cn(
+                              "flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors",
+                              todo.completed && "opacity-60 bg-muted/20"
+                            )}
                           >
                             <div onClick={(e) => e.stopPropagation()}>
                               <Checkbox
@@ -371,7 +384,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                               {todo.due_date && (
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <CalendarIcon className="h-3 w-3" />
-                                  {format(new Date(todo.due_date), "PPP", { locale: sv })}
+                                  Deadline: {format(new Date(todo.due_date), "PPP", { locale: sv })}
                                 </div>
                               )}
 
@@ -383,17 +396,18 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                               )}
                             </div>
                             
-                            {!propertyId && (
-                              <div onClick={(e) => e.stopPropagation()}>
+                            <div onClick={(e) => e.stopPropagation()} className="flex gap-1">
+                              {!propertyId && (
                                 <Button
                                   size="icon"
                                   variant="ghost"
                                   onClick={() => handleDeleteTodo(todo.id)}
+                                  title="Ta bort uppgift"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
                         );
                       })}

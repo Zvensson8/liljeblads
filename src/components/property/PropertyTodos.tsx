@@ -13,6 +13,7 @@ import { TodoPriorityBadge } from "@/components/todos/TodoPriorityBadge";
 import { TodoCategoryBadge } from "@/components/todos/TodoCategoryBadge";
 import { TodoProgressBar } from "@/components/todos/TodoProgressBar";
 import { TodoDetailDialog } from "@/components/todos/TodoDetailDialog";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -36,15 +37,20 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const { data: todos, refetch } = useQuery({
-    queryKey: ["property-todos", propertyId, categoryFilter, priorityFilter],
+    queryKey: ["property-todos", propertyId, categoryFilter, priorityFilter, showCompleted],
     queryFn: async () => {
       let query: any = supabase
         .from("property_todos")
         .select("*")
         .eq("property_id", propertyId)
         .is("parent_todo_id", null);
+
+      if (!showCompleted) {
+        query = query.eq("completed", false);
+      }
 
       if (categoryFilter) {
         query = query.eq("category", categoryFilter);
@@ -159,6 +165,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
     if (error) {
       toast.error("Kunde inte uppdatera uppgift");
     } else {
+      toast.success(completed ? "Uppgift återaktiverad" : "Uppgift slutförd");
       refetch();
     }
   };
@@ -200,32 +207,42 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
     <div className="space-y-4">
       {!compact ? (
         <>
-          <div className="flex gap-2">
-            <Select value={categoryFilter || "all"} onValueChange={(v) => setCategoryFilter(v === "all" ? null : v)}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Kategori" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alla kategorier</SelectItem>
-                <SelectItem value="Brandskydd">Brandskydd</SelectItem>
-                <SelectItem value="Underhåll">Underhåll</SelectItem>
-                <SelectItem value="Dokumentation">Dokumentation</SelectItem>
-                <SelectItem value="Besiktning">Besiktning</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex gap-2 items-center justify-between">
+            <div className="flex gap-2">
+              <Select value={categoryFilter || "all"} onValueChange={(v) => setCategoryFilter(v === "all" ? null : v)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Kategori" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alla kategorier</SelectItem>
+                  <SelectItem value="Brandskydd">Brandskydd</SelectItem>
+                  <SelectItem value="Underhåll">Underhåll</SelectItem>
+                  <SelectItem value="Dokumentation">Dokumentation</SelectItem>
+                  <SelectItem value="Besiktning">Besiktning</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={priorityFilter || "all"} onValueChange={(v) => setPriorityFilter(v === "all" ? null : v)}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Prioritet" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alla prioriteter</SelectItem>
-                <SelectItem value="critical">Kritisk</SelectItem>
-                <SelectItem value="high">Hög</SelectItem>
-                <SelectItem value="medium">Medel</SelectItem>
-                <SelectItem value="low">Låg</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={priorityFilter || "all"} onValueChange={(v) => setPriorityFilter(v === "all" ? null : v)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Prioritet" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alla prioriteter</SelectItem>
+                  <SelectItem value="critical">Kritisk</SelectItem>
+                  <SelectItem value="high">Hög</SelectItem>
+                  <SelectItem value="medium">Medel</SelectItem>
+                  <SelectItem value="low">Låg</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCompleted(!showCompleted)}
+            >
+              {showCompleted ? "Dölj slutförda" : "Visa slutförda"}
+            </Button>
           </div>
 
           <div className="flex gap-2">
@@ -299,7 +316,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
 
             return (
               <div key={todo.id}>
-                <Card className={todo.completed ? "opacity-60" : ""}>
+                <Card className={cn(todo.completed && "opacity-60 bg-muted/20")}>
                   <CardContent className="pt-4">
                     <div className="space-y-3">
                       <div className="flex items-start gap-3">
