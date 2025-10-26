@@ -382,7 +382,6 @@ export function ProjectFormDialog({
                     <SelectValue placeholder="Välj en mall för att förifyll fält" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Ingen mall</SelectItem>
                     {templates.map((template) => (
                       <SelectItem key={template.id} value={template.id}>
                         {template.name}
