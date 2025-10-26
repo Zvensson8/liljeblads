@@ -1,13 +1,35 @@
+import { useState } from "react";
+import { Plus, Edit, Trash2, Copy } from "lucide-react";
 import { useProjectTemplates } from "@/hooks/useProjectTemplates";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ProjectTemplatesProps {
   organizationId: string;
 }
 
 export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
-  const { templates, loading } = useProjectTemplates(organizationId);
+  const { templates, loading, refetch } = useProjectTemplates(organizationId);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<any>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    type: "underhall" as "investering" | "underhall" | "energi" | "annat",
+    default_budget: "",
+    estimated_duration_quarters: "",
+  });
 
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
@@ -19,17 +41,122 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
     return labels[type] || type;
   };
 
+  const handleOpenDialog = (template?: any) => {
+    if (template) {
+      setEditingTemplate(template);
+      setFormData({
+        name: template.name,
+        description: template.description || "",
+        type: template.type,
+        default_budget: template.default_budget?.toString() || "",
+        estimated_duration_quarters: template.estimated_duration_quarters?.toString() || "",
+      });
+    } else {
+      setEditingTemplate(null);
+      setFormData({
+        name: "",
+        description: "",
+        type: "underhall",
+        default_budget: "",
+        estimated_duration_quarters: "",
+      });
+    }
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const templateData = {
+        organization_id: organizationId,
+        name: formData.name,
+        description: formData.description || null,
+        type: formData.type,
+        default_budget: formData.default_budget ? Number(formData.default_budget) : null,
+        estimated_duration_quarters: formData.estimated_duration_quarters ? Number(formData.estimated_duration_quarters) : null,
+        checklist_items: editingTemplate?.checklist_items || [],
+        budget_categories: editingTemplate?.budget_categories || [],
+      };
+
+      if (editingTemplate) {
+        const { error } = await supabase
+          .from("project_templates")
+          .update(templateData)
+          .eq("id", editingTemplate.id);
+        if (error) throw error;
+        toast.success("Mall uppdaterad");
+      } else {
+        const { data: user } = await supabase.auth.getUser();
+        const { error } = await supabase
+          .from("project_templates")
+          .insert({ ...templateData, created_by: user.user?.id });
+        if (error) throw error;
+        toast.success("Mall skapad");
+      }
+
+      setDialogOpen(false);
+      refetch();
+    } catch (error: any) {
+      toast.error("Kunde inte spara mall: " + error.message);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingId) return;
+    try {
+      const { error } = await supabase
+        .from("project_templates")
+        .delete()
+        .eq("id", deletingId);
+      if (error) throw error;
+      toast.success("Mall borttagen");
+      setDeleteDialogOpen(false);
+      refetch();
+    } catch (error: any) {
+      toast.error("Kunde inte ta bort mall: " + error.message);
+    }
+  };
+
+  const handleDuplicate = async (template: any) => {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("project_templates")
+        .insert({
+          organization_id: organizationId,
+          name: `${template.name} (kopia)`,
+          description: template.description,
+          type: template.type,
+          default_budget: template.default_budget,
+          estimated_duration_quarters: template.estimated_duration_quarters,
+          checklist_items: template.checklist_items,
+          budget_categories: template.budget_categories,
+          created_by: user.user?.id,
+        });
+      if (error) throw error;
+      toast.success("Mall duplicerad");
+      refetch();
+    } catch (error: any) {
+      toast.error("Kunde inte duplicera mall: " + error.message);
+    }
+  };
+
   if (loading) {
     return <div className="p-8 text-center">Laddar mallar...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold">Projektmallar</h3>
-        <p className="text-sm text-muted-foreground">
-          Förinställda mallar för din organisation ({templates.length} st)
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">Projektmallar</h3>
+          <p className="text-sm text-muted-foreground">
+            Skapa och hantera projektmallar för din organisation
+          </p>
+        </div>
+        <Button onClick={() => handleOpenDialog()}>
+          <Plus className="h-4 w-4 mr-2" />
+          Ny mall
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -83,6 +210,26 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
                     </div>
                   </div>
                 </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" size="sm" onClick={() => handleOpenDialog(template)}>
+                    <Edit className="h-3 w-3 mr-1" />
+                    Redigera
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleDuplicate(template)}>
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setDeletingId(template.id);
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -92,10 +239,110 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
       {templates.length === 0 && (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            <p>Inga mallar tillgängliga.</p>
+            <p>Inga mallar skapade än. Klicka på "Ny mall" för att skapa din första mall.</p>
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingTemplate ? "Redigera mall" : "Skapa ny mall"}</DialogTitle>
+            <DialogDescription>
+              Skapa en mall som kan användas för att snabbt skapa nya projekt
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Namn *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="T.ex. Fasadrenovering"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Beskrivning</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Beskriv projektmallen..."
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="type">Typ *</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value: any) => setFormData({ ...formData, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="investering">Investering</SelectItem>
+                    <SelectItem value="underhall">Underhåll</SelectItem>
+                    <SelectItem value="energi">Energi</SelectItem>
+                    <SelectItem value="annat">Annat</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="budget">Budget (kr)</Label>
+                <Input
+                  id="budget"
+                  type="number"
+                  value={formData.default_budget}
+                  onChange={(e) => setFormData({ ...formData, default_budget: e.target.value })}
+                  placeholder="500000"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="duration">Förväntad varaktighet (kvartal)</Label>
+              <Input
+                id="duration"
+                type="number"
+                value={formData.estimated_duration_quarters}
+                onChange={(e) => setFormData({ ...formData, estimated_duration_quarters: e.target.value })}
+                placeholder="2"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Avbryt
+            </Button>
+            <Button onClick={handleSubmit}>
+              {editingTemplate ? "Uppdatera" : "Skapa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Är du säker?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Detta kommer att ta bort mallen. Befintliga projekt påverkas inte.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Ta bort</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

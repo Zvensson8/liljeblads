@@ -35,6 +35,7 @@ import { ProjectSimulation } from "@/components/projects/ProjectSimulation";
 import { ProjectActivityLog } from "@/components/projects/ProjectActivityLog";
 import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
 import { ProjectEconomyOverview } from "@/components/projects/ProjectEconomyOverview";
+import { ProjectReportButton } from "@/components/projects/ProjectReportButton";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
 import { exportProjectToZip } from "@/lib/zipExport";
@@ -329,6 +330,7 @@ export default function ProjectDetail() {
                 <Download className="h-4 w-4 mr-2" />
                 {exporting ? "Exporterar..." : "Exportera"}
               </Button>
+              <ProjectReportButton projectId={project.id} />
               {project.is_archived ? (
                 <Button variant="outline" size="sm" onClick={handleReactivate}>
                   <RefreshCw className="h-4 w-4 mr-2" />

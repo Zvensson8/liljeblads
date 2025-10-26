@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -37,6 +38,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { useProjectTemplates } from "@/hooks/useProjectTemplates";
+import { useOrganization } from "@/hooks/useOrganization";
 
 const projectSchema = z.object({
   property_id: z.string().min(1, "Fastighet krävs"),
@@ -73,6 +76,10 @@ export function ProjectFormDialog({
   const [showOrderDraftOption, setShowOrderDraftOption] = useState(false);
   const [sendingDraft, setSendingDraft] = useState(false);
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  
+  const { organization } = useOrganization();
+  const { templates } = useProjectTemplates(organization?.id);
 
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -304,6 +311,23 @@ export function ProjectFormDialog({
     onSuccess();
   };
 
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    if (!templateId) return;
+    
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      form.setValue("name", template.name);
+      form.setValue("description", template.description || "");
+      form.setValue("type", template.type as any);
+      form.setValue("budget", template.default_budget || 0);
+      if (template.estimated_duration_quarters) {
+        form.setValue("end_quarter", Math.min(4, template.estimated_duration_quarters));
+      }
+      toast.success(`Mall "${template.name}" tillagd`);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -349,6 +373,30 @@ export function ProjectFormDialog({
                 </FormItem>
               )}
             />
+
+            {!editingProject && templates.length > 0 && (
+              <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
+                <Label>Använd projektmall (valfritt)</Label>
+                <Select value={selectedTemplateId} onValueChange={handleTemplateSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Välj en mall för att förifyll fält" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Ingen mall</SelectItem>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedTemplateId && (
+                  <p className="text-xs text-muted-foreground">
+                    Mallen har fyllt i projektnamn, beskrivning, typ och budget. Du kan ändra dessa efter behov.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
