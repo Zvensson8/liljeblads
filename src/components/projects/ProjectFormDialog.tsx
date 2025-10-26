@@ -245,6 +245,31 @@ export function ProjectFormDialog({
 
         if (error) throw error;
 
+        // Om mall användes, kopiera checklist items
+        if (selectedTemplateId) {
+          const template = templates.find(t => t.id === selectedTemplateId);
+          if (template?.checklist_items && template.checklist_items.length > 0) {
+            const checklistItems = template.checklist_items.map((item: any, index: number) => ({
+              project_id: project.id,
+              title: item.title,
+              description: item.description || null,
+              completed: false,
+              order_index: index,
+              deadline: null,
+              responsible: null,
+            }));
+
+            const { error: checklistError } = await supabase
+              .from("project_checklist_items")
+              .insert(checklistItems);
+
+            if (checklistError) {
+              console.error("Kunde inte kopiera checklista:", checklistError);
+              toast.error("Projekt skapat men checklista kunde inte kopieras");
+            }
+          }
+        }
+
         await supabase.from("project_activity_log").insert({
           project_id: project.id,
           activity_type: "status_change",
@@ -311,7 +336,7 @@ export function ProjectFormDialog({
     onSuccess();
   };
 
-  const handleTemplateSelect = (templateId: string) => {
+  const handleTemplateSelect = async (templateId: string) => {
     setSelectedTemplateId(templateId);
     if (!templateId) return;
     
@@ -320,7 +345,6 @@ export function ProjectFormDialog({
       form.setValue("name", template.name);
       form.setValue("description", template.description || "");
       form.setValue("type", template.type as any);
-      form.setValue("budget", template.default_budget || 0);
       if (template.estimated_duration_quarters) {
         form.setValue("end_quarter", Math.min(4, template.estimated_duration_quarters));
       }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Edit, Trash2, Copy } from "lucide-react";
+import { Plus, Edit, Trash2, Copy, X } from "lucide-react";
 import { useProjectTemplates } from "@/hooks/useProjectTemplates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,9 +27,11 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
     name: "",
     description: "",
     type: "underhall" as "investering" | "underhall" | "energi" | "annat",
-    default_budget: "",
     estimated_duration_quarters: "",
+    checklist_items: [] as Array<{ title: string; description: string }>,
   });
+  const [checklistDialogOpen, setChecklistDialogOpen] = useState(false);
+  const [newChecklistItem, setNewChecklistItem] = useState({ title: "", description: "" });
 
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
@@ -48,8 +50,8 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
         name: template.name,
         description: template.description || "",
         type: template.type,
-        default_budget: template.default_budget?.toString() || "",
         estimated_duration_quarters: template.estimated_duration_quarters?.toString() || "",
+        checklist_items: template.checklist_items || [],
       });
     } else {
       setEditingTemplate(null);
@@ -57,8 +59,8 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
         name: "",
         description: "",
         type: "underhall",
-        default_budget: "",
         estimated_duration_quarters: "",
+        checklist_items: [],
       });
     }
     setDialogOpen(true);
@@ -71,9 +73,8 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
         name: formData.name,
         description: formData.description || null,
         type: formData.type,
-        default_budget: formData.default_budget ? Number(formData.default_budget) : null,
         estimated_duration_quarters: formData.estimated_duration_quarters ? Number(formData.estimated_duration_quarters) : null,
-        checklist_items: editingTemplate?.checklist_items || [],
+        checklist_items: formData.checklist_items,
         budget_categories: editingTemplate?.budget_categories || [],
       };
 
@@ -126,7 +127,6 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
           name: `${template.name} (kopia)`,
           description: template.description,
           type: template.type,
-          default_budget: template.default_budget,
           estimated_duration_quarters: template.estimated_duration_quarters,
           checklist_items: template.checklist_items,
           budget_categories: template.budget_categories,
@@ -181,14 +181,6 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
                 )}
                 
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  {template.default_budget && (
-                    <div>
-                      <span className="text-muted-foreground">Budget:</span>
-                      <div className="font-medium">
-                        {template.default_budget.toLocaleString("sv-SE")} kr
-                      </div>
-                    </div>
-                  )}
                   {template.estimated_duration_quarters && (
                     <div>
                       <span className="text-muted-foreground">Varaktighet:</span>
@@ -201,12 +193,6 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
                     <span className="text-muted-foreground">Checklista:</span>
                     <div className="font-medium">
                       {template.checklist_items?.length || 0} punkter
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Kategorier:</span>
-                    <div className="font-medium">
-                      {template.budget_categories?.length || 0} st
                     </div>
                   </div>
                 </div>
@@ -295,26 +281,58 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="budget">Budget (kr)</Label>
+                <Label htmlFor="duration">Förväntad varaktighet (kvartal)</Label>
                 <Input
-                  id="budget"
+                  id="duration"
                   type="number"
-                  value={formData.default_budget}
-                  onChange={(e) => setFormData({ ...formData, default_budget: e.target.value })}
-                  placeholder="500000"
+                  value={formData.estimated_duration_quarters}
+                  onChange={(e) => setFormData({ ...formData, estimated_duration_quarters: e.target.value })}
+                  placeholder="2"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="duration">Förväntad varaktighet (kvartal)</Label>
-              <Input
-                id="duration"
-                type="number"
-                value={formData.estimated_duration_quarters}
-                onChange={(e) => setFormData({ ...formData, estimated_duration_quarters: e.target.value })}
-                placeholder="2"
-              />
+              <div className="flex items-center justify-between">
+                <Label>Checklista ({formData.checklist_items.length} punkter)</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setChecklistDialogOpen(true)}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Lägg till
+                </Button>
+              </div>
+              {formData.checklist_items.length > 0 && (
+                <div className="border rounded-md divide-y max-h-48 overflow-y-auto">
+                  {formData.checklist_items.map((item, index) => (
+                    <div key={index} className="p-3 flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">{item.title}</div>
+                        {item.description && (
+                          <div className="text-xs text-muted-foreground truncate">
+                            {item.description}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const newItems = [...formData.checklist_items];
+                          newItems.splice(index, 1);
+                          setFormData({ ...formData, checklist_items: newItems });
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -343,6 +361,67 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={checklistDialogOpen} onOpenChange={setChecklistDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lägg till checklistpunkt</DialogTitle>
+            <DialogDescription>
+              Skapa en ny punkt i projektmallens checklista
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="checklist-title">Titel *</Label>
+              <Input
+                id="checklist-title"
+                value={newChecklistItem.title}
+                onChange={(e) => setNewChecklistItem({ ...newChecklistItem, title: e.target.value })}
+                placeholder="T.ex. Kontakta entreprenör"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="checklist-description">Beskrivning</Label>
+              <Textarea
+                id="checklist-description"
+                value={newChecklistItem.description}
+                onChange={(e) => setNewChecklistItem({ ...newChecklistItem, description: e.target.value })}
+                placeholder="Valfri beskrivning..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setChecklistDialogOpen(false);
+                setNewChecklistItem({ title: "", description: "" });
+              }}
+            >
+              Avbryt
+            </Button>
+            <Button
+              onClick={() => {
+                if (newChecklistItem.title.trim()) {
+                  setFormData({
+                    ...formData,
+                    checklist_items: [...formData.checklist_items, newChecklistItem],
+                  });
+                  setNewChecklistItem({ title: "", description: "" });
+                  setChecklistDialogOpen(false);
+                  toast.success("Checklistpunkt tillagd");
+                }
+              }}
+            >
+              Lägg till
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
