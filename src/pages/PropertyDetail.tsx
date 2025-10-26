@@ -470,7 +470,6 @@ const PropertyDetail = () => {
                 <TabsTrigger value="todos">Att göra</TabsTrigger>
                 <TabsTrigger value="contacts">Kontakter</TabsTrigger>
                 <TabsTrigger value="documents">Dokument</TabsTrigger>
-                <TabsTrigger value="economy">Ekonomi</TabsTrigger>
                 <TabsTrigger value="activity">Aktivitet</TabsTrigger>
                 <TabsTrigger value="technical-info">Teknisk info</TabsTrigger>
                 <TabsTrigger value="info-categories">Info-kategorier</TabsTrigger>
@@ -501,9 +500,6 @@ const PropertyDetail = () => {
             </TabsContent>
             <TabsContent value="documents">
               <PropertyDocuments propertyId={property.id} />
-            </TabsContent>
-            <TabsContent value="economy">
-              <PropertyEconomy propertyId={property.id} />
             </TabsContent>
             <TabsContent value="activity">
               <ActivityTimeline propertyId={property.id} />
@@ -624,7 +620,6 @@ const PropertyDetail = () => {
                   <TabsTrigger value="todos">Att göra</TabsTrigger>
                   <TabsTrigger value="contacts">Kontakter</TabsTrigger>
                   <TabsTrigger value="documents">Dokument</TabsTrigger>
-                  <TabsTrigger value="economy">Ekonomi</TabsTrigger>
                   <TabsTrigger value="activity">Aktivitet</TabsTrigger>
                   <TabsTrigger value="technical-info">Teknisk info</TabsTrigger>
                   <TabsTrigger value="info-categories">Info-kategorier</TabsTrigger>
@@ -650,9 +645,6 @@ const PropertyDetail = () => {
                 </TabsContent>
                 <TabsContent value="documents">
                   <PropertyDocuments propertyId={property.id} />
-                </TabsContent>
-                <TabsContent value="economy">
-                  <PropertyEconomy propertyId={property.id} />
                 </TabsContent>
                 <TabsContent value="activity">
                   <ActivityTimeline propertyId={property.id} />
