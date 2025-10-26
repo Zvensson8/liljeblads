@@ -347,9 +347,6 @@ const Dashboard = () => {
               {/* To-Do List - replaced with TodoWidget */}
               <TodoWidget propertyId={selectedProperty === "all" ? undefined : selectedProperty} />
 
-              {/* Recently Visited */}
-              <RecentlyVisitedWidget />
-
               {/* Projects and Work Orders Grid - Full Width */}
               <div className="grid gap-6 md:grid-cols-2">
                 {/* Ongoing Projects */}
@@ -451,6 +448,9 @@ const Dashboard = () => {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Recently Visited */}
+              <RecentlyVisitedWidget />
             </div>
           </main>
         </SidebarInset>
