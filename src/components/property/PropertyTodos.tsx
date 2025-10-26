@@ -264,6 +264,8 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
               value={newDueDate}
               onChange={(e) => setNewDueDate(e.target.value)}
               className="w-40"
+              placeholder="Deadline"
+              title="Deadline"
             />
             <Button onClick={handleAddTodo} disabled={!newTodo.trim()}>
               <Plus className="h-4 w-4 mr-2" />
@@ -328,7 +330,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
                           {todo.due_date && (
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <Calendar className="h-3 w-3" />
-                              {format(new Date(todo.due_date), "yyyy-MM-dd", { locale: sv })}
+                              <span>Deadline: {format(new Date(todo.due_date), "yyyy-MM-dd", { locale: sv })}</span>
                             </div>
                           )}
 
