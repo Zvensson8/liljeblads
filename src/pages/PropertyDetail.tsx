@@ -23,7 +23,7 @@ import { PropertyContacts } from '@/components/property/PropertyContacts';
 import { PropertyDocuments } from '@/components/property/PropertyDocuments';
 import { PropertyOverview } from '@/components/property/PropertyOverview';
 import { PropertyEconomy } from '@/components/property/PropertyEconomy';
-import { PropertyMaintenancePlan } from '@/components/property/PropertyMaintenancePlan';
+
 import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { Badge } from '@/components/ui/badge';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
@@ -427,7 +427,7 @@ const PropertyDetail = () => {
                   <div>
                     <h1 className="text-xl sm:text-2xl font-bold">{property.name}</h1>
                     <p className="text-sm text-muted-foreground">
-                      {property.property_number ? `#${property.property_number}` : `#${property.id.substring(0, 5).toUpperCase()}`}
+                      {property.property_number || property.id.substring(0, 5).toUpperCase()}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -471,7 +471,6 @@ const PropertyDetail = () => {
                 <TabsTrigger value="contacts">Kontakter</TabsTrigger>
                 <TabsTrigger value="documents">Dokument</TabsTrigger>
                 <TabsTrigger value="economy">Ekonomi</TabsTrigger>
-                <TabsTrigger value="maintenance">Underhållsplan</TabsTrigger>
                 <TabsTrigger value="activity">Aktivitet</TabsTrigger>
                 <TabsTrigger value="technical-info">Teknisk info</TabsTrigger>
                 <TabsTrigger value="info-categories">Info-kategorier</TabsTrigger>
@@ -505,9 +504,6 @@ const PropertyDetail = () => {
             </TabsContent>
             <TabsContent value="economy">
               <PropertyEconomy propertyId={property.id} />
-            </TabsContent>
-            <TabsContent value="maintenance">
-              <PropertyMaintenancePlan propertyId={property.id} />
             </TabsContent>
             <TabsContent value="activity">
               <ActivityTimeline propertyId={property.id} />
@@ -585,7 +581,7 @@ const PropertyDetail = () => {
                     <div>
                       <h1 className="text-xl sm:text-2xl font-bold">{property.name}</h1>
                       <p className="text-sm text-muted-foreground">
-                        {property.property_number ? `#${property.property_number}` : `#${property.id.substring(0, 5).toUpperCase()}`}
+                        {property.property_number || property.id.substring(0, 5).toUpperCase()}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -629,7 +625,6 @@ const PropertyDetail = () => {
                   <TabsTrigger value="contacts">Kontakter</TabsTrigger>
                   <TabsTrigger value="documents">Dokument</TabsTrigger>
                   <TabsTrigger value="economy">Ekonomi</TabsTrigger>
-                  <TabsTrigger value="maintenance">Underhållsplan</TabsTrigger>
                   <TabsTrigger value="activity">Aktivitet</TabsTrigger>
                   <TabsTrigger value="technical-info">Teknisk info</TabsTrigger>
                   <TabsTrigger value="info-categories">Info-kategorier</TabsTrigger>
@@ -658,9 +653,6 @@ const PropertyDetail = () => {
                 </TabsContent>
                 <TabsContent value="economy">
                   <PropertyEconomy propertyId={property.id} />
-                </TabsContent>
-                <TabsContent value="maintenance">
-                  <PropertyMaintenancePlan propertyId={property.id} />
                 </TabsContent>
                 <TabsContent value="activity">
                   <ActivityTimeline propertyId={property.id} />
