@@ -197,7 +197,6 @@ export default function OrganizationSettings() {
                 <TabsTrigger value="info">Information</TabsTrigger>
                 <TabsTrigger value="members">Medlemmar</TabsTrigger>
                 {isAdmin && <TabsTrigger value="invitations">Inbjudningar</TabsTrigger>}
-                {isAdmin && <TabsTrigger value="subscription">Prenumeration</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="branding">Varumärke</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="property-info">Fastighetsinformation</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="export">Data Export</TabsTrigger>}
@@ -222,16 +221,6 @@ export default function OrganizationSettings() {
               {isAdmin && (
                 <TabsContent value="invitations">
                   <OrganizationInvitations organizationId={organization.id} />
-                </TabsContent>
-              )}
-
-              {isAdmin && (
-                <TabsContent value="subscription">
-                  <OrganizationSubscription
-                    organization={organization}
-                    stats={stats}
-                    onUpdate={fetchOrganizationData}
-                  />
                 </TabsContent>
               )}
 
