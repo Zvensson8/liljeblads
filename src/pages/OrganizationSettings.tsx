@@ -198,6 +198,7 @@ export default function OrganizationSettings() {
                 <TabsTrigger value="members">Medlemmar</TabsTrigger>
                 {isAdmin && <TabsTrigger value="invitations">Inbjudningar</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="branding">Varumärke</TabsTrigger>}
+                {isAdmin && <TabsTrigger value="templates">Projektmallar</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="property-info">Fastighetsinformation</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="export">Data Export</TabsTrigger>}
               </TabsList>

@@ -1258,6 +1258,59 @@ export type Database = {
           },
         ]
       }
+      project_templates: {
+        Row: {
+          budget_categories: Json | null
+          checklist_items: Json | null
+          created_at: string
+          created_by: string | null
+          default_budget: number | null
+          description: string | null
+          estimated_duration_quarters: number | null
+          id: string
+          name: string
+          organization_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          budget_categories?: Json | null
+          checklist_items?: Json | null
+          created_at?: string
+          created_by?: string | null
+          default_budget?: number | null
+          description?: string | null
+          estimated_duration_quarters?: number | null
+          id?: string
+          name: string
+          organization_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          budget_categories?: Json | null
+          checklist_items?: Json | null
+          created_at?: string
+          created_by?: string | null
+          default_budget?: number | null
+          description?: string | null
+          estimated_duration_quarters?: number | null
+          id?: string
+          name?: string
+          organization_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           actors: string[] | null
