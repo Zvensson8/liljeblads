@@ -19,6 +19,7 @@ interface DashboardStats {
   totalWorkOrders: number;
   totalProjects: number;
   totalTodos: number;
+  pendingTodos: number;
   pendingWorkOrders: number;
   activeProjects: number;
   completedTodos: number;
@@ -68,6 +69,7 @@ const Dashboard = () => {
     totalWorkOrders: 0,
     totalProjects: 0,
     totalTodos: 0,
+    pendingTodos: 0,
     pendingWorkOrders: 0,
     activeProjects: 0,
     completedTodos: 0,
@@ -133,6 +135,7 @@ const Dashboard = () => {
         totalWorkOrders: data.total_work_orders || 0,
         totalProjects: data.total_projects || 0,
         totalTodos: data.total_todos || 0,
+        pendingTodos: data.pending_todos || 0,
         pendingWorkOrders: data.pending_work_orders || 0,
         activeProjects: data.active_projects || 0,
         completedTodos: data.completed_todos || 0,
@@ -254,11 +257,11 @@ const Dashboard = () => {
     },
     {
       title: 'Att göra',
-      value: stats.totalTodos,
-      prev: prevStats?.totalTodos,
+      value: stats.pendingTodos,
+      prev: prevStats?.pendingTodos,
       subtitle: `${stats.completedTodos} klara`,
       icon: CheckSquare,
-      description: 'Totalt antal uppgifter',
+      description: 'Öppna uppgifter',
       color: 'text-green-500',
       bgColor: 'bg-green-500/10',
     },
