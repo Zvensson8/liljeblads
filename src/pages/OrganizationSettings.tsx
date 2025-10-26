@@ -15,6 +15,7 @@ import { OrganizationSubscription } from "@/components/organization/Organization
 import { OrganizationBranding } from "@/components/organization/OrganizationBranding";
 import { OrganizationDataExport } from "@/components/organization/OrganizationDataExport";
 import { PropertyInfoCategoryManager } from "@/components/property-info/PropertyInfoCategoryManager";
+import { ProjectTemplates } from "@/components/organization/ProjectTemplates";
 
 
 interface Organization {
@@ -231,6 +232,12 @@ export default function OrganizationSettings() {
                     organization={organization}
                     onUpdate={fetchOrganizationData}
                   />
+                </TabsContent>
+              )}
+
+              {isAdmin && (
+                <TabsContent value="templates">
+                  <ProjectTemplates organizationId={organization.id} />
                 </TabsContent>
               )}
 
