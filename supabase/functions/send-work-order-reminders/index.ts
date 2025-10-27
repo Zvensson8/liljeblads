@@ -79,6 +79,15 @@ serve(async (req) => {
         const createdDate = new Date(order.created_at);
         const daysSinceCreated = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
 
+        const escapeHtml = (text: string): string => {
+          return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        };
+
         const emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -111,7 +120,7 @@ serve(async (req) => {
     <div class="content">
       <div class="alert-box">
         <h2 style="color: #92400e;">Dags för uppföljning!</h2>
-        <p style="margin: 0; color: #78350f;">Det har nu gått <strong>${daysSinceCreated} dagar</strong> sedan arbetet med <strong>${order.action}</strong> påbörjades på <strong>${order.properties.name}</strong>.</p>
+        <p style="margin: 0; color: #78350f;">Det har nu gått <strong>${daysSinceCreated} dagar</strong> sedan arbetet med <strong>${escapeHtml(order.action)}</strong> påbörjades på <strong>${escapeHtml(order.properties.name)}</strong>.</p>
       </div>
 
       <div class="stat">
@@ -121,8 +130,8 @@ serve(async (req) => {
 
       <div class="info-box">
         <h2>📋 Arbetsorderinformation</h2>
-        <p><strong>Åtgärd:</strong> ${order.action}</p>
-        <p><strong>Fastighet:</strong> ${order.properties.name}</p>
+        <p><strong>Åtgärd:</strong> ${escapeHtml(order.action)}</p>
+        <p><strong>Fastighet:</strong> ${escapeHtml(order.properties.name)}</p>
         <p style="margin-bottom: 0;"><strong>Status:</strong> Beställd</p>
       </div>
 
@@ -131,7 +140,7 @@ serve(async (req) => {
         <div style="background: white; padding: 15px; border-radius: 4px; margin-top: 15px;">
           <p style="margin: 0 0 10px 0;">Hej,</p>
           <p style="margin: 0 0 10px 0;">Hoppas allt är bra!</p>
-          <p style="margin: 0 0 10px 0;">Vill bara följa upp status avseende arbetet med <strong>${order.action}</strong> på <strong>${order.properties.name}</strong>.</p>
+          <p style="margin: 0 0 10px 0;">Vill bara följa upp status avseende arbetet med <strong>${escapeHtml(order.action)}</strong> på <strong>${escapeHtml(order.properties.name)}</strong>.</p>
           <p style="margin: 0;">Ha en bra dag!</p>
         </div>
       </div>
@@ -154,7 +163,7 @@ serve(async (req) => {
           await resend.emails.send({
             from: 'Arbetsorderpåminnelser <onboarding@resend.dev>',
             to: [order.reminder_recipient_email],
-            subject: `Påminnelse: Uppföljning av ${order.action}`,
+            subject: `Påminnelse: Uppföljning av ${escapeHtml(order.action)}`,
             html: emailHtml,
           });
 
@@ -165,9 +174,10 @@ serve(async (req) => {
             .eq('id', order.id);
 
           remindersSent++;
-          console.log(`Reminder sent successfully for work order ${order.id}`);
-        } catch (emailError) {
-          console.error(`Failed to send reminder for work order ${order.id}:`, emailError);
+          const maskedRecipient = order.reminder_recipient_email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+          console.log(`Reminder sent successfully for work order ${order.id} to ${maskedRecipient}`);
+        } catch (emailError: any) {
+          console.error(`Failed to send reminder for work order ${order.id}:`, emailError.message || "Unknown error");
         }
       }
     }
@@ -186,9 +196,9 @@ serve(async (req) => {
       }
     );
   } catch (error: any) {
-    console.error('Error in send-work-order-reminders function:', error);
+    console.error('Error in send-work-order-reminders function:', error.message || 'Unknown error');
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Failed to send work order reminders' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,

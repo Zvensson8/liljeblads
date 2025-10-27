@@ -97,6 +97,15 @@ serve(async (req) => {
       }).format(amount);
     };
 
+    const escapeHtml = (text: string): string => {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
     // Generate project rows
     const projectRows = typedProjects.map(project => {
       const completion = project.budget > 0 
@@ -109,14 +118,14 @@ serve(async (req) => {
       return `
         <tr>
           <td>
-            <strong>${project.project_number}</strong><br>
-            <small style="color: #6b7280;">${project.name}</small>
+            <strong>${escapeHtml(project.project_number)}</strong><br>
+            <small style="color: #6b7280;">${escapeHtml(project.name)}</small>
           </td>
-          <td>${project.properties.name}</td>
+          <td>${escapeHtml(project.properties.name)}</td>
           <td>
             <span class="badge badge-${statusClass}">${statusLabel}</span>
           </td>
-          <td>${project.project_manager || '-'}</td>
+          <td>${escapeHtml(project.project_manager || '-')}</td>
           <td>${formatCurrency(project.budget || 0)}</td>
           <td>${formatCurrency(project.actual_cost || 0)}</td>
           <td>${formatCurrency(project.forecast || 0)}</td>
@@ -229,16 +238,17 @@ serve(async (req) => {
       html: emailHtml,
     });
 
-    console.log(`Project summary sent to ${userEmail}`);
+    const maskedEmail = userEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+    console.log(`Project summary sent to ${maskedEmail}`);
 
     return new Response(
       JSON.stringify({ success: true, message: 'Project summary sent' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: any) {
-    console.error('Error in send-monthly-project-summary:', error);
+    console.error('Error in send-monthly-project-summary:', error.message || 'Unknown error');
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Failed to send monthly project summary' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

@@ -69,7 +69,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     const contact = contacts && contacts.length > 0 ? contacts[0] : null;
 
-    console.log("Skickar arbetsorderutkast till:", userEmail);
+    const maskedEmail = userEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+    console.log("Skickar arbetsorderutkast till:", maskedEmail);
 
     // Formatera datum
     const timestamp = new Date().toLocaleString("sv-SE", {
@@ -89,6 +90,15 @@ const handler = async (req: Request): Promise<Response> => {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
       }).format(amount);
+    };
+
+    const escapeHtml = (text: string): string => {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
     };
 
     const organization = workOrder.property.organization || { name: "Er organisation", logo_url: null };
@@ -129,31 +139,31 @@ const handler = async (req: Request): Promise<Response> => {
     <p>Hej,</p>
     <p>Hoppas allt är bra!</p>
     
-    <p>Vi önskar härmed beställa arbetet avseende <strong>${workOrder.action}</strong> på fastigheten <strong>${workOrder.property.name}${workOrder.property.address ? ', ' + workOrder.property.address : ''}</strong>.</p>
+    <p>Vi önskar härmed beställa arbetet avseende <strong>${escapeHtml(workOrder.action)}</strong> på fastigheten <strong>${escapeHtml(workOrder.property.name)}${workOrder.property.address ? ', ' + escapeHtml(workOrder.property.address) : ''}</strong>.</p>
     
-    ${workOrder.comments ? `<p>Åtgärden omfattar ${workOrder.comments}.</p>` : ''}
+    ${workOrder.comments ? `<p>Åtgärden omfattar ${escapeHtml(workOrder.comments)}.</p>` : ''}
     
-    ${workOrder.quarter ? `<p>Arbetet planeras att utföras under <strong>${workOrder.quarter}</strong>.</p>` : ''}
+    ${workOrder.quarter ? `<p>Arbetet planeras att utföras under <strong>${escapeHtml(workOrder.quarter)}</strong>.</p>` : ''}
     
     <div class="section">
-      <p><strong>Åtgärd:</strong> ${workOrder.action}</p>
+      <p><strong>Åtgärd:</strong> ${escapeHtml(workOrder.action)}</p>
       ${workOrder.price ? `<p><strong>Estimerat pris:</strong> ${formatAmount(workOrder.price)}</p>` : ''}
     </div>
     
     <div class="section">
       <p><strong>Fakturering sker till:</strong></p>
-      <p style="white-space: pre-line;">${workOrder.property.invoice_address || workOrder.property.address || 'Ej angiven'}</p>
+      <p style="white-space: pre-line;">${escapeHtml(workOrder.property.invoice_address || workOrder.property.address || 'Ej angiven')}</p>
       
-      <p><strong>Märkning:</strong> ${workOrder.property.property_number || 'Ej angivet'} + Kontonummer</p>
+      <p><strong>Märkning:</strong> ${escapeHtml(workOrder.property.property_number || 'Ej angivet')} + Kontonummer</p>
       <p><strong>Faktura skickas till:</strong> scanning@retta.se</p>
     </div>
     
     ${contact ? `
     <div class="section">
       <p><strong>För frågor kring det praktiska arbetet eller tillgång till fastigheten, vänligen kontakta:</strong></p>
-      <p>${contact.name}${contact.role ? ' (' + contact.role + ')' : ''}</p>
-      ${contact.phone ? `<p><strong>Telefon:</strong> ${contact.phone}</p>` : ''}
-      ${contact.email ? `<p><strong>E-post:</strong> <a href="mailto:${contact.email}">${contact.email}</a></p>` : ''}
+      <p>${escapeHtml(contact.name)}${contact.role ? ' (' + escapeHtml(contact.role) + ')' : ''}</p>
+      ${contact.phone ? `<p><strong>Telefon:</strong> ${escapeHtml(contact.phone)}</p>` : ''}
+      ${contact.email ? `<p><strong>E-post:</strong> <a href="mailto:${escapeHtml(contact.email)}">${escapeHtml(contact.email)}</a></p>` : ''}
     </div>
     ` : ''}
     
@@ -165,24 +175,22 @@ const handler = async (req: Request): Promise<Response> => {
     <p>Tack på förhand.</p>
     
     <div class="section" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
-      <p>Detta meddelande är skickat från ${organization.name}</p>
-      <p>Genererat ${timestamp}</p>
+      <p>Detta meddelande är skickat från ${escapeHtml(organization.name)}</p>
+      <p>Genererat ${escapeHtml(timestamp)}</p>
     </div>
   </div>
 </body>
 </html>
     `;
 
-    console.log("Skickar arbetsorderbeställning till:", userEmail);
-
     const emailResponse = await resend.emails.send({
       from: "Fastighetssystem <onboarding@resend.dev>",
       to: [userEmail],
-      subject: `Beställning – ${workOrder.action} ${workOrder.property.name}`,
+      subject: `Beställning – ${escapeHtml(workOrder.action)} ${escapeHtml(workOrder.property.name)}`,
       html: htmlContent,
     });
 
-    console.log("E-post skickad:", emailResponse);
+    console.log("E-post skickad (ID logged only)");
 
     return new Response(
       JSON.stringify({ 
@@ -198,10 +206,10 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
   } catch (error: any) {
-    console.error("Error i send-work-order-draft:", error);
+    console.error("Error i send-work-order-draft:", error.message || "Unknown error");
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Kunde inte skicka beställningsutkast" 
+        error: "Kunde inte skicka beställningsutkast" 
       }),
       {
         status: 500,

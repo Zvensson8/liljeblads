@@ -74,12 +74,22 @@ const handler = async (req: Request): Promise<Response> => {
 
     let sentCount = 0;
 
+    const escapeHtml = (text: string): string => {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
     if (todos && todos.length > 0) {
       for (const todo of todos as Todo[]) {
-        console.log(`Sending reminder for todo: ${todo.title}`);
+        const maskedEmail = todo.reminder_email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+        console.log(`Sending reminder for todo: ${todo.title} to ${maskedEmail}`);
         
         const propertyInfo = todo.properties 
-          ? `<p><strong>Fastighet:</strong> ${todo.properties.name}<br>${todo.properties.address}</p>`
+          ? `<p><strong>Fastighet:</strong> ${escapeHtml(todo.properties.name)}<br>${escapeHtml(todo.properties.address)}</p>`
           : '';
         
         const dueDateInfo = todo.due_date 
@@ -87,7 +97,7 @@ const handler = async (req: Request): Promise<Response> => {
           : '';
         
         const notesInfo = todo.notes 
-          ? `<p><strong>Anteckningar:</strong><br>${todo.notes}</p>`
+          ? `<p><strong>Anteckningar:</strong><br>${escapeHtml(todo.notes)}</p>`
           : '';
         
         const priorityLabels: Record<string, string> = {
@@ -109,7 +119,7 @@ const handler = async (req: Request): Promise<Response> => {
           const { error: emailError } = await resend.emails.send({
             from: "Påminnelse <onboarding@resend.dev>",
             to: [todo.reminder_email],
-            subject: `Påminnelse: ${todo.title}`,
+            subject: `Påminnelse: ${escapeHtml(todo.title)}`,
             html: `
 <!DOCTYPE html>
 <html>
@@ -137,15 +147,15 @@ const handler = async (req: Request): Promise<Response> => {
     
     <div class="content">
       <div class="todo-box">
-        <h2>${todo.title}</h2>
+        <h2>${escapeHtml(todo.title)}</h2>
         
         <div class="info-row">
-          <strong>🎯 Prioritet:</strong> <span class="priority-badge">${priorityLabels[todo.priority] || todo.priority}</span>
+          <strong>🎯 Prioritet:</strong> <span class="priority-badge">${escapeHtml(priorityLabels[todo.priority] || todo.priority)}</span>
         </div>
 
         ${todo.category ? `
         <div class="info-row">
-          <strong>📂 Kategori:</strong> ${todo.category}
+          <strong>📂 Kategori:</strong> ${escapeHtml(todo.category)}
         </div>
         ` : ''}
 
@@ -157,15 +167,15 @@ const handler = async (req: Request): Promise<Response> => {
 
         ${todo.properties ? `
         <div class="info-row">
-          <strong>🏢 Fastighet:</strong> ${todo.properties.name}<br>
-          <span style="color: #6b7280; font-size: 14px;">${todo.properties.address}</span>
+          <strong>🏢 Fastighet:</strong> ${escapeHtml(todo.properties.name)}<br>
+          <span style="color: #6b7280; font-size: 14px;">${escapeHtml(todo.properties.address)}</span>
         </div>
         ` : ''}
 
         ${todo.notes ? `
         <div class="info-row">
           <strong>📝 Anteckningar:</strong><br>
-          <span style="color: #374151;">${todo.notes}</span>
+          <span style="color: #374151;">${escapeHtml(todo.notes)}</span>
         </div>
         ` : ''}
       </div>
@@ -186,7 +196,7 @@ const handler = async (req: Request): Promise<Response> => {
           });
 
           if (emailError) {
-            console.error(`Failed to send email for todo ${todo.id}:`, emailError);
+            console.error(`Failed to send email for todo ${todo.id}:`, emailError.message || "Unknown error");
           } else {
             console.log(`Email sent successfully for todo ${todo.id}`);
             
@@ -201,8 +211,8 @@ const handler = async (req: Request): Promise<Response> => {
             
             sentCount++;
           }
-        } catch (emailError) {
-          console.error(`Error sending email for todo ${todo.id}:`, emailError);
+        } catch (emailError: any) {
+          console.error(`Error sending email for todo ${todo.id}:`, emailError.message || "Unknown error");
         }
       }
     }
@@ -221,9 +231,9 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
   } catch (error: any) {
-    console.error("Error in send-todo-reminders function:", error);
+    console.error("Error in send-todo-reminders function:", error.message || "Unknown error");
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "Failed to send todo reminders" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

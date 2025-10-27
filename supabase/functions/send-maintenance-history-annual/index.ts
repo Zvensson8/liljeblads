@@ -125,11 +125,20 @@ serve(async (req) => {
       }).format(amount);
     };
 
+    const escapeHtml = (text: string): string => {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
     const categoryRows = Object.entries(byCategory)
       .sort((a, b) => b[1].cost - a[1].cost)
       .map(([category, data]) => `
         <tr>
-          <td><strong>${category}</strong></td>
+          <td><strong>${escapeHtml(category)}</strong></td>
           <td>${data.count}</td>
           <td>${formatCurrency(data.cost)}</td>
           <td>${formatCurrency(data.cost / data.count)}</td>
@@ -138,8 +147,8 @@ serve(async (req) => {
 
     const topComponentRows = topComponents.map(([name, data]) => `
       <tr>
-        <td><strong>${name}</strong></td>
-        <td>${data.type}</td>
+        <td><strong>${escapeHtml(name)}</strong></td>
+        <td>${escapeHtml(data.type)}</td>
         <td>${data.count}</td>
         <td>${formatCurrency(data.cost)}</td>
       </tr>
@@ -256,16 +265,17 @@ serve(async (req) => {
       html: emailHtml,
     });
 
-    console.log(`Annual maintenance history sent to ${userEmail}`);
+    const maskedEmail = userEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+    console.log(`Annual maintenance history sent to ${maskedEmail}`);
 
     return new Response(
       JSON.stringify({ success: true, message: 'Annual maintenance history sent' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: any) {
-    console.error('Error in send-maintenance-history-annual:', error);
+    console.error('Error in send-maintenance-history-annual:', error.message || 'Unknown error');
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Failed to send annual maintenance history' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

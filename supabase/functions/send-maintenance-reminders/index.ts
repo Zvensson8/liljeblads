@@ -130,14 +130,23 @@ serve(async (req) => {
       return badges[urgency] || badges.low;
     };
 
+    const escapeHtml = (text: string): string => {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
     const maintenanceRows = upcomingMaintenance.map(item => {
       const badge = getUrgencyBadge(item.urgency);
       return `
         <tr>
-          <td><strong>${item.name}</strong></td>
-          <td>${item.type}</td>
-          <td>${item.properties?.name || '-'}</td>
-          <td>${item.floors?.name || '-'}</td>
+          <td><strong>${escapeHtml(item.name)}</strong></td>
+          <td>${escapeHtml(item.type)}</td>
+          <td>${escapeHtml(item.properties?.name || '-')}</td>
+          <td>${escapeHtml(item.floors?.name || '-')}</td>
           <td><span class="badge badge-${badge.class}">${item.days_until} dagar</span></td>
           <td>${new Date(item.next_maintenance_date!).toLocaleDateString('sv-SE')}</td>
           <td>${item.last_maintenance ? new Date(item.last_maintenance).toLocaleDateString('sv-SE') : 'Aldrig'}</td>
@@ -148,9 +157,9 @@ serve(async (req) => {
     const warrantyRows = expiringWarranties.map(item => {
       return `
         <tr>
-          <td><strong>${item.component.name}</strong></td>
-          <td>${item.component.type}</td>
-          <td>${item.component.properties?.name || '-'}</td>
+          <td><strong>${escapeHtml(item.component.name)}</strong></td>
+          <td>${escapeHtml(item.component.type)}</td>
+          <td>${escapeHtml(item.component.properties?.name || '-')}</td>
           <td>${item.days_until_expiry} dagar</td>
           <td>${item.warranty_expires.toLocaleDateString('sv-SE')}</td>
         </tr>
@@ -253,16 +262,17 @@ serve(async (req) => {
       html: emailHtml,
     });
 
-    console.log(`Maintenance reminders sent to ${userEmail}`);
+    const maskedEmail = userEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+    console.log(`Maintenance reminders sent to ${maskedEmail}`);
 
     return new Response(
       JSON.stringify({ success: true, message: 'Maintenance reminders sent' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: any) {
-    console.error('Error in send-maintenance-reminders:', error);
+    console.error('Error in send-maintenance-reminders:', error.message || 'Unknown error');
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Failed to send maintenance reminders' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

@@ -56,7 +56,8 @@ const handler = async (req: Request): Promise<Response> => {
       recipient_email 
     } = validatedData;
 
-    console.log('Sending property info email to:', recipient_email);
+    const maskedEmail = recipient_email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+    console.log('Sending property info email to:', maskedEmail);
 
     // Parse invoice address to get company name and org number (first two lines)
     const invoiceLines = invoice_address ? invoice_address.split('\n').filter(line => line.trim()) : [];
@@ -103,7 +104,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
   } catch (error: any) {
-    console.error("Error in send-property-info function:", error);
+    console.error("Error in send-property-info function:", error.message || "Unknown error");
     
     // Handle validation errors specifically
     if (error instanceof z.ZodError) {
@@ -117,7 +118,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "Failed to send property information" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },

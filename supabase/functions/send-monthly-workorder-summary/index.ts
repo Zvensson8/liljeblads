@@ -122,14 +122,23 @@ serve(async (req) => {
       return badges[priority] || { class: 'warning', label: priority };
     };
 
+    const escapeHtml = (text: string): string => {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
     const generateTableRows = (orders: WorkOrder[]) => {
       return orders.map(wo => {
         const priorityBadge = getPriorityBadge(wo.priority);
         return `
           <tr>
-            <td><strong>${wo.action}</strong></td>
-            <td>${wo.properties.name}</td>
-            <td>${wo.contractor || '-'}</td>
+            <td><strong>${escapeHtml(wo.action)}</strong></td>
+            <td>${escapeHtml(wo.properties.name)}</td>
+            <td>${escapeHtml(wo.contractor || '-')}</td>
             <td><span class="badge badge-${priorityBadge.class}">${priorityBadge.label}</span></td>
             <td>${wo.price ? formatCurrency(wo.price) : '-'}</td>
             <td>${wo.due_date ? new Date(wo.due_date).toLocaleDateString('sv-SE') : '-'}</td>
@@ -280,16 +289,17 @@ serve(async (req) => {
       html: emailHtml,
     });
 
-    console.log(`Work order summary sent to ${userEmail}`);
+    const maskedEmail = userEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+    console.log(`Work order summary sent to ${maskedEmail}`);
 
     return new Response(
       JSON.stringify({ success: true, message: 'Work order summary sent' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: any) {
-    console.error('Error in send-monthly-workorder-summary:', error);
+    console.error('Error in send-monthly-workorder-summary:', error.message || 'Unknown error');
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Failed to send monthly work order summary' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
