@@ -2173,6 +2173,10 @@ export type Database = {
         Args: { org_id: string }
         Returns: undefined
       }
+      user_has_property_assignment: {
+        Args: { _property_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "founder"
