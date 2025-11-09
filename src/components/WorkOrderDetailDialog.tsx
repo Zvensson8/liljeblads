@@ -183,7 +183,14 @@ export function WorkOrderDetailDialog({
         .select()
         .single();
 
-      if (projectError) throw projectError;
+      if (projectError) {
+        console.error("Project creation error:", projectError);
+        throw projectError;
+      }
+
+      if (!newProject) {
+        throw new Error("Projektet kunde inte skapas");
+      }
 
       // Uppdatera arbetsorderns status till arkiverad
       const { error: updateError } = await supabase
@@ -191,18 +198,23 @@ export function WorkOrderDetailDialog({
         .update({ status: "archived" })
         .eq("id", workOrder.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("Work order update error:", updateError);
+        throw updateError;
+      }
 
       toast.success("Arbetsorder konverterad till projekt!");
-      onUpdate();
-      onOpenChange(false);
       setConvertDialogOpen(false);
+      onUpdate();
       
-      // Navigera till det nya projektet
-      navigate(`/projects/${newProject.id}`);
+      // Använd setTimeout för att säkerställa att state uppdateringar är klara
+      setTimeout(() => {
+        onOpenChange(false);
+        navigate(`/projects/${newProject.id}`);
+      }, 100);
     } catch (error: any) {
-      toast.error("Kunde inte konvertera till projekt: " + error.message);
-    } finally {
+      console.error("Conversion error:", error);
+      toast.error("Kunde inte konvertera till projekt: " + (error.message || "Okänt fel"));
       setConverting(false);
     }
   };

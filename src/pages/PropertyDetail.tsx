@@ -464,16 +464,17 @@ const PropertyDetail = () => {
           {/* Tabs Navigation - Sticky under header */}
           <div className="sticky top-[73px] z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="container mx-auto px-6">
-              <TabsList className="h-12 w-full justify-start rounded-none border-0 bg-transparent p-0 overflow-x-auto">
-                <TabsTrigger value="overview">Översikt</TabsTrigger>
-                <TabsTrigger value="notes">Anteckningar</TabsTrigger>
-                <TabsTrigger value="todos">Att göra</TabsTrigger>
-                <TabsTrigger value="contacts">Kontakter</TabsTrigger>
-                <TabsTrigger value="documents">Dokument</TabsTrigger>
-                <TabsTrigger value="activity">Aktivitet</TabsTrigger>
-                <TabsTrigger value="technical-info">Teknisk info</TabsTrigger>
-                <TabsTrigger value="info-categories">Info-kategorier</TabsTrigger>
-              </TabsList>
+            <TabsList className="h-12 w-full justify-start rounded-none border-0 bg-transparent p-0 overflow-x-auto">
+              <TabsTrigger value="overview">Översikt</TabsTrigger>
+              <TabsTrigger value="drawings">Ritningar</TabsTrigger>
+              <TabsTrigger value="notes">Anteckningar</TabsTrigger>
+              <TabsTrigger value="todos">Att göra</TabsTrigger>
+              <TabsTrigger value="contacts">Kontakter</TabsTrigger>
+              <TabsTrigger value="documents">Dokument</TabsTrigger>
+              <TabsTrigger value="activity">Aktivitet</TabsTrigger>
+              <TabsTrigger value="technical-info">Teknisk info</TabsTrigger>
+              <TabsTrigger value="info-categories">Info-kategorier</TabsTrigger>
+            </TabsList>
             </div>
           </div>
 
@@ -488,6 +489,177 @@ const PropertyDetail = () => {
                 overdueTodos={overdueTodos}
                 urgentWorkOrders={urgentWorkOrders}
               />
+            </TabsContent>
+            <TabsContent value="drawings">
+              <div className="space-y-6">
+                {floors.length === 0 ? (
+                  <Card>
+                    <CardContent className="pt-6 text-center text-muted-foreground">
+                      <p className="mb-4">Inga våningar har skapats än.</p>
+                      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Skapa våning
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Skapa ny våning</DialogTitle>
+                          </DialogHeader>
+                          <form onSubmit={handleCreateFloor} className="space-y-4">
+                            <div>
+                              <Label htmlFor="floorName">Våningsnamn</Label>
+                              <Input
+                                id="floorName"
+                                value={floorName}
+                                onChange={(e) => setFloorName(e.target.value)}
+                                placeholder="t.ex. Entréplan, Våning 2"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="floorLevel">Våningsnummer (valfritt)</Label>
+                              <Input
+                                id="floorLevel"
+                                type="number"
+                                value={floorLevel}
+                                onChange={(e) => setFloorLevel(e.target.value)}
+                                placeholder="t.ex. 1, 2, 3"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                                Avbryt
+                              </Button>
+                              <Button type="submit">Skapa våning</Button>
+                            </div>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-2xl font-bold">Ritningar</h2>
+                      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Lägg till våning
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Skapa ny våning</DialogTitle>
+                          </DialogHeader>
+                          <form onSubmit={handleCreateFloor} className="space-y-4">
+                            <div>
+                              <Label htmlFor="floorName">Våningsnamn</Label>
+                              <Input
+                                id="floorName"
+                                value={floorName}
+                                onChange={(e) => setFloorName(e.target.value)}
+                                placeholder="t.ex. Entréplan, Våning 2"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="floorLevel">Våningsnummer (valfritt)</Label>
+                              <Input
+                                id="floorLevel"
+                                type="number"
+                                value={floorLevel}
+                                onChange={(e) => setFloorLevel(e.target.value)}
+                                placeholder="t.ex. 1, 2, 3"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                                Avbryt
+                              </Button>
+                              <Button type="submit">Skapa våning</Button>
+                            </div>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+
+                    {floors.map((floor) => (
+                      <Card key={floor.id}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle>{floor.name}</CardTitle>
+                              <CardDescription>
+                                {floor.level !== null ? `Våning ${floor.level}` : 'Ingen nivå angiven'}
+                              </CardDescription>
+                            </div>
+                            <div className="flex gap-2">
+                              {floor.drawing_url && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteDrawing(floor)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Ta bort ritning
+                                </Button>
+                              )}
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteFloor(floor.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Ta bort våning
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {floor.drawing_url ? (
+                            <div className="space-y-4">
+                              <FloorCanvas
+                                floorId={floor.id}
+                                drawingUrl={floor.drawing_url}
+                                onUpdate={fetchPropertyAndFloors}
+                              />
+                            </div>
+                          ) : (
+                            <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+                              <p className="text-muted-foreground mb-4">
+                                Ingen ritning uppladdad för denna våning
+                              </p>
+                              <Label htmlFor={`upload-${floor.id}`}>
+                                <Button
+                                  variant="outline"
+                                  disabled={uploadingFile}
+                                  onClick={() => document.getElementById(`upload-${floor.id}`)?.click()}
+                                >
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  {uploadingFile ? 'Laddar upp...' : 'Ladda upp ritning'}
+                                </Button>
+                              </Label>
+                              <Input
+                                id={`upload-${floor.id}`}
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleFileUpload(floor.id, file);
+                                }}
+                              />
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </>
+                )}
+              </div>
             </TabsContent>
             <TabsContent value="notes">
               <PropertyNotes propertyId={property.id} />
@@ -616,6 +788,7 @@ const PropertyDetail = () => {
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="h-12 w-full justify-start rounded-none border-0 bg-transparent p-0 overflow-x-auto">
                   <TabsTrigger value="overview">Översikt</TabsTrigger>
+                  <TabsTrigger value="drawings">Ritningar</TabsTrigger>
                   <TabsTrigger value="notes">Anteckningar</TabsTrigger>
                   <TabsTrigger value="todos">Att göra</TabsTrigger>
                   <TabsTrigger value="contacts">Kontakter</TabsTrigger>
@@ -633,6 +806,177 @@ const PropertyDetail = () => {
                     overdueTodos={overdueTodos}
                     urgentWorkOrders={urgentWorkOrders}
                   />
+                </TabsContent>
+                <TabsContent value="drawings">
+                  <div className="space-y-6">
+                    {floors.length === 0 ? (
+                      <Card>
+                        <CardContent className="pt-6 text-center text-muted-foreground">
+                          <p className="mb-4">Inga våningar har skapats än.</p>
+                          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Skapa våning
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Skapa ny våning</DialogTitle>
+                              </DialogHeader>
+                              <form onSubmit={handleCreateFloor} className="space-y-4">
+                                <div>
+                                  <Label htmlFor="floorName">Våningsnamn</Label>
+                                  <Input
+                                    id="floorName"
+                                    value={floorName}
+                                    onChange={(e) => setFloorName(e.target.value)}
+                                    placeholder="t.ex. Entréplan, Våning 2"
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="floorLevel">Våningsnummer (valfritt)</Label>
+                                  <Input
+                                    id="floorLevel"
+                                    type="number"
+                                    value={floorLevel}
+                                    onChange={(e) => setFloorLevel(e.target.value)}
+                                    placeholder="t.ex. 1, 2, 3"
+                                  />
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                                    Avbryt
+                                  </Button>
+                                  <Button type="submit">Skapa våning</Button>
+                                </div>
+                              </form>
+                            </DialogContent>
+                          </Dialog>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <h2 className="text-2xl font-bold">Ritningar</h2>
+                          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Lägg till våning
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Skapa ny våning</DialogTitle>
+                              </DialogHeader>
+                              <form onSubmit={handleCreateFloor} className="space-y-4">
+                                <div>
+                                  <Label htmlFor="floorName">Våningsnamn</Label>
+                                  <Input
+                                    id="floorName"
+                                    value={floorName}
+                                    onChange={(e) => setFloorName(e.target.value)}
+                                    placeholder="t.ex. Entréplan, Våning 2"
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="floorLevel">Våningsnummer (valfritt)</Label>
+                                  <Input
+                                    id="floorLevel"
+                                    type="number"
+                                    value={floorLevel}
+                                    onChange={(e) => setFloorLevel(e.target.value)}
+                                    placeholder="t.ex. 1, 2, 3"
+                                  />
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                                    Avbryt
+                                  </Button>
+                                  <Button type="submit">Skapa våning</Button>
+                                </div>
+                              </form>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+
+                        {floors.map((floor) => (
+                          <Card key={floor.id}>
+                            <CardHeader>
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <CardTitle>{floor.name}</CardTitle>
+                                  <CardDescription>
+                                    {floor.level !== null ? `Våning ${floor.level}` : 'Ingen nivå angiven'}
+                                  </CardDescription>
+                                </div>
+                                <div className="flex gap-2">
+                                  {floor.drawing_url && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleDeleteDrawing(floor)}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Ta bort ritning
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleDeleteFloor(floor.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Ta bort våning
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              {floor.drawing_url ? (
+                                <div className="space-y-4">
+                                  <FloorCanvas
+                                    floorId={floor.id}
+                                    drawingUrl={floor.drawing_url}
+                                    onUpdate={fetchPropertyAndFloors}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+                                  <p className="text-muted-foreground mb-4">
+                                    Ingen ritning uppladdad för denna våning
+                                  </p>
+                                  <Label htmlFor={`upload-${floor.id}`}>
+                                    <Button
+                                      variant="outline"
+                                      disabled={uploadingFile}
+                                      onClick={() => document.getElementById(`upload-${floor.id}`)?.click()}
+                                    >
+                                      <Upload className="h-4 w-4 mr-2" />
+                                      {uploadingFile ? 'Laddar upp...' : 'Ladda upp ritning'}
+                                    </Button>
+                                  </Label>
+                                  <Input
+                                    id={`upload-${floor.id}`}
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleFileUpload(floor.id, file);
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </>
+                    )}
+                  </div>
                 </TabsContent>
                 <TabsContent value="notes">
                   <PropertyNotes propertyId={property.id} />
