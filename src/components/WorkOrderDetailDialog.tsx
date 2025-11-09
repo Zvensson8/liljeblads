@@ -192,10 +192,18 @@ export function WorkOrderDetailDialog({
         throw new Error("Projektet kunde inte skapas");
       }
 
-      // Uppdatera arbetsorderns status till arkiverad
+      // Uppdatera arbetsorderns status till slutförd och lägg till kommentar om konvertering
+      const conversionNote = `Konverterad till projekt ${newProject.project_number} - ${newProject.name}`;
+      const updatedComments = workOrder.comments 
+        ? `${workOrder.comments}\n\n${conversionNote}` 
+        : conversionNote;
+
       const { error: updateError } = await supabase
         .from("work_orders")
-        .update({ status: "archived" })
+        .update({ 
+          status: "completed",
+          comments: updatedComments
+        })
         .eq("id", workOrder.id);
 
       if (updateError) {
@@ -204,8 +212,9 @@ export function WorkOrderDetailDialog({
       }
 
       toast.success("Arbetsorder konverterad till projekt!");
-      setConvertDialogOpen(false);
       onUpdate();
+      setConvertDialogOpen(false);
+      setConverting(false);
       
       // Använd setTimeout för att säkerställa att state uppdateringar är klara
       setTimeout(() => {
