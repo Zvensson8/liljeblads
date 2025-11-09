@@ -3,13 +3,15 @@ import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Settings, FileDown } from "lucide-react";
+import { Plus, Settings, FileDown, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { RecurringCostForm } from "@/components/recurring-costs/RecurringCostForm";
 import { RecurringCostCard } from "@/components/recurring-costs/RecurringCostCard";
 import { AccountCodeManager } from "@/components/recurring-costs/AccountCodeManager";
 import { RecurringCostReport } from "@/components/recurring-costs/RecurringCostReport";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
 
 interface RecurringCost {
   id: string;
@@ -107,125 +109,153 @@ export default function RecurringCosts() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <Skeleton className="h-12 w-64" />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+      <SidebarProvider>
+        <div className="flex min-h-screen w-full bg-background">
+          <AppSidebar />
+          <SidebarInset className="flex-1">
+            <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+              <SidebarTrigger />
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-primary" />
+                <h1 className="text-xl font-semibold">Återkommande Kostnader</h1>
+              </div>
+            </header>
+            <main className="flex-1 p-6 space-y-6">
+              <Skeleton className="h-12 w-64" />
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <Skeleton className="h-32" />
+                <Skeleton className="h-32" />
+                <Skeleton className="h-32" />
+              </div>
+            </main>
+          </SidebarInset>
         </div>
-      </div>
+      </SidebarProvider>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Återkommande Kostnader</h1>
-          <p className="text-muted-foreground mt-1">
-            Hantera fasta och regelbundna kostnader för dina fastigheter
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsAccountManagerOpen(true)}>
-            <Settings className="h-4 w-4 mr-2" />
-            Kontoplan
-          </Button>
-          <Button variant="outline" onClick={() => setIsReportOpen(true)}>
-            <FileDown className="h-4 w-4 mr-2" />
-            Rapport
-          </Button>
-          <Button onClick={() => {
-            setSelectedCost(null);
-            setIsFormOpen(true);
-          }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Ny Kostnad
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Totalt antal</CardTitle>
-            <CardDescription>Återkommande kostnader</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{costs.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Månadskostnad</CardTitle>
-            <CardDescription>Genomsnitt per månad</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {totalMonthly.toLocaleString("sv-SE")} kr
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background">
+        <AppSidebar />
+        <SidebarInset className="flex-1">
+          <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+            <SidebarTrigger />
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              <h1 className="text-xl font-semibold">Återkommande Kostnader</h1>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Årskostnad</CardTitle>
-            <CardDescription>Prognos för helår</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {totalYearly.toLocaleString("sv-SE")} kr
+          </header>
+          <main className="flex-1 p-6 space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Hantera Kostnader</h2>
+                <p className="text-muted-foreground mt-1">
+                  Hantera fasta och regelbundna kostnader för dina fastigheter
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setIsAccountManagerOpen(true)}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Kontoplan
+                </Button>
+                <Button variant="outline" onClick={() => setIsReportOpen(true)}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Rapport
+                </Button>
+                <Button onClick={() => {
+                  setSelectedCost(null);
+                  setIsFormOpen(true);
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ny Kostnad
+                </Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      <div className="space-y-4">
-        {costs.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6 text-center text-muted-foreground">
-              Inga återkommande kostnader registrerade ännu
-            </CardContent>
-          </Card>
-        ) : (
-          costs.map((cost) => (
-            <RecurringCostCard
-              key={cost.id}
-              cost={cost}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
+            <div className="grid gap-6 md:grid-cols-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Totalt antal</CardTitle>
+                  <CardDescription>Återkommande kostnader</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{costs.length}</div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Månadskostnad</CardTitle>
+                  <CardDescription>Genomsnitt per månad</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {totalMonthly.toLocaleString("sv-SE")} kr
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Årskostnad</CardTitle>
+                  <CardDescription>Prognos för helår</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {totalYearly.toLocaleString("sv-SE")} kr
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-4">
+              {costs.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6 text-center text-muted-foreground">
+                    Inga återkommande kostnader registrerade ännu
+                  </CardContent>
+                </Card>
+              ) : (
+                costs.map((cost) => (
+                  <RecurringCostCard
+                    key={cost.id}
+                    cost={cost}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                ))
+              )}
+            </div>
+
+            <RecurringCostForm
+              open={isFormOpen}
+              onOpenChange={(open) => {
+                setIsFormOpen(open);
+                if (!open) {
+                  setSelectedCost(null);
+                }
+              }}
+              cost={selectedCost}
+              onSuccess={() => {
+                fetchCosts();
+                setIsFormOpen(false);
+                setSelectedCost(null);
+              }}
             />
-          ))
-        )}
+
+            <AccountCodeManager
+              open={isAccountManagerOpen}
+              onOpenChange={setIsAccountManagerOpen}
+            />
+
+            <RecurringCostReport
+              open={isReportOpen}
+              onOpenChange={setIsReportOpen}
+            />
+          </main>
+        </SidebarInset>
       </div>
-
-      <RecurringCostForm
-        open={isFormOpen}
-        onOpenChange={(open) => {
-          setIsFormOpen(open);
-          if (!open) {
-            setSelectedCost(null);
-          }
-        }}
-        cost={selectedCost}
-        onSuccess={() => {
-          fetchCosts();
-          setIsFormOpen(false);
-          setSelectedCost(null);
-        }}
-      />
-
-      <AccountCodeManager
-        open={isAccountManagerOpen}
-        onOpenChange={setIsAccountManagerOpen}
-      />
-
-      <RecurringCostReport
-        open={isReportOpen}
-        onOpenChange={setIsReportOpen}
-      />
-    </div>
+    </SidebarProvider>
   );
 }
