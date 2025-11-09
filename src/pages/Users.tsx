@@ -71,7 +71,7 @@ export default function Users() {
         .select("role")
         .eq("user_id", user?.id)
         .eq("role", "founder" as any)
-        .single();
+        .maybeSingle();
 
       setIsFounder(!!data);
     } catch (error) {
@@ -97,7 +97,7 @@ export default function Users() {
             .from("user_roles")
             .select("role")
             .eq("user_id", profile.id)
-            .single();
+            .maybeSingle();
 
           return {
             ...profile,
@@ -259,7 +259,7 @@ export default function Users() {
         .from("user_roles")
         .select("*")
         .eq("user_id", selectedUser.id)
-        .single();
+        .maybeSingle();
 
       if (existingRole) {
         // Uppdatera befintlig roll
