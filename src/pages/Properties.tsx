@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, Compass, Sparkles, MapPin, Layers, Trash2, MoreVertical, Search, Filter, Wrench, FileText, StickyNote, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { getEnergyGradeColor } from '@/lib/energyUtils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PropertyFilterChips } from '@/components/PropertyFilterChips';
 import {
@@ -50,6 +52,7 @@ interface Property {
   property_number: string | null;
   invoice_address: string | null;
   floors?: any[];
+  energy_grade?: string | null;
 }
 
 const Properties = () => {
@@ -94,7 +97,28 @@ const Properties = () => {
         variant: 'destructive',
       });
     } else {
-      setProperties(data || []);
+      // Fetch energy grades for all properties
+      if (data) {
+        const propertiesWithEnergyGrades = await Promise.all(
+          data.map(async (property) => {
+            const { data: historyData } = await supabase
+              .from('property_energy_history')
+              .select('energy_grade')
+              .eq('property_id', property.id)
+              .order('recorded_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            
+            return {
+              ...property,
+              energy_grade: historyData?.energy_grade || null
+            };
+          })
+        );
+        setProperties(propertiesWithEnergyGrades);
+      } else {
+        setProperties([]);
+      }
     }
     setLoading(false);
   };
@@ -511,8 +535,17 @@ const Properties = () => {
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between mb-2">
-                          <div className="p-2 rounded-lg bg-primary/10">
-                            <Building2 className="h-5 w-5 text-primary" />
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-lg bg-primary/10">
+                              <Building2 className="h-5 w-5 text-primary" />
+                            </div>
+                            {property.energy_grade && (
+                              <Badge 
+                                className={`${getEnergyGradeColor(property.energy_grade).bg} ${getEnergyGradeColor(property.energy_grade).text} ${getEnergyGradeColor(property.energy_grade).border} border font-bold text-xs px-2 py-0.5`}
+                              >
+                                {property.energy_grade}
+                              </Badge>
+                            )}
                           </div>
                           <div className="flex gap-1">
                             <Button 
