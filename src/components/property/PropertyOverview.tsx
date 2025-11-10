@@ -7,6 +7,7 @@ import { ActivityTimeline } from '../ActivityTimeline';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { EnergyDeclarationCard } from './EnergyDeclarationCard';
 
 interface PropertyOverviewProps {
   property: any;
@@ -154,6 +155,12 @@ export function PropertyOverview({
             </div>
           </CardContent>
         </Card>
+
+        {/* Energy Declaration */}
+        <EnergyDeclarationCard 
+          propertyId={property.id} 
+          organizationId={property.organization_id}
+        />
 
         {/* Invoice Address & Send Button */}
         <Card className="hover:shadow-[var(--shadow-elegant)] transition-all">

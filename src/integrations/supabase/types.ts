@@ -1587,6 +1587,47 @@ export type Database = {
           },
         ]
       }
+      property_energy_history: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          energy_grade: string | null
+          id: string
+          primary_energy_number: number | null
+          property_id: string
+          recorded_at: string
+          specific_energy_use: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          energy_grade?: string | null
+          id?: string
+          primary_energy_number?: number | null
+          property_id: string
+          recorded_at?: string
+          specific_energy_use?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          energy_grade?: string | null
+          id?: string
+          primary_energy_number?: number | null
+          property_id?: string
+          recorded_at?: string
+          specific_energy_use?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_energy_history_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_info_categories: {
         Row: {
           created_at: string | null
