@@ -28,8 +28,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Trash2, Crown, Shield, User as UserIcon } from "lucide-react";
+import { Trash2, Crown, Shield, User as UserIcon, DollarSign, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface Member {
   id: string;
@@ -154,6 +161,21 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
     }
   };
 
+  const hasFinancialAccess = (role: string) => {
+    return role === "owner" || role === "admin";
+  };
+
+  const getRolePermissions = (role: string) => {
+    switch (role) {
+      case "owner":
+        return "Full åtkomst inkl. fakturering, budgetar och alla kostnader";
+      case "admin":
+        return "Hantera medlemmar, se all finansiell data";
+      default:
+        return "Visa fastigheter och komponenter, begränsad ekonomiåtkomst";
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -165,23 +187,52 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
   }
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Medlemmar ({members.length})</CardTitle>
-          <CardDescription>Hantera medlemmar i din organisation</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Namn</TableHead>
-                <TableHead>E-post</TableHead>
-                <TableHead>Roll</TableHead>
-                <TableHead>Gick med</TableHead>
-                {isAdmin && <TableHead className="text-right">Åtgärder</TableHead>}
-              </TableRow>
-            </TableHeader>
+    <TooltipProvider>
+      <div className="space-y-4">
+        {/* Information om roller och behörigheter */}
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Roller och Behörigheter</AlertTitle>
+          <AlertDescription className="space-y-2 mt-2">
+            <div className="grid gap-2">
+              <div className="flex items-start gap-2">
+                <Crown className="h-4 w-4 text-yellow-500 mt-0.5" />
+                <div className="text-sm">
+                  <strong>Ägare:</strong> Full åtkomst till allt inkl. fakturering, budgetar, kostnader och organisationsinställningar
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Shield className="h-4 w-4 text-blue-500 mt-0.5" />
+                <div className="text-sm">
+                  <strong>Admin:</strong> Kan hantera medlemmar och har full åtkomst till all finansiell data (budgetar, priser, kostnader)
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <UserIcon className="h-4 w-4 text-gray-500 mt-0.5" />
+                <div className="text-sm">
+                  <strong>Medlem:</strong> Kan visa fastigheter, komponenter och work orders men ser INTE priser eller kostnadsdata
+                </div>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Medlemmar ({members.length})</CardTitle>
+            <CardDescription>Hantera medlemmar och deras rollbehörigheter</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Namn</TableHead>
+                  <TableHead>E-post</TableHead>
+                  <TableHead>Roll & Behörigheter</TableHead>
+                  <TableHead>Gick med</TableHead>
+                  {isAdmin && <TableHead className="text-right">Åtgärder</TableHead>}
+                </TableRow>
+              </TableHeader>
             <TableBody>
               {members.map((member) => (
                 <TableRow key={member.id}>
@@ -190,46 +241,71 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
                   </TableCell>
                   <TableCell>{member.profiles?.email}</TableCell>
                   <TableCell>
-                    {isAdmin && member.user_id !== currentUserId ? (
-                      <Select
-                        value={member.role}
-                        onValueChange={(value) => handleRoleChange(member.id, value)}
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <div className="flex items-center gap-2">
+                    <div className="space-y-2">
+                      {isAdmin && member.user_id !== currentUserId ? (
+                        <Select
+                          value={member.role}
+                          onValueChange={(value) => handleRoleChange(member.id, value)}
+                        >
+                          <SelectTrigger className="w-[160px]">
+                            <div className="flex items-center gap-2">
+                              {getRoleIcon(member.role)}
+                              <SelectValue />
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="owner">
+                              <div className="flex items-center gap-2">
+                                <Crown className="h-4 w-4" />
+                                Ägare
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="admin">
+                              <div className="flex items-center gap-2">
+                                <Shield className="h-4 w-4" />
+                                Admin
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="member">
+                              <div className="flex items-center gap-2">
+                                <UserIcon className="h-4 w-4" />
+                                Medlem
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge variant={getRoleBadgeVariant(member.role)}>
+                          <span className="flex items-center gap-1">
                             {getRoleIcon(member.role)}
-                            <SelectValue />
-                          </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="owner">
-                            <div className="flex items-center gap-2">
-                              <Crown className="h-4 w-4" />
-                              Ägare
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="admin">
-                            <div className="flex items-center gap-2">
-                              <Shield className="h-4 w-4" />
-                              Admin
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="member">
-                            <div className="flex items-center gap-2">
-                              <UserIcon className="h-4 w-4" />
-                              Medlem
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Badge variant={getRoleBadgeVariant(member.role)}>
-                        <span className="flex items-center gap-1">
-                          {getRoleIcon(member.role)}
-                          {member.role === "owner" ? "Ägare" : member.role === "admin" ? "Admin" : "Medlem"}
-                        </span>
-                      </Badge>
-                    )}
+                            {member.role === "owner" ? "Ägare" : member.role === "admin" ? "Admin" : "Medlem"}
+                          </span>
+                        </Badge>
+                      )}
+                      <div className="flex items-center gap-2">
+                        {hasFinancialAccess(member.role) && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-xs">
+                                <DollarSign className="h-3 w-3 mr-1" />
+                                Ekonomi
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs text-xs">Har åtkomst till budgetar, priser och kostnadsdata</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs text-xs">{getRolePermissions(member.role)}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell>
                     {new Date(member.joined_at).toLocaleDateString("sv-SE")}
@@ -256,6 +332,7 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
           </Table>
         </CardContent>
       </Card>
+      </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
@@ -274,6 +351,6 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </TooltipProvider>
   );
 }
