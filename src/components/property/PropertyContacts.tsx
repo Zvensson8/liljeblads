@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,15 +13,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, User, Mail, Phone, Building } from "lucide-react";
+import { Plus, Trash2, User, Mail, Phone, Building, Lock, Shield } from "lucide-react";
 import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface PropertyContactsProps {
   propertyId: string;
 }
 
 export function PropertyContacts({ propertyId }: PropertyContactsProps) {
+  const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     name: "",
     role: "",
@@ -29,21 +34,75 @@ export function PropertyContacts({ propertyId }: PropertyContactsProps) {
     company: "",
   });
 
+  // Kolla om användaren har admin-behörighet
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) return;
+      
+      try {
+        // Hämta fastigheten för att få organization_id
+        const { data: property } = await supabase
+          .from("properties")
+          .select("organization_id")
+          .eq("id", propertyId)
+          .single();
+
+        if (!property?.organization_id) {
+          setIsAdmin(true); // Om ingen org, anta property owner har åtkomst
+          setLoading(false);
+          return;
+        }
+
+        // Kolla användarens roll i organisationen
+        const { data: memberData } = await supabase
+          .from("organization_members")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("organization_id", property.organization_id)
+          .single();
+
+        // Endast owners och admins har åtkomst
+        const hasAccess = memberData?.role === "owner" || memberData?.role === "admin";
+        setIsAdmin(hasAccess);
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+        setIsAdmin(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [user, propertyId]);
+
   const { data: contacts, refetch } = useQuery({
     queryKey: ["property-contacts", propertyId],
     queryFn: async () => {
+      // Query kommer automatiskt att respektera RLS-policies
       const { data, error } = await supabase
         .from("property_contacts")
         .select("*")
         .eq("property_id", propertyId)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        // Om användaren inte har åtkomst, returnera tom array istället för error
+        if (error.code === "42501" || error.code === "PGRST301") {
+          return [];
+        }
+        throw error;
+      }
       return data;
     },
+    enabled: isAdmin && !loading, // Endast hämta om användaren är admin
   });
 
   const handleAddContact = async () => {
+    if (!isAdmin) {
+      toast.error("Endast org owners och admins kan hantera kontakter");
+      return;
+    }
+
     if (!formData.name.trim()) {
       toast.error("Namn krävs");
       return;
@@ -67,6 +126,11 @@ export function PropertyContacts({ propertyId }: PropertyContactsProps) {
   };
 
   const handleDeleteContact = async (id: string) => {
+    if (!isAdmin) {
+      toast.error("Endast org owners och admins kan ta bort kontakter");
+      return;
+    }
+
     const { error } = await supabase
       .from("property_contacts")
       .delete()
@@ -79,6 +143,35 @@ export function PropertyContacts({ propertyId }: PropertyContactsProps) {
       refetch();
     }
   };
+
+  // Visa laddningsindikator
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+        <p className="mt-4 text-muted-foreground">Kontrollerar behörigheter...</p>
+      </div>
+    );
+  }
+
+  // Om användaren inte har admin-behörighet, visa meddelande
+  if (!isAdmin) {
+    return (
+      <Alert>
+        <Lock className="h-4 w-4" />
+        <AlertTitle>Begränsad Åtkomst</AlertTitle>
+        <AlertDescription className="space-y-2">
+          <p>
+            Endast org owners och admins har åtkomst till kontaktuppgifter för att skydda känslig information
+            som telefonnummer och e-postadresser.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Om du behöver kontakta någon angående denna fastighet, vänd dig till din organisations administratör.
+          </p>
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
     <div className="space-y-4">

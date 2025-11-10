@@ -239,7 +239,23 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
                   <TableCell className="font-medium">
                     {member.profiles?.full_name || "Okänd användare"}
                   </TableCell>
-                  <TableCell>{member.profiles?.email}</TableCell>
+                  <TableCell>
+                    {/* Endast org admins kan se email - Defense in Depth */}
+                    {isAdmin || member.user_id === currentUserId ? (
+                      member.profiles?.email
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-muted-foreground cursor-help">
+                            Dold (endast admins)
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Endast org owners och admins kan se e-postadresser</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div className="space-y-2">
                       {isAdmin && member.user_id !== currentUserId ? (
