@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { RecurringCost, calculatePaymentDates, groupByQuarter } from "@/lib/recurringCostUtils";
 
 interface Property {
   id: string;
@@ -99,11 +100,6 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
       const { data, error } = await query;
       if (error) throw error;
 
-      console.log("Fetched recurring costs:", data);
-
-      // Process and group data by quarter
-      const grouped: any = {};
-      
       if (!data || data.length === 0) {
         toast.error("Inga återkommande kostnader hittades");
         setReportData(null);
@@ -112,60 +108,56 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
       }
 
       console.log(`Hittade ${data.length} återkommande kostnader`);
-      console.log("Start quarter:", startQuarter, "End quarter:", endQuarter);
+
+      // Använd samma beräkningslogik som översikten
+      const startDate = quarterToDate(startQuarter);
+      const endDate = quarterToDate(endQuarter);
       
-      data?.forEach((cost: any) => {
-        // Skip if missing required data
-        if (!cost.last_payment_date || !cost.base_interval_months) {
-          console.warn("Hoppar över kostnad - saknar datum eller intervall:", cost.description);
-          return;
-        }
+      // Flytta sluttid till slutet av kvartalet
+      endDate.setMonth(endDate.getMonth() + 3);
+      endDate.setDate(0); // Sista dagen i föregående månad = sista dagen i kvartalet
 
-        console.log(`Bearbetar: ${cost.description}, belopp: ${cost.amount}, intervall: ${cost.base_interval_months} mån`);
+      console.log(`Period: ${startDate.toISOString().split('T')[0]} till ${endDate.toISOString().split('T')[0]}`);
 
-        // Calculate projected payments based on interval
-        const projections = calculateProjections(
-          cost,
-          startQuarter,
-          endQuarter
-        );
+      // Beräkna alla projektioner med samma logik som dashboard
+      const allProjections = (data as RecurringCost[]).flatMap((cost) =>
+        calculatePaymentDates(cost, startDate, endDate)
+      );
 
-        console.log(`  -> ${projections.length} betalningar i vald period`);
+      console.log(`Totalt ${allProjections.length} betalningar i perioden`);
 
-        projections.forEach((projection: any) => {
-          if (!grouped[projection.quarter]) {
-            grouped[projection.quarter] = {
-              quarter: projection.quarter,
-              properties: {},
-              total: 0,
+      // Gruppera per kvartal
+      const quarterSummaries = groupByQuarter(allProjections);
+
+      // Konvertera till rätt format för rapporten
+      const grouped: any = {};
+      
+      quarterSummaries.forEach((quarter) => {
+        grouped[quarter.quarter] = {
+          quarter: quarter.quarter,
+          properties: {},
+          total: quarter.total,
+        };
+
+        Object.entries(quarter.properties).forEach(([propName, propData]) => {
+          grouped[quarter.quarter].properties[propName] = {
+            name: propName,
+            total: propData.total,
+            accounts: {},
+          };
+
+          Object.entries(propData.accountCodes).forEach(([accKey, accData]) => {
+            // Summera alla belopp för detta konto
+            const totalAmount = accData.costs.reduce((sum, cost) => sum + (cost.amount * cost.dates.length), 0);
+            const totalCount = accData.costs.reduce((sum, cost) => sum + cost.dates.length, 0);
+
+            grouped[quarter.quarter].properties[propName].accounts[accKey] = {
+              code: accData.code,
+              description: accData.description,
+              amount: totalAmount,
+              count: totalCount,
             };
-          }
-
-          const propertyName = cost.property?.name || "Okänd";
-          if (!grouped[projection.quarter].properties[propertyName]) {
-            grouped[projection.quarter].properties[propertyName] = {
-              accounts: {},
-              total: 0,
-            };
-          }
-
-          const accountKey = `${cost.account_code?.code} - ${cost.account_code?.description}`;
-          
-          // Summera belopp per konto istället för att lägga till individuella poster
-          if (!grouped[projection.quarter].properties[propertyName].accounts[accountKey]) {
-            grouped[projection.quarter].properties[propertyName].accounts[accountKey] = {
-              code: cost.account_code?.code,
-              description: cost.account_code?.description,
-              amount: 0,
-              count: 0,
-            };
-          }
-
-          // Lägg till beloppet till kontots summa
-          grouped[projection.quarter].properties[propertyName].accounts[accountKey].amount += cost.amount;
-          grouped[projection.quarter].properties[propertyName].accounts[accountKey].count += 1;
-          grouped[projection.quarter].properties[propertyName].total += cost.amount;
-          grouped[projection.quarter].total += cost.amount;
+          });
         });
       });
 
@@ -186,60 +178,10 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
     }
   };
 
-  const calculateProjections = (cost: any, startQ: string, endQ: string) => {
-    const projections = [];
-    
-    if (!cost.last_payment_date || !cost.base_interval_months) {
-      return projections;
-    }
-
-    const startDate = quarterToDate(startQ);
-    const endDate = quarterToDate(endQ);
-    
-    // Start from last payment date
-    const lastPaymentDate = new Date(cost.last_payment_date + "T00:00:00");
-    
-    console.log(`    Beräknar från ${lastPaymentDate.toISOString().split('T')[0]} med intervall ${cost.base_interval_months} mån`);
-    console.log(`    Period: ${startDate.toISOString().split('T')[0]} till ${endDate.toISOString().split('T')[0]}`);
-
-    // Project forward from last payment
-    let currentDate = new Date(lastPaymentDate);
-    let iterations = 0;
-    const maxIterations = 100;
-    
-    // Add one interval to get next payment
-    while (iterations < maxIterations) {
-      iterations++;
-      currentDate.setMonth(currentDate.getMonth() + cost.base_interval_months);
-      
-      // Check if this payment falls within the report period
-      if (currentDate >= startDate && currentDate <= endDate) {
-        const quarter = dateToQuarter(currentDate);
-        projections.push({ 
-          quarter,
-          date: new Date(currentDate)
-        });
-        console.log(`      -> Betalning ${quarter}: ${currentDate.toISOString().split('T')[0]}`);
-      }
-      
-      // Stop if we've passed the end date
-      if (currentDate > endDate) {
-        break;
-      }
-    }
-
-    return projections;
-  };
-
   const quarterToDate = (quarter: string) => {
     const [year, q] = quarter.split("-Q");
     const month = (parseInt(q) - 1) * 3;
     return new Date(parseInt(year), month, 1);
-  };
-
-  const dateToQuarter = (date: Date) => {
-    const quarter = Math.floor(date.getMonth() / 3) + 1;
-    return `${date.getFullYear()}-Q${quarter}`;
   };
 
   const exportToPDF = () => {
