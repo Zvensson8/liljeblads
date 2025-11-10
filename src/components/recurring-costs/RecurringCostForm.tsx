@@ -158,6 +158,9 @@ export function RecurringCostForm({ open, onOpenChange, cost, onSuccess }: Recur
     try {
       const payload = {
         ...formData,
+        // Konvertera tomma datumsträngar till null
+        last_payment_date: formData.last_payment_date || null,
+        user_selected_date: formData.user_selected_date || null,
         calculated_quarter_start: calculatedQuarter.split(" - ")[0] || calculatedQuarter,
         calculated_quarter_end: calculatedQuarter.split(" - ")[1] || calculatedQuarter,
       };
