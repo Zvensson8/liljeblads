@@ -75,16 +75,22 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
   };
 
   const handleGenerate = async () => {
+    if (!organization) {
+      toast.error("Ingen organisation vald");
+      return;
+    }
+
     setIsGenerating(true);
     try {
-      // Fetch all recurring costs
+      // Fetch all recurring costs for the organization
       let query = supabase
         .from("property_recurring_costs")
         .select(`
           *,
-          property:properties(id, name),
+          property:properties!inner(id, name, organization_id),
           account_code:account_codes(code, description)
-        `);
+        `)
+        .eq("property.organization_id", organization.id);
 
       if (selectedProperty !== "all") {
         query = query.eq("property_id", selectedProperty);
@@ -93,16 +99,34 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
       const { data, error } = await query;
       if (error) throw error;
 
+      console.log("Fetched recurring costs:", data);
+
       // Process and group data by quarter
       const grouped: any = {};
       
+      if (!data || data.length === 0) {
+        toast.info("Inga återkommande kostnader hittades för vald period");
+        setIsGenerating(false);
+        return;
+      }
+
+      console.log("Processing costs for quarters:", startQuarter, "to", endQuarter);
+      
       data?.forEach((cost: any) => {
+        // Skip if missing required data
+        if (!cost.last_payment_date || !cost.base_interval_months) {
+          console.warn("Skipping cost due to missing data:", cost);
+          return;
+        }
+
         // Calculate projected payments based on interval
         const projections = calculateProjections(
           cost,
           startQuarter,
           endQuarter
         );
+
+        console.log(`Projections for ${cost.description}:`, projections);
 
         projections.forEach((projection: any) => {
           if (!grouped[projection.quarter]) {
@@ -148,13 +172,23 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
 
   const calculateProjections = (cost: any, startQ: string, endQ: string) => {
     const projections = [];
+    
+    if (!cost.last_payment_date || !cost.base_interval_months) {
+      return projections;
+    }
+
     const lastPayment = new Date(cost.last_payment_date);
     const startDate = quarterToDate(startQ);
     const endDate = quarterToDate(endQ);
 
+    // Start from last payment and project forward
     let currentDate = new Date(lastPayment);
+    let iterations = 0;
+    const maxIterations = 100; // Prevent infinite loops
     
-    while (currentDate <= endDate) {
+    while (currentDate <= endDate && iterations < maxIterations) {
+      iterations++;
+      currentDate = new Date(currentDate);
       currentDate.setMonth(currentDate.getMonth() + cost.base_interval_months);
       
       if (currentDate >= startDate && currentDate <= endDate) {
