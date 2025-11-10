@@ -3,15 +3,17 @@ import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Settings, FileDown, DollarSign } from "lucide-react";
+import { Plus, Settings, FileDown, DollarSign, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { RecurringCostForm } from "@/components/recurring-costs/RecurringCostForm";
 import { RecurringCostCard } from "@/components/recurring-costs/RecurringCostCard";
 import { AccountCodeManager } from "@/components/recurring-costs/AccountCodeManager";
 import { RecurringCostReport } from "@/components/recurring-costs/RecurringCostReport";
+import { RecurringCostDashboard } from "@/components/recurring-costs/RecurringCostDashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface RecurringCost {
   id: string;
@@ -147,86 +149,104 @@ export default function RecurringCosts() {
             </div>
           </header>
           <main className="flex-1 p-6 space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold">Hantera Kostnader</h2>
-                <p className="text-muted-foreground mt-1">
-                  Hantera fasta och regelbundna kostnader för dina fastigheter
-                </p>
+            <Tabs defaultValue="overview" className="w-full">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold">Hantera Kostnader</h2>
+                  <p className="text-muted-foreground mt-1">
+                    Hantera fasta och regelbundna kostnader för dina fastigheter
+                  </p>
+                </div>
+                <TabsList>
+                  <TabsTrigger value="overview">
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Översikt
+                  </TabsTrigger>
+                  <TabsTrigger value="list">Lista</TabsTrigger>
+                </TabsList>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setIsAccountManagerOpen(true)}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Kontoplan
-                </Button>
-                <Button variant="outline" onClick={() => setIsReportOpen(true)}>
-                  <FileDown className="h-4 w-4 mr-2" />
-                  Rapport
-                </Button>
-                <Button onClick={() => {
-                  setSelectedCost(null);
-                  setIsFormOpen(true);
-                }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ny Kostnad
-                </Button>
-              </div>
-            </div>
 
-            <div className="grid gap-6 md:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Totalt antal</CardTitle>
-                  <CardDescription>Återkommande kostnader</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">{costs.length}</div>
-                </CardContent>
-              </Card>
+              <TabsContent value="overview">
+                <RecurringCostDashboard />
+              </TabsContent>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Månadskostnad</CardTitle>
-                  <CardDescription>Genomsnitt per månad</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">
-                    {totalMonthly.toLocaleString("sv-SE")} kr
+              <TabsContent value="list">
+                <div className="space-y-6">
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setIsAccountManagerOpen(true)}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Kontoplan
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsReportOpen(true)}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      Rapport
+                    </Button>
+                    <Button onClick={() => {
+                      setSelectedCost(null);
+                      setIsFormOpen(true);
+                    }}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ny Kostnad
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Årskostnad</CardTitle>
-                  <CardDescription>Prognos för helår</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">
-                    {totalYearly.toLocaleString("sv-SE")} kr
+                  <div className="grid gap-6 md:grid-cols-3">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Totalt antal</CardTitle>
+                        <CardDescription>Återkommande kostnader</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">{costs.length}</div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Månadskostnad</CardTitle>
+                        <CardDescription>Genomsnitt per månad</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">
+                          {totalMonthly.toLocaleString("sv-SE")} kr
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Årskostnad</CardTitle>
+                        <CardDescription>Prognos för helår</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">
+                          {totalYearly.toLocaleString("sv-SE")} kr
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
 
-            <div className="space-y-4">
-              {costs.length === 0 ? (
-                <Card>
-                  <CardContent className="pt-6 text-center text-muted-foreground">
-                    Inga återkommande kostnader registrerade ännu
-                  </CardContent>
-                </Card>
-              ) : (
-                costs.map((cost) => (
-                  <RecurringCostCard
-                    key={cost.id}
-                    cost={cost}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
-                ))
-              )}
-            </div>
+                  <div className="space-y-4">
+                    {costs.length === 0 ? (
+                      <Card>
+                        <CardContent className="pt-6 text-center text-muted-foreground">
+                          Inga återkommande kostnader registrerade ännu
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      costs.map((cost) => (
+                        <RecurringCostCard
+                          key={cost.id}
+                          cost={cost}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
 
             <RecurringCostForm
               open={isFormOpen}
