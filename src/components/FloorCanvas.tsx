@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas as FabricCanvas, Circle, Rect, Line, FabricText, FabricImage } from 'fabric';
+import { Canvas as FabricCanvas, Circle, Rect, Line, FabricText, FabricImage, Point } from 'fabric';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from './ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -214,6 +214,26 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         }
       }
     });
+
+    // Mouse wheel zoom
+    const handleWheel = (opt: any) => {
+      const e = opt.e;
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const delta = e.deltaY;
+      let zoom = canvas.getZoom();
+      zoom *= 0.999 ** delta;
+      
+      if (zoom > 5) zoom = 5;
+      if (zoom < 0.1) zoom = 0.1;
+      
+      const point = new Point(e.offsetX, e.offsetY);
+      canvas.zoomToPoint(point, zoom);
+      setZoom(zoom);
+    };
+    
+    canvas.on('mouse:wheel', handleWheel);
 
     canvas.on('mouse:move', (e) => {
       // Handle panning with Space or Pan tool
@@ -487,17 +507,19 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
 
   const handleZoomIn = () => {
     if (!fabricCanvas) return;
+    const center = new Point(fabricCanvas.width! / 2, fabricCanvas.height! / 2);
     const newZoom = Math.min(zoom * 1.2, 5);
     setZoom(newZoom);
-    fabricCanvas.setZoom(newZoom);
+    fabricCanvas.zoomToPoint(center, newZoom);
     fabricCanvas.renderAll();
   };
 
   const handleZoomOut = () => {
     if (!fabricCanvas) return;
+    const center = new Point(fabricCanvas.width! / 2, fabricCanvas.height! / 2);
     const newZoom = Math.max(zoom / 1.2, 0.1);
     setZoom(newZoom);
-    fabricCanvas.setZoom(newZoom);
+    fabricCanvas.zoomToPoint(center, newZoom);
     fabricCanvas.renderAll();
   };
 
