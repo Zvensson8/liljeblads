@@ -150,16 +150,20 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
           }
 
           const accountKey = `${cost.account_code?.code} - ${cost.account_code?.description}`;
+          
+          // Summera belopp per konto istället för att lägga till individuella poster
           if (!grouped[projection.quarter].properties[propertyName].accounts[accountKey]) {
-            grouped[projection.quarter].properties[propertyName].accounts[accountKey] = [];
+            grouped[projection.quarter].properties[propertyName].accounts[accountKey] = {
+              code: cost.account_code?.code,
+              description: cost.account_code?.description,
+              amount: 0,
+              count: 0,
+            };
           }
 
-          grouped[projection.quarter].properties[propertyName].accounts[accountKey].push({
-            description: cost.description,
-            amount: cost.amount,
-            hasVariation: cost.interval_variation_months > 0,
-          });
-
+          // Lägg till beloppet till kontots summa
+          grouped[projection.quarter].properties[propertyName].accounts[accountKey].amount += cost.amount;
+          grouped[projection.quarter].properties[propertyName].accounts[accountKey].count += 1;
           grouped[projection.quarter].properties[propertyName].total += cost.amount;
           grouped[projection.quarter].total += cost.amount;
         });
@@ -275,14 +279,12 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
       Object.entries(quarterData.properties).forEach(([propertyName, propertyData]: any) => {
         const tableData: any[] = [];
         
-        Object.entries(propertyData.accounts).forEach(([account, costs]: any) => {
-          costs.forEach((cost: any) => {
-            tableData.push([
-              account,
-              cost.description + (cost.hasVariation ? " (±variation)" : ""),
-              `${cost.amount.toLocaleString("sv-SE")} kr`
-            ]);
-          });
+        Object.entries(propertyData.accounts).forEach(([accountKey, accountData]: any) => {
+          tableData.push([
+            accountData.code,
+            accountData.description + (accountData.count > 1 ? ` (${accountData.count} poster)` : ""),
+            `${accountData.amount.toLocaleString("sv-SE")} kr`
+          ]);
         });
 
         // Add subtotal
@@ -342,14 +344,12 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
       Object.entries(quarterData.properties).forEach(([propertyName, propertyData]: any) => {
         worksheetData.push(["Konto", "Beskrivning", "Belopp"]);
 
-        Object.entries(propertyData.accounts).forEach(([account, costs]: any) => {
-          costs.forEach((cost: any) => {
-            worksheetData.push([
-              account,
-              cost.description + (cost.hasVariation ? " (±variation)" : ""),
-              cost.amount
-            ]);
-          });
+        Object.entries(propertyData.accounts).forEach(([accountKey, accountData]: any) => {
+          worksheetData.push([
+            accountData.code,
+            accountData.description + (accountData.count > 1 ? ` (${accountData.count} poster)` : ""),
+            accountData.amount
+          ]);
         });
 
         worksheetData.push([
@@ -483,27 +483,23 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {Object.entries(propertyData.accounts).map(([account, costs]: any) => (
-                            costs.map((cost: any, idx: number) => (
-                              <TableRow key={`${account}-${idx}`}>
-                                {idx === 0 && (
-                                  <TableCell rowSpan={costs.length}>{account}</TableCell>
+                          {Object.entries(propertyData.accounts).map(([accountKey, accountData]: any) => (
+                            <TableRow key={accountKey}>
+                              <TableCell>{accountData.code}</TableCell>
+                              <TableCell>
+                                {accountData.description}
+                                {accountData.count > 1 && (
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    ({accountData.count} poster)
+                                  </span>
                                 )}
-                                <TableCell>
-                                  {cost.description}
-                                  {cost.hasVariation && (
-                                    <span className="text-xs text-muted-foreground ml-2">
-                                      (±variation)
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {cost.amount.toLocaleString("sv-SE")} kr
-                                </TableCell>
-                              </TableRow>
-                            ))
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {accountData.amount.toLocaleString("sv-SE")} kr
+                              </TableCell>
+                            </TableRow>
                           ))}
-                          <TableRow className="font-semibold">
+                          <TableRow className="font-bold bg-muted/50">
                             <TableCell colSpan={2}>Delsumma {propertyName}</TableCell>
                             <TableCell className="text-right">
                               {propertyData.total.toLocaleString("sv-SE")} kr
