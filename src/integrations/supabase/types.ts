@@ -975,6 +975,41 @@ export type Database = {
           },
         ]
       }
+      project_additional_costs: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string
+          id: string
+          project_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string | null
+          description: string
+          id?: string
+          project_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string
+          id?: string
+          project_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_additional_costs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_budget_items: {
         Row: {
           budgeted_amount: number

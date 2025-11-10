@@ -5,9 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Calculator, RotateCcw, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, Calculator, RotateCcw, Plus, Trash2, Save } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ProjectSimulationProps {
+  projectId: string;
   currentBudget: number;
   currentForecast: number;
   currentActualCost: number;
@@ -15,6 +18,7 @@ interface ProjectSimulationProps {
 }
 
 export function ProjectSimulation({
+  projectId,
   currentBudget,
   currentForecast,
   currentActualCost,
@@ -23,27 +27,64 @@ export function ProjectSimulation({
   const [simulatedBudget, setSimulatedBudget] = useState(currentBudget);
   const [simulatedForecast, setSimulatedForecast] = useState(currentForecast);
   const [simulatedActualCost, setSimulatedActualCost] = useState(currentActualCost);
-  const [additionalCosts, setAdditionalCosts] = useState<{id: string; description: string; amount: number}[]>([]);
+  const [additionalCosts, setAdditionalCosts] = useState<{id: string; description: string; amount: number; isNew?: boolean}[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     setSimulatedBudget(currentBudget);
     setSimulatedForecast(currentForecast);
     setSimulatedActualCost(currentActualCost);
-    setAdditionalCosts([]);
   }, [currentBudget, currentForecast, currentActualCost]);
+
+  useEffect(() => {
+    if (projectId) {
+      fetchAdditionalCosts();
+    }
+  }, [projectId]);
+
+  const fetchAdditionalCosts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("project_additional_costs")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      setAdditionalCosts(data || []);
+    } catch (error) {
+      console.error("Error fetching additional costs:", error);
+      toast.error("Kunde inte hämta tillkommande kostnader");
+    }
+  };
 
   const handleReset = () => {
     setSimulatedBudget(currentBudget);
     setSimulatedForecast(currentForecast);
     setSimulatedActualCost(currentActualCost);
-    setAdditionalCosts([]);
+    fetchAdditionalCosts();
   };
 
   const handleAddCost = () => {
-    setAdditionalCosts([...additionalCosts, { id: crypto.randomUUID(), description: '', amount: 0 }]);
+    setAdditionalCosts([...additionalCosts, { id: crypto.randomUUID(), description: '', amount: 0, isNew: true }]);
   };
 
-  const handleRemoveCost = (id: string) => {
+  const handleRemoveCost = async (id: string, isNew?: boolean) => {
+    if (!isNew) {
+      try {
+        const { error } = await supabase
+          .from("project_additional_costs")
+          .delete()
+          .eq("id", id);
+
+        if (error) throw error;
+        toast.success("Kostnad borttagen");
+      } catch (error) {
+        console.error("Error deleting cost:", error);
+        toast.error("Kunde inte ta bort kostnad");
+        return;
+      }
+    }
     setAdditionalCosts(additionalCosts.filter(cost => cost.id !== id));
   };
 
@@ -51,6 +92,47 @@ export function ProjectSimulation({
     setAdditionalCosts(additionalCosts.map(cost => 
       cost.id === id ? { ...cost, [field]: value } : cost
     ));
+  };
+
+  const handleSaveCost = async (cost: {id: string; description: string; amount: number; isNew?: boolean}) => {
+    if (!cost.description || cost.amount <= 0) {
+      toast.error("Fyll i beskrivning och belopp");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      if (cost.isNew) {
+        const { error } = await supabase
+          .from("project_additional_costs")
+          .insert([{
+            project_id: projectId,
+            description: cost.description,
+            amount: cost.amount,
+          }]);
+
+        if (error) throw error;
+        toast.success("Kostnad sparad");
+        await fetchAdditionalCosts();
+      } else {
+        const { error } = await supabase
+          .from("project_additional_costs")
+          .update({
+            description: cost.description,
+            amount: cost.amount,
+          })
+          .eq("id", cost.id);
+
+        if (error) throw error;
+        toast.success("Kostnad uppdaterad");
+        await fetchAdditionalCosts();
+      }
+    } catch (error) {
+      console.error("Error saving cost:", error);
+      toast.error("Kunde inte spara kostnad");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleApplySimulation = () => {
@@ -177,7 +259,22 @@ export function ProjectSimulation({
                     onChange={(e) => handleUpdateCost(cost.id, 'amount', Number(e.target.value))}
                     className="w-32"
                   />
-                  <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCost(cost.id)}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleSaveCost(cost)}
+                    disabled={isLoading}
+                  >
+                    <Save className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleRemoveCost(cost.id, cost.isNew)}
+                    disabled={isLoading}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

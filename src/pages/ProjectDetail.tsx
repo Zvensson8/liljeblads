@@ -539,6 +539,7 @@ export default function ProjectDetail() {
                     </CardHeader>
                     <CardContent>
                       <ProjectSimulation
+                        projectId={project.id}
                         currentBudget={project.budget}
                         currentForecast={project.forecast}
                         currentActualCost={project.actual_cost}
