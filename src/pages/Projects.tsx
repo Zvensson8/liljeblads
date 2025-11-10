@@ -49,6 +49,8 @@ interface Project {
   property_id: string;
   start_date: string | null;
   end_date: string | null;
+  year: number;
+  start_quarter: number;
   budget: number;
   forecast: number;
   actual_cost: number;
@@ -344,8 +346,8 @@ export default function Projects() {
                                     <TableCell>{getTypeBadge(project.type)}</TableCell>
                                     <TableCell>{getStatusBadge(project.status)}</TableCell>
                                     <TableCell className="text-sm text-muted-foreground">
-                                      {project.start_date 
-                                        ? `Q${Math.ceil((new Date(project.start_date).getMonth() + 1) / 3)} ${new Date(project.start_date).getFullYear()}`
+                                      {project.start_quarter && project.year
+                                        ? `Q${project.start_quarter} ${project.year}`
                                         : "-"}
                                     </TableCell>
                                     <TableCell className="text-right">

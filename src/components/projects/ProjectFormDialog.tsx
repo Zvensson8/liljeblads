@@ -51,7 +51,6 @@ const projectSchema = z.object({
   project_manager: z.string().optional(),
   year: z.number().min(2020, "År måste vara minst 2020").max(2050, "År måste vara max 2050"),
   start_quarter: z.number().min(1).max(4),
-  end_quarter: z.number().min(1).max(4),
   budget: z.number().min(0, "Budget måste vara positiv"),
 });
 
@@ -93,7 +92,6 @@ export function ProjectFormDialog({
       project_manager: "",
       year: new Date().getFullYear(),
       start_quarter: 1,
-      end_quarter: 4,
       budget: 0,
     },
   });
@@ -113,7 +111,6 @@ export function ProjectFormDialog({
           project_manager: editingProject.project_manager || '',
           year: editingProject.year || new Date().getFullYear(),
           start_quarter: editingProject.start_quarter || 1,
-          end_quarter: editingProject.end_quarter || 4,
           budget: editingProject.budget,
         });
       } else {
@@ -222,9 +219,6 @@ export function ProjectFormDialog({
         }
         if (values.start_quarter !== editingProject.start_quarter) {
           changes.push(`Startkvartal ändrat från Q${editingProject.start_quarter} till Q${values.start_quarter}`);
-        }
-        if (values.end_quarter !== editingProject.end_quarter) {
-          changes.push(`Slutkvartal ändrat från Q${editingProject.end_quarter} till Q${values.end_quarter}`);
         }
 
         if (changes.length > 0) {
@@ -345,9 +339,6 @@ export function ProjectFormDialog({
       form.setValue("name", template.name);
       form.setValue("description", template.description || "");
       form.setValue("type", template.type as any);
-      if (template.estimated_duration_quarters) {
-        form.setValue("end_quarter", Math.min(4, template.estimated_duration_quarters));
-      }
       toast.success(`Mall "${template.name}" tillagd`);
     }
   };
@@ -538,7 +529,7 @@ export function ProjectFormDialog({
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="year"
@@ -580,33 +571,6 @@ export function ProjectFormDialog({
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Q1" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="1">Q1</SelectItem>
-                        <SelectItem value="2">Q2</SelectItem>
-                        <SelectItem value="3">Q3</SelectItem>
-                        <SelectItem value="4">Q4</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="end_quarter"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Slutkvartal *</FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(parseInt(value))}
-                      value={field.value?.toString()}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Q4" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
