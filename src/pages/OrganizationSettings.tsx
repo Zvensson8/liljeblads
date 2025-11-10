@@ -16,6 +16,7 @@ import { OrganizationBranding } from "@/components/organization/OrganizationBran
 import { OrganizationDataExport } from "@/components/organization/OrganizationDataExport";
 import { PropertyInfoCategoryManager } from "@/components/property-info/PropertyInfoCategoryManager";
 import { ProjectTemplates } from "@/components/organization/ProjectTemplates";
+import { OrganizationAuditLogs } from "@/components/organization/OrganizationAuditLogs";
 
 
 interface Organization {
@@ -198,6 +199,7 @@ export default function OrganizationSettings() {
                 <TabsTrigger value="info">Information</TabsTrigger>
                 <TabsTrigger value="members">Medlemmar</TabsTrigger>
                 {isAdmin && <TabsTrigger value="invitations">Inbjudningar</TabsTrigger>}
+                {isAdmin && <TabsTrigger value="audit">Säkerhetslogg</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="branding">Varumärke</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="templates">Projektmallar</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="property-info">Fastighetsinformation</TabsTrigger>}
@@ -223,6 +225,12 @@ export default function OrganizationSettings() {
               {isAdmin && (
                 <TabsContent value="invitations">
                   <OrganizationInvitations organizationId={organization.id} />
+                </TabsContent>
+              )}
+
+              {isAdmin && (
+                <TabsContent value="audit">
+                  <OrganizationAuditLogs organizationId={organization.id} />
                 </TabsContent>
               )}
 
