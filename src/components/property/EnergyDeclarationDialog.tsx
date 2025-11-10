@@ -8,6 +8,7 @@ import { usePropertyInfoValues } from "@/hooks/usePropertyInfoValues";
 import { useState, useEffect } from "react";
 import { Loader2, TrendingUp, TrendingDown } from "lucide-react";
 import { calculateEnergyImprovement } from "@/lib/energyUtils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface EnergyDeclarationDialogProps {
   open: boolean;
@@ -28,12 +29,26 @@ export function EnergyDeclarationDialog({
   const [energyGrade, setEnergyGrade] = useState<string>('');
   const [primaryEnergy, setPrimaryEnergy] = useState<string>('');
   const [specificEnergy, setSpecificEnergy] = useState<string>('');
+  const [loaValue, setLoaValue] = useState<string>('');
 
-  // Get LOA from property info
-  const loaValue = propertyInfoValues.find(v => {
-    // Find the field that contains "LOA" or "Lokalarea"
-    return v.value && (v.field_id.includes('loa') || v.value.toString().includes('m²'));
-  });
+  // Fetch property data to get LOA directly from properties table
+  useEffect(() => {
+    const fetchPropertyLOA = async () => {
+      const { data } = await supabase
+        .from('properties')
+        .select('loa')
+        .eq('id', propertyId)
+        .single();
+      
+      if (data?.loa) {
+        setLoaValue(data.loa);
+      }
+    };
+    
+    if (open) {
+      fetchPropertyLOA();
+    }
+  }, [open, propertyId]);
 
   useEffect(() => {
     if (open) {
@@ -80,7 +95,7 @@ export function EnergyDeclarationDialog({
           {/* LOA Display */}
           <div className="bg-muted p-3 rounded-lg">
             <p className="text-sm font-medium">Lokalarea (LOA)</p>
-            <p className="text-lg">{loaValue?.value || 'Ej angiven'}</p>
+            <p className="text-lg">{loaValue || 'Ej angiven'}</p>
           </div>
 
           {/* Energy Grade */}
