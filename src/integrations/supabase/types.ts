@@ -2252,6 +2252,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["task_status"]
       }
       get_user_organization_id: { Args: { _user_id: string }; Returns: string }
+      has_financial_access: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_organization_role: {
         Args: { _org_id: string; _role: string; _user_id: string }
         Returns: boolean
