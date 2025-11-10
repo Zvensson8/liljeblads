@@ -7,8 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileDown, Loader2 } from "lucide-react";
+import { FileDown, Loader2, FileText, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 interface Property {
   id: string;
@@ -174,6 +177,137 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
     return `${date.getFullYear()}-Q${quarter}`;
   };
 
+  const exportToPDF = () => {
+    if (!reportData) return;
+
+    const doc = new jsPDF();
+    let yPos = 20;
+
+    // Title
+    doc.setFontSize(16);
+    doc.text("Rapport - Återkommande Kostnader", 14, yPos);
+    yPos += 10;
+
+    doc.setFontSize(10);
+    doc.text(`Period: ${startQuarter} - ${endQuarter}`, 14, yPos);
+    yPos += 5;
+    
+    if (selectedProperty !== "all") {
+      const propertyName = properties.find(p => p.id === selectedProperty)?.name || "";
+      doc.text(`Fastighet: ${propertyName}`, 14, yPos);
+    } else {
+      doc.text("Fastighet: Alla fastigheter", 14, yPos);
+    }
+    yPos += 10;
+
+    // Generate tables for each quarter
+    Object.values(reportData).forEach((quarterData: any) => {
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.text(`${quarterData.quarter} - Total: ${quarterData.total.toLocaleString("sv-SE")} kr`, 14, yPos);
+      yPos += 8;
+
+      Object.entries(quarterData.properties).forEach(([propertyName, propertyData]: any) => {
+        const tableData: any[] = [];
+        
+        Object.entries(propertyData.accounts).forEach(([account, costs]: any) => {
+          costs.forEach((cost: any) => {
+            tableData.push([
+              account,
+              cost.description + (cost.hasVariation ? " (±variation)" : ""),
+              `${cost.amount.toLocaleString("sv-SE")} kr`
+            ]);
+          });
+        });
+
+        // Add subtotal
+        tableData.push([
+          { content: `Delsumma ${propertyName}`, colSpan: 2, styles: { fontStyle: 'bold' } },
+          { content: `${propertyData.total.toLocaleString("sv-SE")} kr`, styles: { fontStyle: 'bold' } }
+        ]);
+
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Konto', 'Beskrivning', 'Belopp']],
+          body: tableData,
+          theme: 'grid',
+          headStyles: { fillColor: [66, 66, 66] },
+          margin: { left: 14 },
+        });
+
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+      });
+
+      yPos += 5;
+    });
+
+    doc.save(`återkommande-kostnader-${startQuarter}-${endQuarter}.pdf`);
+    toast.success("PDF-rapport genererad");
+  };
+
+  const exportToExcel = () => {
+    if (!reportData) return;
+
+    const worksheetData: any[] = [];
+
+    // Add header
+    worksheetData.push([
+      `Återkommande Kostnader - ${startQuarter} till ${endQuarter}`,
+    ]);
+    worksheetData.push([]);
+
+    if (selectedProperty !== "all") {
+      const propertyName = properties.find(p => p.id === selectedProperty)?.name || "";
+      worksheetData.push([`Fastighet: ${propertyName}`]);
+    } else {
+      worksheetData.push(["Fastighet: Alla fastigheter"]);
+    }
+    worksheetData.push([]);
+
+    // Add data for each quarter
+    Object.values(reportData).forEach((quarterData: any) => {
+      worksheetData.push([
+        `${quarterData.quarter}`,
+        "",
+        "",
+        `Total: ${quarterData.total.toLocaleString("sv-SE")} kr`
+      ]);
+      worksheetData.push([]);
+
+      Object.entries(quarterData.properties).forEach(([propertyName, propertyData]: any) => {
+        worksheetData.push(["Konto", "Beskrivning", "Belopp"]);
+
+        Object.entries(propertyData.accounts).forEach(([account, costs]: any) => {
+          costs.forEach((cost: any) => {
+            worksheetData.push([
+              account,
+              cost.description + (cost.hasVariation ? " (±variation)" : ""),
+              cost.amount
+            ]);
+          });
+        });
+
+        worksheetData.push([
+          `Delsumma ${propertyName}`,
+          "",
+          propertyData.total
+        ]);
+        worksheetData.push([]);
+      });
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Återkommande Kostnader");
+
+    XLSX.writeFile(workbook, `återkommande-kostnader-${startQuarter}-${endQuarter}.xlsx`);
+    toast.success("Excel-rapport genererad");
+  };
+
   const quarters = generateQuarters();
 
   return (
@@ -234,19 +368,34 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
           </div>
         </div>
 
-        <Button onClick={handleGenerate} disabled={isGenerating} className="w-full">
-          {isGenerating ? (
+        <div className="flex gap-2">
+          <Button onClick={handleGenerate} disabled={isGenerating} className="flex-1">
+            {isGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Genererar...
+              </>
+            ) : (
+              <>
+                <FileDown className="h-4 w-4 mr-2" />
+                Generera Rapport
+              </>
+            )}
+          </Button>
+          
+          {reportData && (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Genererar...
-            </>
-          ) : (
-            <>
-              <FileDown className="h-4 w-4 mr-2" />
-              Generera Rapport
+              <Button onClick={exportToPDF} variant="outline">
+                <FileText className="h-4 w-4 mr-2" />
+                PDF
+              </Button>
+              <Button onClick={exportToExcel} variant="outline">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Excel
+              </Button>
             </>
           )}
-        </Button>
+        </div>
 
         {reportData && (
           <div className="space-y-6 mt-6">

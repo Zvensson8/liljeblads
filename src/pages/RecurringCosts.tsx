@@ -167,7 +167,26 @@ export default function RecurringCosts() {
               </div>
 
               <TabsContent value="overview">
-                <RecurringCostDashboard />
+                <div className="space-y-6">
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setIsAccountManagerOpen(true)}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Kontoplan
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsReportOpen(true)}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      Rapport
+                    </Button>
+                    <Button onClick={() => {
+                      setSelectedCost(null);
+                      setIsFormOpen(true);
+                    }}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ny Kostnad
+                    </Button>
+                  </div>
+                  <RecurringCostDashboard />
+                </div>
               </TabsContent>
 
               <TabsContent value="list">
