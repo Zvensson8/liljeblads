@@ -105,19 +105,23 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
       const grouped: any = {};
       
       if (!data || data.length === 0) {
-        toast.info("Inga återkommande kostnader hittades för vald period");
+        toast.error("Inga återkommande kostnader hittades");
+        setReportData(null);
         setIsGenerating(false);
         return;
       }
 
-      console.log("Processing costs for quarters:", startQuarter, "to", endQuarter);
+      console.log(`Hittade ${data.length} återkommande kostnader`);
+      console.log("Start quarter:", startQuarter, "End quarter:", endQuarter);
       
       data?.forEach((cost: any) => {
         // Skip if missing required data
         if (!cost.last_payment_date || !cost.base_interval_months) {
-          console.warn("Skipping cost due to missing data:", cost);
+          console.warn("Hoppar över kostnad - saknar datum eller intervall:", cost.description);
           return;
         }
+
+        console.log(`Bearbetar: ${cost.description}, belopp: ${cost.amount}, intervall: ${cost.base_interval_months} mån`);
 
         // Calculate projected payments based on interval
         const projections = calculateProjections(
@@ -126,7 +130,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
           endQuarter
         );
 
-        console.log(`Projections for ${cost.description}:`, projections);
+        console.log(`  -> ${projections.length} betalningar i vald period`);
 
         projections.forEach((projection: any) => {
           if (!grouped[projection.quarter]) {
@@ -161,7 +165,15 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
         });
       });
 
-      setReportData(grouped);
+      console.log("Grupperad data:", grouped);
+      
+      if (Object.keys(grouped).length === 0) {
+        toast.error("Inga betalningar föll inom vald period");
+        setReportData(null);
+      } else {
+        setReportData(grouped);
+        toast.success(`Rapport genererad med ${Object.keys(grouped).length} kvartal`);
+      }
     } catch (error) {
       console.error("Error generating report:", error);
       toast.error("Kunde inte generera rapport");
@@ -177,23 +189,38 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
       return projections;
     }
 
-    const lastPayment = new Date(cost.last_payment_date);
     const startDate = quarterToDate(startQ);
     const endDate = quarterToDate(endQ);
-
-    // Start from last payment and project forward
-    let currentDate = new Date(lastPayment);
-    let iterations = 0;
-    const maxIterations = 100; // Prevent infinite loops
     
-    while (currentDate <= endDate && iterations < maxIterations) {
+    // Start from last payment date
+    const lastPaymentDate = new Date(cost.last_payment_date + "T00:00:00");
+    
+    console.log(`    Beräknar från ${lastPaymentDate.toISOString().split('T')[0]} med intervall ${cost.base_interval_months} mån`);
+    console.log(`    Period: ${startDate.toISOString().split('T')[0]} till ${endDate.toISOString().split('T')[0]}`);
+
+    // Project forward from last payment
+    let currentDate = new Date(lastPaymentDate);
+    let iterations = 0;
+    const maxIterations = 100;
+    
+    // Add one interval to get next payment
+    while (iterations < maxIterations) {
       iterations++;
-      currentDate = new Date(currentDate);
       currentDate.setMonth(currentDate.getMonth() + cost.base_interval_months);
       
+      // Check if this payment falls within the report period
       if (currentDate >= startDate && currentDate <= endDate) {
         const quarter = dateToQuarter(currentDate);
-        projections.push({ quarter });
+        projections.push({ 
+          quarter,
+          date: new Date(currentDate)
+        });
+        console.log(`      -> Betalning ${quarter}: ${currentDate.toISOString().split('T')[0]}`);
+      }
+      
+      // Stop if we've passed the end date
+      if (currentDate > endDate) {
+        break;
       }
     }
 
