@@ -9,14 +9,19 @@ import { EnergyDeclarationDialog } from "./EnergyDeclarationDialog";
 interface EnergyDeclarationCardProps {
   propertyId: string;
   organizationId: string | null;
+  compact?: boolean;
 }
 
-export function EnergyDeclarationCard({ propertyId, organizationId }: EnergyDeclarationCardProps) {
+export function EnergyDeclarationCard({ propertyId, organizationId, compact = false }: EnergyDeclarationCardProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { currentValues, previousHistory, isLoading } = useEnergyDeclaration(propertyId, organizationId);
 
   if (isLoading) {
-    return (
+    return compact ? (
+      <div className="pt-3 mt-3 border-t">
+        <Skeleton className="h-16 w-full" />
+      </div>
+    ) : (
       <Card>
         <CardContent className="p-6">
           <Skeleton className="h-24 w-full" />
@@ -36,6 +41,75 @@ export function EnergyDeclarationCard({ propertyId, organizationId }: EnergyDecl
   const specificImprovement = previousHistory && currentValues.specificEnergyUse
     ? calculateEnergyImprovement(currentValues.specificEnergyUse, previousHistory.specific_energy_use || 0)
     : null;
+
+  if (compact) {
+    return (
+      <>
+        <div 
+          className="pt-3 mt-3 border-t cursor-pointer hover:bg-accent/50 rounded-lg p-2 -mx-2 transition-colors"
+          onClick={() => setDialogOpen(true)}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-medium text-muted-foreground">Energideklaration</span>
+          </div>
+          
+          {!hasData ? (
+            <p className="text-xs text-muted-foreground">
+              Klicka för att lägga till
+            </p>
+          ) : (
+            <div className="flex items-center gap-3">
+              {/* Compact Energy Grade Badge */}
+              <div className={`flex items-center justify-center w-10 h-10 rounded border ${gradeColor.bg} ${gradeColor.text} ${gradeColor.border}`}>
+                <span className="text-xl font-bold">
+                  {currentValues.energyGrade || '-'}
+                </span>
+              </div>
+
+              {/* Compact Energy Values */}
+              <div className="flex-1 space-y-0.5 text-xs">
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground">Primär:</span>
+                  <span className="font-medium">{formatEnergyValue(currentValues.primaryEnergyNumber, 'kWh/m²')}</span>
+                  {primaryImprovement && primaryImprovement.percentage > 0 && (
+                    <span className={`flex items-center gap-0.5 ${primaryImprovement.isImprovement ? 'text-green-600' : 'text-red-600'}`}>
+                      {primaryImprovement.isImprovement ? (
+                        <TrendingDown className="h-2.5 w-2.5" />
+                      ) : (
+                        <TrendingUp className="h-2.5 w-2.5" />
+                      )}
+                      {primaryImprovement.percentage}%
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground">Specifik:</span>
+                  <span className="font-medium">{formatEnergyValue(currentValues.specificEnergyUse, 'kWh/m²/år')}</span>
+                  {specificImprovement && specificImprovement.percentage > 0 && (
+                    <span className={`flex items-center gap-0.5 ${specificImprovement.isImprovement ? 'text-green-600' : 'text-red-600'}`}>
+                      {specificImprovement.isImprovement ? (
+                        <TrendingDown className="h-2.5 w-2.5" />
+                      ) : (
+                        <TrendingUp className="h-2.5 w-2.5" />
+                      )}
+                      {specificImprovement.percentage}%
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <EnergyDeclarationDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          propertyId={propertyId}
+          organizationId={organizationId}
+        />
+      </>
+    );
+  }
 
   return (
     <>

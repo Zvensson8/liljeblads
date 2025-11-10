@@ -153,14 +153,15 @@ export function PropertyOverview({
               <span className="text-muted-foreground">Tomtarea: </span>
               <span className="text-foreground">{property.area_sqm ? `${property.area_sqm} m²` : '-'}</span>
             </div>
+            
+            {/* Compact Energy Declaration */}
+            <EnergyDeclarationCard 
+              propertyId={property.id} 
+              organizationId={property.organization_id}
+              compact
+            />
           </CardContent>
         </Card>
-
-        {/* Energy Declaration */}
-        <EnergyDeclarationCard 
-          propertyId={property.id} 
-          organizationId={property.organization_id}
-        />
 
         {/* Invoice Address & Send Button */}
         <Card className="hover:shadow-[var(--shadow-elegant)] transition-all">
