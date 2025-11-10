@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
@@ -70,12 +70,15 @@ export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [sendingDraft, setSendingDraft] = useState(false);
   const { addRecentItem } = useRecentlyVisited();
+  
+  const activeTab = searchParams.get("tab") || "info";
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -414,7 +417,11 @@ export default function ProjectDetail() {
               </div>
 
               {/* Main Content Tabs */}
-              <Tabs defaultValue="info" className="w-full">
+              <Tabs 
+                value={activeTab} 
+                onValueChange={(value) => setSearchParams({ tab: value })} 
+                className="w-full"
+              >
                 <TabsList className="grid w-full grid-cols-6">
                   <TabsTrigger value="info">Information</TabsTrigger>
                   <TabsTrigger value="economy">Ekonomi</TabsTrigger>
