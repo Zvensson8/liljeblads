@@ -410,38 +410,43 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
   return (
     <Card className={gradientClass}>
       <Collapsible open={expanded} onOpenChange={setExpanded}>
-        <CardHeader className="cursor-pointer hover:bg-muted/50 p-4">
-          <CollapsibleTrigger className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-4">
-              <h3 className="text-lg font-semibold">{quarter}</h3>
-              <div className="flex gap-3 text-sm">
-                <div className="flex items-center gap-1">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  <span>Klara: {stats.completed}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4 text-yellow-500" />
-                  <span>Kvar: {stats.remaining}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <XCircle className="h-4 w-4 text-red-500" />
-                  <span>Saknas: {stats.missing}</span>
+        <CardHeader className="p-4">
+          <div className="flex items-center justify-between w-full gap-2">
+            <CollapsibleTrigger className="flex items-center justify-between flex-1 hover:bg-muted/50 rounded-md p-2 -m-2">
+              <div className="flex items-center gap-4">
+                <h3 className="text-lg font-semibold">{quarter}</h3>
+                <div className="flex gap-3 text-sm">
+                  <div className="flex items-center gap-1">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span>Klara: {stats.completed}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4 text-yellow-500" />
+                    <span>Kvar: {stats.remaining}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    <span>Saknas: {stats.missing}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">{tasks.length} uppgifter</span>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleExportQuarter}
-                title="Exportera kvartal"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-              {expanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </div>
-          </CollapsibleTrigger>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{tasks.length} uppgifter</span>
+                {expanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+              </div>
+            </CollapsibleTrigger>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleExportQuarter();
+              }}
+              title="Exportera kvartal"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
 
         <CollapsibleContent>
