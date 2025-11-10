@@ -669,8 +669,7 @@ const Properties = () => {
                             <th className="text-left py-3 px-4 font-medium">Adress</th>
                             <th className="text-left py-3 px-4 font-medium">Typ</th>
                             <th className="text-left py-3 px-4 font-medium">Byggår</th>
-                            <th className="text-left py-3 px-4 font-medium">Tomtarea</th>
-                            <th className="text-left py-3 px-4 font-medium">Våningar</th>
+                            <th className="text-left py-3 px-4 font-medium">Energiklass</th>
                             <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
                           </tr>
                         </thead>
@@ -706,14 +705,16 @@ const Properties = () => {
                               </td>
                               <td className="py-3 px-4 text-sm">{property.property_type || '-'}</td>
                               <td className="py-3 px-4 text-sm">{property.construction_year || '-'}</td>
-                              <td className="py-3 px-4 text-sm">
-                                {property.area_sqm ? `${property.area_sqm} m²` : '-'}
-                              </td>
                               <td className="py-3 px-4">
-                                <div className="flex items-center gap-2">
-                                  <Layers className="h-4 w-4 text-muted-foreground" />
-                                  <span className="text-sm">{property.floors?.length || 0}</span>
-                                </div>
+                                {property.energy_grade ? (
+                                  <Badge 
+                                    className={`${getEnergyGradeColor(property.energy_grade).bg} ${getEnergyGradeColor(property.energy_grade).text} ${getEnergyGradeColor(property.energy_grade).border} border font-bold text-xs px-2 py-0.5`}
+                                  >
+                                    {property.energy_grade}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">-</span>
+                                )}
                               </td>
                               <td className="py-3 px-4">
                                 <div className="flex gap-1">
