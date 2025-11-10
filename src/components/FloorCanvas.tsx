@@ -266,8 +266,8 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
           if (canvasElement) {
             const rect = canvasElement.getBoundingClientRect();
             setTooltipPosition({
-              x: rect.left + e.pointer.x + 15,
-              y: rect.top + e.pointer.y - 10
+              x: rect.left + e.pointer.x + 10,
+              y: rect.top + e.pointer.y + 10
             });
             setTooltipComponent(component);
             setTooltipVisible(true);
@@ -394,7 +394,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
           fill: 'rgba(59, 130, 246, 0.5)',
           stroke: '#3b82f6',
           strokeWidth: 2,
-          radius: 20,
+          radius: 5,
           selectable: true,
           evented: true,
           hoverCursor: 'move',
