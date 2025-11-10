@@ -29,6 +29,11 @@ export function PropertyOverview({
   const { user } = useAuth();
 
   const handleSendContactInfo = async () => {
+    if (!user?.email) {
+      toast.error('Kunde inte hämta din e-postadress. Vänligen logga in igen.');
+      return;
+    }
+
     setSendingEmail(true);
     
     try {
@@ -42,6 +47,16 @@ export function PropertyOverview({
 
       const mainContact = contacts?.[0];
 
+      // Fetch user's notification preferences to get preferred email
+      const { data: prefs } = await supabase
+        .from('user_notification_preferences')
+        .select('notification_email')
+        .eq('user_id', user.id)
+        .single();
+
+      // Use notification_email if set, otherwise use auth email
+      const recipientEmail = prefs?.notification_email || user.email;
+
       const { error } = await supabase.functions.invoke('send-property-info', {
         body: {
           property_name: property.name,
@@ -49,7 +64,7 @@ export function PropertyOverview({
           property_address: property.address,
           invoice_address: property.invoice_address,
           main_contact: mainContact,
-          recipient_email: user?.email,
+          recipient_email: recipientEmail,
         },
       });
 
