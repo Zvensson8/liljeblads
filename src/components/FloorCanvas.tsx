@@ -2,16 +2,12 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Canvas as FabricCanvas, Circle, Rect, Line, FabricText, FabricImage } from 'fabric';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { CanvasToolbar } from './CanvasToolbar';
 import { ComponentLibraryPanel } from './ComponentLibraryPanel';
 import { ComponentFormDialog } from './ComponentFormDialog';
 import { ComponentTemplate } from '@/hooks/useComponentLibrary';
+import { debounce } from 'lodash-es';
 
 interface FloorCanvasProps {
   floorId: string;
@@ -57,13 +53,52 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [tooltipComponent, setTooltipComponent] = useState<Component | null>(null);
+  const [spacePressed, setSpacePressed] = useState(false);
   const panStart = useRef({ x: 0, y: 0 });
+  const lastSavedPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const { toast } = useToast();
+
+  // Auto-save component position when moved
+  const saveComponentPosition = useCallback(
+    debounce(async (componentId: string, x: number, y: number) => {
+      const lastPos = lastSavedPositions.current.get(componentId);
+      if (lastPos && lastPos.x === x && lastPos.y === y) {
+        return; // Position hasn't changed
+      }
+
+      await supabase
+        .from('component_geometry')
+        .delete()
+        .eq('component_id', componentId);
+
+      const { error } = await supabase
+        .from('component_geometry')
+        .insert({
+          component_id: componentId,
+          x,
+          y,
+        });
+
+      if (!error) {
+        lastSavedPositions.current.set(componentId, { x, y });
+      }
+    }, 500),
+    []
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      // Space for panning
+      if (e.code === 'Space' && !spacePressed && fabricCanvas) {
+        e.preventDefault();
+        setSpacePressed(true);
+        fabricCanvas.defaultCursor = 'grab';
+        fabricCanvas.hoverCursor = 'grab';
+        return;
+      }
       
       if (e.key === 'v' || e.key === 'V') setActiveTool('select');
       if (e.key === 'h' || e.key === 'H') setActiveTool('pan');
@@ -96,9 +131,23 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && fabricCanvas) {
+        setSpacePressed(false);
+        if (activeTool !== 'pan') {
+          fabricCanvas.defaultCursor = 'default';
+          fabricCanvas.hoverCursor = 'move';
+        }
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fabricCanvas, historyStep]);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [fabricCanvas, historyStep, spacePressed, activeTool]);
 
   // Fetch property ID for this floor
   useEffect(() => {
@@ -143,41 +192,39 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     canvas.on('selection:created', (e) => {
       const obj: any = e.selected?.[0];
       setSelectedObject(obj);
-      if (obj?.componentId) {
-        const component = componentsRef.current.find(c => c.id === obj.componentId);
-        if (component) {
-          setEditingComponent(component);
-          setDialogOpen(true);
-        }
-      }
     });
 
     canvas.on('selection:updated', (e) => {
       const obj: any = e.selected?.[0];
       setSelectedObject(obj);
-      if (obj?.componentId) {
-        const component = componentsRef.current.find(c => c.id === obj.componentId);
-        if (component) {
-          setEditingComponent(component);
-          setDialogOpen(true);
-        }
-      }
     });
 
     canvas.on('selection:cleared', () => {
       setSelectedObject(null);
     });
 
+    // Double-click to edit component
+    canvas.on('mouse:dblclick', (e) => {
+      const obj: any = e.target;
+      if (obj?.componentId) {
+        const component = componentsRef.current.find(c => c.id === obj.componentId);
+        if (component) {
+          setEditingComponent(component);
+          setDialogOpen(true);
+        }
+      }
+    });
+
     canvas.on('mouse:move', (e) => {
-      if (isPanning && activeTool === 'pan' && e.pointer) {
-        const delta = {
-          x: e.pointer.x - panStart.current.x,
-          y: e.pointer.y - panStart.current.y
-        };
-        canvas.viewportTransform![4] += delta.x;
-        canvas.viewportTransform![5] += delta.y;
-        canvas.requestRenderAll();
-        panStart.current = { x: e.pointer.x, y: e.pointer.y };
+      // Handle panning with Space or Pan tool
+      if (isPanning && e.pointer) {
+        const vpt = canvas.viewportTransform;
+        if (vpt) {
+          vpt[4] += e.pointer.x - panStart.current.x;
+          vpt[5] += e.pointer.y - panStart.current.y;
+          canvas.requestRenderAll();
+          panStart.current = { x: e.pointer.x, y: e.pointer.y };
+        }
         return;
       }
 
@@ -232,40 +279,44 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
             });
           }
         });
-        canvas.hoverCursor = activeTool === 'pan' ? 'grab' : 'default';
+        canvas.hoverCursor = activeTool === 'pan' || spacePressed ? 'grab' : 'default';
         canvas.renderAll();
       }
     });
 
     canvas.on('mouse:down', (e) => {
-      if (activeTool === 'pan' && e.pointer) {
+      // Enable panning with Space key or Pan tool or middle mouse button
+      const isMiddleButton = e.e instanceof MouseEvent && e.e.button === 1;
+      if ((activeTool === 'pan' || spacePressed || isMiddleButton) && e.pointer) {
+        if (isMiddleButton) {
+          e.e.preventDefault();
+        }
         setIsPanning(true);
         panStart.current = { x: e.pointer.x, y: e.pointer.y };
         canvas.selection = false;
+        canvas.defaultCursor = 'grabbing';
       }
     });
 
-    canvas.on('mouse:move', (e) => {
-      if (isPanning && activeTool === 'pan' && e.pointer) {
-        const delta = {
-          x: e.pointer.x - panStart.current.x,
-          y: e.pointer.y - panStart.current.y
-        };
-        canvas.viewportTransform![4] += delta.x;
-        canvas.viewportTransform![5] += delta.y;
-        canvas.requestRenderAll();
-        panStart.current = { x: e.pointer.x, y: e.pointer.y };
-      }
-    });
-
-    canvas.on('mouse:up', () => {
+    canvas.on('mouse:up', (e) => {
       setIsPanning(false);
-      if (activeTool === 'pan') {
-        canvas.selection = true;
+      if (activeTool === 'pan' || spacePressed) {
+        canvas.selection = activeTool !== 'pan';
+        canvas.defaultCursor = activeTool === 'pan' || spacePressed ? 'grab' : 'default';
       }
     });
 
-    canvas.on('object:modified', () => {
+    // Auto-save component positions when moved
+    canvas.on('object:modified', (e) => {
+      const obj: any = e.target;
+      if (obj && obj.componentId) {
+        saveComponentPosition(obj.componentId, obj.left || 0, obj.top || 0);
+        toast({
+          title: 'Position sparad',
+          description: 'Komponentens position uppdaterades automatiskt.',
+          duration: 2000,
+        });
+      }
       saveHistory();
     });
 
@@ -298,25 +349,39 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
   const renderComponentsOnCanvas = useCallback((componentsData: any[]) => {
     if (!fabricCanvas) return;
 
+    // Store current positions of components being dragged
+    const activeObject = fabricCanvas.getActiveObject();
+    const isDragging = activeObject && (activeObject as any).isMoving;
+
+    // Remove all component objects
     fabricCanvas.getObjects().forEach((obj: any) => {
       if (obj.componentId) {
         fabricCanvas.remove(obj);
       }
     });
 
+    // Re-render components from database
     componentsData.forEach((component) => {
       if (component.component_geometry && component.component_geometry.length > 0) {
         const geometry = component.component_geometry[0];
+        
+        // Store last known position
+        lastSavedPositions.current.set(component.id, { x: geometry.x, y: geometry.y });
+        
         const circle: any = new Circle({
           left: geometry.x,
           top: geometry.y,
           fill: 'rgba(59, 130, 246, 0.5)',
           stroke: '#3b82f6',
           strokeWidth: 2,
-          radius: 15,
+          radius: 20,
           selectable: true,
           evented: true,
-          hoverCursor: 'pointer',
+          hoverCursor: 'move',
+          hasControls: false, // Remove scaling controls
+          hasBorders: true,
+          lockScalingX: true,
+          lockScalingY: true,
         });
         circle.componentId = component.id;
         fabricCanvas.add(circle);
@@ -616,6 +681,11 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
             Spara position
           </Button>
         )}
+        
+        <div className="bg-muted/30 p-2 rounded-lg text-sm text-muted-foreground">
+          💡 Tips: Tryck mellanslag eller använd mellersta musknappen för att panorera. Dubbelklicka på komponent för att redigera.
+        </div>
+        
         <CanvasToolbar
           activeTool={activeTool}
           onToolClick={handleToolClick}
@@ -639,8 +709,13 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
           gridEnabled={gridEnabled}
         />
         
-        <div className="border-2 border-border rounded-lg overflow-hidden shadow-[var(--shadow-card)] bg-white">
+        <div className="border-2 border-border rounded-lg overflow-hidden shadow-[var(--shadow-card)] bg-white relative">
           <canvas ref={canvasRef} />
+          {spacePressed && (
+            <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-3 py-1 rounded-md text-sm font-medium">
+              Panoreringläge
+            </div>
+          )}
         </div>
 
         {/* Tooltip */}
