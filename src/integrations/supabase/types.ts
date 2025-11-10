@@ -53,6 +53,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          organization_id: string | null
           setting_key: string
           setting_value: Json
           updated_at: string
@@ -60,6 +61,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          organization_id?: string | null
           setting_key: string
           setting_value: Json
           updated_at?: string
@@ -67,11 +69,20 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          organization_id?: string | null
           setting_key?: string
           setting_value?: Json
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "admin_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       component_documents: {
         Row: {
@@ -1104,6 +1115,7 @@ export type Database = {
           id: string
           items: Json
           name: string
+          organization_id: string | null
           project_type: Database["public"]["Enums"]["project_type"]
         }
         Insert: {
@@ -1111,6 +1123,7 @@ export type Database = {
           id?: string
           items: Json
           name: string
+          organization_id?: string | null
           project_type: Database["public"]["Enums"]["project_type"]
         }
         Update: {
@@ -1118,9 +1131,18 @@ export type Database = {
           id?: string
           items?: Json
           name?: string
+          organization_id?: string | null
           project_type?: Database["public"]["Enums"]["project_type"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "project_checklist_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_cost_items: {
         Row: {
