@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Filter, FolderArchive, Briefcase, Edit } from "lucide-react";
+import { Plus, Search, Filter, FolderArchive, Briefcase, Edit, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
 import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
 import { ProjectDashboard } from "@/components/projects/ProjectDashboard";
@@ -75,6 +75,8 @@ export default function Projects() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
+  const [sortField, setSortField] = useState<string>("updated_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -175,6 +177,24 @@ export default function Projects() {
     return "text-green-600";
   };
 
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === "asc" 
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
   const filteredProjects = projects.filter((project) => {
     const matchesSearch =
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -186,6 +206,39 @@ export default function Projects() {
     const matchesProperty = propertyFilter === "all" || project.property_id === propertyFilter;
 
     return matchesSearch && matchesStatus && matchesType && matchesProperty;
+  }).sort((a, b) => {
+    let aValue: any = a[sortField as keyof Project];
+    let bValue: any = b[sortField as keyof Project];
+
+    // Handle nested property name
+    if (sortField === "property_name") {
+      aValue = a.property.name;
+      bValue = b.property.name;
+    }
+
+    // Handle quarter sorting
+    if (sortField === "quarter") {
+      aValue = a.year * 10 + (a.start_quarter || 0);
+      bValue = b.year * 10 + (b.start_quarter || 0);
+    }
+
+    // Handle null values
+    if (aValue === null || aValue === undefined) return 1;
+    if (bValue === null || bValue === undefined) return -1;
+
+    // String comparison
+    if (typeof aValue === "string" && typeof bValue === "string") {
+      return sortDirection === "asc" 
+        ? aValue.localeCompare(bValue, "sv")
+        : bValue.localeCompare(aValue, "sv");
+    }
+
+    // Number comparison
+    if (sortDirection === "asc") {
+      return aValue > bValue ? 1 : -1;
+    } else {
+      return aValue < bValue ? 1 : -1;
+    }
   });
 
   if (authLoading || loading) {
@@ -315,14 +368,78 @@ export default function Projects() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>Projektnr</TableHead>
-                                <TableHead>Namn</TableHead>
-                                <TableHead>Fastighet</TableHead>
-                                <TableHead>Typ</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Kvartal</TableHead>
-                                <TableHead className="text-right">Budget</TableHead>
-                                <TableHead className="text-right">Utfall</TableHead>
+                                <TableHead 
+                                  className="cursor-pointer hover:bg-muted/50"
+                                  onClick={() => handleSort("project_number")}
+                                >
+                                  <div className="flex items-center">
+                                    Projektnr
+                                    {getSortIcon("project_number")}
+                                  </div>
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer hover:bg-muted/50"
+                                  onClick={() => handleSort("name")}
+                                >
+                                  <div className="flex items-center">
+                                    Namn
+                                    {getSortIcon("name")}
+                                  </div>
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer hover:bg-muted/50"
+                                  onClick={() => handleSort("property_name")}
+                                >
+                                  <div className="flex items-center">
+                                    Fastighet
+                                    {getSortIcon("property_name")}
+                                  </div>
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer hover:bg-muted/50"
+                                  onClick={() => handleSort("type")}
+                                >
+                                  <div className="flex items-center">
+                                    Typ
+                                    {getSortIcon("type")}
+                                  </div>
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer hover:bg-muted/50"
+                                  onClick={() => handleSort("status")}
+                                >
+                                  <div className="flex items-center">
+                                    Status
+                                    {getSortIcon("status")}
+                                  </div>
+                                </TableHead>
+                                <TableHead 
+                                  className="cursor-pointer hover:bg-muted/50"
+                                  onClick={() => handleSort("quarter")}
+                                >
+                                  <div className="flex items-center">
+                                    Kvartal
+                                    {getSortIcon("quarter")}
+                                  </div>
+                                </TableHead>
+                                <TableHead 
+                                  className="text-right cursor-pointer hover:bg-muted/50"
+                                  onClick={() => handleSort("budget")}
+                                >
+                                  <div className="flex items-center justify-end">
+                                    Budget
+                                    {getSortIcon("budget")}
+                                  </div>
+                                </TableHead>
+                                <TableHead 
+                                  className="text-right cursor-pointer hover:bg-muted/50"
+                                  onClick={() => handleSort("actual_cost")}
+                                >
+                                  <div className="flex items-center justify-end">
+                                    Utfall
+                                    {getSortIcon("actual_cost")}
+                                  </div>
+                                </TableHead>
                                 <TableHead className="text-right">Avvikelse</TableHead>
                                 <TableHead>Åtgärder</TableHead>
                               </TableRow>
