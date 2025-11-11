@@ -77,6 +77,9 @@ export default function Projects() {
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
   const [sortField, setSortField] = useState<string>("updated_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [editingCell, setEditingCell] = useState<{ projectId: string; field: string } | null>(null);
+  const [tempValue, setTempValue] = useState<any>(null);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -175,6 +178,50 @@ export default function Projects() {
     if (variance > 10) return "text-red-600";
     if (variance > 0) return "text-yellow-600";
     return "text-green-600";
+  };
+
+  const updateProject = async (projectId: string, field: string, value: any) => {
+    setUpdating(true);
+    try {
+      const updateData: any = { [field]: value, updated_at: new Date().toISOString() };
+      
+      const { error } = await supabase
+        .from("projects")
+        .update(updateData)
+        .eq("id", projectId);
+      
+      if (error) throw error;
+      
+      setProjects(projects.map(p => 
+        p.id === projectId ? { ...p, [field]: value } : p
+      ));
+      
+      toast.success("Projektet uppdaterades");
+    } catch (error) {
+      toast.error("Kunde inte uppdatera projektet");
+    } finally {
+      setUpdating(false);
+      setEditingCell(null);
+      setTempValue(null);
+    }
+  };
+
+  const startEditing = (projectId: string, field: string, currentValue: any) => {
+    setEditingCell({ projectId, field });
+    setTempValue(currentValue);
+  };
+
+  const cancelEditing = () => {
+    setEditingCell(null);
+    setTempValue(null);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, projectId: string, field: string) => {
+    if (e.key === "Enter" && tempValue !== null) {
+      updateProject(projectId, field, tempValue);
+    } else if (e.key === "Escape") {
+      cancelEditing();
+    }
   };
 
   const handleSort = (field: string) => {
@@ -455,17 +502,154 @@ export default function Projects() {
                                     className="cursor-pointer hover:bg-muted/50"
                                     onClick={() => navigate(`/projects/${project.id}`)}
                                   >
-                                    <TableCell className="font-medium">
-                                      {project.project_number}
+                                    <TableCell 
+                                      className="font-medium group cursor-text hover:bg-muted/30"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startEditing(project.id, "project_number", project.project_number);
+                                      }}
+                                    >
+                                      {editingCell?.projectId === project.id && editingCell?.field === "project_number" ? (
+                                        <Input
+                                          value={tempValue}
+                                          onChange={(e) => setTempValue(e.target.value)}
+                                          onBlur={() => updateProject(project.id, "project_number", tempValue)}
+                                          onKeyDown={(e) => handleKeyDown(e, project.id, "project_number")}
+                                          className="h-8 w-full"
+                                          autoFocus
+                                          disabled={updating}
+                                        />
+                                      ) : (
+                                        <span className="group-hover:underline">{project.project_number}</span>
+                                      )}
                                     </TableCell>
                                     <TableCell>{project.name}</TableCell>
                                     <TableCell>{project.property.name}</TableCell>
-                                    <TableCell>{getTypeBadge(project.type)}</TableCell>
-                                    <TableCell>{getStatusBadge(project.status)}</TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">
-                                      {project.start_quarter && project.year
-                                        ? `Q${project.start_quarter} ${project.year}`
-                                        : "-"}
+                                    <TableCell 
+                                      className="group cursor-pointer hover:bg-muted/30"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {editingCell?.projectId === project.id && editingCell?.field === "type" ? (
+                                        <Select
+                                          value={tempValue}
+                                          onValueChange={(value) => {
+                                            setTempValue(value);
+                                            updateProject(project.id, "type", value);
+                                          }}
+                                          disabled={updating}
+                                        >
+                                          <SelectTrigger className="h-8 w-full">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="investering">Investering</SelectItem>
+                                            <SelectItem value="underhall">Underhåll</SelectItem>
+                                            <SelectItem value="energi">Energi</SelectItem>
+                                            <SelectItem value="annat">Annat</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      ) : (
+                                        <div onClick={() => startEditing(project.id, "type", project.type)}>
+                                          {getTypeBadge(project.type)}
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell 
+                                      className="group cursor-pointer hover:bg-muted/30"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {editingCell?.projectId === project.id && editingCell?.field === "status" ? (
+                                        <Select
+                                          value={tempValue}
+                                          onValueChange={(value) => {
+                                            setTempValue(value);
+                                            updateProject(project.id, "status", value);
+                                          }}
+                                          disabled={updating}
+                                        >
+                                          <SelectTrigger className="h-8 w-full">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="planerat">Planerat</SelectItem>
+                                            <SelectItem value="invantar_offert">Inväntar offert</SelectItem>
+                                            <SelectItem value="offert_finns">Offert finns</SelectItem>
+                                            <SelectItem value="pagaende">Pågående</SelectItem>
+                                            <SelectItem value="pausat">Pausat</SelectItem>
+                                            <SelectItem value="avslutat">Avslutat</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      ) : (
+                                        <div onClick={() => startEditing(project.id, "status", project.status)}>
+                                          {getStatusBadge(project.status)}
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell 
+                                      className="text-sm text-muted-foreground group cursor-pointer hover:bg-muted/30"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {editingCell?.projectId === project.id && editingCell?.field === "quarter" ? (
+                                        <div className="flex gap-2">
+                                          <Select
+                                            value={tempValue?.quarter?.toString() || ""}
+                                            onValueChange={(value) => {
+                                              const newValue = { 
+                                                quarter: parseInt(value), 
+                                                year: tempValue?.year || project.year 
+                                              };
+                                              setTempValue(newValue);
+                                              updateProject(project.id, "start_quarter", parseInt(value));
+                                            }}
+                                            disabled={updating}
+                                          >
+                                            <SelectTrigger className="h-8 w-20">
+                                              <SelectValue placeholder="Q" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="1">Q1</SelectItem>
+                                              <SelectItem value="2">Q2</SelectItem>
+                                              <SelectItem value="3">Q3</SelectItem>
+                                              <SelectItem value="4">Q4</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                          <Select
+                                            value={tempValue?.year?.toString() || ""}
+                                            onValueChange={(value) => {
+                                              const newValue = { 
+                                                quarter: tempValue?.quarter || project.start_quarter, 
+                                                year: parseInt(value) 
+                                              };
+                                              setTempValue(newValue);
+                                              updateProject(project.id, "year", parseInt(value));
+                                            }}
+                                            disabled={updating}
+                                          >
+                                            <SelectTrigger className="h-8 w-24">
+                                              <SelectValue placeholder="År" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {Array.from({ length: 7 }, (_, i) => 2024 + i).map((year) => (
+                                                <SelectItem key={year} value={year.toString()}>
+                                                  {year}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      ) : (
+                                        <div 
+                                          className="group-hover:underline"
+                                          onClick={() => startEditing(project.id, "quarter", { 
+                                            quarter: project.start_quarter, 
+                                            year: project.year 
+                                          })}
+                                        >
+                                          {project.start_quarter && project.year
+                                            ? `Q${project.start_quarter} ${project.year}`
+                                            : "-"}
+                                        </div>
+                                      )}
                                     </TableCell>
                                     <TableCell className="text-right">
                                       {project.budget.toLocaleString("sv-SE")} kr
@@ -547,15 +731,154 @@ export default function Projects() {
                                     className="cursor-pointer hover:bg-muted/50"
                                     onClick={() => navigate(`/projects/${project.id}`)}
                                   >
-                                    <TableCell className="font-medium">{project.project_number}</TableCell>
+                                    <TableCell 
+                                      className="font-medium group cursor-text hover:bg-muted/30"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startEditing(project.id, "project_number", project.project_number);
+                                      }}
+                                    >
+                                      {editingCell?.projectId === project.id && editingCell?.field === "project_number" ? (
+                                        <Input
+                                          value={tempValue}
+                                          onChange={(e) => setTempValue(e.target.value)}
+                                          onBlur={() => updateProject(project.id, "project_number", tempValue)}
+                                          onKeyDown={(e) => handleKeyDown(e, project.id, "project_number")}
+                                          className="h-8 w-full"
+                                          autoFocus
+                                          disabled={updating}
+                                        />
+                                      ) : (
+                                        <span className="group-hover:underline">{project.project_number}</span>
+                                      )}
+                                    </TableCell>
                                     <TableCell>{project.name}</TableCell>
                                     <TableCell>{project.property.name}</TableCell>
-                                    <TableCell>{getTypeBadge(project.type)}</TableCell>
-                                    <TableCell>{getStatusBadge(project.status)}</TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">
-                                      {project.start_date 
-                                        ? `Q${Math.ceil((new Date(project.start_date).getMonth() + 1) / 3)} ${new Date(project.start_date).getFullYear()}`
-                                        : "-"}
+                                    <TableCell 
+                                      className="group cursor-pointer hover:bg-muted/30"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {editingCell?.projectId === project.id && editingCell?.field === "type" ? (
+                                        <Select
+                                          value={tempValue}
+                                          onValueChange={(value) => {
+                                            setTempValue(value);
+                                            updateProject(project.id, "type", value);
+                                          }}
+                                          disabled={updating}
+                                        >
+                                          <SelectTrigger className="h-8 w-full">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="investering">Investering</SelectItem>
+                                            <SelectItem value="underhall">Underhåll</SelectItem>
+                                            <SelectItem value="energi">Energi</SelectItem>
+                                            <SelectItem value="annat">Annat</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      ) : (
+                                        <div onClick={() => startEditing(project.id, "type", project.type)}>
+                                          {getTypeBadge(project.type)}
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell 
+                                      className="group cursor-pointer hover:bg-muted/30"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {editingCell?.projectId === project.id && editingCell?.field === "status" ? (
+                                        <Select
+                                          value={tempValue}
+                                          onValueChange={(value) => {
+                                            setTempValue(value);
+                                            updateProject(project.id, "status", value);
+                                          }}
+                                          disabled={updating}
+                                        >
+                                          <SelectTrigger className="h-8 w-full">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="planerat">Planerat</SelectItem>
+                                            <SelectItem value="invantar_offert">Inväntar offert</SelectItem>
+                                            <SelectItem value="offert_finns">Offert finns</SelectItem>
+                                            <SelectItem value="pagaende">Pågående</SelectItem>
+                                            <SelectItem value="pausat">Pausat</SelectItem>
+                                            <SelectItem value="avslutat">Avslutat</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      ) : (
+                                        <div onClick={() => startEditing(project.id, "status", project.status)}>
+                                          {getStatusBadge(project.status)}
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell 
+                                      className="text-sm text-muted-foreground group cursor-pointer hover:bg-muted/30"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {editingCell?.projectId === project.id && editingCell?.field === "quarter" ? (
+                                        <div className="flex gap-2">
+                                          <Select
+                                            value={tempValue?.quarter?.toString() || ""}
+                                            onValueChange={(value) => {
+                                              const newValue = { 
+                                                quarter: parseInt(value), 
+                                                year: tempValue?.year || project.year 
+                                              };
+                                              setTempValue(newValue);
+                                              updateProject(project.id, "start_quarter", parseInt(value));
+                                            }}
+                                            disabled={updating}
+                                          >
+                                            <SelectTrigger className="h-8 w-20">
+                                              <SelectValue placeholder="Q" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="1">Q1</SelectItem>
+                                              <SelectItem value="2">Q2</SelectItem>
+                                              <SelectItem value="3">Q3</SelectItem>
+                                              <SelectItem value="4">Q4</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                          <Select
+                                            value={tempValue?.year?.toString() || ""}
+                                            onValueChange={(value) => {
+                                              const newValue = { 
+                                                quarter: tempValue?.quarter || project.start_quarter, 
+                                                year: parseInt(value) 
+                                              };
+                                              setTempValue(newValue);
+                                              updateProject(project.id, "year", parseInt(value));
+                                            }}
+                                            disabled={updating}
+                                          >
+                                            <SelectTrigger className="h-8 w-24">
+                                              <SelectValue placeholder="År" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {Array.from({ length: 7 }, (_, i) => 2024 + i).map((year) => (
+                                                <SelectItem key={year} value={year.toString()}>
+                                                  {year}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      ) : (
+                                        <div 
+                                          className="group-hover:underline"
+                                          onClick={() => startEditing(project.id, "quarter", { 
+                                            quarter: project.start_quarter, 
+                                            year: project.year 
+                                          })}
+                                        >
+                                          {project.start_quarter && project.year
+                                            ? `Q${project.start_quarter} ${project.year}`
+                                            : "-"}
+                                        </div>
+                                      )}
                                     </TableCell>
                                     <TableCell className="text-right">
                                       {project.budget.toLocaleString("sv-SE")} kr
