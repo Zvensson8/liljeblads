@@ -11,7 +11,6 @@ import { toast } from "sonner";
 import { OrganizationInfo } from "@/components/organization/OrganizationInfo";
 import { OrganizationMembers } from "@/components/organization/OrganizationMembers";
 import { OrganizationInvitations } from "@/components/organization/OrganizationInvitations";
-import { OrganizationSubscription } from "@/components/organization/OrganizationSubscription";
 import { OrganizationBranding } from "@/components/organization/OrganizationBranding";
 import { OrganizationDataExport } from "@/components/organization/OrganizationDataExport";
 import { PropertyInfoCategoryManager } from "@/components/property-info/PropertyInfoCategoryManager";
