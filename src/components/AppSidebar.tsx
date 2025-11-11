@@ -102,7 +102,6 @@ export function AppSidebar() {
           {!isCollapsed && (
             <div className="flex items-center gap-1">
               <NotificationBell />
-              <KeyboardShortcutsDialog />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="hover:bg-accent">
@@ -116,6 +115,7 @@ export function AppSidebar() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <KeyboardShortcutsDialog />
             </div>
           )}
         </div>
