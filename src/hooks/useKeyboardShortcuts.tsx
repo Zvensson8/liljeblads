@@ -69,7 +69,7 @@ export const useGlobalShortcuts = (onOpenSearch?: () => void) => {
       description: "Gå till Arbetsordrar",
     },
     {
-      key: "c",
+      key: "m",
       ctrlKey: true,
       handler: () => navigate("/components"),
       description: "Gå till Komponenter",

@@ -37,41 +37,39 @@ export function useNotificationPreferences() {
           .eq('id', user.id)
           .single();
 
-        if (profile?.organization_id) {
-          const { data: newPrefs, error: insertError } = await supabase
-            .from('user_notification_preferences')
-            .insert({
-              user_id: user.id,
-              organization_id: profile.organization_id,
-              monthly_project_summary: false,
-              monthly_workorder_summary: false,
-              maintenance_reminders: false,
-              maintenance_history_annual: false,
-              preferred_day: 'monday',
-              notification_email: null,
-              project_summary_previewed: false,
-              workorder_summary_previewed: false,
-              maintenance_reminders_previewed: false,
-              maintenance_history_previewed: false,
-              project_summary_frequency: 'monthly',
-              project_summary_time: '08:00',
-              workorder_summary_frequency: 'monthly',
-              workorder_summary_time: '08:00',
-              maintenance_reminders_frequency: 'weekly',
-              maintenance_reminders_time: '08:00',
-              maintenance_history_frequency: 'yearly',
-              maintenance_history_time: '08:00'
-            })
-            .select()
-            .single();
+        const { data: newPrefs, error: insertError } = await supabase
+          .from('user_notification_preferences')
+          .insert({
+            user_id: user.id,
+            organization_id: profile?.organization_id || null,
+            monthly_project_summary: false,
+            monthly_workorder_summary: false,
+            maintenance_reminders: false,
+            maintenance_history_annual: false,
+            preferred_day: 'monday',
+            notification_email: null,
+            project_summary_previewed: false,
+            workorder_summary_previewed: false,
+            maintenance_reminders_previewed: false,
+            maintenance_history_previewed: false,
+            project_summary_frequency: 'monthly',
+            project_summary_time: '08:00',
+            workorder_summary_frequency: 'monthly',
+            workorder_summary_time: '08:00',
+            maintenance_reminders_frequency: 'weekly',
+            maintenance_reminders_time: '08:00',
+            maintenance_history_frequency: 'yearly',
+            maintenance_history_time: '08:00'
+          })
+          .select()
+          .single();
 
-          if (insertError) {
-            console.error('Error creating notification preferences:', insertError);
-            throw insertError;
-          }
-
-          setPreferences(newPrefs as UserNotificationPreferences);
+        if (insertError) {
+          console.error('Error creating notification preferences:', insertError);
+          throw insertError;
         }
+
+        setPreferences(newPrefs as UserNotificationPreferences);
       }
     } catch (error) {
       console.error('Error in fetchPreferences:', error);

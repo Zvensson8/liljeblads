@@ -54,7 +54,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
         const { data: properties } = await supabase
           .from("properties")
           .select("id, name, address, property_number")
-          .ilike("name", `%${searchQuery}%`)
+          .or(`name.ilike.%${searchQuery}%,address.ilike.%${searchQuery}%,property_number.ilike.%${searchQuery}%`)
           .limit(5);
 
         if (properties) {
@@ -127,7 +127,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
         const { data: projects } = await supabase
           .from("projects")
           .select("id, name, project_number, properties(name)")
-          .ilike("name", `%${searchQuery}%`)
+          .or(`name.ilike.%${searchQuery}%,project_number.ilike.%${searchQuery}%`)
           .eq("is_archived", false)
           .limit(5);
 
