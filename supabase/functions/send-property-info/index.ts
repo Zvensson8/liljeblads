@@ -88,7 +88,7 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: "Fastighetssystem <onboarding@resend.dev>",
+      from: "Fastighetssystem <info@liljeblads.com>",
       to: [recipient_email],
       subject: `Kontaktuppgifter - ${escapeHtml(property_name)}`,
       html: emailHtml,

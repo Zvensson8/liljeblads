@@ -259,7 +259,7 @@ serve(async (req) => {
     `;
 
     await resend.emails.send({
-      from: 'Årsrapporter <onboarding@resend.dev>',
+      from: 'Årsrapporter <info@liljeblads.com>',
       to: [userEmail],
       subject: `Årlig underhållshistorik ${lastYear}`,
       html: emailHtml,

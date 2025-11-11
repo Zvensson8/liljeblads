@@ -232,7 +232,7 @@ serve(async (req) => {
     `;
 
     await resend.emails.send({
-      from: 'Projektrapporter <onboarding@resend.dev>',
+      from: 'Projektrapporter <info@liljeblads.com>',
       to: [userEmail],
       subject: `Månatlig projektsammanfattning - ${monthName} ${year}`,
       html: emailHtml,

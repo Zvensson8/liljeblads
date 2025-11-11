@@ -184,7 +184,7 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: "Fastighetssystem <onboarding@resend.dev>",
+      from: "Fastighetssystem <info@liljeblads.com>",
       to: [userEmail],
       subject: `Beställning – ${escapeHtml(workOrder.action)} ${escapeHtml(workOrder.property.name)}`,
       html: htmlContent,

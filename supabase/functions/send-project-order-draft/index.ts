@@ -192,7 +192,7 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: "Fastighetssystem <onboarding@resend.dev>",
+      from: "Fastighetssystem <info@liljeblads.com>",
       to: [userEmail],
       subject: `Beställning – ${escapeHtml(project.description || project.name)} ${escapeHtml(project.property.name)} ${escapeHtml(project.project_number || '')}`,
       html: htmlContent,

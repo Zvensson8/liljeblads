@@ -256,7 +256,7 @@ serve(async (req) => {
     `;
 
     await resend.emails.send({
-      from: 'Underhållspåminnelser <onboarding@resend.dev>',
+      from: 'Underhållspåminnelser <info@liljeblads.com>',
       to: [userEmail],
       subject: `Underhållspåminnelser - ${upcomingMaintenance.length} åtgärder behövs`,
       html: emailHtml,

@@ -283,7 +283,7 @@ serve(async (req) => {
     `;
 
     await resend.emails.send({
-      from: 'Arbetsorderrapporter <onboarding@resend.dev>',
+      from: 'Arbetsorderrapporter <info@liljeblads.com>',
       to: [userEmail],
       subject: `Månatlig arbetsorderrapport - ${monthName} ${year}`,
       html: emailHtml,

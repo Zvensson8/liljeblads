@@ -161,7 +161,7 @@ serve(async (req) => {
 
         try {
           await resend.emails.send({
-            from: 'Arbetsorderpåminnelser <onboarding@resend.dev>',
+            from: 'Arbetsorderpåminnelser <info@liljeblads.com>',
             to: [order.reminder_recipient_email],
             subject: `Påminnelse: Uppföljning av ${escapeHtml(order.action)}`,
             html: emailHtml,

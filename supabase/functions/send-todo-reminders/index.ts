@@ -117,7 +117,7 @@ const handler = async (req: Request): Promise<Response> => {
           const priorityColor = priorityColors[todo.priority] || priorityColors.medium;
 
           const { error: emailError } = await resend.emails.send({
-            from: "Påminnelse <onboarding@resend.dev>",
+            from: "Påminnelse <info@liljeblads.com>",
             to: [todo.reminder_email],
             subject: `Påminnelse: ${escapeHtml(todo.title)}`,
             html: `
