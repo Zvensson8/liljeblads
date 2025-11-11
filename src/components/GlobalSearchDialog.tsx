@@ -51,15 +51,22 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
 
       try {
         // Search properties
-        const { data: properties } = await supabase
-          .from("properties")
-          .select("id, name, address, property_number")
-          .or(`name.ilike.%${searchQuery}%,address.ilike.%${searchQuery}%,property_number.ilike.%${searchQuery}%`)
-          .limit(5);
+        const propertiesPromises = [
+          supabase.from("properties").select("id, name, address, property_number").ilike("name", `%${searchQuery}%`).limit(5),
+          supabase.from("properties").select("id, name, address, property_number").ilike("address", `%${searchQuery}%`).limit(5),
+          supabase.from("properties").select("id, name, address, property_number").ilike("property_number", `%${searchQuery}%`).limit(5)
+        ];
+        
+        const propertiesResults = await Promise.all(propertiesPromises);
+        const uniqueProperties = new Map();
+        propertiesResults.forEach(result => {
+          result.data?.forEach(p => uniqueProperties.set(p.id, p));
+        });
+        const properties = Array.from(uniqueProperties.values()).slice(0, 5);
 
-        if (properties) {
+        if (properties.length > 0) {
           allResults.push(
-            ...properties.map((p) => ({
+            ...properties.map((p: any) => ({
               id: p.id,
               type: "property" as const,
               title: p.name,
@@ -124,14 +131,19 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
         }
 
         // Search projects
-        const { data: projects } = await supabase
-          .from("projects")
-          .select("id, name, project_number, properties(name)")
-          .or(`name.ilike.%${searchQuery}%,project_number.ilike.%${searchQuery}%`)
-          .eq("is_archived", false)
-          .limit(5);
+        const projectsPromises = [
+          supabase.from("projects").select("id, name, project_number, properties(name)").ilike("name", `%${searchQuery}%`).eq("is_archived", false).limit(5),
+          supabase.from("projects").select("id, name, project_number, properties(name)").ilike("project_number", `%${searchQuery}%`).eq("is_archived", false).limit(5)
+        ];
+        
+        const projectsResults = await Promise.all(projectsPromises);
+        const uniqueProjects = new Map();
+        projectsResults.forEach(result => {
+          result.data?.forEach(p => uniqueProjects.set(p.id, p));
+        });
+        const projects = Array.from(uniqueProjects.values()).slice(0, 5);
 
-        if (projects) {
+        if (projects.length > 0) {
           allResults.push(
             ...projects.map((p: any) => ({
               id: p.id,
