@@ -29,34 +29,38 @@ serve(async (req) => {
       .from('profiles')
       .select('email, organization_id')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
-    if (!profile || !profile.organization_id) {
-      throw new Error('User profile or organization not found');
+    if (!profile) {
+      throw new Error('User profile not found');
     }
 
-    // Get organization
-    const { data: organization } = await supabase
-      .from('organizations')
-      .select('name')
-      .eq('id', profile.organization_id)
-      .single();
+    // Get organization if user has one
+    let organization = null;
+    if (profile.organization_id) {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', profile.organization_id)
+        .maybeSingle();
+      organization = orgData;
+    }
 
     let htmlPreview = '';
 
     // Generate preview based on report type
     switch (reportType) {
       case 'project_summary':
-        htmlPreview = await generateProjectSummaryPreview(supabase, profile.organization_id, organization?.name);
+        htmlPreview = await generateProjectSummaryPreview(supabase, profile.organization_id || null, organization?.name);
         break;
       case 'workorder_summary':
-        htmlPreview = await generateWorkOrderSummaryPreview(supabase, profile.organization_id, organization?.name);
+        htmlPreview = await generateWorkOrderSummaryPreview(supabase, profile.organization_id || null, organization?.name);
         break;
       case 'maintenance_reminders':
-        htmlPreview = await generateMaintenanceRemindersPreview(supabase, profile.organization_id, organization?.name);
+        htmlPreview = await generateMaintenanceRemindersPreview(supabase, profile.organization_id || null, organization?.name);
         break;
       case 'maintenance_history':
-        htmlPreview = await generateMaintenanceHistoryPreview(supabase, profile.organization_id, organization?.name);
+        htmlPreview = await generateMaintenanceHistoryPreview(supabase, profile.organization_id || null, organization?.name);
         break;
       default:
         throw new Error('Invalid report type');
@@ -66,11 +70,8 @@ serve(async (req) => {
     const previewField = `${reportType}_previewed`;
     await supabase
       .from('user_notification_preferences')
-      .upsert({
-        user_id: userId,
-        organization_id: profile.organization_id,
-        [previewField]: true
-      }, { onConflict: 'user_id,organization_id' });
+      .update({ [previewField]: true })
+      .eq('user_id', userId);
 
     return new Response(
       JSON.stringify({ success: true, html: htmlPreview }),
@@ -85,7 +86,7 @@ serve(async (req) => {
   }
 });
 
-async function generateProjectSummaryPreview(supabase: any, organizationId: string, orgName: string | undefined) {
+async function generateProjectSummaryPreview(supabase: any, organizationId: string | null, orgName: string | undefined) {
   // Simplified version - just show structure with sample data
   return `
 <!DOCTYPE html>
@@ -141,7 +142,7 @@ async function generateProjectSummaryPreview(supabase: any, organizationId: stri
   `;
 }
 
-async function generateWorkOrderSummaryPreview(supabase: any, organizationId: string, orgName: string | undefined) {
+async function generateWorkOrderSummaryPreview(supabase: any, organizationId: string | null, orgName: string | undefined) {
   return `
 <!DOCTYPE html>
 <html>
@@ -174,7 +175,7 @@ async function generateWorkOrderSummaryPreview(supabase: any, organizationId: st
   `;
 }
 
-async function generateMaintenanceRemindersPreview(supabase: any, organizationId: string, orgName: string | undefined) {
+async function generateMaintenanceRemindersPreview(supabase: any, organizationId: string | null, orgName: string | undefined) {
   return `
 <!DOCTYPE html>
 <html>
@@ -207,7 +208,7 @@ async function generateMaintenanceRemindersPreview(supabase: any, organizationId
   `;
 }
 
-async function generateMaintenanceHistoryPreview(supabase: any, organizationId: string, orgName: string | undefined) {
+async function generateMaintenanceHistoryPreview(supabase: any, organizationId: string | null, orgName: string | undefined) {
   return `
 <!DOCTYPE html>
 <html>
