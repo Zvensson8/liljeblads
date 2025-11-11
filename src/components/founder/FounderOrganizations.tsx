@@ -38,28 +38,15 @@ interface Organization {
   subscription_tier: string;
   max_properties: number;
   max_users: number;
-  billing_cycle: string;
-  billing_contact: string | null;
-  invoice_email: string | null;
-  payment_status: string;
-  next_billing_date: string | null;
-  last_payment_date: string | null;
   notes: string | null;
   created_at: string;
 }
 
 const TIER_CONFIGS = {
-  small: { name: "Liten", maxProperties: 10, maxUsers: 5, price: 45000 },
-  medium: { name: "Mellan", maxProperties: 50, maxUsers: 20, price: 150000 },
-  large: { name: "Stor", maxProperties: 150, maxUsers: 40, price: 450000 },
-  enterprise: { name: "Enterprise", maxProperties: 300, maxUsers: 60, price: 900000 },
-};
-
-const BILLING_CYCLES = {
-  monthly: "Månadsvis",
-  quarterly: "Kvartalsvis",
-  semi_annually: "Halvårsvis",
-  annually: "Årsvis",
+  small: { name: "Liten", maxProperties: 10, maxUsers: 5 },
+  medium: { name: "Mellan", maxProperties: 50, maxUsers: 20 },
+  large: { name: "Stor", maxProperties: 150, maxUsers: 40 },
+  enterprise: { name: "Enterprise", maxProperties: 300, maxUsers: 60 },
 };
 
 export function FounderOrganizations() {
@@ -75,19 +62,11 @@ export function FounderOrganizations() {
     subscription_tier: "",
     max_properties: 0,
     max_users: 0,
-    billing_cycle: "monthly",
-    billing_contact: "",
-    invoice_email: "",
-    payment_status: "active",
-    next_billing_date: "",
     notes: "",
   });
   const [createForm, setCreateForm] = useState({
     name: "",
     subscription_tier: "small",
-    billing_cycle: "monthly",
-    billing_contact: "",
-    invoice_email: "",
   });
 
   useEffect(() => {
@@ -96,8 +75,7 @@ export function FounderOrganizations() {
 
   useEffect(() => {
     const filtered = organizations.filter((org) =>
-      org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      org.invoice_email?.toLowerCase().includes(searchTerm.toLowerCase())
+      org.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredOrgs(filtered);
   }, [searchTerm, organizations]);
@@ -128,11 +106,6 @@ export function FounderOrganizations() {
       subscription_tier: org.subscription_tier,
       max_properties: org.max_properties,
       max_users: org.max_users,
-      billing_cycle: org.billing_cycle,
-      billing_contact: org.billing_contact || "",
-      invoice_email: org.invoice_email || "",
-      payment_status: org.payment_status,
-      next_billing_date: org.next_billing_date || "",
       notes: org.notes || "",
     });
     setEditDialogOpen(true);
@@ -149,11 +122,6 @@ export function FounderOrganizations() {
           subscription_tier: editForm.subscription_tier,
           max_properties: editForm.max_properties,
           max_users: editForm.max_users,
-          billing_cycle: editForm.billing_cycle,
-          billing_contact: editForm.billing_contact || null,
-          invoice_email: editForm.invoice_email || null,
-          payment_status: editForm.payment_status,
-          next_billing_date: editForm.next_billing_date || null,
           notes: editForm.notes || null,
         })
         .eq("id", selectedOrg.id);
@@ -180,10 +148,6 @@ export function FounderOrganizations() {
           subscription_tier: createForm.subscription_tier,
           max_properties: tierConfig.maxProperties,
           max_users: tierConfig.maxUsers,
-          billing_cycle: createForm.billing_cycle,
-          billing_contact: createForm.billing_contact || null,
-          invoice_email: createForm.invoice_email || null,
-          payment_status: "active",
         });
 
       if (error) throw error;
@@ -193,9 +157,6 @@ export function FounderOrganizations() {
       setCreateForm({
         name: "",
         subscription_tier: "small",
-        billing_cycle: "monthly",
-        billing_contact: "",
-        invoice_email: "",
       });
       fetchOrganizations();
     } catch (error: any) {
@@ -241,21 +202,6 @@ export function FounderOrganizations() {
     });
   };
 
-  const getPaymentStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      active: "default",
-      overdue: "destructive",
-      suspended: "secondary",
-      cancelled: "outline",
-    };
-    const labels: Record<string, string> = {
-      active: "Aktiv",
-      overdue: "Förfallen",
-      suspended: "Pausad",
-      cancelled: "Avslutad",
-    };
-    return <Badge variant={variants[status] || "default"}>{labels[status] || status}</Badge>;
-  };
 
   return (
     <>
@@ -264,7 +210,7 @@ export function FounderOrganizations() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Organisationer ({organizations.length})</CardTitle>
-              <CardDescription>Hantera alla organisationer och deras prenumerationer</CardDescription>
+              <CardDescription>Hantera alla organisationer och deras inställningar</CardDescription>
             </div>
             <div className="flex gap-2">
               <div className="w-64">
@@ -293,9 +239,7 @@ export function FounderOrganizations() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Organisation</TableHead>
-                  <TableHead>Prenumeration</TableHead>
-                  <TableHead>Betalning</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Tier</TableHead>
                   <TableHead>Gränser</TableHead>
                   <TableHead>Skapad</TableHead>
                   <TableHead className="text-right">Åtgärder</TableHead>
@@ -305,31 +249,13 @@ export function FounderOrganizations() {
                 {filteredOrgs.map((org) => (
                   <TableRow key={org.id}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{org.name}</div>
-                        {org.invoice_email && (
-                          <div className="text-sm text-muted-foreground">{org.invoice_email}</div>
-                        )}
-                      </div>
+                      <div className="font-medium">{org.name}</div>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <Badge>
-                          {TIER_CONFIGS[org.subscription_tier as keyof typeof TIER_CONFIGS]?.name || org.subscription_tier}
-                        </Badge>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {BILLING_CYCLES[org.billing_cycle as keyof typeof BILLING_CYCLES]}
-                        </div>
-                      </div>
+                      <Badge>
+                        {TIER_CONFIGS[org.subscription_tier as keyof typeof TIER_CONFIGS]?.name || org.subscription_tier}
+                      </Badge>
                     </TableCell>
-                    <TableCell>
-                      {org.next_billing_date && (
-                        <div className="text-sm">
-                          <div>Nästa: {new Date(org.next_billing_date).toLocaleDateString("sv-SE")}</div>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{getPaymentStatusBadge(org.payment_status)}</TableCell>
                     <TableCell>
                       <div className="text-sm">
                         <div>{org.max_properties} fastigheter</div>
@@ -367,7 +293,7 @@ export function FounderOrganizations() {
           <DialogHeader>
             <DialogTitle>Skapa Ny Organisation</DialogTitle>
             <DialogDescription>
-              Lägg till en ny organisation med prenumeration och faktureringsinformation
+              Lägg till en ny organisation
             </DialogDescription>
           </DialogHeader>
 
@@ -383,7 +309,7 @@ export function FounderOrganizations() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="create_tier">Prenumeration *</Label>
+              <Label htmlFor="create_tier">Tier *</Label>
               <Select
                 value={createForm.subscription_tier}
                 onValueChange={handleCreateTierChange}
@@ -394,51 +320,11 @@ export function FounderOrganizations() {
                 <SelectContent>
                   {Object.entries(TIER_CONFIGS).map(([key, config]) => (
                     <SelectItem key={key} value={key}>
-                      {config.name} - {config.price.toLocaleString("sv-SE")} SEK/år ({config.maxProperties} fastigheter, {config.maxUsers} användare)
+                      {config.name} ({config.maxProperties} fastigheter, {config.maxUsers} användare)
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="create_billing_cycle">Betalningscykel *</Label>
-              <Select
-                value={createForm.billing_cycle}
-                onValueChange={(value) => setCreateForm({ ...createForm, billing_cycle: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(BILLING_CYCLES).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="create_invoice_email">Faktura E-post</Label>
-              <Input
-                id="create_invoice_email"
-                type="email"
-                value={createForm.invoice_email}
-                onChange={(e) => setCreateForm({ ...createForm, invoice_email: e.target.value })}
-                placeholder="faktura@företag.se"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="create_billing_contact">Faktureringskontakt</Label>
-              <Input
-                id="create_billing_contact"
-                value={createForm.billing_contact}
-                onChange={(e) => setCreateForm({ ...createForm, billing_contact: e.target.value })}
-                placeholder="Namn på kontaktperson"
-              />
             </div>
           </div>
 
@@ -459,7 +345,7 @@ export function FounderOrganizations() {
           <DialogHeader>
             <DialogTitle>Redigera Organisation</DialogTitle>
             <DialogDescription>
-              Ändra organisationsinställningar, prenumeration och faktureringsinformation
+              Ändra organisationsinställningar
             </DialogDescription>
           </DialogHeader>
 
@@ -474,7 +360,7 @@ export function FounderOrganizations() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="tier">Prenumeration</Label>
+              <Label htmlFor="tier">Tier</Label>
               <Select
                 value={editForm.subscription_tier}
                 onValueChange={handleTierChange}
@@ -485,7 +371,7 @@ export function FounderOrganizations() {
                 <SelectContent>
                   {Object.entries(TIER_CONFIGS).map(([key, config]) => (
                     <SelectItem key={key} value={key}>
-                      {config.name} - {config.price.toLocaleString("sv-SE")} SEK/år
+                      {config.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -516,74 +402,6 @@ export function FounderOrganizations() {
                   }
                 />
               </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="billing_cycle">Betalningscykel</Label>
-              <Select
-                value={editForm.billing_cycle}
-                onValueChange={(value) => setEditForm({ ...editForm, billing_cycle: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(BILLING_CYCLES).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="payment_status">Betalningsstatus</Label>
-              <Select
-                value={editForm.payment_status}
-                onValueChange={(value) => setEditForm({ ...editForm, payment_status: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Aktiv</SelectItem>
-                  <SelectItem value="overdue">Förfallen</SelectItem>
-                  <SelectItem value="suspended">Pausad</SelectItem>
-                  <SelectItem value="cancelled">Avslutad</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="invoice_email">Faktura E-post</Label>
-              <Input
-                id="invoice_email"
-                type="email"
-                value={editForm.invoice_email}
-                onChange={(e) => setEditForm({ ...editForm, invoice_email: e.target.value })}
-                placeholder="faktura@företag.se"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="billing_contact">Faktureringskontakt</Label>
-              <Input
-                id="billing_contact"
-                value={editForm.billing_contact}
-                onChange={(e) => setEditForm({ ...editForm, billing_contact: e.target.value })}
-                placeholder="Namn på kontaktperson"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="next_billing_date">Nästa faktureringsdatum</Label>
-              <Input
-                id="next_billing_date"
-                type="date"
-                value={editForm.next_billing_date}
-                onChange={(e) => setEditForm({ ...editForm, next_billing_date: e.target.value })}
-              />
             </div>
 
             <div className="grid gap-2">
