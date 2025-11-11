@@ -2038,7 +2038,7 @@ export type Database = {
           monthly_project_summary: boolean | null
           monthly_workorder_summary: boolean | null
           notification_email: string | null
-          organization_id: string
+          organization_id: string | null
           preferred_day: string | null
           project_summary_frequency: string | null
           project_summary_previewed: boolean | null
@@ -2063,7 +2063,7 @@ export type Database = {
           monthly_project_summary?: boolean | null
           monthly_workorder_summary?: boolean | null
           notification_email?: string | null
-          organization_id: string
+          organization_id?: string | null
           preferred_day?: string | null
           project_summary_frequency?: string | null
           project_summary_previewed?: boolean | null
@@ -2088,7 +2088,7 @@ export type Database = {
           monthly_project_summary?: boolean | null
           monthly_workorder_summary?: boolean | null
           notification_email?: string | null
-          organization_id?: string
+          organization_id?: string | null
           preferred_day?: string | null
           project_summary_frequency?: string | null
           project_summary_previewed?: boolean | null
