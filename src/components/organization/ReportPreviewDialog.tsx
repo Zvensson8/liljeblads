@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -25,49 +25,51 @@ export function ReportPreviewDialog({ open, onOpenChange, reportType, onMarkAsPr
   const [loading, setLoading] = useState(false);
   const [htmlContent, setHtmlContent] = useState<string>('');
 
-  const handleOpen = async (isOpen: boolean) => {
-    onOpenChange(isOpen);
-    
-    if (isOpen && reportType) {
-      setLoading(true);
-      setHtmlContent('');
-      try {
-        console.log('Fetching preview for report type:', reportType);
-        
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          console.error('No user found');
-          toast.error('Du måste vara inloggad');
-          return;
+  useEffect(() => {
+    if (open && reportType) {
+      const fetchPreview = async () => {
+        setLoading(true);
+        setHtmlContent('');
+        try {
+          console.log('Fetching preview for report type:', reportType);
+          
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (!user) {
+            console.error('No user found');
+            toast.error('Du måste vara inloggad');
+            return;
+          }
+
+          console.log('Calling preview-report function with userId:', user.id);
+          const { data, error } = await supabase.functions.invoke('preview-report', {
+            body: { reportType, userId: user.id }
+          });
+
+          console.log('Preview response:', { data, error });
+
+          if (error) {
+            console.error('Supabase function error:', error);
+            throw error;
+          }
+
+          if (!data?.html) {
+            throw new Error('Ingen HTML returnerad från förhandsvisningen');
+          }
+
+          console.log('Setting HTML content, length:', data.html.length);
+          setHtmlContent(data.html);
+        } catch (error: any) {
+          console.error('Error generating preview:', error);
+          toast.error(`Kunde inte generera förhandsvisning: ${error.message || 'Okänt fel'}`);
+        } finally {
+          setLoading(false);
         }
-
-        console.log('Calling preview-report function with userId:', user.id);
-        const { data, error } = await supabase.functions.invoke('preview-report', {
-          body: { reportType, userId: user.id }
-        });
-
-        console.log('Preview response:', { data, error });
-
-        if (error) {
-          console.error('Supabase function error:', error);
-          throw error;
-        }
-
-        if (!data?.html) {
-          throw new Error('Ingen HTML returnerad från förhandsvisningen');
-        }
-
-        console.log('Setting HTML content, length:', data.html.length);
-        setHtmlContent(data.html);
-      } catch (error: any) {
-        console.error('Error generating preview:', error);
-        toast.error(`Kunde inte generera förhandsvisning: ${error.message || 'Okänt fel'}`);
-      } finally {
-        setLoading(false);
-      }
+      };
+      
+      fetchPreview();
     }
-  };
+  }, [open, reportType]);
 
   const handleMarkAsPreviewed = () => {
     if (reportType) {
@@ -77,7 +79,7 @@ export function ReportPreviewDialog({ open, onOpenChange, reportType, onMarkAsPr
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Förhandsvisning: {reportType ? reportTitles[reportType] : ''}</DialogTitle>
