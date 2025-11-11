@@ -24,31 +24,25 @@ export function useNotificationPreferences() {
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching notification preferences:', error);
-        toast.error('Kunde inte hämta notifikationsinställningar');
-        return;
       }
 
       if (data) {
         setPreferences(data as UserNotificationPreferences);
       } else {
         // Create default preferences if none exist
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
           .select('organization_id')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-          toast.error('Kunde inte hämta användarinformation');
-          return;
-        }
+        const organizationId = profile?.organization_id || null;
 
         const { data: newPrefs, error: insertError } = await supabase
           .from('user_notification_preferences')
           .insert({
             user_id: user.id,
-            organization_id: profile?.organization_id || null,
+            organization_id: organizationId,
             monthly_project_summary: false,
             monthly_workorder_summary: false,
             maintenance_reminders: false,
