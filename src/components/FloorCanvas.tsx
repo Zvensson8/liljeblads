@@ -54,6 +54,8 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [tooltipComponent, setTooltipComponent] = useState<Component | null>(null);
   const [spacePressed, setSpacePressed] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
   const panStart = useRef({ x: 0, y: 0 });
   const lastSavedPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const { toast } = useToast();
@@ -169,6 +171,10 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
   useEffect(() => {
     if (!canvasRef.current) return;
 
+    console.log('FloorCanvas: Initializing canvas with drawingUrl:', drawingUrl);
+    setImageLoading(true);
+    setImageError(false);
+
     const canvas = new FabricCanvas(canvasRef.current, {
       width: 1200,
       height: 800,
@@ -178,6 +184,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
     FabricImage.fromURL(drawingUrl, {
       crossOrigin: 'anonymous',
     }).then((img) => {
+      console.log('FloorCanvas: Image loaded successfully');
       const scale = Math.min(
         canvas.width! / img.width!,
         canvas.height! / img.height!
@@ -185,6 +192,16 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       img.scale(scale);
       canvas.backgroundImage = img;
       canvas.renderAll();
+      setImageLoading(false);
+    }).catch((error) => {
+      console.error('FloorCanvas: Failed to load image:', error);
+      setImageError(true);
+      setImageLoading(false);
+      toast({
+        title: 'Fel vid laddning av ritning',
+        description: 'Kunde inte ladda ritningen. Försök ladda om sidan.',
+        variant: 'destructive',
+      });
     });
 
     setFabricCanvas(canvas);
@@ -732,6 +749,29 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         />
         
         <div className="border-2 border-border rounded-lg overflow-hidden shadow-[var(--shadow-card)] bg-white relative">
+          {imageLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-10">
+              <div className="text-center space-y-2">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="text-sm text-muted-foreground">Laddar ritning...</p>
+              </div>
+            </div>
+          )}
+          {imageError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 z-10">
+              <div className="text-center space-y-2 p-4">
+                <p className="text-destructive font-semibold">⚠️ Kunde inte ladda ritningen</p>
+                <p className="text-sm text-muted-foreground">Försök ladda om sidan eller kontrollera din internetanslutning</p>
+                <Button 
+                  onClick={() => window.location.reload()} 
+                  variant="outline"
+                  size="sm"
+                >
+                  Ladda om sidan
+                </Button>
+              </div>
+            </div>
+          )}
           <canvas ref={canvasRef} />
           {spacePressed && (
             <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-3 py-1 rounded-md text-sm font-medium">
