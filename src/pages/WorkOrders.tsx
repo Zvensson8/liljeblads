@@ -10,13 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Archive, Edit2, Trash2, LayoutGrid, Table as TableIcon, Wrench } from "lucide-react";
+import { Plus, Search, Archive, Edit2, Trash2, LayoutGrid, Table as TableIcon, Wrench, X } from "lucide-react";
 import { WorkOrderDialog } from "@/components/WorkOrderDialog";
 import { WorkOrderDetailDialog } from "@/components/WorkOrderDetailDialog";
 import { WorkOrderKanban } from "@/components/WorkOrderKanban";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const WorkOrders = () => {
   const { session } = useAuth();
@@ -27,7 +28,10 @@ const WorkOrders = () => {
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [detailOrder, setDetailOrder] = useState<any>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "table">("table");
+  const [selectedProperty, setSelectedProperty] = useState<string>("all");
+  const [selectedContractor, setSelectedContractor] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
 
   const { data: workOrders, refetch } = useQuery({
     queryKey: ["work-orders", showArchived],
@@ -72,13 +76,53 @@ const WorkOrders = () => {
   const activeCount = (workOrders?.filter((wo) => wo.status !== "archived") || []).length;
 
   const filteredOrders = (orders: any[]) => {
-    if (!searchQuery) return orders;
-    return orders.filter(
-      (wo) =>
-        wo.action?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        wo.properties?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        wo.contractor?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    let filtered = orders;
+    
+    // Filter by search query
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (wo) =>
+          wo.action?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          wo.properties?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          wo.contractor?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    // Filter by property
+    if (selectedProperty !== "all") {
+      filtered = filtered.filter((wo) => wo.property_id === selectedProperty);
+    }
+    
+    // Filter by contractor
+    if (selectedContractor !== "all") {
+      filtered = filtered.filter((wo) => wo.contractor === selectedContractor);
+    }
+    
+    // Filter by status
+    if (selectedStatus !== "all") {
+      filtered = filtered.filter((wo) => wo.status === selectedStatus);
+    }
+    
+    return filtered;
+  };
+
+  // Get unique values for filters
+  const uniqueProperties = Array.from(
+    new Set(workOrders?.map((wo) => wo.properties?.name).filter(Boolean))
+  );
+  const uniqueContractors = Array.from(
+    new Set(workOrders?.map((wo) => wo.contractor).filter(Boolean))
+  );
+  
+  const activeFilterCount = 
+    (selectedProperty !== "all" ? 1 : 0) +
+    (selectedContractor !== "all" ? 1 : 0) +
+    (selectedStatus !== "all" ? 1 : 0);
+  
+  const clearAllFilters = () => {
+    setSelectedProperty("all");
+    setSelectedContractor("all");
+    setSelectedStatus("all");
   };
 
   const getPriorityBadge = (priority: string) => {
@@ -249,6 +293,64 @@ const WorkOrders = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
+              </div>
+
+              {/* Filter row */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm text-muted-foreground">Filter:</span>
+                <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Alla fastigheter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alla fastigheter</SelectItem>
+                    {uniqueProperties.map((property) => (
+                      <SelectItem key={property} value={workOrders?.find(wo => wo.properties?.name === property)?.property_id || property}>
+                        {property}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedContractor} onValueChange={setSelectedContractor}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Alla entreprenörer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alla entreprenörer</SelectItem>
+                    {uniqueContractors.map((contractor) => (
+                      <SelectItem key={contractor} value={contractor}>
+                        {contractor}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Alla statusar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alla statusar</SelectItem>
+                    <SelectItem value="not_started">Ej påbörjad</SelectItem>
+                    <SelectItem value="awaiting_quote">Inväntar offert</SelectItem>
+                    <SelectItem value="ordered">Beställt</SelectItem>
+                    <SelectItem value="completed">Slutförd</SelectItem>
+                    <SelectItem value="archived">Arkiverad</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {activeFilterCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllFilters}
+                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Rensa filter ({activeFilterCount})
+                  </Button>
+                )}
               </div>
 
               <div className="flex gap-2">
