@@ -280,11 +280,11 @@ const WorkOrders = () => {
 
           <main className="flex-1 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="text-sm text-muted-foreground">
                   <span className="font-semibold text-foreground">{activeCount} aktiva arbetsordrar</span>
                 </div>
-                <div className="relative w-96">
+                <div className="relative w-full md:w-96">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Sök fastigheter, komponenter, arbetsordrar"
@@ -296,7 +296,7 @@ const WorkOrders = () => {
               </div>
 
               {/* Filter row */}
-              <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap bg-muted/30 p-4 rounded-lg border border-border">
                 <span className="text-sm text-muted-foreground">Filter:</span>
                 <Select value={selectedProperty} onValueChange={setSelectedProperty}>
                   <SelectTrigger className="w-[200px]">
