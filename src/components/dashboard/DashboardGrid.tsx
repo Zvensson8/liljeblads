@@ -83,7 +83,34 @@ export const DashboardGrid = ({ kpiCards }: DashboardGridProps) => {
                       {kpi.title}
                     </CardTitle>
                   </div>
-                  {getTrendIcon(kpi.value, kpi.prev)}
+                  <div className="flex items-center gap-2">
+                    {isEditing && (
+                      <div className="flex gap-1 text-[10px] text-muted-foreground">
+                        <button
+                          type="button"
+                          className="px-1 py-0.5 rounded border border-border/50 hover:bg-muted/60"
+                          onClick={() => setLayout(layout.map(l => l.i === item.i ? { ...l, w: 3, h: 2 } : l))}
+                        >
+                          S
+                        </button>
+                        <button
+                          type="button"
+                          className="px-1 py-0.5 rounded border border-border/50 hover:bg-muted/60"
+                          onClick={() => setLayout(layout.map(l => l.i === item.i ? { ...l, w: 6, h: 3 } : l))}
+                        >
+                          M
+                        </button>
+                        <button
+                          type="button"
+                          className="px-1 py-0.5 rounded border border-border/50 hover:bg-muted/60"
+                          onClick={() => setLayout(layout.map(l => l.i === item.i ? { ...l, w: 12, h: 4 } : l))}
+                        >
+                          L
+                        </button>
+                      </div>
+                    )}
+                    {getTrendIcon(kpi.value, kpi.prev)}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
