@@ -44,43 +44,29 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const isCollapsed = state === "collapsed";
   const [isFounder, setIsFounder] = useState(false);
-  const [isSystemAdmin, setIsSystemAdmin] = useState(false);
 
-  // Filter navigation items based on module access, but always show all for system admins/founders
-  const visibleNavigationItems = isSystemAdmin
-    ? navigationItems
-    : navigationItems.filter((item) => hasModuleAccess(item.moduleName));
+  // Filter navigation items based on module access
+  const visibleNavigationItems = navigationItems.filter(item => 
+    hasModuleAccess(item.moduleName)
+  );
 
   useEffect(() => {
     if (user) {
-      checkSystemRoles();
-    } else {
-      setIsFounder(false);
-      setIsSystemAdmin(false);
+      checkFounderRole();
     }
   }, [user]);
 
-  const checkSystemRoles = async () => {
+  const checkFounderRole = async () => {
     if (!user) return;
-
-    const { data, error } = await supabase
+    
+    const { data } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id);
-
-    if (error) {
-      console.error("Error checking system roles:", error);
-      setIsFounder(false);
-      setIsSystemAdmin(false);
-      return;
-    }
-
-    const roles = (data || []).map((r) => r.role);
-    const isFounderRole = roles.includes("founder" as any);
-    const isAdminRole = roles.includes("admin" as any);
-
-    setIsFounder(isFounderRole);
-    setIsSystemAdmin(isFounderRole || isAdminRole);
+      .eq("user_id", user.id)
+      .eq("role", "founder" as any)
+      .single();
+    
+    setIsFounder(!!data);
   };
 
   // Hide sidebar on mobile - use bottom navigation instead
