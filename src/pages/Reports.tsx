@@ -7,10 +7,15 @@ import { Button } from '@/components/ui/button';
 import { FileText, TrendingUp, Building2, Wrench, Calendar, Download } from 'lucide-react';
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ReportGeneratorDialog } from '@/components/reports/ReportGeneratorDialog';
+import { ReportHistoryCard } from '@/components/reports/ReportHistoryCard';
+import { ScheduledReportsManager } from '@/components/reports/ScheduledReportsManager';
 
 export default function Reports() {
   const isMobile = useIsMobile();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<{ type: string; name: string } | null>(null);
 
   const reportCategories = [
     { id: 'all', name: 'Alla rapporter', icon: FileText },
@@ -92,70 +97,78 @@ export default function Reports() {
                 </TabsList>
 
                 <TabsContent value={selectedCategory} className="mt-6">
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredReports.map((report) => {
-                      const Icon = report.icon;
-                      return (
-                        <Card key={report.id} className="hover:shadow-lg transition-shadow">
-                          <CardHeader>
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-primary/10">
-                                  <Icon className="h-5 w-5 text-primary" />
+                  {selectedCategory === 'scheduled' ? (
+                    <ScheduledReportsManager />
+                  ) : (
+                    <>
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {filteredReports.map((report) => {
+                          const Icon = report.icon;
+                          return (
+                            <Card key={report.id} className="hover:shadow-lg transition-shadow">
+                              <CardHeader>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-primary/10">
+                                      <Icon className="h-5 w-5 text-primary" />
+                                    </div>
+                                    <div>
+                                      <CardTitle className="text-lg">{report.name}</CardTitle>
+                                      <CardDescription className="mt-1">
+                                        {report.description}
+                                      </CardDescription>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div>
-                                  <CardTitle className="text-lg">{report.name}</CardTitle>
-                                  <CardDescription className="mt-1">
-                                    {report.description}
-                                  </CardDescription>
-                                </div>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <Button className="w-full" variant="outline">
-                              <Download className="h-4 w-4 mr-2" />
-                              Generera rapport
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
+                              </CardHeader>
+                              <CardContent>
+                                <Button 
+                                  className="w-full" 
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedReport({ type: report.id, name: report.name });
+                                    setGeneratorOpen(true);
+                                  }}
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Generera rapport
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
 
-                  {filteredReports.length === 0 && (
-                    <div className="text-center py-12">
-                      <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Inga rapporter</h3>
-                      <p className="text-muted-foreground">
-                        Inga rapporter tillgängliga i denna kategori
-                      </p>
-                    </div>
+                      {filteredReports.length === 0 && (
+                        <div className="text-center py-12">
+                          <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">Inga rapporter</h3>
+                          <p className="text-muted-foreground">
+                            Inga rapporter tillgängliga i denna kategori
+                          </p>
+                        </div>
+                      )}
+                    </>
                   )}
                 </TabsContent>
               </Tabs>
             </div>
 
             {/* Recent Reports */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Senaste rapporter</CardTitle>
-                <CardDescription>
-                  Dina nyligen genererade rapporter
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Inga rapporter genererade ännu</p>
-                </div>
-              </CardContent>
-            </Card>
+            <ReportHistoryCard />
           </div>
         </main>
 
         {isMobile && <BottomNavigation />}
       </div>
+      {selectedReport && (
+        <ReportGeneratorDialog
+          open={generatorOpen}
+          onOpenChange={setGeneratorOpen}
+          reportType={selectedReport.type}
+          reportName={selectedReport.name}
+        />
+      )}
     </SidebarProvider>
   );
 }
