@@ -1,82 +1,41 @@
-/// <reference types="@types/google.maps" />
-import { useEffect, useRef, useState } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
+import { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { usePropertyLocations } from '@/hooks/usePropertyLocations';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+// Fix for default marker icons in Leaflet with Vite
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+function MapUpdater({ locations }: { locations: any[] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (locations && locations.length > 0) {
+      const bounds = L.latLngBounds(
+        locations
+          .filter(loc => loc.latitude && loc.longitude)
+          .map(loc => [loc.latitude, loc.longitude] as [number, number])
+      );
+      
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+    }
+  }, [locations, map]);
+
+  return null;
+}
 
 export const PropertyMap = () => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
   const { locations, isLoading } = usePropertyLocations();
-
-  useEffect(() => {
-    const initMap = async () => {
-      if (!mapRef.current) return;
-
-      if (!GOOGLE_MAPS_API_KEY) {
-        console.error('Google Maps API-nyckel saknas');
-        toast.error('Google Maps API-nyckel saknas. Kontakta administratör.');
-        return;
-      }
-
-      try {
-        const loader = new Loader({
-          apiKey: GOOGLE_MAPS_API_KEY,
-          version: 'weekly',
-        });
-
-        await loader.load();
-
-        const mapInstance = new google.maps.Map(mapRef.current, {
-          center: { lat: 59.3293, lng: 18.0686 }, // Stockholm
-          zoom: 12,
-          mapTypeControl: true,
-          streetViewControl: false,
-          fullscreenControl: true,
-        });
-
-        setMap(mapInstance);
-      } catch (error) {
-        console.error('Error loading Google Maps:', error);
-        toast.error('Kunde inte ladda kartan');
-      }
-    };
-
-    initMap();
-  }, []);
-
-  useEffect(() => {
-    if (!map || !locations) return;
-
-    // Clear existing markers
-    // Add markers for each property
-    locations.forEach((location: any) => {
-      if (location.latitude && location.longitude) {
-        const marker = new google.maps.Marker({
-          position: { lat: location.latitude, lng: location.longitude },
-          map,
-          title: location.properties?.name || 'Fastighet',
-        });
-
-        const infoWindow = new google.maps.InfoWindow({
-          content: `
-            <div style="padding: 8px;">
-              <h3 style="font-weight: 600; margin-bottom: 4px;">${location.properties?.name || 'Fastighet'}</h3>
-              <p style="color: #666; font-size: 14px;">${location.formatted_address || location.properties?.address || 'Ingen adress'}</p>
-            </div>
-          `,
-        });
-
-        marker.addListener('click', () => {
-          infoWindow.open(map, marker);
-        });
-      }
-    });
-  }, [map, locations]);
 
   if (isLoading) {
     return (
@@ -86,9 +45,41 @@ export const PropertyMap = () => {
     );
   }
 
+  const validLocations = locations?.filter(
+    (loc: any) => loc.latitude && loc.longitude
+  ) || [];
+
   return (
     <Card className="overflow-hidden">
-      <div ref={mapRef} className="w-full h-[500px]" />
+      <MapContainer
+        center={[59.3293, 18.0686]}
+        zoom={12}
+        style={{ height: '500px', width: '100%' }}
+        scrollWheelZoom={true}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {validLocations.map((location: any) => (
+          <Marker
+            key={location.property_id}
+            position={[location.latitude, location.longitude]}
+          >
+            <Popup>
+              <div className="p-2">
+                <h3 className="font-semibold mb-1">
+                  {location.properties?.name || 'Fastighet'}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {location.formatted_address || location.properties?.address || 'Ingen adress'}
+                </p>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+        <MapUpdater locations={validLocations} />
+      </MapContainer>
     </Card>
   );
 };
