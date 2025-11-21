@@ -84,6 +84,45 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          ip_address: unknown
+          new_values: Json | null
+          old_values: Json | null
+          record_id: string | null
+          table_name: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       component_documents: {
         Row: {
           component_id: string
@@ -438,6 +477,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      dashboard_layouts: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          layout: Json
+          updated_at: string | null
+          user_id: string
+          widgets: Json
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          layout?: Json
+          updated_at?: string | null
+          user_id: string
+          widgets?: Json
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          layout?: Json
+          updated_at?: string | null
+          user_id?: string
+          widgets?: Json
+        }
+        Relationships: []
       }
       drift_categories: {
         Row: {
@@ -1786,6 +1855,44 @@ export type Database = {
           },
         ]
       }
+      property_locations: {
+        Row: {
+          created_at: string | null
+          formatted_address: string | null
+          last_geocoded: string | null
+          latitude: number | null
+          longitude: number | null
+          property_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          formatted_address?: string | null
+          last_geocoded?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          property_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          formatted_address?: string | null
+          last_geocoded?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          property_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_locations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_notes: {
         Row: {
           content: string
@@ -2022,6 +2129,95 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      scheduled_reports: {
+        Row: {
+          config: Json
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          last_run: string | null
+          name: string
+          next_run: string | null
+          organization_id: string | null
+          recipients: string[]
+          report_type: string
+          schedule: string
+          updated_at: string | null
+        }
+        Insert: {
+          config?: Json
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_run?: string | null
+          name: string
+          next_run?: string | null
+          organization_id?: string | null
+          recipients?: string[]
+          report_type: string
+          schedule: string
+          updated_at?: string | null
+        }
+        Update: {
+          config?: Json
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_run?: string | null
+          name?: string
+          next_run?: string | null
+          organization_id?: string | null
+          recipients?: string[]
+          report_type?: string
+          schedule?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_consents: {
+        Row: {
+          consent_type: string
+          created_at: string | null
+          granted: boolean
+          granted_at: string | null
+          id: string
+          revoked_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          consent_type: string
+          created_at?: string | null
+          granted?: boolean
+          granted_at?: string | null
+          id?: string
+          revoked_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          consent_type?: string
+          created_at?: string | null
+          granted?: boolean
+          granted_at?: string | null
+          id?: string
+          revoked_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_module_access: {
         Row: {

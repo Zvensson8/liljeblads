@@ -30,6 +30,8 @@ const UserSettings = lazy(() => import("./pages/UserSettings"));
 const FounderAdmin = lazy(() => import("./pages/FounderAdmin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const RecurringCosts = lazy(() => import("./pages/RecurringCosts"));
+const Reports = lazy(() => import("./pages/Reports"));
+const SecurityDashboard = lazy(() => import("./pages/SecurityDashboard"));
 
 // Loading component
 const PageLoader = () => (
@@ -60,6 +62,8 @@ const AppContent = () => {
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/cost-overview" element={<CostOverview />} />
           <Route path="/recurring-costs" element={<RecurringCosts />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/security" element={<SecurityDashboard />} />
           <Route path="/users" element={<Users />} />
           <Route path="/user/settings" element={<UserSettings />} />
           <Route path="/organization/settings" element={<OrganizationSettings />} />
@@ -72,17 +76,8 @@ const AppContent = () => {
   );
 };
 
-// Configure QueryClient with optimal caching
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
+// Import the configured query client
+import { queryClient } from './lib/queryClient';
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
