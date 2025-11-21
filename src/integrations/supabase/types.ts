@@ -2023,6 +2023,33 @@ export type Database = {
           },
         ]
       }
+      user_module_access: {
+        Row: {
+          created_at: string
+          id: string
+          is_enabled: boolean
+          module_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          module_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          module_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_notification_preferences: {
         Row: {
           created_at: string | null
@@ -2250,6 +2277,10 @@ export type Database = {
       get_task_status: {
         Args: { planned: number; reported: number }
         Returns: Database["public"]["Enums"]["task_status"]
+      }
+      get_user_enabled_modules: {
+        Args: { target_user_id: string }
+        Returns: string[]
       }
       get_user_organization_id: { Args: { _user_id: string }; Returns: string }
       has_financial_access: {

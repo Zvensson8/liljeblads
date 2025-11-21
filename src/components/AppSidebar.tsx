@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
+import { useModuleAccess, ModuleName } from "@/hooks/useModuleAccess";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -22,16 +23,16 @@ import { NotificationBell } from "./NotificationBell";
 import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
-const navigationItems = [
-  { title: "Dashboard", url: "/", icon: Home },
-  { title: "Fastigheter", url: "/properties", icon: Building2 },
-  { title: "Komponenter", url: "/components", icon: Settings },
-  { title: "Arbetsordrar", url: "/work-orders", icon: Wrench },
-  { title: "Driftuppföljning", url: "/operations", icon: ClipboardList },
-  { title: "Projekthantering", url: "/projects", icon: Briefcase },
-  { title: "Återkommande kostnader", url: "/recurring-costs", icon: DollarSign },
-  { title: "Användare", url: "/users", icon: Users },
-  { title: "Organisation", url: "/organization/settings", icon: Building },
+const navigationItems: Array<{ title: string; url: string; icon: any; moduleName: ModuleName }> = [
+  { title: "Dashboard", url: "/", icon: Home, moduleName: "dashboard" },
+  { title: "Fastigheter", url: "/properties", icon: Building2, moduleName: "properties" },
+  { title: "Komponenter", url: "/components", icon: Settings, moduleName: "components" },
+  { title: "Arbetsordrar", url: "/work-orders", icon: Wrench, moduleName: "work-orders" },
+  { title: "Driftuppföljning", url: "/operations", icon: ClipboardList, moduleName: "operations" },
+  { title: "Projekthantering", url: "/projects", icon: Briefcase, moduleName: "projects" },
+  { title: "Återkommande kostnader", url: "/recurring-costs", icon: DollarSign, moduleName: "recurring-costs" },
+  { title: "Användare", url: "/users", icon: Users, moduleName: "users" },
+  { title: "Organisation", url: "/organization/settings", icon: Building, moduleName: "organization" },
 ];
 
 export function AppSidebar() {
@@ -39,9 +40,15 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const { signOut, user } = useAuth();
   const { organization, loading: orgLoading } = useOrganization();
+  const { hasModuleAccess } = useModuleAccess();
   const navigate = useNavigate();
   const isCollapsed = state === "collapsed";
   const [isFounder, setIsFounder] = useState(false);
+
+  // Filter navigation items based on module access
+  const visibleNavigationItems = navigationItems.filter(item => 
+    hasModuleAccess(item.moduleName)
+  );
 
   useEffect(() => {
     if (user) {
@@ -127,7 +134,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigationItems.map((item) => (
+              {visibleNavigationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild className="hover:bg-sidebar-accent">
                     <NavLink
