@@ -51,6 +51,26 @@ export const OrganizationModuleAccess = () => {
     enabled: !!organization?.id,
   });
 
+  // Check if selected user is admin or founder
+  const { data: selectedUserRoles } = useQuery({
+    queryKey: ["selected-user-roles", selectedUserId],
+    queryFn: async () => {
+      if (!selectedUserId) return [];
+
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", selectedUserId);
+
+      return data || [];
+    },
+    enabled: !!selectedUserId,
+  });
+
+  const isSelectedUserSystemAdmin = selectedUserRoles?.some(
+    (r) => r.role === "admin" || r.role === "founder"
+  ) || false;
+
   // Fetch module access for selected user
   const { data: moduleAccess, isLoading: isLoadingAccess } = useQuery({
     queryKey: ["user-module-access", selectedUserId],
@@ -145,6 +165,13 @@ export const OrganizationModuleAccess = () => {
             {isLoadingAccess ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : isSelectedUserSystemAdmin ? (
+              <div className="p-4 border rounded-md bg-muted/50">
+                <p className="text-sm text-muted-foreground">
+                  Denna användare är administratör/grundare och har alltid tillgång till alla moduler.
+                  Modulåtkomst kan inte ändras för administratörer och grundare.
+                </p>
               </div>
             ) : (
               <>
