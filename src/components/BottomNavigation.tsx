@@ -10,28 +10,33 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { useState } from 'react';
+import { useModuleAccess, ModuleName } from '@/hooks/useModuleAccess';
 
 export const BottomNavigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const { hasModuleAccess } = useModuleAccess();
 
   const isActive = (path: string) => location.pathname === path;
 
-  const primaryNavItems = [
-    { path: '/', icon: Home, label: 'Hem' },
-    { path: '/properties', icon: Building2, label: 'Fastigheter' },
-    { path: '/components', icon: Wrench, label: 'Komponenter' },
-    { path: '/work-orders', icon: FolderKanban, label: 'Ordrar' },
+  const allPrimaryNavItems = [
+    { path: '/', icon: Home, label: 'Hem', moduleName: 'dashboard' as ModuleName },
+    { path: '/properties', icon: Building2, label: 'Fastigheter', moduleName: 'properties' as ModuleName },
+    { path: '/components', icon: Wrench, label: 'Komponenter', moduleName: 'components' as ModuleName },
+    { path: '/work-orders', icon: FolderKanban, label: 'Ordrar', moduleName: 'work-orders' as ModuleName },
   ];
 
-  const secondaryNavItems = [
-    { path: '/projects', label: 'Projekt' },
-    { path: '/operations', label: 'Drift' },
-    { path: '/cost-overview', label: 'Kostnader' },
-    { path: '/recurring-costs', label: 'Återkommande' },
-    { path: '/organization/settings', label: 'Inställningar' },
+  const allSecondaryNavItems = [
+    { path: '/projects', label: 'Projekt', moduleName: 'projects' as ModuleName },
+    { path: '/operations', label: 'Drift', moduleName: 'operations' as ModuleName },
+    { path: '/recurring-costs', label: 'Återkommande', moduleName: 'recurring-costs' as ModuleName },
+    { path: '/organization/settings', label: 'Inställningar', moduleName: 'organization' as ModuleName },
   ];
+
+  // Filter based on module access
+  const primaryNavItems = allPrimaryNavItems.filter(item => hasModuleAccess(item.moduleName));
+  const secondaryNavItems = allSecondaryNavItems.filter(item => hasModuleAccess(item.moduleName));
 
   return (
     <>

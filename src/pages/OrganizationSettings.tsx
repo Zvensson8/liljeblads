@@ -10,12 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { OrganizationInfo } from "@/components/organization/OrganizationInfo";
 import { OrganizationMembers } from "@/components/organization/OrganizationMembers";
-import { OrganizationInvitations } from "@/components/organization/OrganizationInvitations";
 import { OrganizationBranding } from "@/components/organization/OrganizationBranding";
+import { OrganizationInvitations } from "@/components/organization/OrganizationInvitations";
+import { OrganizationAuditLogs } from "@/components/organization/OrganizationAuditLogs";
 import { OrganizationDataExport } from "@/components/organization/OrganizationDataExport";
 import { PropertyInfoCategoryManager } from "@/components/property-info/PropertyInfoCategoryManager";
 import { ProjectTemplates } from "@/components/organization/ProjectTemplates";
-import { OrganizationAuditLogs } from "@/components/organization/OrganizationAuditLogs";
+import { NotificationSettings } from "@/components/organization/NotificationSettings";
+import { OrganizationModuleAccess } from "@/components/organization/OrganizationModuleAccess";
 
 
 interface Organization {
@@ -197,6 +199,7 @@ export default function OrganizationSettings() {
               <TabsList>
                 <TabsTrigger value="info">Information</TabsTrigger>
                 <TabsTrigger value="members">Medlemmar</TabsTrigger>
+                {isAdmin && <TabsTrigger value="module-access">Modulåtkomst</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="invitations">Inbjudningar</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="audit">Säkerhetslogg</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="branding">Varumärke</TabsTrigger>}
@@ -220,6 +223,12 @@ export default function OrganizationSettings() {
                   currentUserId={user?.id || ""}
                 />
               </TabsContent>
+
+              {isAdmin && (
+                <TabsContent value="module-access">
+                  <OrganizationModuleAccess />
+                </TabsContent>
+              )}
 
               {isAdmin && (
                 <TabsContent value="invitations">
