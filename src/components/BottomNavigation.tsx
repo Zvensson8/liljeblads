@@ -9,14 +9,46 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useModuleAccess, ModuleName } from '@/hooks/useModuleAccess';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 export const BottomNavigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const { hasModuleAccess } = useModuleAccess();
+  const { user } = useAuth();
+  const [isSystemAdmin, setIsSystemAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setIsSystemAdmin(false);
+      return;
+    }
+
+    const checkRoles = async () => {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error checking system roles in bottom nav:', error);
+        setIsSystemAdmin(false);
+        return;
+      }
+
+      const roles = (data || []).map((r) => r.role);
+      const isAdminOrFounder =
+        roles.includes('admin' as any) || roles.includes('founder' as any);
+
+      setIsSystemAdmin(isAdminOrFounder);
+    };
+
+    checkRoles();
+  }, [user]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -34,9 +66,13 @@ export const BottomNavigation = () => {
     { path: '/organization/settings', label: 'Inställningar', moduleName: 'organization' as ModuleName },
   ];
 
-  // Filter based on module access
-  const primaryNavItems = allPrimaryNavItems.filter(item => hasModuleAccess(item.moduleName));
-  const secondaryNavItems = allSecondaryNavItems.filter(item => hasModuleAccess(item.moduleName));
+  // Filter based on module access, but always show all for system admins/founders
+  const primaryNavItems = isSystemAdmin
+    ? allPrimaryNavItems
+    : allPrimaryNavItems.filter((item) => hasModuleAccess(item.moduleName));
+  const secondaryNavItems = isSystemAdmin
+    ? allSecondaryNavItems
+    : allSecondaryNavItems.filter((item) => hasModuleAccess(item.moduleName));
 
   return (
     <>
