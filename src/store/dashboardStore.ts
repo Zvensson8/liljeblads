@@ -28,17 +28,17 @@ interface DashboardState {
 }
 
 const defaultLayout: DashboardLayout[] = [
-  { i: 'stats', x: 0, y: 0, w: 12, h: 2 },
-  { i: 'todos', x: 0, y: 2, w: 6, h: 4 },
-  { i: 'projects', x: 6, y: 2, w: 6, h: 4 },
-  { i: 'workorders', x: 0, y: 6, w: 12, h: 4 },
+  { i: 'kpi-properties', x: 0, y: 0, w: 3, h: 2 },
+  { i: 'kpi-workorders', x: 3, y: 0, w: 3, h: 2 },
+  { i: 'kpi-projects', x: 6, y: 0, w: 3, h: 2 },
+  { i: 'kpi-todos', x: 9, y: 0, w: 3, h: 2 },
 ];
 
 const defaultWidgets: DashboardWidget[] = [
-  { id: 'stats', type: 'kpi-cards', config: {} },
-  { id: 'todos', type: 'todo-list', config: {} },
-  { id: 'projects', type: 'project-list', config: {} },
-  { id: 'workorders', type: 'workorder-list', config: {} },
+  { id: 'kpi-properties', type: 'kpi-card', config: { metric: 'properties' } },
+  { id: 'kpi-workorders', type: 'kpi-card', config: { metric: 'workorders' } },
+  { id: 'kpi-projects', type: 'kpi-card', config: { metric: 'projects' } },
+  { id: 'kpi-todos', type: 'kpi-card', config: { metric: 'todos' } },
 ];
 
 export const useDashboardStore = create<DashboardState>()(
