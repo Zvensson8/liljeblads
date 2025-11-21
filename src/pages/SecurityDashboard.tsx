@@ -3,13 +3,20 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, AlertTriangle, CheckCircle2, Activity } from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle2, Activity, Trash2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
+import { GDPRDataExport } from '@/components/security/GDPRDataExport';
+import { ConsentManager } from '@/components/security/ConsentManager';
+import { DeleteAccountDialog } from '@/components/security/DeleteAccountDialog';
+import { SecurityMetrics } from '@/components/security/SecurityMetrics';
+import { Button } from '@/components/ui/button';
+import { useState } from 'react';
 
 export default function SecurityDashboard() {
   const isMobile = useIsMobile();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const { data: auditLogs, isLoading } = useQuery({
     queryKey: ['audit-logs-recent'],
@@ -24,37 +31,6 @@ export default function SecurityDashboard() {
       return data;
     },
   });
-
-  const securityMetrics = [
-    {
-      title: 'Säkerhetsstatus',
-      value: 'Bra',
-      icon: Shield,
-      description: 'Inga kritiska problem',
-      color: 'text-green-600',
-    },
-    {
-      title: 'Aktiva varningar',
-      value: '0',
-      icon: AlertTriangle,
-      description: 'Inga varningar',
-      color: 'text-yellow-600',
-    },
-    {
-      title: 'Senaste kontroll',
-      value: 'Just nu',
-      icon: CheckCircle2,
-      description: 'Automatisk övervakning',
-      color: 'text-blue-600',
-    },
-    {
-      title: 'Aktivitetsloggar',
-      value: auditLogs?.length || 0,
-      icon: Activity,
-      description: 'Senaste händelser',
-      color: 'text-purple-600',
-    },
-  ];
 
   return (
     <SidebarProvider>
@@ -71,27 +47,7 @@ export default function SecurityDashboard() {
             </div>
 
             {/* Security Metrics */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {securityMetrics.map((metric) => {
-                const Icon = metric.icon;
-                return (
-                  <Card key={metric.title}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        {metric.title}
-                      </CardTitle>
-                      <Icon className={`h-4 w-4 ${metric.color}`} />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{metric.value}</div>
-                      <p className="text-xs text-muted-foreground">
-                        {metric.description}
-                      </p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+            <SecurityMetrics />
 
             {/* Audit Logs */}
             <Card>
@@ -137,17 +93,36 @@ export default function SecurityDashboard() {
             </Card>
 
             {/* GDPR Compliance */}
-            <Card>
+            <div className="grid gap-6 md:grid-cols-2">
+              <GDPRDataExport />
+              <ConsentManager />
+            </div>
+
+            {/* Danger Zone */}
+            <Card className="border-destructive">
               <CardHeader>
-                <CardTitle>GDPR & Dataskydd</CardTitle>
+                <CardTitle className="text-destructive flex items-center gap-2">
+                  <Trash2 className="h-5 w-5" />
+                  Farlig zon
+                </CardTitle>
                 <CardDescription>
-                  Hantera användarsamtycken och dataexport
+                  Irreversibla åtgärder - var försiktig
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Compliance-funktioner kommer snart</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Radera mitt konto</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Radera permanent all din data enligt GDPR
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    Radera konto
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -156,6 +131,7 @@ export default function SecurityDashboard() {
 
         {isMobile && <BottomNavigation />}
       </div>
+      <DeleteAccountDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} />
     </SidebarProvider>
   );
 }
