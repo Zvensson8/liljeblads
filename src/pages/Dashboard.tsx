@@ -231,6 +231,7 @@ const Dashboard = () => {
 
   const kpiCards = [
     {
+      id: 'kpi-properties',
       title: 'Fastigheter',
       value: stats.totalProperties,
       prev: prevStats?.totalProperties,
@@ -240,6 +241,7 @@ const Dashboard = () => {
       bgColor: 'bg-blue-500/10',
     },
     {
+      id: 'kpi-workorders',
       title: 'Arbetsordrar',
       value: stats.totalWorkOrders,
       prev: prevStats?.totalWorkOrders,
@@ -250,6 +252,7 @@ const Dashboard = () => {
       bgColor: 'bg-orange-500/10',
     },
     {
+      id: 'kpi-projects',
       title: 'Projekt',
       value: stats.totalProjects,
       prev: prevStats?.totalProjects,
@@ -260,6 +263,7 @@ const Dashboard = () => {
       bgColor: 'bg-purple-500/10',
     },
     {
+      id: 'kpi-todos',
       title: 'Att göra',
       value: stats.pendingTodos,
       prev: prevStats?.pendingTodos,
