@@ -21,31 +21,20 @@ export const useModuleAccess = () => {
     },
   });
 
-  // Check if user has system roles (admin/founder)
-  const { data: systemRoles } = useQuery({
-    queryKey: ["system-roles", session?.user?.id],
-    queryFn: async () => {
-      if (!session?.user?.id) return [];
-
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", session.user.id);
-
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!session?.user?.id,
-  });
-
-  const isSystemAdmin = systemRoles?.some(
-    (r) => r.role === "admin" || r.role === "founder"
-  ) || false;
-
   const { data: moduleAccess, isLoading } = useQuery({
     queryKey: ["module-access", session?.user?.id],
     queryFn: async () => {
       if (!session?.user?.id) return [];
+
+      // Check system roles INSIDE the query to avoid race conditions
+      const { data: systemRoles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", session.user.id);
+
+      const isSystemAdmin = systemRoles?.some(
+        (r) => r.role === "admin" || r.role === "founder"
+      ) || false;
 
       // If user is admin or founder, return all modules immediately
       if (isSystemAdmin) {
