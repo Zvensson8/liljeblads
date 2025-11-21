@@ -33,7 +33,8 @@ export const useModuleAccess = () => {
 
       if (error) throw error;
 
-      // If no specific access rules, all modules are enabled by default
+      // If no specific access rules exist, all modules are enabled by default
+      // This ensures admins, founders, and users without restrictions see everything
       if (!data || data.length === 0) {
         return [
           "dashboard",
