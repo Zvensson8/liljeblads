@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 export const PropertyMap = () => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -16,6 +16,12 @@ export const PropertyMap = () => {
   useEffect(() => {
     const initMap = async () => {
       if (!mapRef.current) return;
+
+      if (!GOOGLE_MAPS_API_KEY) {
+        console.error('Google Maps API-nyckel saknas');
+        toast.error('Google Maps API-nyckel saknas. Kontakta administratör.');
+        return;
+      }
 
       try {
         const loader = new Loader({
