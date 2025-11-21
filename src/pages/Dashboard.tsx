@@ -15,6 +15,7 @@ import { RecentlyVisitedWidget } from '@/components/RecentlyVisitedWidget';
 import { TodoWidget } from '@/components/TodoWidget';
 import { DashboardCustomizer } from '@/components/dashboard/DashboardCustomizer';
 import { PropertyMapDialog } from '@/components/maps/PropertyMapDialog';
+import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
 
 interface DashboardStats {
   totalProperties: number;
@@ -326,40 +327,8 @@ const Dashboard = () => {
                 propertyId={selectedProperty === "all" ? undefined : selectedProperty} 
               />
 
-              {/* KPI Cards - Full Width */}
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                {kpiCards.map((kpi) => (
-                  <Card key={kpi.title} className="border-border/50 hover:shadow-[var(--shadow-elegant)] transition-all">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
-                            <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-                          </div>
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            {kpi.title}
-                          </CardTitle>
-                        </div>
-                        {getTrendIcon(kpi.value, kpi.prev)}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold mb-2">{kpi.value}</div>
-                      {getTrendText(kpi.value, kpi.prev) && (
-                        <p className="text-xs text-muted-foreground mb-1">
-                          {getTrendText(kpi.value, kpi.prev)}
-                        </p>
-                      )}
-                      {kpi.subtitle && (
-                        <p className="text-sm text-muted-foreground mb-1">{kpi.subtitle}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {kpi.description}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              {/* KPI Cards - Draggable Grid */}
+              <DashboardGrid kpiCards={kpiCards} />
 
               {/* To-Do List - replaced with TodoWidget */}
               <TodoWidget propertyId={selectedProperty === "all" ? undefined : selectedProperty} />
