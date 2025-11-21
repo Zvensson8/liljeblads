@@ -2,7 +2,9 @@ import { useMemo } from 'react';
 import { Responsive, WidthProvider, Layout } from 'react-grid-layout';
 import { useDashboardStore } from '@/store/dashboardStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Wrench, FolderKanban, CheckSquare, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Building2, Wrench, FolderKanban, CheckSquare, TrendingUp, TrendingDown, Minus, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
@@ -22,7 +24,7 @@ interface DashboardGridProps {
 }
 
 export const DashboardGrid = ({ kpiCards }: DashboardGridProps) => {
-  const { layout, setLayout, isEditing } = useDashboardStore();
+  const { layout, setLayout, isEditing, removeWidget } = useDashboardStore();
 
   const getTrendIcon = (current: number, previous: number | undefined) => {
     if (!previous || previous === 0) return null;
@@ -85,31 +87,44 @@ export const DashboardGrid = ({ kpiCards }: DashboardGridProps) => {
                   </div>
                   <div className="flex items-center gap-2">
                     {isEditing && (
-                      <div className="flex gap-1 text-[10px] text-muted-foreground">
-                        <button
-                          type="button"
-                          className="px-1 py-0.5 rounded border border-border/50 hover:bg-muted/60"
-                          onClick={() => setLayout(layout.map(l => l.i === item.i ? { ...l, w: 3, h: 2 } : l))}
+                      <>
+                        <div className="flex gap-1 text-[10px] text-muted-foreground">
+                          <button
+                            type="button"
+                            className="px-1 py-0.5 rounded border border-border/50 hover:bg-muted/60"
+                            onClick={() => setLayout(layout.map(l => l.i === item.i ? { ...l, w: 3, h: 2 } : l))}
+                          >
+                            S
+                          </button>
+                          <button
+                            type="button"
+                            className="px-1 py-0.5 rounded border border-border/50 hover:bg-muted/60"
+                            onClick={() => setLayout(layout.map(l => l.i === item.i ? { ...l, w: 6, h: 3 } : l))}
+                          >
+                            M
+                          </button>
+                          <button
+                            type="button"
+                            className="px-1 py-0.5 rounded border border-border/50 hover:bg-muted/60"
+                            onClick={() => setLayout(layout.map(l => l.i === item.i ? { ...l, w: 12, h: 4 } : l))}
+                          >
+                            L
+                          </button>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => {
+                            removeWidget(item.i);
+                            toast.success('Widget borttagen');
+                          }}
                         >
-                          S
-                        </button>
-                        <button
-                          type="button"
-                          className="px-1 py-0.5 rounded border border-border/50 hover:bg-muted/60"
-                          onClick={() => setLayout(layout.map(l => l.i === item.i ? { ...l, w: 6, h: 3 } : l))}
-                        >
-                          M
-                        </button>
-                        <button
-                          type="button"
-                          className="px-1 py-0.5 rounded border border-border/50 hover:bg-muted/60"
-                          onClick={() => setLayout(layout.map(l => l.i === item.i ? { ...l, w: 12, h: 4 } : l))}
-                        >
-                          L
-                        </button>
-                      </div>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </>
                     )}
-                    {getTrendIcon(kpi.value, kpi.prev)}
+                    {!isEditing && getTrendIcon(kpi.value, kpi.prev)}
                   </div>
                 </div>
               </CardHeader>
