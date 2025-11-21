@@ -6,13 +6,15 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrganization } from '@/hooks/useOrganization';
-import { Building2, Wrench, FolderKanban, CheckSquare, Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Building2, Wrench, FolderKanban, CheckSquare, Loader2, TrendingUp, TrendingDown, Minus, Map as MapIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AttentionRequiredSection } from '@/components/AttentionRequiredSection';
 import { RecentlyVisitedWidget } from '@/components/RecentlyVisitedWidget';
 import { TodoWidget } from '@/components/TodoWidget';
+import { DashboardCustomizer } from '@/components/dashboard/DashboardCustomizer';
+import { PropertyMapDialog } from '@/components/maps/PropertyMapDialog';
 
 interface DashboardStats {
   totalProperties: number;
@@ -64,6 +66,7 @@ const Dashboard = () => {
   const { organization } = useOrganization();
   const [selectedProperty, setSelectedProperty] = useState<string>("all");
   const [properties, setProperties] = useState<Property[]>([]);
+  const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
     totalProperties: 0,
     totalWorkOrders: 0,
@@ -274,9 +277,20 @@ const Dashboard = () => {
         <SidebarInset className="flex-1">
           <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
             <SidebarTrigger />
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1">
               <TrendingUp className="h-5 w-5 text-primary" />
               <h1 className="text-xl font-semibold">Dashboard</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMapDialogOpen(true)}
+              >
+                <MapIcon className="h-4 w-4 mr-2" />
+                Visa karta
+              </Button>
+              <DashboardCustomizer />
             </div>
           </header>
 
@@ -458,6 +472,7 @@ const Dashboard = () => {
           </main>
         </SidebarInset>
       </div>
+      <PropertyMapDialog open={mapDialogOpen} onOpenChange={setMapDialogOpen} />
     </SidebarProvider>
   );
 };

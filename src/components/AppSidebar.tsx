@@ -1,4 +1,4 @@
-import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown, UserCog, User } from "lucide-react";
+import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown, UserCog, User, FileText, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,6 +31,8 @@ const navigationItems: Array<{ title: string; url: string; icon: any; moduleName
   { title: "Driftuppföljning", url: "/operations", icon: ClipboardList, moduleName: "operations" },
   { title: "Projekthantering", url: "/projects", icon: Briefcase, moduleName: "projects" },
   { title: "Återkommande kostnader", url: "/recurring-costs", icon: DollarSign, moduleName: "recurring-costs" },
+  { title: "Rapporter", url: "/reports", icon: FileText, moduleName: "dashboard" },
+  { title: "Säkerhet", url: "/security", icon: Shield, moduleName: "organization" },
   { title: "Användare", url: "/users", icon: Users, moduleName: "users" },
   { title: "Organisation", url: "/organization/settings", icon: Building, moduleName: "organization" },
 ];
