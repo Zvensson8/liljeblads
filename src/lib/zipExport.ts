@@ -3,6 +3,14 @@ import { saveAs } from "file-saver";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
+import {
+  generateProjectDocx,
+  generateChecklistDocx,
+  generateActivitiesDocx,
+  generateCostsDocx,
+  generateBudgetDocx,
+  generateWorkOrderDocx,
+} from "./docxExport";
 
 interface Project {
   id: string;
@@ -43,8 +51,8 @@ export async function exportProjectToZip(projectId: string) {
     if (projectError) throw projectError;
 
     // Skapa projektinfo-fil
-    const projectInfo = generateProjectInfo(project);
-    zip.file("Projektinformation.txt", projectInfo);
+    const projectDocx = await generateProjectDocx(project);
+    zip.file("Projektinformation.docx", projectDocx);
 
     // Hämta och lägg till dokument
     const { data: documents } = await supabase
@@ -74,8 +82,8 @@ export async function exportProjectToZip(projectId: string) {
       .order("order_index", { ascending: true });
 
     if (checklist && checklist.length > 0) {
-      const checklistText = generateChecklistText(checklist);
-      zip.file("Checklista.txt", checklistText);
+      const checklistDocx = await generateChecklistDocx(checklist);
+      zip.file("Checklista.docx", checklistDocx);
     }
 
     // Hämta och lägg till aktivitetslogg
@@ -86,8 +94,8 @@ export async function exportProjectToZip(projectId: string) {
       .order("created_at", { ascending: false });
 
     if (activities && activities.length > 0) {
-      const activitiesText = generateActivitiesText(activities);
-      zip.file("Aktivitetslogg.txt", activitiesText);
+      const activitiesDocx = await generateActivitiesDocx(activities);
+      zip.file("Aktivitetslogg.docx", activitiesDocx);
     }
 
     // Hämta och lägg till kostnadsposter
@@ -98,8 +106,8 @@ export async function exportProjectToZip(projectId: string) {
       .order("cost_date", { ascending: false });
 
     if (costs && costs.length > 0) {
-      const costsText = generateCostsText(costs);
-      zip.file("Kostnader.txt", costsText);
+      const costsDocx = await generateCostsDocx(costs);
+      zip.file("Kostnader.docx", costsDocx);
     }
 
     // Hämta och lägg till budgetposter
@@ -109,8 +117,8 @@ export async function exportProjectToZip(projectId: string) {
       .eq("project_id", projectId);
 
     if (budget && budget.length > 0) {
-      const budgetText = generateBudgetText(budget);
-      zip.file("Budget.txt", budgetText);
+      const budgetDocx = await generateBudgetDocx(budget);
+      zip.file("Budget.docx", budgetDocx);
     }
 
     // Generera och ladda ner ZIP
@@ -139,8 +147,8 @@ export async function exportWorkOrderToZip(workOrderId: string) {
     if (workOrderError) throw workOrderError;
 
     // Skapa arbetsorder-info-fil
-    const workOrderInfo = generateWorkOrderInfo(workOrder);
-    zip.file("Arbetsorder_information.txt", workOrderInfo);
+    const workOrderDocx = await generateWorkOrderDocx(workOrder);
+    zip.file("Arbetsorder_information.docx", workOrderDocx);
 
     // Hämta och lägg till filer
     const { data: files } = await supabase
