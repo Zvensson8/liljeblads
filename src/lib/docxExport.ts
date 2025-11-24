@@ -15,22 +15,18 @@ import {
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 
-// Professional Swedish corporate color scheme
+// Professional business document color scheme
 const COLORS = {
-  primary: "1E40AF", // Deep professional blue
-  primaryLight: "3B82F6", // Lighter blue for accents
-  success: "059669", // Professional green
-  successLight: "D1FAE5", // Light green background
-  warning: "D97706", // Amber for warnings
-  warningLight: "FEF3C7", // Light amber background
-  danger: "DC2626", // Red for critical items
-  dangerLight: "FEE2E2", // Light red background
-  text: "1F2937", // Dark gray for text
+  primary: "2563EB", // Professional blue for accents
+  primaryLight: "DBEAFE", // Very light blue for highlights
+  success: "16A34A", // Professional green
+  successLight: "DCFCE7", // Very light green background
+  text: "1F2937", // Dark gray for text (almost black)
   textLight: "6B7280", // Medium gray for secondary text
   border: "D1D5DB", // Light gray for borders
-  background: "F9FAFB", // Very light gray for alternating rows
-  headerBg: "1E3A8A", // Dark blue for headers
-  headerText: "FFFFFF", // White text on dark headers
+  background: "F3F4F6", // Very light gray for alternating rows
+  headerBg: "E5E7EB", // Light gray for headers (professional and subtle)
+  headerText: "111827", // Dark text on light headers
 };
 
 // Helper function to create a styled heading
@@ -99,7 +95,7 @@ function createTableCell(
           new TextRun({
             text,
             bold: isHeader || bold,
-            color: isHeader ? COLORS.headerText : COLORS.text,
+            color: COLORS.text,
             size: isHeader ? 22 : 20,
           }),
         ],
@@ -530,13 +526,13 @@ export async function generateCostsDocx(costs: any[]): Promise<Blob> {
                   text: `TOTALT: ${formatCurrency(total)}`, 
                   bold: true,
                   size: 24,
-                  color: COLORS.headerText,
+                  color: COLORS.text,
                 }),
               ],
               alignment: AlignmentType.RIGHT,
             }),
           ],
-          shading: { fill: COLORS.success, type: ShadingType.SOLID },
+          shading: { fill: COLORS.successLight, type: ShadingType.SOLID },
           margins: { top: 150, bottom: 150, left: 200, right: 200 },
           borders: {
             top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
@@ -637,13 +633,13 @@ export async function generateBudgetDocx(budget: any[]): Promise<Blob> {
                   text: `TOTALT: ${formatCurrency(totalBudget)}`, 
                   bold: true,
                   size: 24,
-                  color: COLORS.headerText,
+                  color: COLORS.text,
                 }),
               ],
               alignment: AlignmentType.RIGHT,
             }),
           ],
-          shading: { fill: COLORS.primaryLight, type: ShadingType.SOLID },
+          shading: { fill: COLORS.headerBg, type: ShadingType.SOLID },
           margins: { top: 150, bottom: 150, left: 200, right: 200 },
           borders: {
             top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
@@ -660,13 +656,13 @@ export async function generateBudgetDocx(budget: any[]): Promise<Blob> {
                   text: totalForecast > 0 ? formatCurrency(totalForecast) : "-",
                   bold: true,
                   size: 24,
-                  color: COLORS.headerText,
+                  color: COLORS.text,
                 }),
               ],
               alignment: AlignmentType.RIGHT,
             }),
           ],
-          shading: { fill: COLORS.primaryLight, type: ShadingType.SOLID },
+          shading: { fill: COLORS.headerBg, type: ShadingType.SOLID },
           margins: { top: 150, bottom: 150, left: 200, right: 200 },
           borders: {
             top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
