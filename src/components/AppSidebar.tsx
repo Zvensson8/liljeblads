@@ -51,19 +51,11 @@ export function AppSidebar() {
   const visibleNavigationItems = navigationItems.filter(item => {
     // Check if item requires founder access
     if (item.founderOnly && !isFounder) {
-      console.log(`❌ ${item.title} requires founder access, user is not founder`);
       return false;
     }
     // Check module access
-    const hasAccess = hasModuleAccess(item.moduleName);
-    console.log(`${hasAccess ? '✅' : '❌'} ${item.title} (${item.moduleName}): ${hasAccess}`);
-    return hasAccess;
+    return hasModuleAccess(item.moduleName);
   });
-
-  console.log("📱 Visible navigation items:", visibleNavigationItems.map(i => i.title));
-  console.log("👑 Is Founder:", isFounder);
-  console.log("📊 Module Access Loading:", moduleAccessLoading);
-  console.log("📋 Module Access:", moduleAccess);
 
   useEffect(() => {
     if (user) {
