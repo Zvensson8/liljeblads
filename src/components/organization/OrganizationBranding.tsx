@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ interface OrganizationBrandingProps {
 }
 
 export function OrganizationBranding({ organization, onUpdate }: OrganizationBrandingProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [primaryColor, setPrimaryColor] = useState(organization.primary_color || "#000000");
   const [uploading, setUploading] = useState(false);
@@ -111,18 +112,18 @@ export function OrganizationBranding({ organization, onUpdate }: OrganizationBra
           )}
 
           <div className="flex items-center gap-2">
-            <Input
+            <input
+              ref={fileInputRef}
               type="file"
               accept="image/*"
               onChange={handleLogoUpload}
               disabled={uploading}
               className="hidden"
-              id="logo-upload"
             />
             <Button 
               type="button" 
               disabled={uploading}
-              onClick={() => document.getElementById('logo-upload')?.click()}
+              onClick={() => fileInputRef.current?.click()}
             >
               <Upload className="h-4 w-4 mr-2" />
               {uploading ? "Laddar upp..." : "Välj logotyp"}
