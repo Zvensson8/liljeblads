@@ -23,7 +23,7 @@ import { NotificationBell } from "./NotificationBell";
 import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
-const navigationItems: Array<{ title: string; url: string; icon: any; moduleName: ModuleName }> = [
+const navigationItems: Array<{ title: string; url: string; icon: any; moduleName: ModuleName; founderOnly?: boolean }> = [
   { title: "Dashboard", url: "/dashboard", icon: Home, moduleName: "dashboard" },
   { title: "Fastigheter", url: "/properties", icon: Building2, moduleName: "properties" },
   { title: "Komponenter", url: "/components", icon: Settings, moduleName: "components" },
@@ -31,8 +31,8 @@ const navigationItems: Array<{ title: string; url: string; icon: any; moduleName
   { title: "Driftuppföljning", url: "/operations", icon: ClipboardList, moduleName: "operations" },
   { title: "Projekthantering", url: "/projects", icon: Briefcase, moduleName: "projects" },
   { title: "Återkommande kostnader", url: "/recurring-costs", icon: DollarSign, moduleName: "recurring-costs" },
-  { title: "Rapporter", url: "/reports", icon: FileText, moduleName: "dashboard" },
-  { title: "Säkerhet", url: "/security", icon: Shield, moduleName: "organization" },
+  { title: "Rapporter", url: "/reports", icon: FileText, moduleName: "dashboard", founderOnly: true },
+  { title: "Säkerhet", url: "/security", icon: Shield, moduleName: "organization", founderOnly: true },
   { title: "Användare", url: "/users", icon: Users, moduleName: "users" },
   { title: "Organisation", url: "/organization/settings", icon: Building, moduleName: "organization" },
 ];
@@ -47,10 +47,15 @@ export function AppSidebar() {
   const isCollapsed = state === "collapsed";
   const [isFounder, setIsFounder] = useState(false);
 
-  // Filter navigation items based on module access
-  const visibleNavigationItems = navigationItems.filter(item => 
-    hasModuleAccess(item.moduleName)
-  );
+  // Filter navigation items based on module access and founder status
+  const visibleNavigationItems = navigationItems.filter(item => {
+    // Check if item requires founder access
+    if (item.founderOnly && !isFounder) {
+      return false;
+    }
+    // Check module access
+    return hasModuleAccess(item.moduleName);
+  });
 
   useEffect(() => {
     if (user) {
