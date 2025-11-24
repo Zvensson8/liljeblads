@@ -508,6 +508,7 @@ export async function generateCostsDocx(costs: any[]): Promise<Blob> {
         new TableCell({ 
           children: [new Paragraph("")], 
           columnSpan: 4,
+          shading: { fill: "FFFFFF", type: ShadingType.SOLID },
           borders: {
             top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
           },
@@ -615,6 +616,7 @@ export async function generateBudgetDocx(budget: any[]): Promise<Blob> {
         new TableCell({ 
           children: [new Paragraph("")], 
           columnSpan: 2,
+          shading: { fill: "FFFFFF", type: ShadingType.SOLID },
           borders: {
             top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
           },
