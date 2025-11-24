@@ -120,11 +120,9 @@ export function OrganizationBranding({ organization, onUpdate }: OrganizationBra
               id="logo-upload"
             />
             <Label htmlFor="logo-upload" className="cursor-pointer">
-              <Button asChild disabled={uploading}>
-                <span>
-                  <Upload className="h-4 w-4 mr-2" />
-                  {uploading ? "Laddar upp..." : "Välj logotyp"}
-                </span>
+              <Button type="button" disabled={uploading}>
+                <Upload className="h-4 w-4 mr-2" />
+                {uploading ? "Laddar upp..." : "Välj logotyp"}
               </Button>
             </Label>
           </div>
