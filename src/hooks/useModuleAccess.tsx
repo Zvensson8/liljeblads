@@ -25,20 +25,24 @@ export const useModuleAccess = () => {
   const { data: moduleAccess, isLoading } = useQuery({
     queryKey: ["module-access", session?.user?.id],
     queryFn: async () => {
+      console.log("🚀 Module access query started");
+      console.log("🔐 Session user ID:", session?.user?.id);
+      
       if (!session?.user?.id) {
-        console.log("🔍 No user ID, returning empty array");
+        console.log("❌ No user ID found, returning empty array");
         return [];
       }
 
       console.log("🔍 Checking module access for user:", session.user.id);
 
       // Check system roles INSIDE the query to avoid race conditions
-      const { data: systemRoles } = await supabase
+      const { data: systemRoles, error: rolesError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", session.user.id);
 
       console.log("👑 System roles:", systemRoles);
+      console.log("👑 Roles error:", rolesError);
 
       const isSystemAdmin = systemRoles?.some(
         (r) => r.role === "admin" || r.role === "founder"
@@ -69,6 +73,7 @@ export const useModuleAccess = () => {
         .eq("user_id", session.user.id);
 
       console.log("📋 Module access data from DB:", data);
+      console.log("📋 Module access error:", error);
 
       if (error) {
         console.error("❌ Error fetching module access:", error);
@@ -105,7 +110,8 @@ export const useModuleAccess = () => {
       // If all modules are disabled, return empty array (user has no access)
       return enabledModules;
     },
-    enabled: !!session?.user?.id,
+    // Remove the enabled check - let the query run and handle empty session inside
+    enabled: true,
   });
 
   const hasModuleAccess = (moduleName: ModuleName): boolean => {
