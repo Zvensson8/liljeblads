@@ -42,7 +42,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const { signOut, user } = useAuth();
   const { organization, loading: orgLoading } = useOrganization();
-  const { hasModuleAccess } = useModuleAccess();
+  const { hasModuleAccess, isLoading: moduleAccessLoading, moduleAccess } = useModuleAccess();
   const navigate = useNavigate();
   const isCollapsed = state === "collapsed";
   const [isFounder, setIsFounder] = useState(false);
@@ -51,11 +51,19 @@ export function AppSidebar() {
   const visibleNavigationItems = navigationItems.filter(item => {
     // Check if item requires founder access
     if (item.founderOnly && !isFounder) {
+      console.log(`❌ ${item.title} requires founder access, user is not founder`);
       return false;
     }
     // Check module access
-    return hasModuleAccess(item.moduleName);
+    const hasAccess = hasModuleAccess(item.moduleName);
+    console.log(`${hasAccess ? '✅' : '❌'} ${item.title} (${item.moduleName}): ${hasAccess}`);
+    return hasAccess;
   });
+
+  console.log("📱 Visible navigation items:", visibleNavigationItems.map(i => i.title));
+  console.log("👑 Is Founder:", isFounder);
+  console.log("📊 Module Access Loading:", moduleAccessLoading);
+  console.log("📋 Module Access:", moduleAccess);
 
   useEffect(() => {
     if (user) {
@@ -66,14 +74,19 @@ export function AppSidebar() {
   const checkFounderRole = async () => {
     if (!user) return;
     
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .eq("role", "founder" as any)
-      .single();
+      .eq("role", "founder" as any);
     
-    setIsFounder(!!data);
+    if (error) {
+      console.error("Error checking founder role:", error);
+      setIsFounder(false);
+      return;
+    }
+    
+    setIsFounder(data && data.length > 0);
   };
 
   // Hide sidebar on mobile - use bottom navigation instead
