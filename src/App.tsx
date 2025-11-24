@@ -13,6 +13,7 @@ import { BottomNavigation } from "@/components/BottomNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // Lazy load all routes for better performance
+const Index = lazy(() => import("./pages/Index"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Properties = lazy(() => import("./pages/Properties"));
@@ -50,7 +51,8 @@ const AppContent = () => {
       <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<Index />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/properties" element={<Properties />} />
           <Route path="/property/:id" element={<PropertyDetail />} />

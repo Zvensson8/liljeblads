@@ -85,10 +85,12 @@ const Dashboard = () => {
   const [prevStats, setPrevStats] = useState<DashboardStats | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    } else if (user) {
-      fetchProperties();
+    if (!authLoading) {
+      if (!user) {
+        navigate('/auth');
+      } else {
+        fetchProperties();
+      }
     }
   }, [user, authLoading, navigate]);
 

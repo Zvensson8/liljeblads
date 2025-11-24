@@ -57,6 +57,22 @@ export default function RecurringCosts() {
     if (!organization) return;
 
     try {
+      // First get all properties for the organization
+      const { data: orgProperties, error: propError } = await supabase
+        .from("properties")
+        .select("id")
+        .eq("organization_id", organization.id);
+
+      if (propError) throw propError;
+      
+      const propertyIds = orgProperties?.map(p => p.id) || [];
+      
+      if (propertyIds.length === 0) {
+        setCosts([]);
+        return;
+      }
+
+      // Then get recurring costs for those properties
       const { data, error } = await supabase
         .from("property_recurring_costs")
         .select(`
@@ -64,7 +80,7 @@ export default function RecurringCosts() {
           property:properties(name),
           account_code:account_codes(code, description)
         `)
-        .eq("properties.organization_id", organization.id)
+        .in("property_id", propertyIds)
         .order("last_payment_date", { ascending: false });
 
       if (error) throw error;

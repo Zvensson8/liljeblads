@@ -24,7 +24,7 @@ import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
 const navigationItems: Array<{ title: string; url: string; icon: any; moduleName: ModuleName }> = [
-  { title: "Dashboard", url: "/", icon: Home, moduleName: "dashboard" },
+  { title: "Dashboard", url: "/dashboard", icon: Home, moduleName: "dashboard" },
   { title: "Fastigheter", url: "/properties", icon: Building2, moduleName: "properties" },
   { title: "Komponenter", url: "/components", icon: Settings, moduleName: "components" },
   { title: "Arbetsordrar", url: "/work-orders", icon: Wrench, moduleName: "work-orders" },
