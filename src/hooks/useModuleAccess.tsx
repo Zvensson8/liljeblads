@@ -24,7 +24,12 @@ export const useModuleAccess = () => {
   const { data: moduleAccess, isLoading } = useQuery({
     queryKey: ["module-access", session?.user?.id],
     queryFn: async () => {
-      if (!session?.user?.id) return [];
+      if (!session?.user?.id) {
+        console.log("🔍 No user ID, returning empty array");
+        return [];
+      }
+
+      console.log("🔍 Checking module access for user:", session.user.id);
 
       // Check system roles INSIDE the query to avoid race conditions
       const { data: systemRoles } = await supabase
@@ -32,13 +37,17 @@ export const useModuleAccess = () => {
         .select("role")
         .eq("user_id", session.user.id);
 
+      console.log("👑 System roles:", systemRoles);
+
       const isSystemAdmin = systemRoles?.some(
         (r) => r.role === "admin" || r.role === "founder"
       ) || false;
 
+      console.log("🔑 Is system admin:", isSystemAdmin);
+
       // If user is admin or founder, return all modules immediately
       if (isSystemAdmin) {
-        return [
+        const allModules = [
           "dashboard",
           "properties",
           "components",
@@ -49,6 +58,8 @@ export const useModuleAccess = () => {
           "users",
           "organization",
         ] as ModuleName[];
+        console.log("✅ Admin/Founder - returning all modules:", allModules);
+        return allModules;
       }
 
       const { data, error } = await supabase
@@ -56,12 +67,17 @@ export const useModuleAccess = () => {
         .select("module_name, is_enabled")
         .eq("user_id", session.user.id);
 
-      if (error) throw error;
+      console.log("📋 Module access data from DB:", data);
+
+      if (error) {
+        console.error("❌ Error fetching module access:", error);
+        throw error;
+      }
 
       // If no specific access rules exist, grant access to all modules by default
       // Admins can then explicitly restrict access for specific users
       if (!data || data.length === 0) {
-        return [
+        const defaultModules = [
           "dashboard",
           "properties",
           "components",
@@ -72,12 +88,18 @@ export const useModuleAccess = () => {
           "users",
           "organization",
         ] as ModuleName[];
+        console.log("✅ No rules found - returning all modules:", defaultModules);
+        return defaultModules;
       }
 
       // Filter only enabled modules
       const enabledModules = data
         .filter((item) => item.is_enabled)
         .map((item) => item.module_name as ModuleName);
+      
+      console.log("📊 Enabled modules after filtering:", enabledModules);
+      console.log("📊 Total modules in DB:", data.length);
+      console.log("📊 Enabled count:", enabledModules.length);
       
       // If all modules are disabled, return empty array (user has no access)
       return enabledModules;
@@ -86,14 +108,30 @@ export const useModuleAccess = () => {
   });
 
   const hasModuleAccess = (moduleName: ModuleName): boolean => {
+    console.log(`🔍 hasModuleAccess called for: ${moduleName}`);
+    console.log(`  - isLoading: ${isLoading}`);
+    console.log(`  - moduleAccess:`, moduleAccess);
+    console.log(`  - moduleAccess length:`, moduleAccess?.length);
+    
     // Always allow access while loading to prevent flickering
-    if (isLoading) return true;
+    if (isLoading) {
+      console.log(`  ⏳ Loading - allowing access`);
+      return true;
+    }
     // If no moduleAccess data loaded yet, allow access by default
-    if (!moduleAccess) return true;
+    if (!moduleAccess) {
+      console.log(`  ⚠️ No moduleAccess data - allowing access`);
+      return true;
+    }
     // If empty array, user has no module access
-    if (moduleAccess.length === 0) return false;
+    if (moduleAccess.length === 0) {
+      console.log(`  ❌ Empty array - denying access`);
+      return false;
+    }
     // Check if user has access to this specific module
-    return moduleAccess.includes(moduleName);
+    const hasAccess = moduleAccess.includes(moduleName);
+    console.log(`  ${hasAccess ? '✅' : '❌'} Module ${moduleName}: ${hasAccess}`);
+    return hasAccess;
   };
 
   return {
