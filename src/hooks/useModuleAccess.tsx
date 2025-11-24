@@ -58,10 +58,20 @@ export const useModuleAccess = () => {
 
       if (error) throw error;
 
-      // If no specific access rules exist, return empty array to deny all access
-      // Organization admins should explicitly configure module access for users
+      // If no specific access rules exist, grant access to all modules by default
+      // Admins can then explicitly restrict access for specific users
       if (!data || data.length === 0) {
-        return [] as ModuleName[];
+        return [
+          "dashboard",
+          "properties",
+          "components",
+          "work-orders",
+          "operations",
+          "projects",
+          "recurring-costs",
+          "users",
+          "organization",
+        ] as ModuleName[];
       }
 
       return data
