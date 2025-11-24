@@ -310,7 +310,7 @@ export async function generateProjectDocx(project: any): Promise<Blob> {
 export async function generateChecklistDocx(checklist: any[]): Promise<Blob> {
   const rows = checklist.map((item, index) => {
     const statusSymbol = item.completed ? "✓" : "☐";
-    const statusColor = item.completed ? COLORS.success : COLORS.textLight;
+    const statusColor = item.completed ? COLORS.success : COLORS.text;
     const completedText = item.completed_at
       ? ` (${format(new Date(item.completed_at), "PPP", { locale: sv })})`
       : "";
@@ -348,14 +348,8 @@ export async function generateChecklistDocx(checklist: any[]): Promise<Blob> {
               children: [
                 new TextRun({ 
                   text: item.title,
-                  size: 22,
                   color: COLORS.text,
-                }),
-                new TextRun({ 
-                  text: completedText, 
-                  italics: true, 
-                  color: COLORS.textLight,
-                  size: 18,
+                  size: 20,
                 }),
               ],
             }),
