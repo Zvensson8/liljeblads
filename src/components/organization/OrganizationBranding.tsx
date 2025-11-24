@@ -25,7 +25,12 @@ export function OrganizationBranding({ organization, onUpdate }: OrganizationBra
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      console.log("No file selected");
+      return;
+    }
+
+    console.log("File selected:", file.name, file.type, file.size);
 
     if (!file.type.startsWith("image/")) {
       toast.error("Välj en bildfil");
@@ -41,27 +46,50 @@ export function OrganizationBranding({ organization, onUpdate }: OrganizationBra
     
     try {
       setUploading(true);
+      console.log("Starting upload...");
+      
       const fileExt = file.name.split(".").pop();
-      const filePath = `${organization.id}/logo.${fileExt}`;
+      const timestamp = Date.now();
+      const filePath = `${organization.id}/logo-${timestamp}.${fileExt}`;
+
+      console.log("Uploading to:", filePath);
 
       const { error: uploadError } = await supabase.storage
         .from("organization-logos")
         .upload(filePath, file, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw uploadError;
+      }
+
+      console.log("Upload successful, getting public URL...");
 
       const { data: { publicUrl } } = supabase.storage
         .from("organization-logos")
         .getPublicUrl(filePath);
+
+      console.log("Public URL:", publicUrl);
+      console.log("Updating organization record...");
 
       const { error: updateError } = await supabase
         .from("organizations")
         .update({ logo_url: publicUrl })
         .eq("id", organization.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("Update error:", updateError);
+        throw updateError;
+      }
 
+      console.log("Organization updated successfully");
       toast.success("Logotyp uppladdad");
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
       onUpdate();
     } catch (error: any) {
       console.error("Error uploading logo:", error);
@@ -117,13 +145,16 @@ export function OrganizationBranding({ organization, onUpdate }: OrganizationBra
               type="file"
               accept="image/*"
               onChange={handleLogoUpload}
-              disabled={uploading}
-              className="hidden"
+              style={{ display: 'none' }}
             />
             <Button 
               type="button" 
               disabled={uploading}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={(e) => {
+                e.preventDefault();
+                console.log("Button clicked");
+                fileInputRef.current?.click();
+              }}
             >
               <Upload className="h-4 w-4 mr-2" />
               {uploading ? "Laddar upp..." : "Välj logotyp"}
