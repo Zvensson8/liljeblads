@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Database } from "@/integrations/supabase/types";
@@ -63,6 +64,7 @@ interface Project {
 
 export default function Projects() {
   const { user, loading: authLoading } = useAuth();
+  const { organization } = useOrganization();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -84,7 +86,7 @@ export default function Projects() {
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
-    } else if (user) {
+    } else if (user && organization) {
       fetchProjects(showArchived);
       fetchProperties();
       
@@ -94,7 +96,7 @@ export default function Projects() {
         handleEditFromUrl(editId);
       }
     }
-  }, [user, authLoading, navigate, showArchived, searchParams]);
+  }, [user, authLoading, navigate, showArchived, searchParams, organization]);
 
   const handleEditFromUrl = async (projectId: string) => {
     try {
@@ -120,14 +122,33 @@ export default function Projects() {
   };
 
   const fetchProjects = async (archived = false) => {
+    if (!organization) return;
+    
     setLoading(true);
     try {
+      // First get all properties for the organization
+      const { data: orgProperties, error: propError } = await supabase
+        .from("properties")
+        .select("id")
+        .eq("organization_id", organization.id);
+
+      if (propError) throw propError;
+      
+      const propertyIds = orgProperties?.map(p => p.id) || [];
+      
+      if (propertyIds.length === 0) {
+        setProjects([]);
+        return;
+      }
+
+      // Then get projects for those properties
       const { data, error } = await supabase
         .from("projects")
         .select(`
           *,
           property:properties(name)
         `)
+        .in("property_id", propertyIds)
         .eq("is_archived", archived)
         .order("updated_at", { ascending: false });
 
@@ -141,9 +162,12 @@ export default function Projects() {
   };
 
   const fetchProperties = async () => {
+    if (!organization) return;
+    
     const { data } = await supabase
       .from("properties")
       .select("id, name")
+      .eq("organization_id", organization.id)
       .order("name");
     setProperties(data || []);
   };

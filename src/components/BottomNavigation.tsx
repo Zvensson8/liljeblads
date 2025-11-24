@@ -21,7 +21,7 @@ export const BottomNavigation = () => {
   const isActive = (path: string) => location.pathname === path;
 
   const allPrimaryNavItems = [
-    { path: '/', icon: Home, label: 'Hem', moduleName: 'dashboard' as ModuleName },
+    { path: '/dashboard', icon: Home, label: 'Hem', moduleName: 'dashboard' as ModuleName },
     { path: '/properties', icon: Building2, label: 'Fastigheter', moduleName: 'properties' as ModuleName },
     { path: '/components', icon: Wrench, label: 'Komponenter', moduleName: 'components' as ModuleName },
     { path: '/work-orders', icon: FolderKanban, label: 'Ordrar', moduleName: 'work-orders' as ModuleName },
