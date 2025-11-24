@@ -13,10 +13,11 @@ export type ModuleName =
   | "organization";
 
 export const useModuleAccess = () => {
-  const { data: session } = useQuery({
+  const { data: session, isLoading: sessionLoading } = useQuery({
     queryKey: ["session"],
     queryFn: async () => {
       const { data } = await supabase.auth.getSession();
+      console.log("🔐 Session data:", data.session?.user?.id);
       return data.session;
     },
   });
