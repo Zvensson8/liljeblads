@@ -15,13 +15,22 @@ import {
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 
+// Professional Swedish corporate color scheme
 const COLORS = {
-  primary: "2563EB", // Blue
-  success: "10B981", // Green
-  warning: "F59E0B", // Yellow
-  danger: "EF4444", // Red
-  gray: "6B7280",
-  lightGray: "F3F4F6",
+  primary: "1E40AF", // Deep professional blue
+  primaryLight: "3B82F6", // Lighter blue for accents
+  success: "059669", // Professional green
+  successLight: "D1FAE5", // Light green background
+  warning: "D97706", // Amber for warnings
+  warningLight: "FEF3C7", // Light amber background
+  danger: "DC2626", // Red for critical items
+  dangerLight: "FEE2E2", // Light red background
+  text: "1F2937", // Dark gray for text
+  textLight: "6B7280", // Medium gray for secondary text
+  border: "D1D5DB", // Light gray for borders
+  background: "F9FAFB", // Very light gray for alternating rows
+  headerBg: "1E3A8A", // Dark blue for headers
+  headerText: "FFFFFF", // White text on dark headers
 };
 
 // Helper function to create a styled heading
@@ -29,10 +38,25 @@ function createHeading(
   text: string,
   level: (typeof HeadingLevel)[keyof typeof HeadingLevel] = HeadingLevel.HEADING_1
 ) {
+  const isH1 = level === HeadingLevel.HEADING_1;
   return new Paragraph({
-    text,
-    heading: level,
-    spacing: { before: 400, after: 200 },
+    children: [
+      new TextRun({
+        text,
+        bold: true,
+        size: isH1 ? 32 : 28,
+        color: isH1 ? COLORS.primary : COLORS.text,
+      }),
+    ],
+    spacing: { before: isH1 ? 600 : 400, after: 300 },
+    border: isH1 ? {
+      bottom: {
+        color: COLORS.primary,
+        space: 1,
+        style: BorderStyle.SINGLE,
+        size: 20,
+      },
+    } : undefined,
   });
 }
 
@@ -40,16 +64,65 @@ function createHeading(
 function createInfoRow(key: string, value: string) {
   return new Paragraph({
     children: [
-      new TextRun({ text: `${key}: `, bold: true }),
-      new TextRun({ text: value }),
+      new TextRun({ 
+        text: `${key}: `, 
+        bold: true,
+        color: COLORS.text,
+        size: 22,
+      }),
+      new TextRun({ 
+        text: value,
+        color: COLORS.textLight,
+        size: 22,
+      }),
     ],
-    spacing: { after: 100 },
+    spacing: { after: 150, line: 360 },
   });
 }
 
 // Helper function to format currency
 function formatCurrency(amount: number): string {
   return `${amount.toLocaleString("sv-SE")} kr`;
+}
+
+// Helper function to create a professional table cell
+function createTableCell(
+  text: string,
+  isHeader: boolean = false,
+  backgroundColor?: string,
+  bold: boolean = false
+): TableCell {
+  return new TableCell({
+    children: [
+      new Paragraph({
+        children: [
+          new TextRun({
+            text,
+            bold: isHeader || bold,
+            color: isHeader ? COLORS.headerText : COLORS.text,
+            size: isHeader ? 22 : 20,
+          }),
+        ],
+        alignment: AlignmentType.LEFT,
+      }),
+    ],
+    shading: {
+      fill: backgroundColor || (isHeader ? COLORS.headerBg : "FFFFFF"),
+      type: ShadingType.SOLID,
+    },
+    margins: {
+      top: 150,
+      bottom: 150,
+      left: 200,
+      right: 200,
+    },
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+      bottom: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+      left: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+      right: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+    },
+  });
 }
 
 export async function generateProjectDocx(project: any): Promise<Blob> {
@@ -68,9 +141,42 @@ export async function generateProjectDocx(project: any): Promise<Blob> {
   };
 
   const doc = new Document({
+    creator: "FastighetsPortal",
+    title: `Projekt: ${project.name}`,
+    description: `Projektdokumentation för ${project.project_number}`,
+    styles: {
+      paragraphStyles: [
+        {
+          id: "Normal",
+          name: "Normal",
+          basedOn: "Normal",
+          next: "Normal",
+          run: {
+            size: 22,
+            color: COLORS.text,
+          },
+          paragraph: {
+            spacing: {
+              line: 360,
+              before: 100,
+              after: 100,
+            },
+          },
+        },
+      ],
+    },
     sections: [
       {
-        properties: {},
+        properties: {
+          page: {
+            margin: {
+              top: 1440, // 1 inch
+              right: 1440,
+              bottom: 1440,
+              left: 1440,
+            },
+          },
+        },
         children: [
           createHeading("PROJEKTINFORMATION", HeadingLevel.HEADING_1),
           
@@ -84,46 +190,48 @@ export async function generateProjectDocx(project: any): Promise<Blob> {
           
           createHeading("Beskrivning", HeadingLevel.HEADING_2),
           new Paragraph({
-            text: project.description || "Ingen beskrivning",
-            spacing: { after: 200 },
+            children: [
+              new TextRun({
+                text: project.description || "Ingen beskrivning",
+                size: 22,
+                color: COLORS.textLight,
+              }),
+            ],
+            spacing: { after: 300, line: 360 },
           }),
           
           createHeading("Tidsplan", HeadingLevel.HEADING_2),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              bottom: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              left: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              right: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+              insideVertical: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            },
             rows: [
               new TableRow({
                 children: [
-                  new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: "Startdatum", bold: true })] })],
-                    shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        text: project.start_date
-                          ? format(new Date(project.start_date), "PPP", { locale: sv })
-                          : "-",
-                      }),
-                    ],
-                  }),
+                  createTableCell("Startdatum", false, COLORS.background, true),
+                  createTableCell(
+                    project.start_date
+                      ? format(new Date(project.start_date), "PPP", { locale: sv })
+                      : "-",
+                    false
+                  ),
                 ],
               }),
               new TableRow({
                 children: [
-                  new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: "Slutdatum", bold: true })] })],
-                    shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        text: project.end_date
-                          ? format(new Date(project.end_date), "PPP", { locale: sv })
-                          : "-",
-                      }),
-                    ],
-                  }),
+                  createTableCell("Slutdatum", false, COLORS.background, true),
+                  createTableCell(
+                    project.end_date
+                      ? format(new Date(project.end_date), "PPP", { locale: sv })
+                      : "-",
+                    false
+                  ),
                 ],
               }),
             ],
@@ -134,52 +242,40 @@ export async function generateProjectDocx(project: any): Promise<Blob> {
           createHeading("Ekonomi", HeadingLevel.HEADING_2),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              bottom: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              left: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              right: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+              insideVertical: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            },
             rows: [
               new TableRow({
                 children: [
-                  new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: "Budget", bold: true })] })],
-                    shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        text: project.budget ? formatCurrency(Number(project.budget)) : "-",
-                      }),
-                    ],
-                  }),
+                  createTableCell("Budget", false, COLORS.background, true),
+                  createTableCell(
+                    project.budget ? formatCurrency(Number(project.budget)) : "-",
+                    false
+                  ),
                 ],
               }),
               new TableRow({
                 children: [
-                  new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: "Prognos", bold: true })] })],
-                    shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        text: project.forecast ? formatCurrency(Number(project.forecast)) : "-",
-                      }),
-                    ],
-                  }),
+                  createTableCell("Prognos", false, COLORS.background, true),
+                  createTableCell(
+                    project.forecast ? formatCurrency(Number(project.forecast)) : "-",
+                    false
+                  ),
                 ],
               }),
               new TableRow({
                 children: [
-                  new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: "Faktisk kostnad", bold: true })] })],
-                    shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        text: project.actual_cost
-                          ? formatCurrency(Number(project.actual_cost))
-                          : "-",
-                      }),
-                    ],
-                  }),
+                  createTableCell("Faktisk kostnad", false, COLORS.background, true),
+                  createTableCell(
+                    project.actual_cost ? formatCurrency(Number(project.actual_cost)) : "-",
+                    false
+                  ),
                 ],
               }),
             ],
@@ -188,10 +284,24 @@ export async function generateProjectDocx(project: any): Promise<Blob> {
           new Paragraph({ text: "" }), // Empty line
           
           new Paragraph({
-            text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+            children: [
+              new TextRun({
+                text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+                size: 18,
+                color: COLORS.textLight,
+                italics: true,
+              }),
+            ],
             alignment: AlignmentType.CENTER,
-            spacing: { before: 600 },
-            style: "footer",
+            spacing: { before: 800 },
+            border: {
+              top: {
+                color: COLORS.border,
+                space: 1,
+                style: BorderStyle.SINGLE,
+                size: 6,
+              },
+            },
           }),
         ],
       },
@@ -202,12 +312,13 @@ export async function generateProjectDocx(project: any): Promise<Blob> {
 }
 
 export async function generateChecklistDocx(checklist: any[]): Promise<Blob> {
-  const rows = checklist.map((item) => {
+  const rows = checklist.map((item, index) => {
     const statusSymbol = item.completed ? "✓" : "☐";
-    const statusColor = item.completed ? COLORS.success : COLORS.gray;
+    const statusColor = item.completed ? COLORS.success : COLORS.textLight;
     const completedText = item.completed_at
       ? ` (${format(new Date(item.completed_at), "PPP", { locale: sv })})`
       : "";
+    const bgColor = index % 2 === 0 ? "FFFFFF" : COLORS.background;
 
     return new TableRow({
       children: [
@@ -215,39 +326,89 @@ export async function generateChecklistDocx(checklist: any[]): Promise<Blob> {
           children: [
             new Paragraph({
               children: [
-                new TextRun({ text: statusSymbol, color: statusColor, bold: true }),
+                new TextRun({ 
+                  text: statusSymbol, 
+                  color: statusColor, 
+                  bold: true,
+                  size: 28,
+                }),
               ],
+              alignment: AlignmentType.CENTER,
             }),
           ],
-          width: { size: 5, type: WidthType.PERCENTAGE },
+          width: { size: 8, type: WidthType.PERCENTAGE },
+          shading: { fill: bgColor, type: ShadingType.SOLID },
+          margins: { top: 150, bottom: 150, left: 200, right: 200 },
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            bottom: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            left: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            right: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+          },
         }),
         new TableCell({
           children: [
             new Paragraph({
               children: [
-                new TextRun({ text: item.title }),
-                new TextRun({ text: completedText, italics: true, color: COLORS.gray }),
+                new TextRun({ 
+                  text: item.title,
+                  size: 22,
+                  color: COLORS.text,
+                }),
+                new TextRun({ 
+                  text: completedText, 
+                  italics: true, 
+                  color: COLORS.textLight,
+                  size: 18,
+                }),
               ],
             }),
           ],
-          width: { size: 95, type: WidthType.PERCENTAGE },
+          width: { size: 92, type: WidthType.PERCENTAGE },
+          shading: { fill: bgColor, type: ShadingType.SOLID },
+          margins: { top: 150, bottom: 150, left: 200, right: 200 },
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            bottom: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            left: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            right: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+          },
         }),
       ],
     });
   });
 
   const doc = new Document({
+    creator: "FastighetsPortal",
+    title: "Projektchecklista",
     sections: [
       {
-        properties: {},
+        properties: {
+          page: {
+            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+          },
+        },
         children: [
           createHeading("CHECKLISTA", HeadingLevel.HEADING_1),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              bottom: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              left: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              right: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+            },
             rows,
           }),
           new Paragraph({
-            text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+            children: [
+              new TextRun({
+                text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+                size: 18,
+                color: COLORS.textLight,
+                italics: true,
+              }),
+            ],
             alignment: AlignmentType.CENTER,
             spacing: { before: 600 },
           }),
@@ -263,55 +424,56 @@ export async function generateActivitiesDocx(activities: any[]): Promise<Blob> {
   const rows = [
     new TableRow({
       children: [
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Datum", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Typ", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Beskrivning", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
+        createTableCell("Datum", true),
+        createTableCell("Typ", true),
+        createTableCell("Beskrivning", true),
       ],
     }),
     ...activities.map((activity, index) => {
       const date = format(new Date(activity.created_at), "PPP HH:mm", { locale: sv });
-      const isEven = index % 2 === 0;
+      const bgColor = index % 2 === 0 ? "FFFFFF" : COLORS.background;
       
       return new TableRow({
         children: [
-          new TableCell({
-            children: [new Paragraph({ text: date })],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: activity.activity_type })],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: activity.description })],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
+          createTableCell(date, false, bgColor),
+          createTableCell(activity.activity_type, false, bgColor),
+          createTableCell(activity.description, false, bgColor),
         ],
       });
     }),
   ];
 
   const doc = new Document({
+    creator: "FastighetsPortal",
+    title: "Aktivitetslogg",
     sections: [
       {
-        properties: {},
+        properties: {
+          page: {
+            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+          },
+        },
         children: [
           createHeading("AKTIVITETSLOGG", HeadingLevel.HEADING_1),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              bottom: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              left: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              right: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+            },
             rows,
           }),
           new Paragraph({
-            text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+            children: [
+              new TextRun({
+                text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+                size: 18,
+                color: COLORS.textLight,
+                italics: true,
+              }),
+            ],
             alignment: AlignmentType.CENTER,
             spacing: { before: 600 },
           }),
@@ -328,88 +490,96 @@ export async function generateCostsDocx(costs: any[]): Promise<Blob> {
   const rows = [
     new TableRow({
       children: [
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Datum", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Beskrivning", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Kategori", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Aktör", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Belopp", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
+        createTableCell("Datum", true),
+        createTableCell("Beskrivning", true),
+        createTableCell("Kategori", true),
+        createTableCell("Aktör", true),
+        createTableCell("Belopp", true),
       ],
     }),
     ...costs.map((cost, index) => {
       const date = format(new Date(cost.cost_date), "PPP", { locale: sv });
       const amount = Number(cost.amount);
       total += amount;
-      const isEven = index % 2 === 0;
+      const bgColor = index % 2 === 0 ? "FFFFFF" : COLORS.background;
 
       return new TableRow({
         children: [
-          new TableCell({
-            children: [new Paragraph({ text: date })],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: cost.description })],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: cost.category || "-" })],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: cost.actor || "-" })],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: formatCurrency(amount) })],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
+          createTableCell(date, false, bgColor),
+          createTableCell(cost.description, false, bgColor),
+          createTableCell(cost.category || "-", false, bgColor),
+          createTableCell(cost.actor || "-", false, bgColor),
+          createTableCell(formatCurrency(amount), false, bgColor),
         ],
       });
     }),
     new TableRow({
       children: [
-        new TableCell({ children: [new Paragraph("")], columnSpan: 4 }),
+        new TableCell({ 
+          children: [new Paragraph("")], 
+          columnSpan: 4,
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+          },
+        }),
         new TableCell({
           children: [
             new Paragraph({
               children: [
-                new TextRun({ text: `TOTALT: ${formatCurrency(total)}`, bold: true }),
+                new TextRun({ 
+                  text: `TOTALT: ${formatCurrency(total)}`, 
+                  bold: true,
+                  size: 24,
+                  color: COLORS.headerText,
+                }),
               ],
+              alignment: AlignmentType.RIGHT,
             }),
           ],
-          shading: { fill: COLORS.primary, type: ShadingType.SOLID },
+          shading: { fill: COLORS.success, type: ShadingType.SOLID },
+          margins: { top: 150, bottom: 150, left: 200, right: 200 },
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+            bottom: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            left: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            right: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+          },
         }),
       ],
     }),
   ];
 
   const doc = new Document({
+    creator: "FastighetsPortal",
+    title: "Projektkostnader",
     sections: [
       {
-        properties: {},
+        properties: {
+          page: {
+            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+          },
+        },
         children: [
           createHeading("KOSTNADER", HeadingLevel.HEADING_1),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              bottom: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              left: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              right: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+            },
             rows,
           }),
           new Paragraph({
-            text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+            children: [
+              new TextRun({
+                text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+                size: 18,
+                color: COLORS.textLight,
+                italics: true,
+              }),
+            ],
             alignment: AlignmentType.CENTER,
             spacing: { before: 600 },
           }),
@@ -428,22 +598,10 @@ export async function generateBudgetDocx(budget: any[]): Promise<Blob> {
   const rows = [
     new TableRow({
       children: [
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Beskrivning", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Kategori", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Budgeterat", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
-        new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: "Prognos", bold: true })] })],
-          shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-        }),
+        createTableCell("Beskrivning", true),
+        createTableCell("Kategori", true),
+        createTableCell("Budgeterat", true),
+        createTableCell("Prognos", true),
       ],
     }),
     ...budget.map((item, index) => {
@@ -451,43 +609,48 @@ export async function generateBudgetDocx(budget: any[]): Promise<Blob> {
       const forecasted = item.forecasted_amount ? Number(item.forecasted_amount) : 0;
       totalBudget += budgeted;
       totalForecast += forecasted;
-      const isEven = index % 2 === 0;
+      const bgColor = index % 2 === 0 ? "FFFFFF" : COLORS.background;
 
       return new TableRow({
         children: [
-          new TableCell({
-            children: [new Paragraph({ text: item.description })],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: item.category || "-" })],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: formatCurrency(budgeted) })],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
-          new TableCell({
-            children: [
-              new Paragraph({ text: forecasted > 0 ? formatCurrency(forecasted) : "-" }),
-            ],
-            shading: isEven ? { fill: "FFFFFF", type: ShadingType.SOLID } : undefined,
-          }),
+          createTableCell(item.description, false, bgColor),
+          createTableCell(item.category || "-", false, bgColor),
+          createTableCell(formatCurrency(budgeted), false, bgColor),
+          createTableCell(forecasted > 0 ? formatCurrency(forecasted) : "-", false, bgColor),
         ],
       });
     }),
     new TableRow({
       children: [
-        new TableCell({ children: [new Paragraph("")], columnSpan: 2 }),
+        new TableCell({ 
+          children: [new Paragraph("")], 
+          columnSpan: 2,
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+          },
+        }),
         new TableCell({
           children: [
             new Paragraph({
               children: [
-                new TextRun({ text: `TOTALT: ${formatCurrency(totalBudget)}`, bold: true }),
+                new TextRun({ 
+                  text: `TOTALT: ${formatCurrency(totalBudget)}`, 
+                  bold: true,
+                  size: 24,
+                  color: COLORS.headerText,
+                }),
               ],
+              alignment: AlignmentType.RIGHT,
             }),
           ],
-          shading: { fill: COLORS.primary, type: ShadingType.SOLID },
+          shading: { fill: COLORS.primaryLight, type: ShadingType.SOLID },
+          margins: { top: 150, bottom: 150, left: 200, right: 200 },
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+            bottom: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            left: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            right: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+          },
         }),
         new TableCell({
           children: [
@@ -496,28 +659,57 @@ export async function generateBudgetDocx(budget: any[]): Promise<Blob> {
                 new TextRun({
                   text: totalForecast > 0 ? formatCurrency(totalForecast) : "-",
                   bold: true,
+                  size: 24,
+                  color: COLORS.headerText,
                 }),
               ],
+              alignment: AlignmentType.RIGHT,
             }),
           ],
-          shading: { fill: COLORS.primary, type: ShadingType.SOLID },
+          shading: { fill: COLORS.primaryLight, type: ShadingType.SOLID },
+          margins: { top: 150, bottom: 150, left: 200, right: 200 },
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+            bottom: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            left: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            right: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+          },
         }),
       ],
     }),
   ];
 
   const doc = new Document({
+    creator: "FastighetsPortal",
+    title: "Projektbudget",
     sections: [
       {
-        properties: {},
+        properties: {
+          page: {
+            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+          },
+        },
         children: [
           createHeading("BUDGET", HeadingLevel.HEADING_1),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              bottom: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              left: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              right: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+            },
             rows,
           }),
           new Paragraph({
-            text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+            children: [
+              new TextRun({
+                text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+                size: 18,
+                color: COLORS.textLight,
+                italics: true,
+              }),
+            ],
             alignment: AlignmentType.CENTER,
             spacing: { before: 600 },
           }),
@@ -545,9 +737,15 @@ export async function generateWorkOrderDocx(workOrder: any): Promise<Blob> {
   };
 
   const doc = new Document({
+    creator: "FastighetsPortal",
+    title: `Arbetsorder: ${workOrder.action}`,
     sections: [
       {
-        properties: {},
+        properties: {
+          page: {
+            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+          },
+        },
         children: [
           createHeading("ARBETSORDER", HeadingLevel.HEADING_1),
           
@@ -565,59 +763,45 @@ export async function generateWorkOrderDocx(workOrder: any): Promise<Blob> {
           createHeading("Detaljer", HeadingLevel.HEADING_2),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              bottom: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              left: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              right: { style: BorderStyle.SINGLE, size: 2, color: COLORS.border },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+              insideVertical: { style: BorderStyle.SINGLE, size: 1, color: COLORS.border },
+            },
             rows: [
               new TableRow({
                 children: [
-                  new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: "Entreprenör", bold: true })] })],
-                    shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-                  }),
-                  new TableCell({
-                    children: [new Paragraph({ text: workOrder.contractor || "-" })],
-                  }),
+                  createTableCell("Entreprenör", false, COLORS.background, true),
+                  createTableCell(workOrder.contractor || "-", false),
                 ],
               }),
               new TableRow({
                 children: [
-                  new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: "Pris", bold: true })] })],
-                    shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        text: workOrder.price ? formatCurrency(Number(workOrder.price)) : "-",
-                      }),
-                    ],
-                  }),
+                  createTableCell("Pris", false, COLORS.background, true),
+                  createTableCell(
+                    workOrder.price ? formatCurrency(Number(workOrder.price)) : "-",
+                    false
+                  ),
                 ],
               }),
               new TableRow({
                 children: [
-                  new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: "Datum", bold: true })] })],
-                    shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-                  }),
-                  new TableCell({
-                    children: [
-                      new Paragraph({
-                        text: workOrder.due_date
-                          ? format(new Date(workOrder.due_date), "PPP", { locale: sv })
-                          : "-",
-                      }),
-                    ],
-                  }),
+                  createTableCell("Datum", false, COLORS.background, true),
+                  createTableCell(
+                    workOrder.due_date
+                      ? format(new Date(workOrder.due_date), "PPP", { locale: sv })
+                      : "-",
+                    false
+                  ),
                 ],
               }),
               new TableRow({
                 children: [
-                  new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: "Kvartal", bold: true })] })],
-                    shading: { fill: COLORS.lightGray, type: ShadingType.SOLID },
-                  }),
-                  new TableCell({
-                    children: [new Paragraph({ text: workOrder.quarter || "-" })],
-                  }),
+                  createTableCell("Kvartal", false, COLORS.background, true),
+                  createTableCell(workOrder.quarter || "-", false),
                 ],
               }),
             ],
@@ -627,14 +811,35 @@ export async function generateWorkOrderDocx(workOrder: any): Promise<Blob> {
           
           createHeading("Kommentar", HeadingLevel.HEADING_2),
           new Paragraph({
-            text: workOrder.comments || "Ingen kommentar",
-            spacing: { after: 200 },
+            children: [
+              new TextRun({
+                text: workOrder.comments || "Ingen kommentar",
+                size: 22,
+                color: COLORS.textLight,
+              }),
+            ],
+            spacing: { after: 300, line: 360 },
           }),
           
           new Paragraph({
-            text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+            children: [
+              new TextRun({
+                text: `Genererad: ${format(new Date(), "PPP HH:mm", { locale: sv })}`,
+                size: 18,
+                color: COLORS.textLight,
+                italics: true,
+              }),
+            ],
             alignment: AlignmentType.CENTER,
-            spacing: { before: 600 },
+            spacing: { before: 800 },
+            border: {
+              top: {
+                color: COLORS.border,
+                space: 1,
+                style: BorderStyle.SINGLE,
+                size: 6,
+              },
+            },
           }),
         ],
       },
