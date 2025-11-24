@@ -52,34 +52,11 @@ const Auth = () => {
           variant: 'destructive',
         });
       } else if (data.user) {
-        // Check if user is approved
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('approved')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profileError || !profile) {
-          toast({
-            title: 'Fel',
-            description: 'Kunde inte hämta användarprofil',
-            variant: 'destructive',
-          });
-          await supabase.auth.signOut();
-        } else if (!profile.approved) {
-          toast({
-            title: 'Väntar på godkännande',
-            description: 'Ditt konto väntar på att godkännas av en administratör. Du kommer få ett meddelande när ditt konto är godkänt.',
-            variant: 'destructive',
-          });
-          await supabase.auth.signOut();
-        } else {
-          toast({
-            title: 'Välkommen!',
-            description: 'Du är nu inloggad.',
-          });
-          navigate('/');
-        }
+        toast({
+          title: 'Välkommen!',
+          description: 'Du är nu inloggad.',
+        });
+        navigate('/');
       }
     } catch (error: any) {
       if (error instanceof z.ZodError) {
