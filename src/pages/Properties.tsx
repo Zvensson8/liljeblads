@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from '@/hooks/useAuth';
+import { useOrganization } from '@/hooks/useOrganization';
 import { z } from 'zod';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
@@ -71,6 +72,7 @@ const Properties = () => {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const { toast } = useToast();
   const { signOut, user } = useAuth();
+  const { organization } = useOrganization();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -126,6 +128,15 @@ const Properties = () => {
   const handleCreateProperty = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!organization?.id) {
+      toast({
+        title: 'Fel',
+        description: 'Du måste tillhöra en organisation för att skapa fastigheter.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       // Validate input data
       propertySchema.parse({
@@ -140,7 +151,8 @@ const Properties = () => {
           name: name.trim(), 
           address: address.trim() || null, 
           description: description.trim() || null, 
-          owner_id: user?.id 
+          owner_id: user?.id,
+          organization_id: organization.id
         }]);
 
       if (error) {
