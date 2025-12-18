@@ -1,7 +1,25 @@
 project_id = "vfwxpbffadedpvhdxntm"
 
+[functions.check-and-send-reminders]
+verify_jwt = false
+
 [functions.send-work-order-reminders]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-todo-reminders]
-verify_jwt = true
+verify_jwt = false
+
+[functions.send-maintenance-reminders]
+verify_jwt = false
+
+[functions.send-monthly-project-summary]
+verify_jwt = false
+
+[functions.send-monthly-workorder-summary]
+verify_jwt = false
+
+[functions.send-maintenance-history-annual]
+verify_jwt = false
+
+[functions.generate-scheduled-reports]
+verify_jwt = false
