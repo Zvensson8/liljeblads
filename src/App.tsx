@@ -34,6 +34,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const RecurringCosts = lazy(() => import("./pages/RecurringCosts"));
 const Reports = lazy(() => import("./pages/Reports"));
 const SecurityDashboard = lazy(() => import("./pages/SecurityDashboard"));
+const AIChat = lazy(() => import("./pages/AIChat"));
 
 // Loading component
 const PageLoader = () => (
@@ -67,6 +68,7 @@ const AppContent = () => {
           <Route path="/recurring-costs" element={<RecurringCosts />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/security" element={<SecurityDashboard />} />
+          <Route path="/ai-chat" element={<AIChat />} />
           <Route path="/users" element={<Users />} />
           <Route path="/user/settings" element={<UserSettings />} />
           <Route path="/organization/settings" element={<OrganizationSettings />} />
