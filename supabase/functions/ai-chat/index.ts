@@ -239,14 +239,25 @@ serve(async (req) => {
               
               // Work orders
               if (workOrdersResult.data && workOrdersResult.data.length > 0) {
-                const pending = workOrdersResult.data.filter((wo: any) => wo.status === 'pending' || wo.status === 'in_progress');
+                const ongoingStatuses = new Set(['not_started', 'awaiting_quote', 'ordered']);
+                const pending = workOrdersResult.data.filter((wo: any) => ongoingStatuses.has(wo.status));
                 const completed = workOrdersResult.data.filter((wo: any) => wo.status === 'completed');
+
+                const statusLabel = (status: string) => {
+                  if (status === 'not_started') return 'Ej påbörjad';
+                  if (status === 'awaiting_quote') return 'Väntar på offert';
+                  if (status === 'ordered') return 'Beställd';
+                  if (status === 'completed') return 'Avslutad';
+                  if (status === 'archived') return 'Arkiverad';
+                  return status;
+                };
+
                 propInfo += `\n\n🛠️ ARBETSORDRAR (${pending.length} pågående, ${completed.length} avslutade):`;
-                
-                // Show pending/in progress first
+
+                // Show ongoing first
                 for (const wo of pending) {
                   propInfo += `\n  - ${wo.action}`;
-                  propInfo += `\n    Status: ${wo.status === 'pending' ? 'Väntande' : wo.status === 'in_progress' ? 'Pågående' : wo.status}`;
+                  propInfo += `\n    Status: ${statusLabel(wo.status)}`;
                   if (wo.priority) propInfo += `, Prioritet: ${wo.priority}`;
                   if (wo.contractor) propInfo += `\n    Entreprenör: ${wo.contractor}`;
                   if (wo.due_date) propInfo += `\n    Deadline: ${wo.due_date}`;
@@ -254,7 +265,7 @@ serve(async (req) => {
                   if (wo.price) propInfo += `\n    Pris: ${wo.price.toLocaleString('sv-SE')} kr`;
                   if (wo.comments) propInfo += `\n    Kommentar: ${wo.comments}`;
                 }
-                
+
                 // Show recent completed
                 for (const wo of completed.slice(0, 5)) {
                   propInfo += `\n  - ${wo.action} (Avslutad)`;
@@ -453,9 +464,11 @@ ${t.notes ? `- Anteckningar: ${t.notes}` : ''}`);
               if (contextParts.some(cp => cp.includes(wo.action) && cp.includes('ARBETSORDER'))) continue;
               
               let statusText = wo.status;
-              if (wo.status === 'pending') statusText = 'Väntande';
-              else if (wo.status === 'in_progress') statusText = 'Pågående';
+              if (wo.status === 'not_started') statusText = 'Ej påbörjad';
+              else if (wo.status === 'awaiting_quote') statusText = 'Väntar på offert';
+              else if (wo.status === 'ordered') statusText = 'Beställd';
               else if (wo.status === 'completed') statusText = 'Avslutad';
+              else if (wo.status === 'archived') statusText = 'Arkiverad';
               
               contextParts.push(`🛠️ ARBETSORDER: ${wo.action}
 - Status: ${statusText}
