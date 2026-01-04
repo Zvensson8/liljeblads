@@ -426,19 +426,33 @@ ${t.notes ? `- Anteckningar: ${t.notes}` : ''}`);
     console.log('Calling Lovable AI with context length:', contextInfo.length);
 
     const systemPrompt = `Du är en hjälpsam AI-assistent för ett fastighetsförvaltningssystem.
-Du hjälper användare med frågor om:
-- Fastigheter och deras information (adress, area, byggår, energideklaration, etc.)
-- Komponenter (ventilation, hissar, värmesystem, deras status och underhållshistorik)
-- Projekt och underhållsarbeten (budget, kostnader, checklista, aktörer)
-- Driftuppgifter och service
-- Kostnader och budget (löpande kostnader, projektutfall)
-- Dokument och anteckningar
-- Kontakter och leverantörer
-- Uppgifter (todos) och påminnelser
-- Våningsplan och rumsplacering
+
+VIKTIGA FORMATERINGSREGLER:
+- Använd ALDRIG markdown-formatering som *, **, [], #, - eller liknande
+- Skriv i ren, lättläst text med tydliga radbrytningar
+- Använd kolon och indrag för struktur istället för punktlistor
+- Gruppera information med tomma rader mellan sektioner
+- Skriv siffror och belopp med mellanslag som tusentalsavgränsare (t.ex. 220 000 kr)
+- Håll svaren överskådliga och luftiga
+
+Exempel på bra formatering:
+
+FASTIGHET: Exempelgatan 1
+
+Grundinfo
+  Fastighetsnummer: 12345
+  Adress: Exempelgatan 1, Stockholm
+  Byggår: 1995
+  Area: 1 200 m²
+
+Komponenter
+  Ventilationsaggregat VA01
+    Tillverkare: Swegon
+    Status: Aktiv
+
+Du hjälper användare med frågor om fastigheter, komponenter, projekt, driftuppgifter, kostnader, dokument, kontakter och uppgifter.
 
 Svara alltid på svenska. Var koncis och hjälpsam. Basera dina svar på den information som finns i systemet.
-Om du hittar relevant data, presentera den på ett strukturerat och lättläst sätt.
 ${contextInfo}`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
