@@ -708,6 +708,94 @@ export type Database = {
           },
         ]
       }
+      embedding_queue: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          operation: string
+          organization_id: string | null
+          processed: boolean
+          processed_at: string | null
+          source_id: string
+          source_table: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          operation: string
+          organization_id?: string | null
+          processed?: boolean
+          processed_at?: string | null
+          source_id: string
+          source_table: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          operation?: string
+          organization_id?: string | null
+          processed?: boolean
+          processed_at?: string | null
+          source_id?: string
+          source_table?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "embedding_queue_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      embeddings: {
+        Row: {
+          content: string
+          content_hash: string
+          created_at: string
+          embedding: string | null
+          id: string
+          organization_id: string | null
+          source_id: string
+          source_table: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          content_hash: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          organization_id?: string | null
+          source_id: string
+          source_table: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          content_hash?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          organization_id?: string | null
+          source_id?: string
+          source_table?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "embeddings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       floors: {
         Row: {
           created_at: string
@@ -2501,6 +2589,22 @@ export type Database = {
       seed_default_property_info_categories: {
         Args: { org_id: string }
         Returns: undefined
+      }
+      semantic_search: {
+        Args: {
+          filter_tables?: string[]
+          match_count?: number
+          match_threshold?: number
+          org_id?: string
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          id: string
+          similarity: number
+          source_id: string
+          source_table: string
+        }[]
       }
       user_has_property_assignment: {
         Args: { _property_id: string; _user_id: string }

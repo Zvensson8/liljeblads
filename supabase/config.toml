@@ -23,3 +23,15 @@ verify_jwt = false
 
 [functions.generate-scheduled-reports]
 verify_jwt = false
+
+[functions.generate-embeddings]
+verify_jwt = false
+
+[functions.ai-search]
+verify_jwt = false
+
+[functions.backfill-embeddings]
+verify_jwt = false
+
+[functions.cost-analysis]
+verify_jwt = false

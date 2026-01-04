@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -9,15 +9,19 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Building2, Package, Wrench, Briefcase, Search } from "lucide-react";
+import { Building2, Package, Wrench, Briefcase, Search, Sparkles, CheckSquare } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAISearch, AISearchResult } from "@/hooks/useAISearch";
+import { Toggle } from "@/components/ui/toggle";
+import { Badge } from "@/components/ui/badge";
 
 interface SearchResult {
   id: string;
-  type: "property" | "component" | "work_order" | "project";
+  type: "property" | "component" | "work_order" | "project" | "todo";
   title: string;
   subtitle: string;
   path: string;
+  similarity?: number;
 }
 
 interface GlobalSearchDialogProps {
@@ -31,15 +35,88 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [useAI, setUseAI] = useState(false);
+  
+  const { search: aiSearch, isSearching: aiSearching, results: aiResults, error: aiError, clearResults } = useAISearch();
 
   useEffect(() => {
     if (!open) {
       setSearchQuery("");
       setResults([]);
+      clearResults();
     }
-  }, [open]);
+  }, [open, clearResults]);
 
+  // Convert AI results to standard format
+  const convertAIResults = useCallback((aiData: typeof aiResults): SearchResult[] => {
+    if (!aiData) return [];
+    
+    return aiData.results.map((r: AISearchResult) => {
+      let title = "";
+      let subtitle = "";
+      let path = "";
+      let type: SearchResult["type"] = "component";
+
+      switch (r.source_table) {
+        case "components":
+          type = "component";
+          title = r.details?.name || r.content.split('.')[0];
+          subtitle = r.details?.property?.name || r.details?.type || "";
+          path = `/components/${r.source_id}`;
+          break;
+        case "work_orders":
+          type = "work_order";
+          title = r.details?.action || r.content.split('.')[0];
+          subtitle = r.details?.component?.property?.name || r.details?.status || "";
+          path = `/work-orders?id=${r.source_id}`;
+          break;
+        case "projects":
+          type = "project";
+          title = r.details?.name || r.content.split('.')[0];
+          subtitle = r.details?.property?.name || r.details?.type || "";
+          path = `/projects/${r.source_id}`;
+          break;
+        case "property_todos":
+          type = "todo";
+          title = r.details?.title || r.content.split('.')[0];
+          subtitle = r.details?.property?.name || r.details?.category || "";
+          path = `/properties/${r.details?.property?.id}?tab=todos`;
+          break;
+      }
+
+      return {
+        id: r.source_id,
+        type,
+        title,
+        subtitle,
+        path,
+        similarity: r.similarity
+      };
+    });
+  }, []);
+
+  // AI search effect
   useEffect(() => {
+    if (!useAI || !searchQuery || searchQuery.length < 2) return;
+    
+    const debounce = setTimeout(() => {
+      aiSearch(searchQuery);
+    }, 500);
+    
+    return () => clearTimeout(debounce);
+  }, [searchQuery, useAI, aiSearch]);
+
+  // Update results when AI results change
+  useEffect(() => {
+    if (useAI && aiResults) {
+      setResults(convertAIResults(aiResults));
+    }
+  }, [aiResults, useAI, convertAIResults]);
+
+  // Standard search effect
+  useEffect(() => {
+    if (useAI) return;
+    
     const searchData = async () => {
       if (!searchQuery || searchQuery.length < 2 || !user) {
         setResults([]);
@@ -165,7 +242,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
 
     const debounce = setTimeout(searchData, 300);
     return () => clearTimeout(debounce);
-  }, [searchQuery, user]);
+  }, [searchQuery, user, useAI]);
 
   const handleSelect = (path: string) => {
     navigate(path);
@@ -182,6 +259,8 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
         return <Wrench className="h-4 w-4" />;
       case "project":
         return <Briefcase className="h-4 w-4" />;
+      case "todo":
+        return <CheckSquare className="h-4 w-4" />;
       default:
         return <Search className="h-4 w-4" />;
     }
@@ -197,6 +276,8 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
         return "Arbetsorder";
       case "project":
         return "Projekt";
+      case "todo":
+        return "Att göra";
       default:
         return "";
     }
@@ -207,27 +288,68 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
     component: results.filter((r) => r.type === "component"),
     work_order: results.filter((r) => r.type === "work_order"),
     project: results.filter((r) => r.type === "project"),
+    todo: results.filter((r) => r.type === "todo"),
   };
+
+  const isLoading = useAI ? aiSearching : loading;
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput
-        placeholder="Sök fastigheter, komponenter, arbetsordrar, projekt..."
-        value={searchQuery}
-        onValueChange={setSearchQuery}
-      />
+      <div className="flex items-center gap-2 px-3 border-b">
+        <CommandInput
+          placeholder={useAI ? "Sök med AI - beskriv vad du letar efter..." : "Sök fastigheter, komponenter, arbetsordrar, projekt..."}
+          value={searchQuery}
+          onValueChange={setSearchQuery}
+          className="flex-1"
+        />
+        <Toggle
+          pressed={useAI}
+          onPressedChange={setUseAI}
+          size="sm"
+          className="shrink-0"
+          aria-label="Toggle AI search"
+        >
+          <Sparkles className={`h-4 w-4 ${useAI ? 'text-primary' : ''}`} />
+          <span className="ml-1 text-xs">AI</span>
+        </Toggle>
+      </div>
       <CommandList>
         {!searchQuery && (
           <div className="py-6 text-center text-sm text-muted-foreground">
-            Börja skriva för att söka...
+            {useAI ? (
+              <div className="space-y-2">
+                <Sparkles className="h-8 w-8 mx-auto text-primary/50" />
+                <p>AI-sökning aktiverad</p>
+                <p className="text-xs">Beskriv vad du letar efter med egna ord...</p>
+              </div>
+            ) : (
+              "Börja skriva för att söka..."
+            )}
           </div>
         )}
-        {searchQuery && !loading && results.length === 0 && (
-          <CommandEmpty>Inga resultat hittades.</CommandEmpty>
+        
+        {aiError && (
+          <div className="py-6 text-center text-sm text-destructive">
+            {aiError}
+          </div>
         )}
-        {loading && (
+        
+        {searchQuery && !isLoading && results.length === 0 && !aiError && (
+          <CommandEmpty>
+            {useAI ? "Inga AI-resultat hittades. Prova att beskriva på ett annat sätt." : "Inga resultat hittades."}
+          </CommandEmpty>
+        )}
+        
+        {isLoading && (
           <div className="py-6 text-center text-sm text-muted-foreground">
-            Söker...
+            {useAI ? (
+              <div className="flex items-center justify-center gap-2">
+                <Sparkles className="h-4 w-4 animate-pulse" />
+                <span>AI söker...</span>
+              </div>
+            ) : (
+              "Söker..."
+            )}
           </div>
         )}
 
@@ -244,6 +366,11 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
                   <div className="font-medium">{result.title}</div>
                   <div className="text-xs text-muted-foreground">{result.subtitle}</div>
                 </div>
+                {result.similarity && (
+                  <Badge variant="secondary" className="text-xs">
+                    {Math.round(result.similarity * 100)}%
+                  </Badge>
+                )}
               </CommandItem>
             ))}
           </CommandGroup>
@@ -262,6 +389,11 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
                   <div className="font-medium">{result.title}</div>
                   <div className="text-xs text-muted-foreground">{result.subtitle}</div>
                 </div>
+                {result.similarity && (
+                  <Badge variant="secondary" className="text-xs">
+                    {Math.round(result.similarity * 100)}%
+                  </Badge>
+                )}
               </CommandItem>
             ))}
           </CommandGroup>
@@ -280,6 +412,11 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
                   <div className="font-medium">{result.title}</div>
                   <div className="text-xs text-muted-foreground">{result.subtitle}</div>
                 </div>
+                {result.similarity && (
+                  <Badge variant="secondary" className="text-xs">
+                    {Math.round(result.similarity * 100)}%
+                  </Badge>
+                )}
               </CommandItem>
             ))}
           </CommandGroup>
@@ -298,6 +435,34 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
                   <div className="font-medium">{result.title}</div>
                   <div className="text-xs text-muted-foreground">{result.subtitle}</div>
                 </div>
+                {result.similarity && (
+                  <Badge variant="secondary" className="text-xs">
+                    {Math.round(result.similarity * 100)}%
+                  </Badge>
+                )}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {groupedResults.todo.length > 0 && (
+          <CommandGroup heading="Att göra">
+            {groupedResults.todo.map((result) => (
+              <CommandItem
+                key={result.id}
+                onSelect={() => handleSelect(result.path)}
+                className="flex items-center gap-3"
+              >
+                {getIcon(result.type)}
+                <div className="flex-1">
+                  <div className="font-medium">{result.title}</div>
+                  <div className="text-xs text-muted-foreground">{result.subtitle}</div>
+                </div>
+                {result.similarity && (
+                  <Badge variant="secondary" className="text-xs">
+                    {Math.round(result.similarity * 100)}%
+                  </Badge>
+                )}
               </CommandItem>
             ))}
           </CommandGroup>
