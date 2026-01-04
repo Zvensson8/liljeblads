@@ -754,33 +754,42 @@ export type Database = {
       }
       embeddings: {
         Row: {
+          access_count: number | null
+          boost_score: number | null
           content: string
           content_hash: string
           created_at: string
           embedding: string | null
           id: string
+          last_accessed_at: string | null
           organization_id: string | null
           source_id: string
           source_table: string
           updated_at: string
         }
         Insert: {
+          access_count?: number | null
+          boost_score?: number | null
           content: string
           content_hash: string
           created_at?: string
           embedding?: string | null
           id?: string
+          last_accessed_at?: string | null
           organization_id?: string | null
           source_id: string
           source_table: string
           updated_at?: string
         }
         Update: {
+          access_count?: number | null
+          boost_score?: number | null
           content?: string
           content_hash?: string
           created_at?: string
           embedding?: string | null
           id?: string
+          last_accessed_at?: string | null
           organization_id?: string | null
           source_id?: string
           source_table?: string
@@ -2605,6 +2614,31 @@ export type Database = {
           source_id: string
           source_table: string
         }[]
+      }
+      semantic_search_ranked: {
+        Args: {
+          boost_popular?: boolean
+          boost_recent?: boolean
+          filter_tables?: string[]
+          match_count?: number
+          match_threshold?: number
+          org_id?: string
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          final_score: number
+          id: string
+          popularity_boost: number
+          recency_boost: number
+          similarity: number
+          source_id: string
+          source_table: string
+        }[]
+      }
+      update_embedding_access: {
+        Args: { p_source_id: string; p_source_table: string }
+        Returns: undefined
       }
       user_has_property_assignment: {
         Args: { _property_id: string; _user_id: string }

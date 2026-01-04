@@ -8,6 +8,9 @@ export interface AISearchResult {
   source_id: string;
   content: string;
   similarity: number;
+  recency_boost?: number;
+  popularity_boost?: number;
+  final_score?: number;
   details?: {
     id: string;
     name?: string;
@@ -58,6 +61,8 @@ export function useAISearch() {
       filterTables?: string[];
       matchThreshold?: number;
       matchCount?: number;
+      boostRecent?: boolean;
+      boostPopular?: boolean;
     }
   ) => {
     if (!query.trim()) {
@@ -75,7 +80,9 @@ export function useAISearch() {
           organizationId: organization?.id,
           filterTables: options?.filterTables,
           matchThreshold: options?.matchThreshold ?? 0.3,
-          matchCount: options?.matchCount ?? 20
+          matchCount: options?.matchCount ?? 20,
+          boostRecent: options?.boostRecent ?? true,
+          boostPopular: options?.boostPopular ?? true
         }
       });
 
