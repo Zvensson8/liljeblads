@@ -1,4 +1,3 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -13,10 +12,18 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY is not configured');
+    }
 
-    const response = await fetch('https://llm.lovable.dev/v1/chat/completions', {
+    console.log('Calling Lovable AI with messages:', messages.length);
+
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -40,13 +47,29 @@ Svara alltid på svenska. Var koncis och hjälpsam. Om du inte vet svaret, säg 
       }),
     });
 
-    const data = await response.json();
-    
     if (!response.ok) {
-      console.error('Lovable AI error:', data);
-      throw new Error(data.error?.message || 'AI request failed');
+      const errorText = await response.text();
+      console.error('AI gateway error:', response.status, errorText);
+      
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: 'För många förfrågningar. Försök igen om en stund.' }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: 'Krediter slut. Lägg till mer i Lovable-inställningarna.' }), {
+          status: 402,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      throw new Error(`AI gateway error: ${response.status}`);
     }
 
+    const data = await response.json();
+    console.log('AI response received');
+    
     const message = data.choices?.[0]?.message?.content || 'Kunde inte generera svar.';
 
     return new Response(JSON.stringify({ message }), {
