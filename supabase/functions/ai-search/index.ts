@@ -12,6 +12,8 @@ interface SearchRequest {
   filterTables?: string[];
   matchThreshold?: number;
   matchCount?: number;
+  boostRecent?: boolean;
+  boostPopular?: boolean;
 }
 
 interface SearchResult {
@@ -20,6 +22,9 @@ interface SearchResult {
   source_id: string;
   content: string;
   similarity: number;
+  recency_boost?: number;
+  popularity_boost?: number;
+  final_score?: number;
   details?: any;
 }
 
@@ -40,7 +45,9 @@ serve(async (req) => {
       organizationId, 
       filterTables, 
       matchThreshold = 0.3, 
-      matchCount = 20 
+      matchCount = 20,
+      boostRecent = true,
+      boostPopular = true
     }: SearchRequest = await req.json();
 
     if (!query || query.trim().length === 0) {
@@ -50,7 +57,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Searching for: "${query}" in org: ${organizationId || 'all'}`);
+    console.log(`AI Search: "${query}" | org: ${organizationId || 'all'} | boostRecent: ${boostRecent} | boostPopular: ${boostPopular}`);
 
     // Generate embedding for the search query
     const embeddingResponse = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
@@ -89,49 +96,50 @@ serve(async (req) => {
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.data[0].embedding;
 
-    // Perform semantic search using the database function
-    const { data: searchResults, error: searchError } = await supabase.rpc('semantic_search', {
+    // Perform semantic search with re-ranking using the enhanced database function
+    const { data: searchResults, error: searchError } = await supabase.rpc('semantic_search_ranked', {
       query_embedding: queryEmbedding,
       match_threshold: matchThreshold,
       match_count: matchCount,
       org_id: organizationId || null,
-      filter_tables: filterTables || null
+      filter_tables: filterTables || null,
+      boost_recent: boostRecent,
+      boost_popular: boostPopular
     });
 
     if (searchError) {
       console.error('Search error:', searchError);
-      throw searchError;
+      // Fallback to basic search if ranked search fails
+      const { data: fallbackResults, error: fallbackError } = await supabase.rpc('semantic_search', {
+        query_embedding: queryEmbedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
+        org_id: organizationId || null,
+        filter_tables: filterTables || null
+      });
+      
+      if (fallbackError) throw fallbackError;
+      
+      // Use fallback results
+      const enrichedFallback = await enrichResults(supabase, fallbackResults || []);
+      return formatResponse(query, enrichedFallback);
     }
 
-    console.log(`Found ${searchResults?.length || 0} results`);
+    console.log(`Found ${searchResults?.length || 0} results with re-ranking`);
 
-    // Enrich results with additional details
-    const enrichedResults: SearchResult[] = [];
-    
-    for (const result of (searchResults || [])) {
-      const details = await getSourceDetails(supabase, result.source_table, result.source_id);
-      enrichedResults.push({
-        ...result,
-        details
+    // Enrich results with additional details and update access stats
+    const enrichedResults = await enrichResults(supabase, searchResults || []);
+
+    // Update access stats for top results (for future re-ranking)
+    const topResults = enrichedResults.slice(0, 5);
+    for (const result of topResults) {
+      await supabase.rpc('update_embedding_access', {
+        p_source_table: result.source_table,
+        p_source_id: result.source_id
       });
     }
 
-    // Group results by source table
-    const groupedResults = {
-      components: enrichedResults.filter(r => r.source_table === 'components'),
-      work_orders: enrichedResults.filter(r => r.source_table === 'work_orders'),
-      projects: enrichedResults.filter(r => r.source_table === 'projects'),
-      property_todos: enrichedResults.filter(r => r.source_table === 'property_todos'),
-    };
-
-    return new Response(JSON.stringify({ 
-      query,
-      totalResults: enrichedResults.length,
-      results: enrichedResults,
-      grouped: groupedResults
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return formatResponse(query, enrichedResults);
 
   } catch (error) {
     console.error('Error in ai-search:', error);
@@ -141,6 +149,46 @@ serve(async (req) => {
     });
   }
 });
+
+function formatResponse(query: string, results: SearchResult[]) {
+  // Group results by source table
+  const groupedResults = {
+    components: results.filter(r => r.source_table === 'components'),
+    work_orders: results.filter(r => r.source_table === 'work_orders'),
+    projects: results.filter(r => r.source_table === 'projects'),
+    property_todos: results.filter(r => r.source_table === 'property_todos'),
+  };
+
+  return new Response(JSON.stringify({ 
+    query,
+    totalResults: results.length,
+    results,
+    grouped: groupedResults
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+async function enrichResults(supabase: any, results: any[]): Promise<SearchResult[]> {
+  const enrichedResults: SearchResult[] = [];
+  
+  for (const result of results) {
+    const details = await getSourceDetails(supabase, result.source_table, result.source_id);
+    enrichedResults.push({
+      id: result.id,
+      source_table: result.source_table,
+      source_id: result.source_id,
+      content: result.content,
+      similarity: result.similarity,
+      recency_boost: result.recency_boost,
+      popularity_boost: result.popularity_boost,
+      final_score: result.final_score || result.similarity,
+      details
+    });
+  }
+  
+  return enrichedResults;
+}
 
 async function getSourceDetails(supabase: any, sourceTable: string, sourceId: string): Promise<any> {
   switch (sourceTable) {
