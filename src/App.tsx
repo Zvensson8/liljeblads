@@ -11,6 +11,7 @@ import { GlobalSearchDialog } from "@/components/GlobalSearchDialog";
 import { Loader2 } from "lucide-react";
 import { BottomNavigation } from "@/components/BottomNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
+import AIChatBubble from "@/components/ai-chat/AIChatBubble";
 
 // Lazy load all routes for better performance
 const Index = lazy(() => import("./pages/Index"));
@@ -74,6 +75,7 @@ const AppContent = () => {
         </Routes>
       </Suspense>
       {isMobile && <BottomNavigation />}
+      <AIChatBubble />
     </>
   );
 };
