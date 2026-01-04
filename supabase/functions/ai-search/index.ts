@@ -153,6 +153,7 @@ serve(async (req) => {
 function formatResponse(query: string, results: SearchResult[]) {
   // Group results by source table
   const groupedResults = {
+    properties: results.filter(r => r.source_table === 'properties'),
     components: results.filter(r => r.source_table === 'components'),
     work_orders: results.filter(r => r.source_table === 'work_orders'),
     projects: results.filter(r => r.source_table === 'projects'),
@@ -192,6 +193,18 @@ async function enrichResults(supabase: any, results: any[]): Promise<SearchResul
 
 async function getSourceDetails(supabase: any, sourceTable: string, sourceId: string): Promise<any> {
   switch (sourceTable) {
+    case 'properties': {
+      const { data } = await supabase
+        .from('properties')
+        .select(`
+          id, name, address, property_number, property_type, 
+          construction_year, area_sqm, loa, description
+        `)
+        .eq('id', sourceId)
+        .single();
+      return data;
+    }
+
     case 'components': {
       const { data } = await supabase
         .from('components')

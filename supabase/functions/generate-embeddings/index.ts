@@ -194,6 +194,35 @@ serve(async (req) => {
 
 async function getContentForEmbedding(supabase: any, sourceTable: string, sourceId: string): Promise<ContentResult | null> {
   switch (sourceTable) {
+    case 'properties': {
+      const { data, error } = await supabase
+        .from('properties')
+        .select(`
+          name, address, property_number, property_type, description, 
+          construction_year, area_sqm, loa, organization_id
+        `)
+        .eq('id', sourceId)
+        .single();
+      
+      if (error || !data) return null;
+      
+      const parts = [
+        `Fastighet: ${data.name}`,
+        data.property_number ? `Fastighetsnummer: ${data.property_number}` : '',
+        data.address ? `Adress: ${data.address}` : '',
+        data.property_type ? `Typ: ${data.property_type}` : '',
+        data.construction_year ? `Byggår: ${data.construction_year}` : '',
+        data.area_sqm ? `Area: ${data.area_sqm} m²` : '',
+        data.loa ? `LOA: ${data.loa} m²` : '',
+        data.description ? `Beskrivning: ${data.description}` : ''
+      ].filter(Boolean);
+      
+      return {
+        content: parts.join('. '),
+        organizationId: data.organization_id || null
+      };
+    }
+
     case 'components': {
       const { data, error } = await supabase
         .from('components')
