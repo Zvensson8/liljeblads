@@ -64,7 +64,8 @@ serve(async (req) => {
                 floorsResult,
                 driftTasksResult,
                 driftCategoriesResult,
-                energyHistoryResult
+                energyHistoryResult,
+                workOrdersResult
               ] = await Promise.all([
                 supabase.from('components').select('*, maintenance_history(*)').eq('property_id', p.id).limit(20),
                 supabase.from('projects').select('*, project_cost_items(*), project_checklist_items(*), project_notes(*)').eq('property_id', p.id).limit(10),
@@ -76,7 +77,8 @@ serve(async (req) => {
                 supabase.from('floors').select('*').eq('property_id', p.id).limit(10),
                 supabase.from('drift_tasks').select('*, drift_task_components(*)').eq('property_id', p.id).limit(20),
                 supabase.from('drift_categories').select('*').eq('property_id', p.id).limit(20),
-                supabase.from('property_energy_history').select('*').eq('property_id', p.id).order('recorded_at', { ascending: false }).limit(5)
+                supabase.from('property_energy_history').select('*').eq('property_id', p.id).order('recorded_at', { ascending: false }).limit(5),
+                supabase.from('work_orders').select('*').eq('property_id', p.id).limit(20)
               ]);
               
               let propInfo = `📍 FASTIGHET: ${p.name}
@@ -233,6 +235,32 @@ serve(async (req) => {
                 if (latest.primary_energy_number) propInfo += `\n  Primärenergital: ${latest.primary_energy_number} kWh/m²`;
                 if (latest.specific_energy_use) propInfo += `\n  Specifik energianvändning: ${latest.specific_energy_use} kWh/m²`;
                 propInfo += `\n  Datum: ${latest.recorded_at}`;
+              }
+              
+              // Work orders
+              if (workOrdersResult.data && workOrdersResult.data.length > 0) {
+                const pending = workOrdersResult.data.filter((wo: any) => wo.status === 'pending' || wo.status === 'in_progress');
+                const completed = workOrdersResult.data.filter((wo: any) => wo.status === 'completed');
+                propInfo += `\n\n🛠️ ARBETSORDRAR (${pending.length} pågående, ${completed.length} avslutade):`;
+                
+                // Show pending/in progress first
+                for (const wo of pending) {
+                  propInfo += `\n  - ${wo.action}`;
+                  propInfo += `\n    Status: ${wo.status === 'pending' ? 'Väntande' : wo.status === 'in_progress' ? 'Pågående' : wo.status}`;
+                  if (wo.priority) propInfo += `, Prioritet: ${wo.priority}`;
+                  if (wo.contractor) propInfo += `\n    Entreprenör: ${wo.contractor}`;
+                  if (wo.due_date) propInfo += `\n    Deadline: ${wo.due_date}`;
+                  if (wo.quarter) propInfo += `, Kvartal: ${wo.quarter}`;
+                  if (wo.price) propInfo += `\n    Pris: ${wo.price.toLocaleString('sv-SE')} kr`;
+                  if (wo.comments) propInfo += `\n    Kommentar: ${wo.comments}`;
+                }
+                
+                // Show recent completed
+                for (const wo of completed.slice(0, 5)) {
+                  propInfo += `\n  - ${wo.action} (Avslutad)`;
+                  if (wo.contractor) propInfo += ` - ${wo.contractor}`;
+                  if (wo.price) propInfo += ` - ${wo.price.toLocaleString('sv-SE')} kr`;
+                }
               }
               
               contextParts.push(propInfo);
@@ -412,6 +440,36 @@ ${t.notes ? `- Anteckningar: ${t.notes}` : ''}`);
           }
         }
         
+        // Search work orders directly
+        for (const term of searchTerms) {
+          const { data: workOrders } = await supabase
+            .from('work_orders')
+            .select('*, property:properties(name)')
+            .or(`action.ilike.%${term}%,contractor.ilike.%${term}%,comments.ilike.%${term}%,quarter.ilike.%${term}%`)
+            .limit(10);
+          
+          if (workOrders && workOrders.length > 0) {
+            for (const wo of workOrders) {
+              if (contextParts.some(cp => cp.includes(wo.action) && cp.includes('ARBETSORDER'))) continue;
+              
+              let statusText = wo.status;
+              if (wo.status === 'pending') statusText = 'Väntande';
+              else if (wo.status === 'in_progress') statusText = 'Pågående';
+              else if (wo.status === 'completed') statusText = 'Avslutad';
+              
+              contextParts.push(`🛠️ ARBETSORDER: ${wo.action}
+- Status: ${statusText}
+- Prioritet: ${wo.priority || 'Ej angivet'}
+- Entreprenör: ${wo.contractor || 'Ej angivet'}
+- Deadline: ${wo.due_date || 'Ej angivet'}
+- Kvartal: ${wo.quarter || 'Ej angivet'}
+- Pris: ${wo.price ? wo.price.toLocaleString('sv-SE') + ' kr' : 'Ej angivet'}
+- Fastighet: ${wo.property?.name || 'Ej angivet'}
+${wo.comments ? `- Kommentar: ${wo.comments}` : ''}`);
+            }
+          }
+        }
+        
         if (contextParts.length > 0) {
           contextInfo = `\n\nHär är relevant information från systemet:\n\n${contextParts.join('\n\n---\n\n')}`;
           console.log(`Found ${contextParts.length} context items`);
@@ -461,6 +519,15 @@ PROJEKT
     Status: [status]
     Budget: [belopp] kr
     Utfall: [belopp] kr
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ARBETSORDRAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  [Åtgärd/Beskrivning]
+    Status: [Väntande/Pågående/Avslutad]
+    Entreprenör: [entreprenör]
+    Deadline: [datum]
+    Pris: [belopp] kr
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 LÖPANDE KOSTNADER
