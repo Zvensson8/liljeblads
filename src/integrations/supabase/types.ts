@@ -2692,6 +2692,7 @@ export type Database = {
           source_table: string
         }[]
       }
+      trigger_embedding_processing: { Args: never; Returns: undefined }
       update_embedding_access: {
         Args: { p_source_id: string; p_source_table: string }
         Returns: undefined
