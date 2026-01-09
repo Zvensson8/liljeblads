@@ -16,12 +16,60 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
+    // Validate authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify the user's JWT token
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      console.error('Auth validation failed:', claimsError);
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const userId = claimsData.claims.sub;
+    console.log(`Authenticated user: ${userId}`);
+
+    // Use service role for data access
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get user's organization from their verified profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !profile?.organization_id) {
+      console.error('Profile lookup failed:', profileError);
+      return new Response(JSON.stringify({ error: 'User profile not found' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Use the verified organization_id to scope all queries
+    const verifiedOrgId = profile.organization_id;
 
     // Get the last user message for context search
     const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop();
@@ -39,11 +87,12 @@ serve(async (req) => {
         const foundPropertyIds = new Set<string>();
         const foundComponentIds = new Set<string>();
         
-        // Search properties and gather ALL related data
+        // Search properties scoped to user's organization
         for (const term of searchTerms) {
           const { data: properties } = await supabase
             .from('properties')
             .select('*')
+            .eq('organization_id', verifiedOrgId)
             .or(`name.ilike.%${term}%,address.ilike.%${term}%,property_number.ilike.%${term}%,loa.ilike.%${term}%`)
             .limit(5);
           
@@ -279,11 +328,22 @@ serve(async (req) => {
           }
         }
         
-        // Search components directly (if not already found via property)
+        // Search components directly (if not already found via property) - scoped to user's organization
         for (const term of searchTerms) {
+          // First get property IDs for this organization to filter components
+          const { data: orgProperties } = await supabase
+            .from('properties')
+            .select('id')
+            .eq('organization_id', verifiedOrgId);
+          
+          const orgPropertyIds = orgProperties?.map(p => p.id) || [];
+          
+          if (orgPropertyIds.length === 0) continue;
+          
           const { data: components } = await supabase
             .from('components')
             .select('*, property:properties(name, address), maintenance_history(*), component_purchase_info(*), component_documents(*)')
+            .in('property_id', orgPropertyIds)
             .or(`name.ilike.%${term}%,type.ilike.%${term}%,manufacturer.ilike.%${term}%,serial_number.ilike.%${term}%,registration_number.ilike.%${term}%`)
             .limit(5);
           
@@ -347,11 +407,21 @@ serve(async (req) => {
           }
         }
         
-        // Search projects directly
+        // Search projects directly - scoped to user's organization via property
         for (const term of searchTerms) {
+          const { data: orgProperties } = await supabase
+            .from('properties')
+            .select('id')
+            .eq('organization_id', verifiedOrgId);
+          
+          const orgPropertyIds = orgProperties?.map(p => p.id) || [];
+          
+          if (orgPropertyIds.length === 0) continue;
+          
           const { data: projects } = await supabase
             .from('projects')
             .select('*, property:properties(name), project_cost_items(*), project_checklist_items(*), project_notes(*), project_documents(*)')
+            .in('property_id', orgPropertyIds)
             .or(`name.ilike.%${term}%,project_number.ilike.%${term}%,description.ilike.%${term}%,project_manager.ilike.%${term}%`)
             .limit(5);
           
@@ -407,11 +477,21 @@ serve(async (req) => {
           }
         }
         
-        // Search contacts
+        // Search contacts - scoped to user's organization via property
         for (const term of searchTerms) {
+          const { data: orgProperties } = await supabase
+            .from('properties')
+            .select('id')
+            .eq('organization_id', verifiedOrgId);
+          
+          const orgPropertyIds = orgProperties?.map(p => p.id) || [];
+          
+          if (orgPropertyIds.length === 0) continue;
+          
           const { data: contacts } = await supabase
             .from('property_contacts')
             .select('*, property:properties(name)')
+            .in('property_id', orgPropertyIds)
             .or(`name.ilike.%${term}%,company.ilike.%${term}%,role.ilike.%${term}%,email.ilike.%${term}%`)
             .limit(5);
           
@@ -428,11 +508,21 @@ serve(async (req) => {
           }
         }
         
-        // Search todos
+        // Search todos - scoped to user's organization via property
         for (const term of searchTerms) {
+          const { data: orgProperties } = await supabase
+            .from('properties')
+            .select('id')
+            .eq('organization_id', verifiedOrgId);
+          
+          const orgPropertyIds = orgProperties?.map(p => p.id) || [];
+          
+          if (orgPropertyIds.length === 0) continue;
+          
           const { data: todos } = await supabase
             .from('property_todos')
             .select('*, property:properties(name)')
+            .in('property_id', orgPropertyIds)
             .or(`title.ilike.%${term}%,notes.ilike.%${term}%,category.ilike.%${term}%`)
             .limit(5);
           
@@ -451,11 +541,21 @@ ${t.notes ? `- Anteckningar: ${t.notes}` : ''}`);
           }
         }
         
-        // Search work orders directly
+        // Search work orders directly - scoped to user's organization via property
         for (const term of searchTerms) {
+          const { data: orgProperties } = await supabase
+            .from('properties')
+            .select('id')
+            .eq('organization_id', verifiedOrgId);
+          
+          const orgPropertyIds = orgProperties?.map(p => p.id) || [];
+          
+          if (orgPropertyIds.length === 0) continue;
+          
           const { data: workOrders } = await supabase
             .from('work_orders')
             .select('*, property:properties(name)')
+            .in('property_id', orgPropertyIds)
             .or(`action.ilike.%${term}%,contractor.ilike.%${term}%,comments.ilike.%${term}%,quarter.ilike.%${term}%`)
             .limit(10);
           

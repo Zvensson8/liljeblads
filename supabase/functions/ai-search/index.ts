@@ -36,13 +36,60 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
+    // Validate authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify the user's JWT token
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      console.error('Auth validation failed:', claimsError);
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const userId = claimsData.claims.sub;
+    console.log(`Authenticated user: ${userId}`);
+
+    // Use service role for data access but enforce organization scoping
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get user's organization from their verified profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !profile?.organization_id) {
+      console.error('Profile lookup failed:', profileError);
+      return new Response(JSON.stringify({ error: 'User profile not found' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Use the verified organization_id from the user's profile, not from request
+    const verifiedOrgId = profile.organization_id;
 
     const { 
       query, 
-      organizationId, 
       filterTables, 
       matchThreshold = 0.3, 
       matchCount = 20,
@@ -57,7 +104,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`AI Search: "${query}" | org: ${organizationId || 'all'} | boostRecent: ${boostRecent} | boostPopular: ${boostPopular}`);
+    console.log(`AI Search: "${query}" | org: ${verifiedOrgId} | boostRecent: ${boostRecent} | boostPopular: ${boostPopular}`);
 
     // Generate embedding for the search query
     const embeddingResponse = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
@@ -96,12 +143,12 @@ serve(async (req) => {
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.data[0].embedding;
 
-    // Perform semantic search with re-ranking using the enhanced database function
+    // Perform semantic search with re-ranking using the verified organization ID
     const { data: searchResults, error: searchError } = await supabase.rpc('semantic_search_ranked', {
       query_embedding: queryEmbedding,
       match_threshold: matchThreshold,
       match_count: matchCount,
-      org_id: organizationId || null,
+      org_id: verifiedOrgId,
       filter_tables: filterTables || null,
       boost_recent: boostRecent,
       boost_popular: boostPopular
@@ -114,7 +161,7 @@ serve(async (req) => {
         query_embedding: queryEmbedding,
         match_threshold: matchThreshold,
         match_count: matchCount,
-        org_id: organizationId || null,
+        org_id: verifiedOrgId,
         filter_tables: filterTables || null
       });
       
