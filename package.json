@@ -76,7 +76,7 @@
     "react-is": "^19.2.0",
     "react-leaflet": "^5.0.0",
     "react-resizable-panels": "^2.1.9",
-    "react-router-dom": "^6.30.1",
+    "react-router-dom": "^7.12.0",
     "react-swipeable": "^7.0.2",
     "recharts": "^3.4.1",
     "sonner": "^1.7.4",
