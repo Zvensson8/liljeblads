@@ -134,43 +134,52 @@ export function WorkOrderDialog({
   }, [order, propertyId, form, user?.email]);
 
   const onSubmit = async (data: WorkOrderFormData) => {
-    const payload = {
-      action: data.action,
-      property_id: data.property_id,
-      status: data.status,
-      priority: data.priority,
-      price: data.price ? parseFloat(data.price) : null,
-      contractor: data.contractor || null,
-      quarter: data.quarter || null,
-      comments: data.comments || null,
-      due_date: data.due_date || null,
-      reminder_enabled: data.reminder_enabled,
-      reminder_frequency: data.reminder_frequency,
-      reminder_recipient_email: data.reminder_recipient_email || null,
-    };
+    try {
+      const payload = {
+        action: data.action,
+        property_id: data.property_id,
+        status: data.status,
+        priority: data.priority,
+        price: data.price ? parseFloat(data.price) : null,
+        contractor: data.contractor || null,
+        quarter: data.quarter || null,
+        comments: data.comments || null,
+        due_date: data.due_date || null,
+        reminder_enabled: data.reminder_enabled,
+        reminder_frequency: data.reminder_frequency,
+        reminder_recipient_email: data.reminder_recipient_email || null,
+      };
 
-    if (order) {
-      const { error } = await supabase
-        .from("work_orders")
-        .update(payload)
-        .eq("id", order.id);
+      if (order) {
+        const { error } = await supabase
+          .from("work_orders")
+          .update(payload)
+          .eq("id", order.id);
 
-      if (error) {
-        toast.error("Kunde inte uppdatera arbetsorder");
-        return;
+        if (error) {
+          console.error("Update error:", error);
+          toast.error("Kunde inte uppdatera arbetsorder: " + error.message);
+          return;
+        }
+        toast.success("Arbetsorder uppdaterad");
+      } else {
+        const { error } = await supabase.from("work_orders").insert([payload]);
+
+        if (error) {
+          console.error("Insert error:", error);
+          toast.error("Kunde inte skapa arbetsorder: " + error.message);
+          return;
+        }
+        toast.success("Arbetsorder skapad");
       }
-      toast.success("Arbetsorder uppdaterad");
-    } else {
-      const { error } = await supabase.from("work_orders").insert([payload]);
 
-      if (error) {
-        toast.error("Kunde inte skapa arbetsorder");
-        return;
-      }
-      toast.success("Arbetsorder skapad");
+      form.reset();
+      onOpenChange(false);
+      onSuccess();
+    } catch (error: any) {
+      console.error("Unexpected error:", error);
+      toast.error("Ett oväntat fel uppstod");
     }
-
-    onSuccess();
   };
 
   return (
