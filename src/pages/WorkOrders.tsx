@@ -32,6 +32,11 @@ const WorkOrders = () => {
   const [selectedProperty, setSelectedProperty] = useState<string>("all");
   const [selectedContractor, setSelectedContractor] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  
+  // Inline editing state
+  const [editingCell, setEditingCell] = useState<{ orderId: string; field: string } | null>(null);
+  const [tempValue, setTempValue] = useState<any>(null);
+  const [updating, setUpdating] = useState(false);
 
   const { data: workOrders, refetch } = useQuery({
     queryKey: ["work-orders", showArchived],
@@ -125,6 +130,48 @@ const WorkOrders = () => {
     setSelectedStatus("all");
   };
 
+  // Inline editing functions
+  const updateWorkOrder = async (orderId: string, field: string, value: any) => {
+    setUpdating(true);
+    try {
+      const updateData: any = { [field]: value, updated_at: new Date().toISOString() };
+      
+      const { error } = await supabase
+        .from("work_orders")
+        .update(updateData)
+        .eq("id", orderId);
+      
+      if (error) throw error;
+      
+      toast.success("Arbetsorder uppdaterad");
+      refetch();
+    } catch (error) {
+      toast.error("Kunde inte uppdatera arbetsorder");
+    } finally {
+      setUpdating(false);
+      setEditingCell(null);
+      setTempValue(null);
+    }
+  };
+
+  const startEditing = (orderId: string, field: string, currentValue: any) => {
+    setEditingCell({ orderId, field });
+    setTempValue(currentValue);
+  };
+
+  const cancelEditing = () => {
+    setEditingCell(null);
+    setTempValue(null);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, orderId: string, field: string) => {
+    if (e.key === "Enter" && tempValue !== null) {
+      updateWorkOrder(orderId, field, field === "price" ? parseFloat(tempValue) || null : tempValue);
+    } else if (e.key === "Escape") {
+      cancelEditing();
+    }
+  };
+
   const getPriorityBadge = (priority: string) => {
     const colors = {
       low: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -211,13 +258,32 @@ const WorkOrders = () => {
                         "-"
                       )}
                     </td>
-                    <td className="py-3 px-2">
-                      {order.price ? (
-                        <span className="text-green-500 font-medium">
+                    <td 
+                      className="py-3 px-2 cursor-pointer hover:bg-muted/30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditing(order.id, "price", order.price?.toString() || "");
+                      }}
+                    >
+                      {editingCell?.orderId === order.id && editingCell?.field === "price" ? (
+                        <Input
+                          type="number"
+                          value={tempValue}
+                          onChange={(e) => setTempValue(e.target.value)}
+                          onBlur={() => updateWorkOrder(order.id, "price", tempValue ? parseFloat(tempValue) : null)}
+                          onKeyDown={(e) => handleKeyDown(e, order.id, "price")}
+                          className="h-8 w-28"
+                          autoFocus
+                          disabled={updating}
+                          placeholder="Pris"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : order.price ? (
+                        <span className="text-green-500 font-medium hover:underline">
                           💰 {Number(order.price).toLocaleString("sv-SE")} kr
                         </span>
                       ) : (
-                        "-"
+                        <span className="text-muted-foreground hover:underline">Lägg till pris</span>
                       )}
                     </td>
                     <td className="py-3 px-2">
@@ -227,8 +293,38 @@ const WorkOrders = () => {
                     </td>
                     <td className="py-3 px-2">{getPriorityBadge(order.priority)}</td>
                     <td className="py-3 px-2">{order.quarter || "-"}</td>
-                    <td className="py-3 px-2">
-                      <Badge variant="outline">{getStatusLabel(order.status)}</Badge>
+                    <td 
+                      className="py-3 px-2 cursor-pointer hover:bg-muted/30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditing(order.id, "status", order.status);
+                      }}
+                    >
+                      {editingCell?.orderId === order.id && editingCell?.field === "status" ? (
+                        <Select
+                          value={tempValue}
+                          onValueChange={(value) => {
+                            setTempValue(value);
+                            updateWorkOrder(order.id, "status", value);
+                          }}
+                          disabled={updating}
+                        >
+                          <SelectTrigger className="h-8 w-36" onClick={(e) => e.stopPropagation()}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="not_started">Ej påbörjad</SelectItem>
+                            <SelectItem value="awaiting_quote">Inväntar offert</SelectItem>
+                            <SelectItem value="ordered">Beställt</SelectItem>
+                            <SelectItem value="completed">Slutförd</SelectItem>
+                            <SelectItem value="archived">Arkiverad</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge variant="outline" className="hover:bg-muted cursor-pointer">
+                          {getStatusLabel(order.status)}
+                        </Badge>
+                      )}
                     </td>
                     <td className="py-3 px-2">
                       <div className="flex gap-2">
