@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -31,7 +32,6 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -68,7 +68,8 @@ export function WorkOrderDialog({
   propertyId,
 }: WorkOrderDialogProps) {
   const { user } = useAuth();
-  
+  const [submitting, setSubmitting] = useState(false);
+
   const form = useForm<WorkOrderFormData>({
     resolver: zodResolver(workOrderSchema),
     defaultValues: {
@@ -97,7 +98,9 @@ export function WorkOrderDialog({
       if (error) throw error;
       return data;
     },
+    enabled: !!user,
   });
+
 
   useEffect(() => {
     if (order) {
@@ -134,6 +137,12 @@ export function WorkOrderDialog({
   }, [order, propertyId, form, user?.email]);
 
   const onSubmit = async (data: WorkOrderFormData) => {
+    if (!user) {
+      toast.error("Du måste vara inloggad för att skapa en arbetsorder");
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const payload = {
         action: data.action,
@@ -150,15 +159,24 @@ export function WorkOrderDialog({
         reminder_recipient_email: data.reminder_recipient_email || null,
       };
 
+      const handleDbError = (actionLabel: string, err: any) => {
+        console.error(`${actionLabel} error:`, err, { payload });
+        const msg = String(err?.message || "");
+        if (msg.toLowerCase().includes("row-level security") || err?.code === "42501") {
+          toast.error("Du saknar behörighet för vald fastighet");
+          return;
+        }
+        toast.error(`${actionLabel} misslyckades: ${msg || "Okänt fel"}`);
+      };
+
       if (order) {
         const { error } = await supabase
           .from("work_orders")
-          .update(payload)
+          .update({ ...payload, updated_at: new Date().toISOString() })
           .eq("id", order.id);
 
         if (error) {
-          console.error("Update error:", error);
-          toast.error("Kunde inte uppdatera arbetsorder: " + error.message);
+          handleDbError("Uppdatering", error);
           return;
         }
         toast.success("Arbetsorder uppdaterad");
@@ -166,8 +184,7 @@ export function WorkOrderDialog({
         const { error } = await supabase.from("work_orders").insert([payload]);
 
         if (error) {
-          console.error("Insert error:", error);
-          toast.error("Kunde inte skapa arbetsorder: " + error.message);
+          handleDbError("Skapande", error);
           return;
         }
         toast.success("Arbetsorder skapad");
@@ -179,6 +196,8 @@ export function WorkOrderDialog({
     } catch (error: any) {
       console.error("Unexpected error:", error);
       toast.error("Ett oväntat fel uppstod");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -468,8 +487,12 @@ export function WorkOrderDialog({
               >
                 Avbryt
               </Button>
-              <Button type="submit">
-                {order ? "Uppdatera Arbetsorder" : "Skapa Arbetsorder"}
+              <Button type="submit" disabled={submitting}>
+                {submitting
+                  ? "Sparar…"
+                  : order
+                    ? "Uppdatera Arbetsorder"
+                    : "Skapa Arbetsorder"}
               </Button>
             </div>
           </form>
