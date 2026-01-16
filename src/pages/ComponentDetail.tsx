@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Home,
   Building2,
+  Wrench,
 } from "lucide-react";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -34,6 +35,8 @@ import { MaintenanceHistoryDialog } from "@/components/MaintenanceHistoryDialog"
 import { ComponentDocuments } from "@/components/component/ComponentDocuments";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
+import { FloorSelector } from "@/components/FloorSelector";
+import { QuickServiceButton } from "@/components/QuickServiceButton";
 
 interface Component {
   id: string;
@@ -274,6 +277,11 @@ export default function ComponentDetail() {
               {getStatusBadge(component.status)}
             </div>
             <div className="flex items-center gap-2">
+              <QuickServiceButton
+                componentId={component.id}
+                componentName={component.name}
+                onSuccess={fetchComponentData}
+              />
               <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(true)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Redigera
@@ -541,17 +549,13 @@ export default function ComponentDetail() {
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Våningsplan</p>
-                        <p className="text-base">
-                          {floor.id ? (
-                            <>
-                              {floor.name}
-                              {floor.level !== null && ` (Våning ${floor.level})`}
-                            </>
-                          ) : (
-                            <span className="italic text-muted-foreground">Ingen våning vald</span>
-                          )}
-                        </p>
+                        <p className="text-sm font-medium text-muted-foreground mb-2">Våningsplan</p>
+                        <FloorSelector
+                          componentId={component.id}
+                          propertyId={property.id}
+                          currentFloorId={component.floor_id}
+                          onSuccess={fetchComponentData}
+                        />
                       </div>
                       {component.room_zone && (
                         <div>
