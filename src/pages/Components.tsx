@@ -9,13 +9,16 @@ import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download, Upload, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download, Upload, LayoutGrid, Table as TableIcon, Edit } from 'lucide-react';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
 import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
 import { SelectPropertyFloorDialog } from '@/components/SelectPropertyFloorDialog';
 import { ComponentImportDialog } from '@/components/ComponentImportDialog';
 import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { FloorSelector } from '@/components/FloorSelector';
+import { QuickServiceButton } from '@/components/QuickServiceButton';
+import { LastServiceBadge } from '@/components/LastServiceBadge';
 
 interface Component {
   id: string;
@@ -317,8 +320,8 @@ const Components = () => {
                           className="group hover:shadow-lg transition-all duration-300 cursor-pointer"
                           onClick={() => navigate(`/components/${component.id}`)}
                         >
-                      <CardHeader>
-                        <div className="flex justify-between items-start mb-2">
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start mb-1">
                           <CardTitle className="text-lg">{component.name}</CardTitle>
                           <Badge className={getStatusColor(component.status)}>
                             {getStatusText(component.status)}
@@ -329,86 +332,90 @@ const Components = () => {
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3">
-                        {component.manufacturer && (
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Tillverkare: </span>
-                            <span className="font-medium">{component.manufacturer}</span>
-                          </div>
-                        )}
-                        {component.model && (
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Modell: </span>
-                            <span className="font-medium">{component.model}</span>
-                          </div>
-                        )}
-                        {component.room_zone && (
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Rum/Zon: </span>
-                            <span className="font-medium">{component.room_zone}</span>
-                          </div>
-                        )}
-                        {component.installation_year && (
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Installerad: </span>
-                            <span className="font-medium">{component.installation_year}</span>
-                          </div>
-                        )}
+                        {/* Service badge - always visible */}
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <LastServiceBadge componentId={component.id} />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          {component.manufacturer && (
+                            <div>
+                              <span className="text-muted-foreground">Tillverkare: </span>
+                              <span className="font-medium">{component.manufacturer}</span>
+                            </div>
+                          )}
+                          {component.model && (
+                            <div>
+                              <span className="text-muted-foreground">Modell: </span>
+                              <span className="font-medium">{component.model}</span>
+                            </div>
+                          )}
+                          {component.installation_year && (
+                            <div>
+                              <span className="text-muted-foreground">Installerad: </span>
+                              <span className="font-medium">{component.installation_year}</span>
+                            </div>
+                          )}
+                          {component.room_zone && (
+                            <div>
+                              <span className="text-muted-foreground">Rum: </span>
+                              <span className="font-medium">{component.room_zone}</span>
+                            </div>
+                          )}
+                        </div>
                         
                         <div className="pt-3 border-t border-border space-y-2">
                           <div className="flex items-center gap-2 text-sm">
                             <Building2 className="h-4 w-4 text-primary" />
                             <span className="font-medium">{component.property_name}</span>
                           </div>
-                          {component.property_address && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <MapPin className="h-4 w-4" />
-                              <span className="text-xs">{component.property_address}</span>
-                            </div>
-                          )}
-                          {component.floor_name && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <span className="text-xs">
-                                {component.floor_name}
-                                {component.floor_level !== null && ` (Våning ${component.floor_level})`}
-                              </span>
-                            </div>
-                          )}
-                          {!component.floor_name && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <span className="text-xs italic">Ingen våning vald</span>
-                            </div>
-                          )}
-                          <div className="flex flex-col gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div className="flex gap-2">
-                              <div onClick={(e) => e.stopPropagation()} className="flex-1">
-                                <MaintenanceHistoryDialog
-                                  componentId={component.id}
-                                  componentName={component.name}
-                                />
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="flex-1"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/property/${component.property_id}`);
-                                }}
-                              >
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                Ritning
-                              </Button>
+                          
+                          {/* Floor selector - inline */}
+                          <div onClick={(e) => e.stopPropagation()}>
+                            {component.property_id ? (
+                              <FloorSelector
+                                componentId={component.id}
+                                propertyId={component.property_id}
+                                currentFloorId={component.floor_id}
+                                onSuccess={fetchComponents}
+                                compact
+                              />
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">Ingen fastighet</span>
+                            )}
+                          </div>
+                          
+                          {/* Action buttons - always visible now */}
+                          <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-border/50">
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <QuickServiceButton
+                                componentId={component.id}
+                                componentName={component.name}
+                                onSuccess={fetchComponents}
+                              />
                             </div>
                             <Button
-                              variant="destructive"
+                              variant="outline"
                               size="sm"
+                              className="h-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/components/${component.id}`);
+                              }}
+                            >
+                              <Edit className="h-3.5 w-3.5 mr-1" />
+                              Detaljer
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-destructive hover:text-destructive"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteComponent(component.id, component.name);
                               }}
                             >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Ta bort
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
                         </div>
@@ -424,12 +431,11 @@ const Components = () => {
                           <thead>
                             <tr className="border-b text-sm text-muted-foreground">
                               <th className="text-left py-3 px-4 font-medium">Komponent</th>
-                              <th className="text-left py-3 px-4 font-medium">Typ</th>
-                              <th className="text-left py-3 px-4 font-medium">Tillverkare</th>
-                              <th className="text-left py-3 px-4 font-medium">Modell</th>
-                              <th className="text-left py-3 px-4 font-medium">Installerad</th>
+                              <th className="text-left py-3 px-4 font-medium hidden md:table-cell">Typ</th>
+                              <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Tillverkare</th>
                               <th className="text-left py-3 px-4 font-medium">Fastighet</th>
                               <th className="text-left py-3 px-4 font-medium">Våning</th>
+                              <th className="text-left py-3 px-4 font-medium hidden sm:table-cell">Senaste service</th>
                               <th className="text-left py-3 px-4 font-medium">Status</th>
                               <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
                             </tr>
@@ -443,56 +449,49 @@ const Components = () => {
                               >
                                 <td className="py-3 px-4">
                                   <div className="font-medium">{component.name}</div>
+                                  <div className="text-xs text-muted-foreground md:hidden">{component.type}</div>
                                   {component.room_zone && (
                                     <div className="text-xs text-muted-foreground">{component.room_zone}</div>
                                   )}
                                 </td>
-                                <td className="py-3 px-4 text-sm">{component.type}</td>
-                                <td className="py-3 px-4 text-sm">{component.manufacturer || '-'}</td>
-                                <td className="py-3 px-4 text-sm">{component.model || '-'}</td>
-                                <td className="py-3 px-4 text-sm">{component.installation_year || '-'}</td>
+                                <td className="py-3 px-4 text-sm hidden md:table-cell">{component.type}</td>
+                                <td className="py-3 px-4 text-sm hidden lg:table-cell">{component.manufacturer || '-'}</td>
                                 <td className="py-3 px-4">
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Building2 className="h-4 w-4 text-primary" />
-                                    <span>{component.property_name}</span>
-                                  </div>
+                                  <div className="text-sm font-medium">{component.property_name}</div>
                                 </td>
-                                <td className="py-3 px-4 text-sm">
-                                  {component.floor_name ? (
-                                    <span>
-                                      {component.floor_name}
-                                      {component.floor_level !== null && ` (${component.floor_level})`}
-                                    </span>
+                                <td className="py-2 px-4" onClick={(e) => e.stopPropagation()}>
+                                  {component.property_id ? (
+                                    <FloorSelector
+                                      componentId={component.id}
+                                      propertyId={component.property_id}
+                                      currentFloorId={component.floor_id}
+                                      onSuccess={fetchComponents}
+                                      compact
+                                    />
                                   ) : (
-                                    <span className="italic text-muted-foreground">Ingen våning</span>
+                                    <span className="text-xs text-muted-foreground italic">-</span>
                                   )}
+                                </td>
+                                <td className="py-2 px-4 hidden sm:table-cell" onClick={(e) => e.stopPropagation()}>
+                                  <LastServiceBadge componentId={component.id} />
                                 </td>
                                 <td className="py-3 px-4">
                                   <Badge className={getStatusColor(component.status)}>
                                     {getStatusText(component.status)}
                                   </Badge>
                                 </td>
-                                <td className="py-3 px-4">
-                                  <div className="flex gap-1">
+                                <td className="py-2 px-4">
+                                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                    <QuickServiceButton
+                                      componentId={component.id}
+                                      componentName={component.name}
+                                      onSuccess={fetchComponents}
+                                    />
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      className="h-8 w-8"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        navigate(`/components/${component.id}`);
-                                      }}
-                                    >
-                                      <span>✏️</span>
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-destructive"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteComponent(component.id, component.name);
-                                      }}
+                                      className="h-8 w-8 text-destructive hover:text-destructive"
+                                      onClick={() => handleDeleteComponent(component.id, component.name)}
                                     >
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
