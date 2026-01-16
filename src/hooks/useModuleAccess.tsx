@@ -20,13 +20,25 @@ export const useModuleAccess = () => {
       console.log("🔐 Session data:", data.session?.user?.id);
       return data.session;
     },
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  const { data: moduleAccess, isLoading } = useQuery({
+  const { data: moduleAccess, isLoading: moduleLoading } = useQuery({
     queryKey: ["module-access", session?.user?.id],
     queryFn: async () => {
       if (!session?.user?.id) {
-        return [];
+        // If no session, return all modules to allow public access
+        return [
+          "dashboard",
+          "properties",
+          "components",
+          "work-orders",
+          "operations",
+          "projects",
+          "recurring-costs",
+          "users",
+          "organization",
+        ] as ModuleName[];
       }
 
       // Check system roles INSIDE the query to avoid race conditions
@@ -85,8 +97,12 @@ export const useModuleAccess = () => {
       // If all modules are disabled, return empty array (user has no access)
       return enabledModules;
     },
-    enabled: true,
+    // Only run when session loading is complete
+    enabled: !sessionLoading,
   });
+
+  // Combined loading state
+  const isLoading = sessionLoading || moduleLoading;
 
   const hasModuleAccess = (moduleName: ModuleName): boolean => {
     console.log(`🔍 hasModuleAccess called for: ${moduleName}`);
