@@ -121,26 +121,6 @@ export const MaintenanceHistoryDialog = ({
     }
   };
 
-  const handleDeleteRecord = async (id: string) => {
-    const { error } = await supabase
-      .from('maintenance_history')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Borttagen',
-        description: 'Underhållsposten har tagits bort.',
-      });
-      fetchRecords();
-    }
-  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
