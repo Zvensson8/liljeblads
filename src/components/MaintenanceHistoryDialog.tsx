@@ -6,10 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { History, Plus, Trash2 } from 'lucide-react';
+import { History, Plus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { format } from 'date-fns';
-import { sv } from 'date-fns/locale';
+import { ServiceRecordCard } from './ServiceRecordCard';
 
 interface MaintenanceRecord {
   id: string;
@@ -249,50 +248,18 @@ export const MaintenanceHistoryDialog = ({
               <p className="text-sm text-muted-foreground">Ingen underhållshistorik registrerad än.</p>
             ) : (
               records.map((record) => (
-                <Card key={record.id}>
-                  <CardContent className="pt-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-3">
-                          <h4 className="font-semibold">{record.action_type}</h4>
-                          {record.category && (
-                            <span className="text-xs px-2 py-1 bg-muted rounded">
-                              {record.category}
-                            </span>
-                          )}
-                          <span className="text-sm text-muted-foreground">
-                            {format(new Date(record.performed_date), 'PPP', { locale: sv })}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          {record.supplier && (
-                            <div>
-                              <span className="text-muted-foreground">Utförare: </span>
-                              <span>{record.supplier}</span>
-                            </div>
-                          )}
-                          {record.cost && (
-                            <div>
-                              <span className="text-muted-foreground">Kostnad: </span>
-                              <span>{record.cost.toLocaleString('sv-SE')} kr</span>
-                            </div>
-                          )}
-                        </div>
-                        {record.notes && (
-                          <p className="text-sm text-muted-foreground">{record.notes}</p>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteRecord(record.id)}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <ServiceRecordCard
+                  key={record.id}
+                  record={record}
+                  onUpdate={() => {
+                    fetchRecords();
+                    onSuccess?.();
+                  }}
+                  onDelete={() => {
+                    fetchRecords();
+                    onSuccess?.();
+                  }}
+                />
               ))
             )}
           </div>
