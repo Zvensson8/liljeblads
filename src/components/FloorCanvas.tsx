@@ -282,25 +282,35 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
           const canvasElement = canvasRef.current;
           if (canvasElement) {
             const rect = canvasElement.getBoundingClientRect();
-            
-            // Use the native mouse event coordinates (viewport coords)
-            // This avoids issues when the canvas is scaled, zoomed, or transformed.
-            const nativeEvt = e.e as MouseEvent | undefined;
-            const screenX = nativeEvt?.clientX ?? (rect.left + e.pointer.x);
-            const screenY = nativeEvt?.clientY ?? (rect.top + e.pointer.y);
-            
-            // Position tooltip directly next to cursor
+
+            // Anchor tooltip to the hovered object (not the mouse), and correctly account for:
+            // - Fabric viewportTransform (pan/zoom)
+            // - CSS scaling of the canvas element inside the layout
+            const vpt = canvas.viewportTransform || [1, 0, 0, 1, 0, 0];
+            const center = target.getCenterPoint ? target.getCenterPoint() : { x: target.left || 0, y: target.top || 0 };
+
+            // Transform object center from canvas coords -> viewport coords
+            const xVpt = center.x * vpt[0] + center.y * vpt[2] + vpt[4];
+            const yVpt = center.x * vpt[1] + center.y * vpt[3] + vpt[5];
+
+            // Map viewport coords (which are in Fabric canvas pixels) -> screen pixels
+            const scaleX = rect.width / (canvas.getWidth() || rect.width);
+            const scaleY = rect.height / (canvas.getHeight() || rect.height);
+
+            const screenX = rect.left + xVpt * scaleX;
+            const screenY = rect.top + yVpt * scaleY;
+
+            // Position tooltip directly next to the hovered component point
             const tooltipWidth = 180;
             const tooltipHeight = 90;
-            const offsetX = 12;
-            const offsetY = 12;
-            
+            const offsetX = 14;
+            const offsetY = 14;
+
             let finalX = screenX + offsetX;
             let finalY = screenY + offsetY;
-            
+
             // Keep tooltip within viewport bounds
             if (finalX + tooltipWidth > window.innerWidth - 10) {
-              // If no room on right, show on left
               finalX = screenX - tooltipWidth - 10;
             }
             if (finalY + tooltipHeight > window.innerHeight - 10) {
@@ -309,7 +319,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
             if (finalY < 10) {
               finalY = 10;
             }
-            
+
             setTooltipPosition({ x: finalX, y: finalY });
             setTooltipComponent(component);
             setTooltipVisible(true);
