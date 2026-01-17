@@ -952,6 +952,44 @@ export type Database = {
           },
         ]
       }
+      maintenance_history_documents: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          maintenance_history_id: string
+          mime_type: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          maintenance_history_id: string
+          mime_type?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          maintenance_history_id?: string
+          mime_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_history_documents_maintenance_history_id_fkey"
+            columns: ["maintenance_history_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_invitations: {
         Row: {
           accepted_at: string | null

@@ -411,6 +411,45 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
       };
     }
 
+    case 'maintenance_history_documents': {
+      // Fetch the document info along with its related maintenance history
+      const { data, error } = await supabase
+        .from('maintenance_history_documents')
+        .select(`
+          file_name, file_url,
+          maintenance_history:maintenance_history!inner(
+            action_type, performed_date, notes, supplier, cost, category,
+            component:components!inner(
+              name, type,
+              property:properties!inner(organization_id, name)
+            )
+          )
+        `)
+        .eq('id', sourceId)
+        .single();
+      
+      if (error || !data) return null;
+
+      const mh = data.maintenance_history;
+      const parts = [
+        `Serviceprotokoll: ${data.file_name}`,
+        mh?.action_type ? `Åtgärd: ${mh.action_type}` : '',
+        mh?.performed_date ? `Utfört: ${mh.performed_date}` : '',
+        mh?.supplier ? `Leverantör: ${mh.supplier}` : '',
+        mh?.cost ? `Kostnad: ${mh.cost} kr` : '',
+        mh?.category ? `Kategori: ${mh.category}` : '',
+        mh?.notes ? `Anteckningar: ${mh.notes}` : '',
+        mh?.component?.name ? `Komponent: ${mh.component.name}` : '',
+        mh?.component?.type ? `Komponenttyp: ${mh.component.type}` : '',
+        mh?.component?.property?.name ? `Fastighet: ${mh.component.property.name}` : ''
+      ].filter(Boolean);
+
+      return {
+        content: parts.join('. '),
+        organizationId: mh?.component?.property?.organization_id || null
+      };
+    }
+
     default:
       return null;
   }
