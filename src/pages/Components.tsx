@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download, Upload, LayoutGrid, Table as TableIcon, Edit, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download, Upload, LayoutGrid, Table as TableIcon, Edit, Filter, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
 import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
@@ -55,52 +55,33 @@ const Components = () => {
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
   const [selectedFloorId, setSelectedFloorId] = useState('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
-  const [sortField, setSortField] = useState<'type' | 'property' | 'manufacturer' | 'model' | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterProperty, setFilterProperty] = useState<string>('all');
+  const [filterManufacturer, setFilterManufacturer] = useState<string>('all');
+  const [filterModel, setFilterModel] = useState<string>('all');
 
-  const sortedComponents = [...components].sort((a, b) => {
-    if (!sortField) return 0;
-    
-    let aValue = '';
-    let bValue = '';
-    
-    switch (sortField) {
-      case 'type':
-        aValue = a.type || '';
-        bValue = b.type || '';
-        break;
-      case 'property':
-        aValue = a.property_name || '';
-        bValue = b.property_name || '';
-        break;
-      case 'manufacturer':
-        aValue = a.manufacturer || '';
-        bValue = b.manufacturer || '';
-        break;
-      case 'model':
-        aValue = a.model || '';
-        bValue = b.model || '';
-        break;
-    }
-    
-    const comparison = aValue.localeCompare(bValue, 'sv');
-    return sortDirection === 'asc' ? comparison : -comparison;
+  // Get unique values for filter dropdowns
+  const uniqueTypes = [...new Set(components.map(c => c.type))].filter(Boolean).sort((a, b) => a.localeCompare(b, 'sv'));
+  const uniqueProperties = [...new Set(components.map(c => c.property_name))].filter(Boolean).sort((a, b) => (a || '').localeCompare(b || '', 'sv'));
+  const uniqueManufacturers = [...new Set(components.map(c => c.manufacturer))].filter(Boolean).sort((a, b) => (a || '').localeCompare(b || '', 'sv'));
+  const uniqueModels = [...new Set(components.map(c => c.model))].filter(Boolean).sort((a, b) => (a || '').localeCompare(b || '', 'sv'));
+
+  // Filter components
+  const filteredComponents = components.filter(component => {
+    if (filterType !== 'all' && component.type !== filterType) return false;
+    if (filterProperty !== 'all' && component.property_name !== filterProperty) return false;
+    if (filterManufacturer !== 'all' && component.manufacturer !== filterManufacturer) return false;
+    if (filterModel !== 'all' && component.model !== filterModel) return false;
+    return true;
   });
 
-  const handleSort = (field: 'type' | 'property' | 'manufacturer' | 'model') => {
-    if (sortField === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
+  const hasActiveFilters = filterType !== 'all' || filterProperty !== 'all' || filterManufacturer !== 'all' || filterModel !== 'all';
 
-  const getSortIcon = (field: 'type' | 'property' | 'manufacturer' | 'model') => {
-    if (sortField !== field) return <ArrowUpDown className="h-3.5 w-3.5 ml-1 opacity-50" />;
-    return sortDirection === 'asc' 
-      ? <ArrowUp className="h-3.5 w-3.5 ml-1" /> 
-      : <ArrowDown className="h-3.5 w-3.5 ml-1" />;
+  const clearFilters = () => {
+    setFilterType('all');
+    setFilterProperty('all');
+    setFilterManufacturer('all');
+    setFilterModel('all');
   };
 
   useEffect(() => {
@@ -317,38 +298,8 @@ const Components = () => {
                     </Button>
                   </div>
                   
-                  {/* Sorting dropdown */}
-                  <Select
-                    value={sortField ? `${sortField}-${sortDirection}` : 'none'}
-                    onValueChange={(value) => {
-                      if (value === 'none') {
-                        setSortField(null);
-                      } else {
-                        const [field, dir] = value.split('-') as ['type' | 'property' | 'manufacturer' | 'model', 'asc' | 'desc'];
-                        setSortField(field);
-                        setSortDirection(dir);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <ArrowUpDown className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Sortera..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Ingen sortering</SelectItem>
-                      <SelectItem value="type-asc">Typ (A-Ö)</SelectItem>
-                      <SelectItem value="type-desc">Typ (Ö-A)</SelectItem>
-                      <SelectItem value="property-asc">Fastighet (A-Ö)</SelectItem>
-                      <SelectItem value="property-desc">Fastighet (Ö-A)</SelectItem>
-                      <SelectItem value="manufacturer-asc">Tillverkare (A-Ö)</SelectItem>
-                      <SelectItem value="manufacturer-desc">Tillverkare (Ö-A)</SelectItem>
-                      <SelectItem value="model-asc">Modell (A-Ö)</SelectItem>
-                      <SelectItem value="model-desc">Modell (Ö-A)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
                   <Badge variant="outline" className="text-base px-4 py-2">
-                    {components.length} komponenter
+                    {filteredComponents.length}{hasActiveFilters ? ` av ${components.length}` : ''} komponenter
                   </Badge>
                   <ComponentImportDialog onSuccess={fetchComponents} />
                   {components.length > 0 && (
@@ -376,6 +327,71 @@ const Components = () => {
                     </div>
                   </div>
 
+                  {/* Filter section */}
+                  {components.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Filter className="h-4 w-4" />
+                        <span>Filtrera:</span>
+                      </div>
+                      
+                      <Select value={filterType} onValueChange={setFilterType}>
+                        <SelectTrigger className="w-[160px] h-9">
+                          <SelectValue placeholder="Komponenttyp" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alla typer</SelectItem>
+                          {uniqueTypes.map(type => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={filterProperty} onValueChange={setFilterProperty}>
+                        <SelectTrigger className="w-[160px] h-9">
+                          <SelectValue placeholder="Fastighet" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alla fastigheter</SelectItem>
+                          {uniqueProperties.map(prop => (
+                            <SelectItem key={prop} value={prop!}>{prop}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={filterManufacturer} onValueChange={setFilterManufacturer}>
+                        <SelectTrigger className="w-[160px] h-9">
+                          <SelectValue placeholder="Tillverkare" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alla tillverkare</SelectItem>
+                          {uniqueManufacturers.map(mfr => (
+                            <SelectItem key={mfr} value={mfr!}>{mfr}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={filterModel} onValueChange={setFilterModel}>
+                        <SelectTrigger className="w-[160px] h-9">
+                          <SelectValue placeholder="Modell" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alla modeller</SelectItem>
+                          {uniqueModels.map(model => (
+                            <SelectItem key={model} value={model!}>{model}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {hasActiveFilters && (
+                        <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9">
+                          <X className="h-4 w-4 mr-1" />
+                          Rensa filter
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                   {components.length === 0 ? (
                     <Card className="text-center py-16 border-dashed">
                       <CardContent>
@@ -393,7 +409,7 @@ const Components = () => {
                     </Card>
                   ) : viewMode === 'cards' ? (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {sortedComponents.map((component) => (
+                      {filteredComponents.map((component) => (
                         <Card
                           key={component.id}
                           className="group hover:shadow-lg transition-all duration-300 cursor-pointer"
@@ -510,33 +526,9 @@ const Components = () => {
                           <thead>
                             <tr className="border-b text-sm text-muted-foreground">
                               <th className="text-left py-3 px-4 font-medium">Komponent</th>
-                              <th 
-                                className="text-left py-3 px-4 font-medium hidden md:table-cell cursor-pointer hover:text-foreground transition-colors"
-                                onClick={() => handleSort('type')}
-                              >
-                                <span className="flex items-center">
-                                  Typ
-                                  {getSortIcon('type')}
-                                </span>
-                              </th>
-                              <th 
-                                className="text-left py-3 px-4 font-medium hidden lg:table-cell cursor-pointer hover:text-foreground transition-colors"
-                                onClick={() => handleSort('manufacturer')}
-                              >
-                                <span className="flex items-center">
-                                  Tillverkare
-                                  {getSortIcon('manufacturer')}
-                                </span>
-                              </th>
-                              <th 
-                                className="text-left py-3 px-4 font-medium cursor-pointer hover:text-foreground transition-colors"
-                                onClick={() => handleSort('property')}
-                              >
-                                <span className="flex items-center">
-                                  Fastighet
-                                  {getSortIcon('property')}
-                                </span>
-                              </th>
+                              <th className="text-left py-3 px-4 font-medium hidden md:table-cell">Typ</th>
+                              <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Tillverkare</th>
+                              <th className="text-left py-3 px-4 font-medium">Fastighet</th>
                               <th className="text-left py-3 px-4 font-medium">Våning</th>
                               <th className="text-left py-3 px-4 font-medium hidden sm:table-cell">Senaste service</th>
                               <th className="text-left py-3 px-4 font-medium">Status</th>
@@ -544,7 +536,7 @@ const Components = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {sortedComponents.map((component) => (
+                            {filteredComponents.map((component) => (
                               <tr 
                                 key={component.id} 
                                 className="border-b hover:bg-muted/50 cursor-pointer"
