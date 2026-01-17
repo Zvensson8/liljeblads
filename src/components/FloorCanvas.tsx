@@ -9,7 +9,6 @@ import { ComponentFormDialog } from './ComponentFormDialog';
 import { ComponentTemplate } from '@/hooks/useComponentLibrary';
 import { debounce } from 'lodash-es';
 import { ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 interface FloorCanvasProps {
   floorId: string;
@@ -289,38 +288,50 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
             // Anchor tooltip to the hovered object (not the mouse), and correctly account for:
             // - Fabric viewportTransform (pan/zoom)
             // - CSS scaling of the canvas element inside the layout
+            // - Mobile viewport offsets (VisualViewport) when the page is pinch-zoomed
             const vpt = canvas.viewportTransform || [1, 0, 0, 1, 0, 0];
-            const center = target.getCenterPoint ? target.getCenterPoint() : { x: target.left || 0, y: target.top || 0 };
+            const center = target.getCenterPoint
+              ? target.getCenterPoint()
+              : { x: target.left || 0, y: target.top || 0 };
 
-            // Transform object center from canvas coords -> viewport coords
+            // Transform object center from canvas coords -> viewport coords (Fabric)
             const xVpt = center.x * vpt[0] + center.y * vpt[2] + vpt[4];
             const yVpt = center.x * vpt[1] + center.y * vpt[3] + vpt[5];
 
-            // Map viewport coords (which are in Fabric canvas pixels) -> screen pixels
+            // Map viewport coords (Fabric pixels) -> screen pixels (DOM)
             const scaleX = rect.width / (canvas.getWidth() || rect.width);
             const scaleY = rect.height / (canvas.getHeight() || rect.height);
 
             const screenX = rect.left + xVpt * scaleX;
             const screenY = rect.top + yVpt * scaleY;
 
-            // Position tooltip directly next to the hovered component point
+            // Fixed-position elements are laid out against the *layout viewport*, but
+            // getBoundingClientRect() is relative to the *visual viewport*.
+            // When users pinch-zoom on mobile, we must add VisualViewport offsets.
+            const vv = window.visualViewport;
+            const viewportOffsetLeft = vv?.offsetLeft ?? 0;
+            const viewportOffsetTop = vv?.offsetTop ?? 0;
+            const viewportWidth = vv?.width ?? window.innerWidth;
+            const viewportHeight = vv?.height ?? window.innerHeight;
+
+            // Position tooltip next to the hovered component point
             const tooltipWidth = 180;
             const tooltipHeight = 90;
             const offsetX = 14;
             const offsetY = 14;
 
-            let finalX = screenX + offsetX;
-            let finalY = screenY + offsetY;
+            let finalX = screenX + offsetX + viewportOffsetLeft;
+            let finalY = screenY + offsetY + viewportOffsetTop;
 
             // Keep tooltip within viewport bounds
-            if (finalX + tooltipWidth > window.innerWidth - 10) {
-              finalX = screenX - tooltipWidth - 10;
+            if (finalX + tooltipWidth > viewportOffsetLeft + viewportWidth - 10) {
+              finalX = screenX - tooltipWidth - 10 + viewportOffsetLeft;
             }
-            if (finalY + tooltipHeight > window.innerHeight - 10) {
-              finalY = window.innerHeight - tooltipHeight - 10;
+            if (finalY + tooltipHeight > viewportOffsetTop + viewportHeight - 10) {
+              finalY = viewportOffsetTop + viewportHeight - tooltipHeight - 10;
             }
-            if (finalY < 10) {
-              finalY = 10;
+            if (finalY < viewportOffsetTop + 10) {
+              finalY = viewportOffsetTop + 10;
             }
 
             setTooltipPosition({ x: finalX, y: finalY });
