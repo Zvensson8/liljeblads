@@ -8,11 +8,14 @@ import { ComponentLibraryPanel } from './ComponentLibraryPanel';
 import { ComponentFormDialog } from './ComponentFormDialog';
 import { ComponentTemplate } from '@/hooks/useComponentLibrary';
 import { debounce } from 'lodash-es';
+import { ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface FloorCanvasProps {
   floorId: string;
   drawingUrl: string;
   onUpdate: () => void;
+  onBack?: () => void;
 }
 
 interface Component {
@@ -34,7 +37,7 @@ interface Component {
   serial_number: string | null;
 }
 
-export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps) => {
+export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [activeTool, setActiveTool] = useState<string>('select');
@@ -764,6 +767,18 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
       />
       
       <div className="flex-1 flex flex-col gap-4">
+        {/* Back button */}
+        {onBack && (
+          <Button 
+            variant="outline" 
+            onClick={onBack}
+            className="w-fit"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Tillbaka till fastighet
+          </Button>
+        )}
+        
         {selectedObject && (selectedObject as any).existingComponentId && (
           <Button onClick={handleSaveComponentPosition} size="lg">
             Spara position
