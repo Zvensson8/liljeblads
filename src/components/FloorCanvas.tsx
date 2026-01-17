@@ -283,20 +283,17 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
           if (canvasElement) {
             const rect = canvasElement.getBoundingClientRect();
             
-            // Use the mouse pointer position which is already in screen-relative coordinates
-            // This ensures the tooltip follows the actual hover position
-            const mouseX = e.pointer.x;
-            const mouseY = e.pointer.y;
+            // Use the native mouse event coordinates (viewport coords)
+            // This avoids issues when the canvas is scaled, zoomed, or transformed.
+            const nativeEvt = e.e as MouseEvent | undefined;
+            const screenX = nativeEvt?.clientX ?? (rect.left + e.pointer.x);
+            const screenY = nativeEvt?.clientY ?? (rect.top + e.pointer.y);
             
-            // Calculate screen position from canvas-relative mouse position
-            const screenX = rect.left + mouseX;
-            const screenY = rect.top + mouseY;
-            
-            // Position tooltip directly to the right of cursor, very close
+            // Position tooltip directly next to cursor
             const tooltipWidth = 180;
             const tooltipHeight = 90;
-            const offsetX = 15; // Small offset from cursor
-            const offsetY = -20; // Slightly above cursor
+            const offsetX = 12;
+            const offsetY = 12;
             
             let finalX = screenX + offsetX;
             let finalY = screenY + offsetY;
