@@ -16,6 +16,7 @@ import { TodoWidget } from '@/components/TodoWidget';
 import { DashboardCustomizer } from '@/components/dashboard/DashboardCustomizer';
 import { PropertyMapDialog } from '@/components/maps/PropertyMapDialog';
 import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
+import { EmbeddingStatsWidget } from '@/components/dashboard/EmbeddingStatsWidget';
 
 interface DashboardStats {
   totalProperties: number;
@@ -440,6 +441,9 @@ const Dashboard = () => {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Embedding Stats Widget */}
+              <EmbeddingStatsWidget />
 
               {/* Recently Visited */}
               <RecentlyVisitedWidget />
