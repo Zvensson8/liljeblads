@@ -93,6 +93,23 @@ export function EmbeddingStatsWidget() {
     }
   };
 
+  const handleClearErrors = async () => {
+    try {
+      const { error } = await supabase
+        .from('embedding_queue')
+        .delete()
+        .not('error', 'is', null);
+      
+      if (error) throw error;
+      
+      toast.success('Fel rensade');
+      await fetchStats();
+    } catch (error) {
+      console.error('Error clearing errors:', error);
+      toast.error('Kunde inte rensa fel');
+    }
+  };
+
   const handleBackfill = async () => {
     setProcessing(true);
     try {
@@ -192,7 +209,12 @@ export function EmbeddingStatsWidget() {
                 </Badge>
               )}
               {(stats?.queueErrors || 0) > 0 && (
-                <Badge variant="destructive">
+                <Badge 
+                  variant="destructive" 
+                  className="cursor-pointer hover:opacity-80"
+                  onClick={handleClearErrors}
+                  title="Klicka för att rensa fel"
+                >
                   <AlertCircle className="h-3 w-3 mr-1" />
                   {stats?.queueErrors} fel
                 </Badge>
