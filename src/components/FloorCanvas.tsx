@@ -276,41 +276,41 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         canvas.hoverCursor = 'pointer';
         canvas.renderAll();
         
-        // Show tooltip positioned close to the component
+        // Show tooltip positioned directly next to the component
         const component = componentsRef.current.find(c => c.id === target.componentId);
         if (component) {
           const canvasElement = canvasRef.current;
           if (canvasElement) {
             const rect = canvasElement.getBoundingClientRect();
-            const zoom = canvas.getZoom();
-            const vpt = canvas.viewportTransform || [1, 0, 0, 1, 0, 0];
             
-            // Calculate the object's screen position using viewport transform
-            const objLeft = target.left || 0;
-            const objTop = target.top || 0;
-            const objRadius = target.radius || 15;
+            // Use the mouse pointer position which is already in screen-relative coordinates
+            // This ensures the tooltip follows the actual hover position
+            const mouseX = e.pointer.x;
+            const mouseY = e.pointer.y;
             
-            // Transform canvas coordinates to screen coordinates
-            const screenX = rect.left + (objLeft * zoom) + vpt[4];
-            const screenY = rect.top + (objTop * zoom) + vpt[5];
+            // Calculate screen position from canvas-relative mouse position
+            const screenX = rect.left + mouseX;
+            const screenY = rect.top + mouseY;
             
-            // Position tooltip to the right of the component
-            const tooltipWidth = 200;
-            const tooltipHeight = 100;
-            const offset = (objRadius * zoom) + 12;
+            // Position tooltip directly to the right of cursor, very close
+            const tooltipWidth = 180;
+            const tooltipHeight = 90;
+            const offsetX = 15; // Small offset from cursor
+            const offsetY = -20; // Slightly above cursor
             
-            let finalX = screenX + offset;
-            let finalY = screenY - 10;
+            let finalX = screenX + offsetX;
+            let finalY = screenY + offsetY;
             
             // Keep tooltip within viewport bounds
-            if (finalX + tooltipWidth > window.innerWidth - 20) {
-              finalX = screenX - tooltipWidth - 12;
+            if (finalX + tooltipWidth > window.innerWidth - 10) {
+              // If no room on right, show on left
+              finalX = screenX - tooltipWidth - 10;
             }
-            if (finalY + tooltipHeight > window.innerHeight - 20) {
-              finalY = window.innerHeight - tooltipHeight - 20;
+            if (finalY + tooltipHeight > window.innerHeight - 10) {
+              finalY = window.innerHeight - tooltipHeight - 10;
             }
-            if (finalY < 20) {
-              finalY = 20;
+            if (finalY < 10) {
+              finalY = 10;
             }
             
             setTooltipPosition({ x: finalX, y: finalY });
