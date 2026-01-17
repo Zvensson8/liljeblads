@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TaskFormDialog } from "./TaskFormDialog";
-import { StatisticsCard } from "./StatisticsCard";
 import { exportQuarterToExcel } from "@/lib/operationsExport";
 import { ComponentAutoDetect } from "./ComponentAutoDetect";
 import { LinkedComponentCard } from "./LinkedComponentCard";
@@ -451,8 +450,6 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
 
         <CollapsibleContent>
           <CardContent className="space-y-4 p-4">
-            <StatisticsCard stats={stats} quarter={quarter} />
-
             <div className="flex flex-wrap gap-3 pb-4 border-b">
               <Input
                 placeholder="Sök uppgifter..."
@@ -691,30 +688,44 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
                                   </TabsContent>
 
                                   <TabsContent value="dropdown" className="p-4">
-                                    <div className="flex gap-2">
-                                      <Select
-                                        value={selectedComponentId[task.id] || ""}
-                                        onValueChange={(value) =>
-                                          setSelectedComponentId(prev => ({ ...prev, [task.id]: value }))
-                                        }
-                                      >
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Välj komponent..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {availableComponents.map((comp) => (
-                                            <SelectItem key={comp.id} value={comp.id}>
-                                              {comp.name} ({comp.type})
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <Button
-                                        onClick={() => handleAddComponent(task.id)}
-                                        size="sm"
-                                      >
-                                        <Plus className="h-4 w-4" />
-                                      </Button>
+                                    <div className="space-y-3">
+                                      {availableComponents.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground text-center py-4">
+                                          Inga komponenter hittades för denna fastighet
+                                        </p>
+                                      ) : (
+                                        <>
+                                          <p className="text-sm text-muted-foreground">
+                                            {availableComponents.length} komponenter tillgängliga
+                                          </p>
+                                          <div className="flex gap-2">
+                                            <Select
+                                              value={selectedComponentId[task.id] || ""}
+                                              onValueChange={(value) =>
+                                                setSelectedComponentId(prev => ({ ...prev, [task.id]: value }))
+                                              }
+                                            >
+                                              <SelectTrigger className="flex-1">
+                                                <SelectValue placeholder="Välj komponent..." />
+                                              </SelectTrigger>
+                                              <SelectContent className="max-h-[300px]">
+                                                {availableComponents.map((comp) => (
+                                                  <SelectItem key={comp.id} value={comp.id}>
+                                                    {comp.name} ({comp.type})
+                                                  </SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                            <Button
+                                              onClick={() => handleAddComponent(task.id)}
+                                              size="sm"
+                                              disabled={!selectedComponentId[task.id]}
+                                            >
+                                              <Plus className="h-4 w-4" />
+                                            </Button>
+                                          </div>
+                                        </>
+                                      )}
                                     </div>
                                   </TabsContent>
 

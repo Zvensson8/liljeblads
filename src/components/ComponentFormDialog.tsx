@@ -51,6 +51,8 @@ export const ComponentFormDialog = ({
   const { toast } = useToast();
   const [properties, setProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [newComponentId, setNewComponentId] = useState<string | null>(null);
+  const [showServicePlan, setShowServicePlan] = useState(false);
   
   // Form fields
   const [designation, setDesignation] = useState('');
@@ -70,6 +72,8 @@ export const ComponentFormDialog = ({
   useEffect(() => {
     if (open) {
       fetchProperties();
+      setNewComponentId(null);
+      setShowServicePlan(false);
       
       if (editingComponent) {
         // Populate form with existing data
@@ -191,13 +195,12 @@ export const ComponentFormDialog = ({
 
         toast({
           title: 'Komponent skapad!',
-          description: `${designation} har lagts till.`,
+          description: `${designation} har lagts till. Koppla till driftuppgifter nedan.`,
         });
 
-        // Pass the component ID to onSuccess
-        resetForm();
-        onOpenChange(false);
-        onSuccess(newComponent?.id);
+        // Show service plan section for linking to drift tasks
+        setNewComponentId(newComponent?.id || null);
+        setShowServicePlan(true);
         setLoading(false);
         return;
       }
@@ -239,10 +242,20 @@ export const ComponentFormDialog = ({
     setRefrigerantCode('');
     setRefrigerantAmount('');
     setRefrigerantType('');
+    setNewComponentId(null);
+    setShowServicePlan(false);
+  };
+
+  const handleCloseDialog = () => {
+    if (newComponentId) {
+      onSuccess(newComponentId);
+    }
+    resetForm();
+    onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleCloseDialog}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto" aria-describedby="component-form-description">
         <DialogHeader>
           <DialogTitle>
@@ -431,6 +444,21 @@ export const ComponentFormDialog = ({
             )}
           </div>
 
+          {/* Show service plan section after creating new component OR when editing */}
+          {showServicePlan && newComponentId && propertyId && (
+            <div className="pt-4 border-t space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-green-700 font-medium">
+                  ✓ Komponenten har skapats! Du kan nu koppla den till driftuppgifter nedan.
+                </p>
+              </div>
+              <ComponentServicePlanSection
+                componentId={newComponentId}
+                propertyId={propertyId}
+              />
+            </div>
+          )}
+
           {editingComponent && propertyId && (
             <div className="pt-4 border-t space-y-4">
               <ComponentServicePlanSection
@@ -448,14 +476,16 @@ export const ComponentFormDialog = ({
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => onOpenChange(false)}
+              onClick={handleCloseDialog}
               disabled={loading}
             >
-              Avbryt
+              {showServicePlan ? 'Klar' : 'Avbryt'}
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Sparar...' : (editingComponent ? 'Uppdatera' : 'Skapa')}
-            </Button>
+            {!showServicePlan && (
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Sparar...' : (editingComponent ? 'Uppdatera' : 'Skapa')}
+              </Button>
+            )}
           </div>
         </form>
       </DialogContent>
