@@ -625,6 +625,7 @@ const PropertyDetail = () => {
                                 floorId={floor.id}
                                 drawingUrl={floor.drawing_url}
                                 onUpdate={fetchPropertyAndFloors}
+                                onBack={() => setActiveTab('overview')}
                               />
                             </div>
                           ) : (
@@ -942,6 +943,7 @@ const PropertyDetail = () => {
                                     floorId={floor.id}
                                     drawingUrl={floor.drawing_url}
                                     onUpdate={fetchPropertyAndFloors}
+                                    onBack={() => setActiveTab('overview')}
                                   />
                                 </div>
                               ) : (
