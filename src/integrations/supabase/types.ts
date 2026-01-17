@@ -906,6 +906,7 @@ export type Database = {
           component_id: string
           cost: number | null
           created_at: string
+          drift_task_id: string | null
           expected_cost: number | null
           id: string
           is_warranty: boolean | null
@@ -920,6 +921,7 @@ export type Database = {
           component_id: string
           cost?: number | null
           created_at?: string
+          drift_task_id?: string | null
           expected_cost?: number | null
           id?: string
           is_warranty?: boolean | null
@@ -934,6 +936,7 @@ export type Database = {
           component_id?: string
           cost?: number | null
           created_at?: string
+          drift_task_id?: string | null
           expected_cost?: number | null
           id?: string
           is_warranty?: boolean | null
@@ -948,6 +951,13 @@ export type Database = {
             columns: ["component_id"]
             isOneToOne: false
             referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_history_drift_task_id_fkey"
+            columns: ["drift_task_id"]
+            isOneToOne: false
+            referencedRelation: "drift_tasks"
             referencedColumns: ["id"]
           },
         ]
