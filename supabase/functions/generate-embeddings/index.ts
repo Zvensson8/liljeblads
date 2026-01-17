@@ -338,6 +338,67 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
       };
     }
 
+    case 'drift_tasks': {
+      const { data, error } = await supabase
+        .from('drift_tasks')
+        .select(`
+          name, description, quarter, year, planned_count, reported_count,
+          category:drift_categories(name),
+          property:properties(organization_id, name)
+        `)
+        .eq('id', sourceId)
+        .single();
+      
+      if (error || !data) return null;
+      
+      const parts = [
+        `Driftuppgift: ${data.name}`,
+        data.quarter ? `Kvartal: ${data.quarter}` : '',
+        data.year ? `År: ${data.year}` : '',
+        `Planerat: ${data.planned_count || 0}, Rapporterat: ${data.reported_count || 0}`,
+        data.category?.name ? `Kategori: ${data.category.name}` : '',
+        data.description ? `Beskrivning: ${data.description}` : '',
+        data.property?.name ? `Fastighet: ${data.property.name}` : ''
+      ].filter(Boolean);
+      
+      return {
+        content: parts.join('. '),
+        organizationId: data.property?.organization_id || null
+      };
+    }
+
+    case 'maintenance_history': {
+      const { data, error } = await supabase
+        .from('maintenance_history')
+        .select(`
+          action_type, notes, performed_date, cost, supplier, category,
+          component:components(
+            name, type,
+            property:properties(organization_id, name)
+          )
+        `)
+        .eq('id', sourceId)
+        .single();
+      
+      if (error || !data) return null;
+      
+      const parts = [
+        `Underhållshistorik: ${data.action_type}`,
+        data.performed_date ? `Utfört: ${data.performed_date}` : '',
+        data.cost ? `Kostnad: ${data.cost} kr` : '',
+        data.supplier ? `Leverantör: ${data.supplier}` : '',
+        data.category ? `Kategori: ${data.category}` : '',
+        data.notes ? `Anteckningar: ${data.notes}` : '',
+        data.component?.name ? `Komponent: ${data.component.name}` : '',
+        data.component?.property?.name ? `Fastighet: ${data.component.property.name}` : ''
+      ].filter(Boolean);
+      
+      return {
+        content: parts.join('. '),
+        organizationId: data.component?.property?.organization_id || null
+      };
+    }
+
     default:
       return null;
   }

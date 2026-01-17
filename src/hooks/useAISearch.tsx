@@ -16,12 +16,23 @@ export interface AISearchResult {
     name?: string;
     title?: string;
     action?: string;
+    action_type?: string;
     status?: string;
     type?: string;
     category?: string;
     priority?: string;
     completed?: boolean;
     due_date?: string;
+    performed_date?: string;
+    quarter?: string;
+    year?: number;
+    planned_count?: number;
+    reported_count?: number;
+    description?: string;
+    cost?: number;
+    supplier?: string;
+    notes?: string;
+    address?: string;
     property?: {
       id: string;
       name: string;
@@ -42,10 +53,13 @@ export interface AISearchResponse {
   totalResults: number;
   results: AISearchResult[];
   grouped: {
+    properties: AISearchResult[];
     components: AISearchResult[];
     work_orders: AISearchResult[];
     projects: AISearchResult[];
     property_todos: AISearchResult[];
+    drift_tasks: AISearchResult[];
+    maintenance_history: AISearchResult[];
   };
 }
 

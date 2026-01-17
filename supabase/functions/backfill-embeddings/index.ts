@@ -24,7 +24,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { 
-      tables = ['components', 'work_orders', 'projects', 'property_todos'],
+      tables = ['properties', 'components', 'work_orders', 'projects', 'property_todos', 'drift_tasks', 'maintenance_history'],
       batchSize = 100,
       organizationId
     }: BackfillRequest = await req.json().catch(() => ({}));
@@ -48,10 +48,16 @@ serve(async (req) => {
       // Get all records that need embedding
       let records: any[] = [];
       
-      if (table === 'work_orders') {
+      if (table === 'work_orders' || table === 'maintenance_history') {
         const { data, error } = await supabase
           .from(table)
           .select('id, component_id')
+          .limit(batchSize);
+        if (!error) records = data || [];
+      } else if (table === 'properties') {
+        const { data, error } = await supabase
+          .from(table)
+          .select('id, organization_id')
           .limit(batchSize);
         if (!error) records = data || [];
       } else {
@@ -73,25 +79,30 @@ serve(async (req) => {
         
         // Get organization ID from property if not provided
         if (!orgId) {
-          let propertyId = record.property_id;
-          
-          // For work orders, get property_id through component
-          if (table === 'work_orders' && record.component_id) {
-            const { data: component } = await supabase
-              .from('components')
-              .select('property_id')
-              .eq('id', record.component_id)
-              .single();
-            propertyId = component?.property_id;
-          }
+          // For properties table, use organization_id directly
+          if (table === 'properties' && record.organization_id) {
+            orgId = record.organization_id;
+          } else {
+            let propertyId = record.property_id;
+            
+            // For work orders and maintenance_history, get property_id through component
+            if ((table === 'work_orders' || table === 'maintenance_history') && record.component_id) {
+              const { data: component } = await supabase
+                .from('components')
+                .select('property_id')
+                .eq('id', record.component_id)
+                .single();
+              propertyId = component?.property_id;
+            }
 
-          if (propertyId) {
-            const { data: property } = await supabase
-              .from('properties')
-              .select('organization_id')
-              .eq('id', propertyId)
-              .single();
-            orgId = property?.organization_id;
+            if (propertyId) {
+              const { data: property } = await supabase
+                .from('properties')
+                .select('organization_id')
+                .eq('id', propertyId)
+                .single();
+              orgId = property?.organization_id;
+            }
           }
         }
 

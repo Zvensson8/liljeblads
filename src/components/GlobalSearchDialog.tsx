@@ -9,7 +9,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Building2, Package, Wrench, Briefcase, Search, Sparkles, CheckSquare } from "lucide-react";
+import { Building2, Package, Wrench, Briefcase, Search, Sparkles, CheckSquare, Calendar, ClipboardList } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAISearch, AISearchResult } from "@/hooks/useAISearch";
 import { Toggle } from "@/components/ui/toggle";
@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface SearchResult {
   id: string;
-  type: "property" | "component" | "work_order" | "project" | "todo";
+  type: "property" | "component" | "work_order" | "project" | "todo" | "drift_task" | "maintenance";
   title: string;
   subtitle: string;
   path: string;
@@ -58,6 +58,12 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
       let type: SearchResult["type"] = "component";
 
       switch (r.source_table) {
+        case "properties":
+          type = "property";
+          title = r.details?.name || r.content.split('.')[0];
+          subtitle = r.details?.address || "";
+          path = `/properties/${r.source_id}`;
+          break;
         case "components":
           type = "component";
           title = r.details?.name || r.content.split('.')[0];
@@ -81,6 +87,18 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
           title = r.details?.title || r.content.split('.')[0];
           subtitle = r.details?.property?.name || r.details?.category || "";
           path = `/properties/${r.details?.property?.id}?tab=todos`;
+          break;
+        case "drift_tasks":
+          type = "drift_task";
+          title = r.details?.name || r.content.split('.')[0];
+          subtitle = `${r.details?.quarter || ''} ${r.details?.year || ''} - ${r.details?.property?.name || ''}`;
+          path = `/operations?property=${r.details?.property?.id}`;
+          break;
+        case "maintenance_history":
+          type = "maintenance";
+          title = r.details?.action_type || r.content.split('.')[0];
+          subtitle = `${r.details?.performed_date || ''} - ${r.details?.component?.name || ''}`;
+          path = `/components/${r.details?.component?.id}`;
           break;
       }
 
@@ -261,6 +279,10 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
         return <Briefcase className="h-4 w-4" />;
       case "todo":
         return <CheckSquare className="h-4 w-4" />;
+      case "drift_task":
+        return <Calendar className="h-4 w-4" />;
+      case "maintenance":
+        return <ClipboardList className="h-4 w-4" />;
       default:
         return <Search className="h-4 w-4" />;
     }
@@ -278,6 +300,10 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
         return "Projekt";
       case "todo":
         return "Att göra";
+      case "drift_task":
+        return "Driftuppgift";
+      case "maintenance":
+        return "Underhåll";
       default:
         return "";
     }
@@ -289,6 +315,8 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
     work_order: results.filter((r) => r.type === "work_order"),
     project: results.filter((r) => r.type === "project"),
     todo: results.filter((r) => r.type === "todo"),
+    drift_task: results.filter((r) => r.type === "drift_task"),
+    maintenance: results.filter((r) => r.type === "maintenance"),
   };
 
   const isLoading = useAI ? aiSearching : loading;
@@ -448,6 +476,52 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
         {groupedResults.todo.length > 0 && (
           <CommandGroup heading="Att göra">
             {groupedResults.todo.map((result) => (
+              <CommandItem
+                key={result.id}
+                onSelect={() => handleSelect(result.path)}
+                className="flex items-center gap-3"
+              >
+                {getIcon(result.type)}
+                <div className="flex-1">
+                  <div className="font-medium">{result.title}</div>
+                  <div className="text-xs text-muted-foreground">{result.subtitle}</div>
+                </div>
+                {result.similarity && (
+                  <Badge variant="secondary" className="text-xs">
+                    {Math.round(result.similarity * 100)}%
+                  </Badge>
+                )}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {groupedResults.drift_task.length > 0 && (
+          <CommandGroup heading="Driftuppgifter">
+            {groupedResults.drift_task.map((result) => (
+              <CommandItem
+                key={result.id}
+                onSelect={() => handleSelect(result.path)}
+                className="flex items-center gap-3"
+              >
+                {getIcon(result.type)}
+                <div className="flex-1">
+                  <div className="font-medium">{result.title}</div>
+                  <div className="text-xs text-muted-foreground">{result.subtitle}</div>
+                </div>
+                {result.similarity && (
+                  <Badge variant="secondary" className="text-xs">
+                    {Math.round(result.similarity * 100)}%
+                  </Badge>
+                )}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {groupedResults.maintenance.length > 0 && (
+          <CommandGroup heading="Underhållshistorik">
+            {groupedResults.maintenance.map((result) => (
               <CommandItem
                 key={result.id}
                 onSelect={() => handleSelect(result.path)}
