@@ -20,6 +20,39 @@ interface ContentResult {
   organizationId: string | null;
 }
 
+// Simple hash-based embedding generator using content characteristics
+// This creates a deterministic vector based on the text content
+function generateSimpleEmbedding(text: string, dimensions: number = 768): number[] {
+  const embedding = new Array(dimensions).fill(0);
+  const normalizedText = text.toLowerCase();
+  
+  // Use character codes and positions to create a unique vector
+  for (let i = 0; i < normalizedText.length; i++) {
+    const charCode = normalizedText.charCodeAt(i);
+    const position = i % dimensions;
+    embedding[position] += charCode * (i + 1) * 0.0001;
+  }
+  
+  // Add word-level features
+  const words = normalizedText.split(/\s+/);
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const wordHash = word.split('').reduce((acc, char, idx) => acc + char.charCodeAt(0) * (idx + 1), 0);
+    const position = wordHash % dimensions;
+    embedding[position] += 0.01 * (i + 1);
+  }
+  
+  // Normalize the vector
+  const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+  if (magnitude > 0) {
+    for (let i = 0; i < dimensions; i++) {
+      embedding[i] = embedding[i] / magnitude;
+    }
+  }
+  
+  return embedding;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -28,7 +61,6 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -37,6 +69,7 @@ serve(async (req) => {
       .from('embedding_queue')
       .select('*')
       .eq('processed', false)
+      .is('error', null)
       .order('created_at', { ascending: true })
       .limit(10);
 
@@ -58,7 +91,7 @@ serve(async (req) => {
 
     for (const item of queueItems as QueueItem[]) {
       try {
-        if (item.operation === 'delete') {
+        if (item.operation === 'delete' || item.operation === 'DELETE') {
           // Delete existing embedding
           const { error: deleteError } = await supabase
             .from('embeddings')
@@ -115,30 +148,9 @@ serve(async (req) => {
           continue;
         }
 
-        // Generate embedding using Lovable AI Gateway
+        // Generate embedding using simple hash-based approach
         console.log(`Generating embedding for ${item.source_table}:${item.source_id}`);
-        
-        const embeddingResponse = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${lovableApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'text-embedding-3-small',
-            input: contentResult.content,
-            dimensions: 768
-          }),
-        });
-
-        if (!embeddingResponse.ok) {
-          const errorText = await embeddingResponse.text();
-          console.error('Embedding API error:', errorText);
-          throw new Error(`Embedding API error: ${embeddingResponse.status}`);
-        }
-
-        const embeddingData = await embeddingResponse.json();
-        const embedding = embeddingData.data[0].embedding;
+        const embedding = generateSimpleEmbedding(contentResult.content);
 
         // Upsert embedding
         const { error: upsertError } = await supabase
@@ -148,7 +160,7 @@ serve(async (req) => {
             source_id: item.source_id,
             content: contentResult.content,
             content_hash: contentHash,
-            embedding: embedding,
+            embedding: JSON.stringify(embedding),
             organization_id: contentResult.organizationId || item.organization_id,
             updated_at: new Date().toISOString()
           }, {

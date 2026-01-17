@@ -10,7 +10,6 @@ interface SearchRequest {
   query: string;
   organizationId?: string;
   filterTables?: string[];
-  matchThreshold?: number;
   matchCount?: number;
   boostRecent?: boolean;
   boostPopular?: boolean;
@@ -37,7 +36,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
     // Validate authentication
     const authHeader = req.headers.get('Authorization');
@@ -85,13 +83,12 @@ serve(async (req) => {
       });
     }
 
-    // Use the verified organization_id from the user's profile, not from request
+    // Use the verified organization_id from the user's profile
     const verifiedOrgId = profile.organization_id;
 
     const { 
       query, 
       filterTables, 
-      matchThreshold = 0.3, 
       matchCount = 20,
       boostRecent = true,
       boostPopular = true
@@ -106,85 +103,98 @@ serve(async (req) => {
 
     console.log(`AI Search: "${query}" | org: ${verifiedOrgId} | boostRecent: ${boostRecent} | boostPopular: ${boostPopular}`);
 
-    // Generate embedding for the search query
-    const embeddingResponse = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: query,
-        dimensions: 768
-      }),
-    });
+    // Perform text-based search on embeddings table
+    const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 1);
+    
+    // Build search query
+    let searchQuery = supabase
+      .from('embeddings')
+      .select('id, source_table, source_id, content, updated_at, access_count, boost_score')
+      .eq('organization_id', verifiedOrgId);
 
-    if (!embeddingResponse.ok) {
-      const errorText = await embeddingResponse.text();
-      console.error('Embedding API error:', errorText);
-      
-      if (embeddingResponse.status === 429) {
-        return new Response(JSON.stringify({ error: 'Rate limit exceeded, please try again later' }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      if (embeddingResponse.status === 402) {
-        return new Response(JSON.stringify({ error: 'Payment required, please add funds' }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      throw new Error(`Embedding API error: ${embeddingResponse.status}`);
+    // Filter by tables if specified
+    if (filterTables && filterTables.length > 0) {
+      searchQuery = searchQuery.in('source_table', filterTables);
     }
 
-    const embeddingData = await embeddingResponse.json();
-    const queryEmbedding = embeddingData.data[0].embedding;
-
-    // Perform semantic search with re-ranking using the verified organization ID
-    const { data: searchResults, error: searchError } = await supabase.rpc('semantic_search_ranked', {
-      query_embedding: queryEmbedding,
-      match_threshold: matchThreshold,
-      match_count: matchCount,
-      org_id: verifiedOrgId,
-      filter_tables: filterTables || null,
-      boost_recent: boostRecent,
-      boost_popular: boostPopular
-    });
+    const { data: allEmbeddings, error: searchError } = await searchQuery.limit(500);
 
     if (searchError) {
       console.error('Search error:', searchError);
-      // Fallback to basic search if ranked search fails
-      const { data: fallbackResults, error: fallbackError } = await supabase.rpc('semantic_search', {
-        query_embedding: queryEmbedding,
-        match_threshold: matchThreshold,
-        match_count: matchCount,
-        org_id: verifiedOrgId,
-        filter_tables: filterTables || null
-      });
-      
-      if (fallbackError) throw fallbackError;
-      
-      // Use fallback results
-      const enrichedFallback = await enrichResults(supabase, fallbackResults || []);
-      return formatResponse(query, enrichedFallback);
+      throw searchError;
     }
 
-    console.log(`Found ${searchResults?.length || 0} results with re-ranking`);
+    // Score and rank results based on text matching
+    const scoredResults = (allEmbeddings || [])
+      .map(embedding => {
+        const contentLower = embedding.content.toLowerCase();
+        
+        // Calculate text match score
+        let matchScore = 0;
+        let exactMatch = false;
+        
+        // Check for exact phrase match
+        if (contentLower.includes(query.toLowerCase())) {
+          matchScore += 100;
+          exactMatch = true;
+        }
+        
+        // Check for individual term matches
+        for (const term of searchTerms) {
+          if (contentLower.includes(term)) {
+            matchScore += 10;
+            // Bonus for term appearing at the start
+            if (contentLower.startsWith(term) || contentLower.includes(`: ${term}`)) {
+              matchScore += 5;
+            }
+          }
+        }
+        
+        // Calculate recency boost (items updated in last 30 days get boost)
+        let recencyBoost = 0;
+        if (boostRecent && embedding.updated_at) {
+          const daysSinceUpdate = (Date.now() - new Date(embedding.updated_at).getTime()) / (1000 * 60 * 60 * 24);
+          if (daysSinceUpdate < 7) recencyBoost = 20;
+          else if (daysSinceUpdate < 30) recencyBoost = 10;
+          else if (daysSinceUpdate < 90) recencyBoost = 5;
+        }
+        
+        // Calculate popularity boost
+        let popularityBoost = 0;
+        if (boostPopular) {
+          popularityBoost = Math.min((embedding.access_count || 0) * 2, 20);
+          popularityBoost += (embedding.boost_score || 0) * 5;
+        }
+        
+        const finalScore = matchScore + recencyBoost + popularityBoost;
+        
+        return {
+          ...embedding,
+          matchScore,
+          recencyBoost,
+          popularityBoost,
+          finalScore,
+          similarity: matchScore / 100 // Normalize to 0-1 range
+        };
+      })
+      .filter(r => r.matchScore > 0) // Only include results with matches
+      .sort((a, b) => b.finalScore - a.finalScore)
+      .slice(0, matchCount);
 
-    // Enrich results with additional details and update access stats
-    const enrichedResults = await enrichResults(supabase, searchResults || []);
+    console.log(`Found ${scoredResults.length} results`);
 
-    // Update access stats for top results (for future re-ranking)
-    const topResults = enrichedResults.slice(0, 5);
-    for (const result of topResults) {
-      await supabase.rpc('update_embedding_access', {
-        p_source_table: result.source_table,
-        p_source_id: result.source_id
-      });
-    }
+    // Enrich results with additional details
+    const enrichedResults = await enrichResults(supabase, scoredResults);
+
+    // Update access stats for top results (fire and forget)
+    enrichedResults.slice(0, 5).forEach(result => {
+      supabase
+        .from('embeddings')
+        .update({ last_accessed_at: new Date().toISOString() })
+        .eq('source_table', result.source_table)
+        .eq('source_id', result.source_id)
+        .then(() => {});
+    });
 
     return formatResponse(query, enrichedResults);
 
@@ -230,9 +240,9 @@ async function enrichResults(supabase: any, results: any[]): Promise<SearchResul
       source_id: result.source_id,
       content: result.content,
       similarity: result.similarity,
-      recency_boost: result.recency_boost,
-      popularity_boost: result.popularity_boost,
-      final_score: result.final_score || result.similarity,
+      recency_boost: result.recencyBoost,
+      popularity_boost: result.popularityBoost,
+      final_score: result.finalScore,
       details
     });
   }
