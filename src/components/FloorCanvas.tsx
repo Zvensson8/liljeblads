@@ -276,16 +276,44 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         canvas.hoverCursor = 'pointer';
         canvas.renderAll();
         
-        // Show tooltip
+        // Show tooltip positioned close to the component
         const component = componentsRef.current.find(c => c.id === target.componentId);
         if (component) {
           const canvasElement = canvasRef.current;
           if (canvasElement) {
             const rect = canvasElement.getBoundingClientRect();
-            setTooltipPosition({
-              x: rect.left + e.pointer.x + 10,
-              y: rect.top + e.pointer.y + 10
-            });
+            const zoom = canvas.getZoom();
+            const vpt = canvas.viewportTransform || [1, 0, 0, 1, 0, 0];
+            
+            // Calculate the object's screen position using viewport transform
+            const objLeft = target.left || 0;
+            const objTop = target.top || 0;
+            const objRadius = target.radius || 15;
+            
+            // Transform canvas coordinates to screen coordinates
+            const screenX = rect.left + (objLeft * zoom) + vpt[4];
+            const screenY = rect.top + (objTop * zoom) + vpt[5];
+            
+            // Position tooltip to the right of the component
+            const tooltipWidth = 200;
+            const tooltipHeight = 100;
+            const offset = (objRadius * zoom) + 12;
+            
+            let finalX = screenX + offset;
+            let finalY = screenY - 10;
+            
+            // Keep tooltip within viewport bounds
+            if (finalX + tooltipWidth > window.innerWidth - 20) {
+              finalX = screenX - tooltipWidth - 12;
+            }
+            if (finalY + tooltipHeight > window.innerHeight - 20) {
+              finalY = window.innerHeight - tooltipHeight - 20;
+            }
+            if (finalY < 20) {
+              finalY = 20;
+            }
+            
+            setTooltipPosition({ x: finalX, y: finalY });
             setTooltipComponent(component);
             setTooltipVisible(true);
           }
@@ -685,9 +713,23 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate }: FloorCanvasProps)
         variant: 'destructive',
       });
     } else {
+      // Ask if user wants to update floor_id for this component
+      const shouldUpdateFloor = window.confirm(
+        'Vill du koppla komponenten till denna våning?'
+      );
+      
+      if (shouldUpdateFloor) {
+        await supabase
+          .from('components')
+          .update({ floor_id: floorId })
+          .eq('id', existingComponentId);
+      }
+      
       toast({
         title: 'Position sparad',
-        description: 'Komponentens position har sparats.',
+        description: shouldUpdateFloor 
+          ? 'Komponentens position och våningskoppling har sparats.'
+          : 'Komponentens position har sparats.',
       });
       loadComponents();
       fabricCanvas.remove(selectedObject);
