@@ -299,7 +299,7 @@ export default function Operations() {
                   </TabsList>
 
                   <TabsContent value="quarters" className="space-y-4 mt-4">
-                    <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-4">
                       {(["Q1", "Q2", "Q3", "Q4"] as const).map((quarter) => {
                         const property = properties.find(p => p.id === selectedProperty);
                         return (

@@ -398,18 +398,18 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     return matchesSearch && matchesStatus;
   });
 
-  const completionRate = stats.totalTasks > 0 
-    ? Math.round((stats.completed / stats.totalTasks) * 100)
-    : 0;
-
-  const gradientClass = 
-    completionRate >= 80 ? 'gradient-success' :
-    completionRate >= 40 ? 'gradient-warning' : 'gradient-danger';
+  // Header color based on status: green only when ALL tasks are done
+  const getHeaderColorClass = () => {
+    if (stats.totalTasks === 0) return "bg-muted";
+    if (stats.completed === stats.totalTasks) return "bg-green-500/20 border-green-500/50";
+    if (stats.missing > 0) return "bg-red-500/20 border-red-500/50";
+    return "bg-yellow-500/20 border-yellow-500/50";
+  };
 
   return (
-    <Card className={gradientClass}>
+    <Card>
       <Collapsible open={expanded} onOpenChange={setExpanded}>
-        <CardHeader className="p-4">
+        <CardHeader className={`p-4 rounded-t-lg border-b ${getHeaderColorClass()}`}>
           <div className="flex items-center justify-between w-full gap-2">
             <CollapsibleTrigger className="flex items-center justify-between flex-1 hover:bg-muted/50 rounded-md p-2 -m-2">
               <div className="flex items-center gap-4">
