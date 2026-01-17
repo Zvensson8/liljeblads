@@ -9,7 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download, Upload, LayoutGrid, Table as TableIcon, Edit } from 'lucide-react';
+import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download, Upload, LayoutGrid, Table as TableIcon, Edit, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
 import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
 import { SelectPropertyFloorDialog } from '@/components/SelectPropertyFloorDialog';
@@ -54,6 +55,53 @@ const Components = () => {
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
   const [selectedFloorId, setSelectedFloorId] = useState('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [sortField, setSortField] = useState<'type' | 'property' | 'manufacturer' | 'model' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const sortedComponents = [...components].sort((a, b) => {
+    if (!sortField) return 0;
+    
+    let aValue = '';
+    let bValue = '';
+    
+    switch (sortField) {
+      case 'type':
+        aValue = a.type || '';
+        bValue = b.type || '';
+        break;
+      case 'property':
+        aValue = a.property_name || '';
+        bValue = b.property_name || '';
+        break;
+      case 'manufacturer':
+        aValue = a.manufacturer || '';
+        bValue = b.manufacturer || '';
+        break;
+      case 'model':
+        aValue = a.model || '';
+        bValue = b.model || '';
+        break;
+    }
+    
+    const comparison = aValue.localeCompare(bValue, 'sv');
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
+  const handleSort = (field: 'type' | 'property' | 'manufacturer' | 'model') => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: 'type' | 'property' | 'manufacturer' | 'model') => {
+    if (sortField !== field) return <ArrowUpDown className="h-3.5 w-3.5 ml-1 opacity-50" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-3.5 w-3.5 ml-1" /> 
+      : <ArrowDown className="h-3.5 w-3.5 ml-1" />;
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -268,6 +316,37 @@ const Components = () => {
                       Tabell
                     </Button>
                   </div>
+                  
+                  {/* Sorting dropdown */}
+                  <Select
+                    value={sortField ? `${sortField}-${sortDirection}` : 'none'}
+                    onValueChange={(value) => {
+                      if (value === 'none') {
+                        setSortField(null);
+                      } else {
+                        const [field, dir] = value.split('-') as ['type' | 'property' | 'manufacturer' | 'model', 'asc' | 'desc'];
+                        setSortField(field);
+                        setSortDirection(dir);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <ArrowUpDown className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Sortera..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Ingen sortering</SelectItem>
+                      <SelectItem value="type-asc">Typ (A-Ö)</SelectItem>
+                      <SelectItem value="type-desc">Typ (Ö-A)</SelectItem>
+                      <SelectItem value="property-asc">Fastighet (A-Ö)</SelectItem>
+                      <SelectItem value="property-desc">Fastighet (Ö-A)</SelectItem>
+                      <SelectItem value="manufacturer-asc">Tillverkare (A-Ö)</SelectItem>
+                      <SelectItem value="manufacturer-desc">Tillverkare (Ö-A)</SelectItem>
+                      <SelectItem value="model-asc">Modell (A-Ö)</SelectItem>
+                      <SelectItem value="model-desc">Modell (Ö-A)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
                   <Badge variant="outline" className="text-base px-4 py-2">
                     {components.length} komponenter
                   </Badge>
@@ -314,7 +393,7 @@ const Components = () => {
                     </Card>
                   ) : viewMode === 'cards' ? (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {components.map((component) => (
+                      {sortedComponents.map((component) => (
                         <Card
                           key={component.id}
                           className="group hover:shadow-lg transition-all duration-300 cursor-pointer"
@@ -431,9 +510,33 @@ const Components = () => {
                           <thead>
                             <tr className="border-b text-sm text-muted-foreground">
                               <th className="text-left py-3 px-4 font-medium">Komponent</th>
-                              <th className="text-left py-3 px-4 font-medium hidden md:table-cell">Typ</th>
-                              <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Tillverkare</th>
-                              <th className="text-left py-3 px-4 font-medium">Fastighet</th>
+                              <th 
+                                className="text-left py-3 px-4 font-medium hidden md:table-cell cursor-pointer hover:text-foreground transition-colors"
+                                onClick={() => handleSort('type')}
+                              >
+                                <span className="flex items-center">
+                                  Typ
+                                  {getSortIcon('type')}
+                                </span>
+                              </th>
+                              <th 
+                                className="text-left py-3 px-4 font-medium hidden lg:table-cell cursor-pointer hover:text-foreground transition-colors"
+                                onClick={() => handleSort('manufacturer')}
+                              >
+                                <span className="flex items-center">
+                                  Tillverkare
+                                  {getSortIcon('manufacturer')}
+                                </span>
+                              </th>
+                              <th 
+                                className="text-left py-3 px-4 font-medium cursor-pointer hover:text-foreground transition-colors"
+                                onClick={() => handleSort('property')}
+                              >
+                                <span className="flex items-center">
+                                  Fastighet
+                                  {getSortIcon('property')}
+                                </span>
+                              </th>
                               <th className="text-left py-3 px-4 font-medium">Våning</th>
                               <th className="text-left py-3 px-4 font-medium hidden sm:table-cell">Senaste service</th>
                               <th className="text-left py-3 px-4 font-medium">Status</th>
@@ -441,7 +544,7 @@ const Components = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {components.map((component) => (
+                            {sortedComponents.map((component) => (
                               <tr 
                                 key={component.id} 
                                 className="border-b hover:bg-muted/50 cursor-pointer"
