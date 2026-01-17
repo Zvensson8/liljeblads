@@ -83,9 +83,147 @@ serve(async (req) => {
         const searchTerms = extractSearchTerms(lastUserMessage.content);
         console.log('Extracted search terms:', searchTerms);
         
+        // Parse time-based filters (Q1, Q2, 2024, 2025, etc.)
+        const timeFilter = parseTimeFilter(lastUserMessage.content);
+        console.log('Time filter:', timeFilter);
+        
         const contextParts: string[] = [];
         const foundPropertyIds = new Set<string>();
         const foundComponentIds = new Set<string>();
+        const foundProjectIds = new Set<string>();
+        
+        // Get all property IDs for user's organization (needed for time-based searches)
+        const { data: orgProperties } = await supabase
+          .from('properties')
+          .select('id, name')
+          .eq('organization_id', verifiedOrgId);
+        const orgPropertyIds = orgProperties?.map(p => p.id) || [];
+        const propertyNameMap = new Map(orgProperties?.map(p => [p.id, p.name]) || []);
+        
+        // If there's a time filter, search projects by quarter/year
+        if ((timeFilter.quarter || timeFilter.year) && orgPropertyIds.length > 0) {
+          console.log('Searching projects by time filter:', timeFilter);
+          
+          let query = supabase
+            .from('projects')
+            .select('*, property:properties(name), project_cost_items(*), project_checklist_items(*)')
+            .in('property_id', orgPropertyIds);
+          
+          if (timeFilter.quarter) {
+            query = query.eq('start_quarter', timeFilter.quarter);
+          }
+          if (timeFilter.year) {
+            query = query.eq('year', timeFilter.year);
+          }
+          
+          const { data: projects, error: projectsError } = await query.limit(30);
+          
+          if (projectsError) {
+            console.error('Project time search error:', projectsError);
+          } else if (projects && projects.length > 0) {
+            console.log(`Found ${projects.length} projects for time filter`);
+            
+            // Group by property for better presentation
+            const projectsByProperty = new Map<string, typeof projects>();
+            for (const pr of projects) {
+              foundProjectIds.add(pr.id);
+              const propId = pr.property_id;
+              if (!projectsByProperty.has(propId)) {
+                projectsByProperty.set(propId, []);
+              }
+              projectsByProperty.get(propId)!.push(pr);
+            }
+            
+            for (const [propId, propProjects] of projectsByProperty) {
+              const propName = propertyNameMap.get(propId) || 'Okänd fastighet';
+              let projInfo = `📋 PROJEKT FÖR ${propName.toUpperCase()} (${timeFilter.quarter ? 'Q' + timeFilter.quarter : ''} ${timeFilter.year || ''}):`;
+              
+              for (const pr of propProjects) {
+                projInfo += `\n\n  ${pr.name} (${pr.project_number})`;
+                projInfo += `\n    Status: ${pr.status || 'Ej angivet'}`;
+                projInfo += `, Typ: ${pr.type || 'Ej angivet'}`;
+                if (pr.budget) projInfo += `\n    Budget: ${pr.budget.toLocaleString('sv-SE')} kr`;
+                if (pr.actual_cost) projInfo += `, Utfall: ${pr.actual_cost.toLocaleString('sv-SE')} kr`;
+                if (pr.forecast) projInfo += `, Prognos: ${pr.forecast.toLocaleString('sv-SE')} kr`;
+                if (pr.start_date) projInfo += `\n    Start: ${pr.start_date}`;
+                if (pr.end_date) projInfo += `, Slut: ${pr.end_date}`;
+                if (pr.project_manager) projInfo += `\n    Projektledare: ${pr.project_manager}`;
+                if (pr.description) projInfo += `\n    Beskrivning: ${pr.description}`;
+                
+                // Checklist summary
+                if (pr.project_checklist_items && pr.project_checklist_items.length > 0) {
+                  const completed = pr.project_checklist_items.filter((i: any) => i.completed).length;
+                  projInfo += `\n    Checklista: ${completed}/${pr.project_checklist_items.length} klara`;
+                }
+                
+                // Costs summary
+                if (pr.project_cost_items && pr.project_cost_items.length > 0) {
+                  const totalCost = pr.project_cost_items.reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
+                  projInfo += `\n    Bokförda kostnader: ${totalCost.toLocaleString('sv-SE')} kr`;
+                }
+              }
+              
+              contextParts.push(projInfo);
+            }
+            
+            // Add summary
+            const totalBudget = projects.reduce((sum, p) => sum + (p.budget || 0), 0);
+            const totalActual = projects.reduce((sum, p) => sum + (p.actual_cost || 0), 0);
+            const totalForecast = projects.reduce((sum, p) => sum + (p.forecast || 0), 0);
+            
+            contextParts.unshift(`📊 SAMMANFATTNING ${timeFilter.quarter ? 'Q' + timeFilter.quarter : ''} ${timeFilter.year || ''}:
+  Antal projekt: ${projects.length}
+  Total budget: ${totalBudget.toLocaleString('sv-SE')} kr
+  Totalt utfall: ${totalActual.toLocaleString('sv-SE')} kr
+  Total prognos: ${totalForecast.toLocaleString('sv-SE')} kr
+  Fastigheter: ${projectsByProperty.size} st`);
+          }
+          
+          // Also search drift tasks for the same time period
+          const quarterName = timeFilter.quarter ? `Q${timeFilter.quarter}` : null;
+          if (quarterName || timeFilter.year) {
+            let driftQuery = supabase
+              .from('drift_tasks')
+              .select('*, property:properties(name), drift_task_components(*)')
+              .in('property_id', orgPropertyIds);
+            
+            if (quarterName) {
+              driftQuery = driftQuery.eq('quarter', quarterName);
+            }
+            if (timeFilter.year) {
+              driftQuery = driftQuery.eq('year', timeFilter.year);
+            }
+            
+            const { data: driftTasks } = await driftQuery.limit(30);
+            
+            if (driftTasks && driftTasks.length > 0) {
+              console.log(`Found ${driftTasks.length} drift tasks for time filter`);
+              
+              // Group by property
+              const tasksByProperty = new Map<string, typeof driftTasks>();
+              for (const dt of driftTasks) {
+                const propId = dt.property_id;
+                if (!tasksByProperty.has(propId)) {
+                  tasksByProperty.set(propId, []);
+                }
+                tasksByProperty.get(propId)!.push(dt);
+              }
+              
+              for (const [propId, propTasks] of tasksByProperty) {
+                const propName = propertyNameMap.get(propId) || 'Okänd fastighet';
+                let taskInfo = `🔄 DRIFTUPPGIFTER FÖR ${propName.toUpperCase()} (${quarterName || ''} ${timeFilter.year || ''}):`;
+                
+                for (const dt of propTasks) {
+                  taskInfo += `\n  ${dt.name}`;
+                  taskInfo += ` - Planerat: ${dt.planned_count}, Rapporterat: ${dt.reported_count}`;
+                  if (dt.description) taskInfo += `\n    ${dt.description}`;
+                }
+                
+                contextParts.push(taskInfo);
+              }
+            }
+          }
+        }
         
         // Search properties scoped to user's organization
         for (const term of searchTerms) {
@@ -427,6 +565,8 @@ serve(async (req) => {
           
           if (projects && projects.length > 0) {
             for (const pr of projects) {
+              // Skip if already found via time filter or already in context
+              if (foundProjectIds.has(pr.id)) continue;
               if (contextParts.some(cp => cp.includes(`PROJEKT: ${pr.name}`))) continue;
               
               let projInfo = `📋 PROJEKT: ${pr.name}
@@ -764,4 +904,28 @@ function extractSearchTerms(message: string): string[] {
   
   // Remove duplicates
   return [...new Set(words)];
+}
+
+// Parse time-based queries (Q1, Q2, 2024, 2025, etc.)
+interface TimeFilter {
+  quarter?: number;
+  year?: number;
+}
+
+function parseTimeFilter(message: string): TimeFilter {
+  const filter: TimeFilter = {};
+  
+  // Match quarters: Q1, Q2, Q3, Q4, kvartal 1, etc.
+  const quarterMatch = message.match(/(?:q|kvartal\s*)([1-4])/i);
+  if (quarterMatch) {
+    filter.quarter = parseInt(quarterMatch[1]);
+  }
+  
+  // Match years: 2024, 2025, 2026, etc.
+  const yearMatch = message.match(/\b(20[2-3]\d)\b/);
+  if (yearMatch) {
+    filter.year = parseInt(yearMatch[1]);
+  }
+  
+  return filter;
 }
