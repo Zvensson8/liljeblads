@@ -91,8 +91,10 @@ serve(async (req) => {
         const foundPropertyIds = new Set<string>();
         const foundComponentIds = new Set<string>();
         const foundProjectIds = new Set<string>();
+        const foundMaintenanceIds = new Set<string>();
+        const foundWorkOrderIds = new Set<string>();
         
-        // Get all property IDs for user's organization (needed for time-based searches)
+        // Get all properties and components for user's organization
         const { data: orgProperties } = await supabase
           .from('properties')
           .select('id, name')
@@ -100,7 +102,181 @@ serve(async (req) => {
         const orgPropertyIds = orgProperties?.map(p => p.id) || [];
         const propertyNameMap = new Map(orgProperties?.map(p => [p.id, p.name]) || []);
         
-        // If there's a time filter, search projects by quarter/year
+        // Get all component IDs for the organization's properties
+        const { data: orgComponents } = await supabase
+          .from('components')
+          .select('id, name, property_id')
+          .in('property_id', orgPropertyIds);
+        const orgComponentIds = orgComponents?.map(c => c.id) || [];
+        const componentNameMap = new Map(orgComponents?.map(c => [c.id, c.name]) || []);
+        const componentPropertyMap = new Map(orgComponents?.map(c => [c.id, c.property_id]) || []);
+        
+        // ============================================
+        // SEARCH 1: Maintenance History by Year/Terms
+        // ============================================
+        // This catches questions like "when did we replace the roof in 2025" or "what did ventilation cost"
+        if (orgComponentIds.length > 0) {
+          let maintenanceQuery = supabase
+            .from('maintenance_history')
+            .select('*, component:components(name, property_id, property:properties(name))')
+            .in('component_id', orgComponentIds)
+            .order('performed_date', { ascending: false });
+          
+          // Filter by year if specified
+          if (timeFilter.year) {
+            const yearStart = `${timeFilter.year}-01-01`;
+            const yearEnd = `${timeFilter.year}-12-31`;
+            maintenanceQuery = maintenanceQuery.gte('performed_date', yearStart).lte('performed_date', yearEnd);
+          }
+          
+          const { data: maintenanceRecords, error: maintenanceError } = await maintenanceQuery.limit(50);
+          
+          if (maintenanceError) {
+            console.error('Maintenance search error:', maintenanceError);
+          } else if (maintenanceRecords && maintenanceRecords.length > 0) {
+            console.log(`Found ${maintenanceRecords.length} maintenance records`);
+            
+            // Filter by search terms if present
+            let filteredRecords = maintenanceRecords;
+            if (searchTerms.length > 0) {
+              filteredRecords = maintenanceRecords.filter(mh => {
+                const searchText = `${mh.action_type || ''} ${mh.notes || ''} ${mh.category || ''} ${mh.supplier || ''} ${mh.component?.name || ''}`.toLowerCase();
+                return searchTerms.some(term => searchText.includes(term.toLowerCase()));
+              });
+            }
+            
+            if (filteredRecords.length > 0 || timeFilter.year) {
+              // Group by property for presentation
+              const recordsByProperty = new Map<string, typeof maintenanceRecords>();
+              for (const mh of filteredRecords.length > 0 ? filteredRecords : maintenanceRecords.slice(0, 20)) {
+                foundMaintenanceIds.add(mh.id);
+                const propId = mh.component?.property_id;
+                if (propId) {
+                  if (!recordsByProperty.has(propId)) {
+                    recordsByProperty.set(propId, []);
+                  }
+                  recordsByProperty.get(propId)!.push(mh);
+                }
+              }
+              
+              for (const [propId, records] of recordsByProperty) {
+                const propName = propertyNameMap.get(propId) || 'Okänd fastighet';
+                let mhInfo = `🔧 UNDERHÅLLSHISTORIK FÖR ${propName.toUpperCase()}${timeFilter.year ? ` (${timeFilter.year})` : ''}:`;
+                
+                let totalCost = 0;
+                for (const mh of records) {
+                  mhInfo += `\n\n  ${mh.performed_date}: ${mh.action_type}`;
+                  mhInfo += `\n    Komponent: ${mh.component?.name || 'Okänd'}`;
+                  if (mh.category) mhInfo += `\n    Kategori: ${mh.category}`;
+                  if (mh.cost) {
+                    mhInfo += `\n    Kostnad: ${mh.cost.toLocaleString('sv-SE')} kr`;
+                    totalCost += mh.cost;
+                  }
+                  if (mh.expected_cost) mhInfo += `\n    Förväntad kostnad: ${mh.expected_cost.toLocaleString('sv-SE')} kr`;
+                  if (mh.supplier) mhInfo += `\n    Leverantör: ${mh.supplier}`;
+                  if (mh.is_warranty) mhInfo += ` (Garanti)`;
+                  if (mh.notes) mhInfo += `\n    Anteckningar: ${mh.notes}`;
+                }
+                
+                if (records.length > 1) {
+                  mhInfo += `\n\n  TOTALT: ${totalCost.toLocaleString('sv-SE')} kr för ${records.length} åtgärder`;
+                }
+                
+                contextParts.push(mhInfo);
+              }
+            }
+          }
+        }
+        
+        // ============================================
+        // SEARCH 2: Work Orders by Year/Terms
+        // ============================================
+        if (orgPropertyIds.length > 0) {
+          let workOrderQuery = supabase
+            .from('work_orders')
+            .select('*, property:properties(name), component:components(name)')
+            .in('property_id', orgPropertyIds)
+            .order('created_at', { ascending: false });
+          
+          // Filter by year if specified (use due_date or created_at)
+          if (timeFilter.year) {
+            const yearStart = `${timeFilter.year}-01-01`;
+            const yearEnd = `${timeFilter.year}-12-31`;
+            workOrderQuery = workOrderQuery.or(`due_date.gte.${yearStart},created_at.gte.${yearStart}`);
+          }
+          
+          const { data: workOrders, error: woError } = await workOrderQuery.limit(50);
+          
+          if (woError) {
+            console.error('Work order year search error:', woError);
+          } else if (workOrders && workOrders.length > 0) {
+            // Filter by search terms if present
+            let filteredOrders = workOrders;
+            if (searchTerms.length > 0) {
+              filteredOrders = workOrders.filter(wo => {
+                const searchText = `${wo.action || ''} ${wo.comments || ''} ${wo.contractor || ''} ${wo.property?.name || ''} ${wo.component?.name || ''}`.toLowerCase();
+                return searchTerms.some(term => searchText.includes(term.toLowerCase()));
+              });
+            }
+            
+            const ordersToShow = filteredOrders.length > 0 ? filteredOrders : (timeFilter.year ? workOrders.slice(0, 20) : []);
+            
+            if (ordersToShow.length > 0) {
+              console.log(`Found ${ordersToShow.length} work orders for year/terms`);
+              
+              // Group by property
+              const ordersByProperty = new Map<string, typeof workOrders>();
+              for (const wo of ordersToShow) {
+                foundWorkOrderIds.add(wo.id);
+                const propId = wo.property_id;
+                if (!ordersByProperty.has(propId)) {
+                  ordersByProperty.set(propId, []);
+                }
+                ordersByProperty.get(propId)!.push(wo);
+              }
+              
+              for (const [propId, orders] of ordersByProperty) {
+                const propName = propertyNameMap.get(propId) || 'Okänd fastighet';
+                let woInfo = `🛠️ ARBETSORDRAR FÖR ${propName.toUpperCase()}${timeFilter.year ? ` (${timeFilter.year})` : ''}:`;
+                
+                const statusLabel = (status: string) => {
+                  if (status === 'not_started') return 'Ej påbörjad';
+                  if (status === 'awaiting_quote') return 'Väntar på offert';
+                  if (status === 'ordered') return 'Beställd';
+                  if (status === 'completed') return 'Avslutad';
+                  if (status === 'archived') return 'Arkiverad';
+                  return status;
+                };
+                
+                let totalPrice = 0;
+                for (const wo of orders) {
+                  woInfo += `\n\n  ${wo.action}`;
+                  woInfo += `\n    Status: ${statusLabel(wo.status)}`;
+                  if (wo.priority) woInfo += `, Prioritet: ${wo.priority}`;
+                  if (wo.contractor) woInfo += `\n    Entreprenör: ${wo.contractor}`;
+                  if (wo.component?.name) woInfo += `\n    Komponent: ${wo.component.name}`;
+                  if (wo.due_date) woInfo += `\n    Deadline: ${wo.due_date}`;
+                  if (wo.quarter) woInfo += `, Kvartal: ${wo.quarter}`;
+                  if (wo.price) {
+                    woInfo += `\n    Pris: ${wo.price.toLocaleString('sv-SE')} kr`;
+                    totalPrice += wo.price;
+                  }
+                  if (wo.comments) woInfo += `\n    Kommentar: ${wo.comments}`;
+                }
+                
+                if (orders.length > 1 && totalPrice > 0) {
+                  woInfo += `\n\n  TOTALT: ${totalPrice.toLocaleString('sv-SE')} kr för ${orders.length} arbetsordrar`;
+                }
+                
+                contextParts.push(woInfo);
+              }
+            }
+          }
+        }
+        
+        // ============================================
+        // SEARCH 3: Projects by Quarter/Year
+        // ============================================
         if ((timeFilter.quarter || timeFilter.year) && orgPropertyIds.length > 0) {
           console.log('Searching projects by time filter:', timeFilter);
           
@@ -225,7 +401,9 @@ serve(async (req) => {
           }
         }
         
-        // Search properties scoped to user's organization
+        // ============================================
+        // SEARCH 4: Properties by search terms
+        // ============================================
         for (const term of searchTerms) {
           const { data: properties } = await supabase
             .from('properties')
@@ -305,7 +483,8 @@ serve(async (req) => {
                   if (c.maintenance_history && c.maintenance_history.length > 0) {
                     propInfo += `\n    Underhållshistorik:`;
                     for (const mh of c.maintenance_history.slice(0, 5)) {
-                      propInfo += `\n      - ${mh.performed_date}: ${mh.action_type}${mh.cost ? ` (${mh.cost} kr)` : ''}${mh.notes ? ` - ${mh.notes}` : ''}`;
+                      foundMaintenanceIds.add(mh.id);
+                      propInfo += `\n      - ${mh.performed_date}: ${mh.action_type}${mh.cost ? ` (${mh.cost.toLocaleString('sv-SE')} kr)` : ''}${mh.supplier ? ` - ${mh.supplier}` : ''}${mh.notes ? ` - ${mh.notes}` : ''}`;
                     }
                   }
                 }
@@ -443,6 +622,7 @@ serve(async (req) => {
 
                 // Show ongoing first
                 for (const wo of pending) {
+                  foundWorkOrderIds.add(wo.id);
                   propInfo += `\n  - ${wo.action}`;
                   propInfo += `\n    Status: ${statusLabel(wo.status)}`;
                   if (wo.priority) propInfo += `, Prioritet: ${wo.priority}`;
@@ -455,6 +635,7 @@ serve(async (req) => {
 
                 // Show recent completed
                 for (const wo of completed.slice(0, 5)) {
+                  foundWorkOrderIds.add(wo.id);
                   propInfo += `\n  - ${wo.action} (Avslutad)`;
                   if (wo.contractor) propInfo += ` - ${wo.contractor}`;
                   if (wo.price) propInfo += ` - ${wo.price.toLocaleString('sv-SE')} kr`;
@@ -466,24 +647,18 @@ serve(async (req) => {
           }
         }
         
-        // Search components directly (if not already found via property) - scoped to user's organization
+        // ============================================
+        // SEARCH 5: Components directly by search terms
+        // ============================================
         for (const term of searchTerms) {
-          // First get property IDs for this organization to filter components
-          const { data: orgProperties } = await supabase
-            .from('properties')
-            .select('id')
-            .eq('organization_id', verifiedOrgId);
-          
-          const orgPropertyIds = orgProperties?.map(p => p.id) || [];
-          
           if (orgPropertyIds.length === 0) continue;
           
           const { data: components } = await supabase
             .from('components')
             .select('*, property:properties(name, address), maintenance_history(*), component_purchase_info(*), component_documents(*)')
             .in('property_id', orgPropertyIds)
-            .or(`name.ilike.%${term}%,type.ilike.%${term}%,manufacturer.ilike.%${term}%,serial_number.ilike.%${term}%,registration_number.ilike.%${term}%`)
-            .limit(5);
+            .or(`name.ilike.%${term}%,type.ilike.%${term}%,manufacturer.ilike.%${term}%,serial_number.ilike.%${term}%,registration_number.ilike.%${term}%,notes.ilike.%${term}%`)
+            .limit(10);
           
           if (components && components.length > 0) {
             for (const c of components) {
@@ -524,10 +699,12 @@ serve(async (req) => {
               // Maintenance history
               if (c.maintenance_history && c.maintenance_history.length > 0) {
                 compInfo += `\n\nUnderhållshistorik (${c.maintenance_history.length} poster):`;
-                for (const mh of c.maintenance_history.slice(0, 5)) {
+                for (const mh of c.maintenance_history.slice(0, 10)) {
+                  foundMaintenanceIds.add(mh.id);
                   compInfo += `\n  - ${mh.performed_date}: ${mh.action_type}`;
-                  if (mh.cost) compInfo += ` (${mh.cost} kr)`;
+                  if (mh.cost) compInfo += ` (${mh.cost.toLocaleString('sv-SE')} kr)`;
                   if (mh.supplier) compInfo += ` - ${mh.supplier}`;
+                  if (mh.category) compInfo += ` [${mh.category}]`;
                   if (mh.notes) compInfo += ` - ${mh.notes}`;
                 }
               }
@@ -545,15 +722,46 @@ serve(async (req) => {
           }
         }
         
-        // Search projects directly - scoped to user's organization via property
+        // ============================================
+        // SEARCH 6: Maintenance history by action type/notes
+        // ============================================
         for (const term of searchTerms) {
-          const { data: orgProperties } = await supabase
-            .from('properties')
-            .select('id')
-            .eq('organization_id', verifiedOrgId);
+          if (orgComponentIds.length === 0) continue;
           
-          const orgPropertyIds = orgProperties?.map(p => p.id) || [];
+          const { data: maintenance } = await supabase
+            .from('maintenance_history')
+            .select('*, component:components(name, property_id, property:properties(name))')
+            .in('component_id', orgComponentIds)
+            .or(`action_type.ilike.%${term}%,notes.ilike.%${term}%,category.ilike.%${term}%,supplier.ilike.%${term}%`)
+            .order('performed_date', { ascending: false })
+            .limit(15);
           
+          if (maintenance && maintenance.length > 0) {
+            for (const mh of maintenance) {
+              if (foundMaintenanceIds.has(mh.id)) continue;
+              foundMaintenanceIds.add(mh.id);
+              
+              const propName = mh.component?.property?.name || 'Okänd fastighet';
+              let mhInfo = `🔧 UNDERHÅLL: ${mh.action_type}
+- Datum: ${mh.performed_date}
+- Komponent: ${mh.component?.name || 'Okänd'}
+- Fastighet: ${propName}`;
+              if (mh.category) mhInfo += `\n- Kategori: ${mh.category}`;
+              if (mh.cost) mhInfo += `\n- Kostnad: ${mh.cost.toLocaleString('sv-SE')} kr`;
+              if (mh.expected_cost) mhInfo += `\n- Förväntad kostnad: ${mh.expected_cost.toLocaleString('sv-SE')} kr`;
+              if (mh.supplier) mhInfo += `\n- Leverantör: ${mh.supplier}`;
+              if (mh.is_warranty) mhInfo += `\n- Garanti: Ja`;
+              if (mh.notes) mhInfo += `\n- Anteckningar: ${mh.notes}`;
+              
+              contextParts.push(mhInfo);
+            }
+          }
+        }
+        
+        // ============================================
+        // SEARCH 7: Projects directly by search terms
+        // ============================================
+        for (const term of searchTerms) {
           if (orgPropertyIds.length === 0) continue;
           
           const { data: projects } = await supabase
@@ -567,7 +775,7 @@ serve(async (req) => {
             for (const pr of projects) {
               // Skip if already found via time filter or already in context
               if (foundProjectIds.has(pr.id)) continue;
-              if (contextParts.some(cp => cp.includes(`PROJEKT: ${pr.name}`))) continue;
+              foundProjectIds.add(pr.id);
               
               let projInfo = `📋 PROJEKT: ${pr.name}
 - Projektnummer: ${pr.project_number}
@@ -587,9 +795,12 @@ serve(async (req) => {
               // Costs
               if (pr.project_cost_items && pr.project_cost_items.length > 0) {
                 projInfo += `\n\nKostnader (${pr.project_cost_items.length} poster):`;
+                const totalCost = pr.project_cost_items.reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
+                projInfo += `\n  Totalt: ${totalCost.toLocaleString('sv-SE')} kr`;
                 for (const ci of pr.project_cost_items.slice(0, 10)) {
                   projInfo += `\n  - ${ci.description}: ${ci.amount?.toLocaleString('sv-SE')} kr (${ci.cost_date})`;
                   if (ci.actor) projInfo += ` - ${ci.actor}`;
+                  if (ci.category) projInfo += ` [${ci.category}]`;
                 }
               }
               
@@ -617,15 +828,10 @@ serve(async (req) => {
           }
         }
         
-        // Search contacts - scoped to user's organization via property
+        // ============================================
+        // SEARCH 8: Contacts by search terms
+        // ============================================
         for (const term of searchTerms) {
-          const { data: orgProperties } = await supabase
-            .from('properties')
-            .select('id')
-            .eq('organization_id', verifiedOrgId);
-          
-          const orgPropertyIds = orgProperties?.map(p => p.id) || [];
-          
           if (orgPropertyIds.length === 0) continue;
           
           const { data: contacts } = await supabase
@@ -648,15 +854,10 @@ serve(async (req) => {
           }
         }
         
-        // Search todos - scoped to user's organization via property
+        // ============================================
+        // SEARCH 9: Todos by search terms
+        // ============================================
         for (const term of searchTerms) {
-          const { data: orgProperties } = await supabase
-            .from('properties')
-            .select('id')
-            .eq('organization_id', verifiedOrgId);
-          
-          const orgPropertyIds = orgProperties?.map(p => p.id) || [];
-          
           if (orgPropertyIds.length === 0) continue;
           
           const { data: todos } = await supabase
@@ -681,27 +882,23 @@ ${t.notes ? `- Anteckningar: ${t.notes}` : ''}`);
           }
         }
         
-        // Search work orders directly - scoped to user's organization via property
+        // ============================================
+        // SEARCH 10: Work orders by search terms
+        // ============================================
         for (const term of searchTerms) {
-          const { data: orgProperties } = await supabase
-            .from('properties')
-            .select('id')
-            .eq('organization_id', verifiedOrgId);
-          
-          const orgPropertyIds = orgProperties?.map(p => p.id) || [];
-          
           if (orgPropertyIds.length === 0) continue;
           
           const { data: workOrders } = await supabase
             .from('work_orders')
-            .select('*, property:properties(name)')
+            .select('*, property:properties(name), component:components(name)')
             .in('property_id', orgPropertyIds)
             .or(`action.ilike.%${term}%,contractor.ilike.%${term}%,comments.ilike.%${term}%,quarter.ilike.%${term}%`)
             .limit(10);
           
           if (workOrders && workOrders.length > 0) {
             for (const wo of workOrders) {
-              if (contextParts.some(cp => cp.includes(wo.action) && cp.includes('ARBETSORDER'))) continue;
+              if (foundWorkOrderIds.has(wo.id)) continue;
+              foundWorkOrderIds.add(wo.id);
               
               let statusText = wo.status;
               if (wo.status === 'not_started') statusText = 'Ej påbörjad';
@@ -714,11 +911,44 @@ ${t.notes ? `- Anteckningar: ${t.notes}` : ''}`);
 - Status: ${statusText}
 - Prioritet: ${wo.priority || 'Ej angivet'}
 - Entreprenör: ${wo.contractor || 'Ej angivet'}
+- Komponent: ${wo.component?.name || 'Ej angivet'}
 - Deadline: ${wo.due_date || 'Ej angivet'}
 - Kvartal: ${wo.quarter || 'Ej angivet'}
 - Pris: ${wo.price ? wo.price.toLocaleString('sv-SE') + ' kr' : 'Ej angivet'}
 - Fastighet: ${wo.property?.name || 'Ej angivet'}
 ${wo.comments ? `- Kommentar: ${wo.comments}` : ''}`);
+            }
+          }
+        }
+        
+        // ============================================
+        // SEARCH 11: Recurring costs by search terms
+        // ============================================
+        for (const term of searchTerms) {
+          if (orgPropertyIds.length === 0) continue;
+          
+          const { data: recurringCosts } = await supabase
+            .from('property_recurring_costs')
+            .select('*, property:properties(name), account_codes(code, description)')
+            .in('property_id', orgPropertyIds)
+            .or(`description.ilike.%${term}%,contractor_name.ilike.%${term}%,contact_person.ilike.%${term}%`)
+            .limit(10);
+          
+          if (recurringCosts && recurringCosts.length > 0) {
+            for (const rc of recurringCosts) {
+              if (contextParts.some(cp => cp.includes(rc.description) && cp.includes('LÖPANDE KOSTNAD'))) continue;
+              
+              let rcInfo = `💰 LÖPANDE KOSTNAD: ${rc.description}
+- Belopp: ${rc.amount?.toLocaleString('sv-SE')} kr`;
+              if (rc.base_interval_months) rcInfo += `\n- Intervall: Var ${rc.base_interval_months}:e månad`;
+              if (rc.contractor_name) rcInfo += `\n- Entreprenör: ${rc.contractor_name}`;
+              if (rc.contact_person) rcInfo += `\n- Kontaktperson: ${rc.contact_person}`;
+              if (rc.next_due_date) rcInfo += `\n- Nästa förfallodatum: ${rc.next_due_date}`;
+              if (rc.last_payment_date) rcInfo += `\n- Senaste betalning: ${rc.last_payment_date}`;
+              if (rc.account_codes) rcInfo += `\n- Kontokod: ${rc.account_codes.code} - ${rc.account_codes.description}`;
+              rcInfo += `\n- Fastighet: ${rc.property?.name || 'Ej angivet'}`;
+              
+              contextParts.push(rcInfo);
             }
           }
         }
@@ -764,6 +994,14 @@ KOMPONENTER
     Typ: [typ]
     Tillverkare: [tillverkare]
     Status: [status]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+UNDERHÅLLSHISTORIK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  [Datum]: [Åtgärd]
+    Komponent: [komponent]
+    Kostnad: [belopp] kr
+    Leverantör: [leverantör]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PROJEKT
@@ -877,10 +1115,10 @@ function extractSearchTerms(message: string): string[] {
     'ett', 'en', 'och', 'eller', 'för', 'med', 'på', 'i', 'av', 'till', 'från',
     'finns', 'har', 'hade', 'vara', 'bli', 'får', 'ska', 'vill', 'måste',
     'visa', 'ge', 'mig', 'information', 'data', 'uppgifter', 'detaljer',
-    'fastigheten', 'komponenten', 'projektet', 'fastighet', 'komponent', 'projekt',
     'alla', 'allt', 'vilka', 'vilken', 'vilket', 'denna', 'detta', 'dessa',
     'min', 'mitt', 'mina', 'din', 'ditt', 'dina', 'sin', 'sitt', 'sina',
-    'vår', 'vårt', 'våra', 'er', 'ert', 'era', 'deras'
+    'vår', 'vårt', 'våra', 'er', 'ert', 'era', 'deras',
+    'när', 'var', 'vart', 'varför', 'hur', 'mycket'
   ];
   
   // Split and filter
@@ -902,8 +1140,9 @@ function extractSearchTerms(message: string): string[] {
     words.push(...quotedMatch.map(m => m.replace(/"/g, '').trim()));
   }
   
-  // Remove duplicates
-  return [...new Set(words)];
+  // Remove duplicates and filter out years (they're handled separately)
+  const yearPattern = /^20[2-3]\d$/;
+  return [...new Set(words)].filter(w => !yearPattern.test(w));
 }
 
 // Parse time-based queries (Q1, Q2, 2024, 2025, etc.)
