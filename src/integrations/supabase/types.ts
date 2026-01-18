@@ -2671,6 +2671,13 @@ export type Database = {
     Functions: {
       calculate_todo_progress: { Args: { todo_id: string }; Returns: Json }
       get_dashboard_stats: { Args: { property_ids: string[] }; Returns: Json }
+      get_organization_member_names: {
+        Args: { org_id: string }
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
       get_task_status: {
         Args: { planned: number; reported: number }
         Returns: Database["public"]["Enums"]["task_status"]
