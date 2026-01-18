@@ -260,18 +260,17 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
         <CardContent className="space-y-4">
           {/* Add Todo Form */}
           {!propertyId && (
-            <div className="space-y-2 pb-4 border-b">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Ny uppgift..."
-                  value={newTodo}
-                  onChange={(e) => setNewTodo(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleAddTodo()}
-                  className="flex-1"
-                />
+            <div className="space-y-3 pb-4 border-b">
+              <Input
+                placeholder="Ny uppgift..."
+                value={newTodo}
+                onChange={(e) => setNewTodo(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && handleAddTodo()}
+              />
+              <div className="grid grid-cols-2 gap-2">
                 <Select value={newPriority} onValueChange={setNewPriority}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
+                  <SelectTrigger>
+                    <SelectValue placeholder="Prioritet" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">Låg</SelectItem>
@@ -280,10 +279,22 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                     <SelectItem value="critical">Kritisk</SelectItem>
                   </SelectContent>
                 </Select>
+                <Select value={newCategory} onValueChange={setNewCategory}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Ingen</SelectItem>
+                    <SelectItem value="Brandskydd">Brandskydd</SelectItem>
+                    <SelectItem value="Underhåll">Underhåll</SelectItem>
+                    <SelectItem value="Dokumentation">Dokumentation</SelectItem>
+                    <SelectItem value="Besiktning">Besiktning</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Select value={newPropertyId} onValueChange={setNewPropertyId}>
-                  <SelectTrigger className="flex-1">
+                  <SelectTrigger>
                     <SelectValue placeholder="Välj fastighet (valfritt)" />
                   </SelectTrigger>
                   <SelectContent>
@@ -295,29 +306,17 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={newCategory} onValueChange={setNewCategory}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Kategori" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Ingen</SelectItem>
-                    <SelectItem value="Brandskydd">Brandskydd</SelectItem>
-                    <SelectItem value="Underhåll">Underhåll</SelectItem>
-                    <SelectItem value="Dokumentation">Dokumentation</SelectItem>
-                    <SelectItem value="Besiktning">Besiktning</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Input
                   type="date"
                   value={newDueDate}
                   onChange={(e) => setNewDueDate(e.target.value)}
-                  className="w-40"
+                  placeholder="Deadline"
                 />
-                <Button onClick={handleAddTodo} disabled={!newTodo.trim()}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Lägg till
-                </Button>
               </div>
+              <Button onClick={handleAddTodo} disabled={!newTodo.trim()} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Lägg till
+              </Button>
             </div>
           )}
 

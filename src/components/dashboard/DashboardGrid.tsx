@@ -42,13 +42,40 @@ export const DashboardGrid = ({ kpiCards }: DashboardGridProps) => {
     toast.success('Widget borttagen');
   };
 
-  const layouts = useMemo(() => ({
-    lg: layout,
-    md: layout,
-    sm: layout,
-    xs: layout,
-    xxs: layout,
-  }), [layout]);
+  // Create responsive layouts - on mobile, stack widgets vertically full width
+  const layouts = useMemo(() => {
+    const mobileLayout = layout.map((item, index) => ({
+      ...item,
+      x: 0,
+      y: index * 2,
+      w: 2, // Full width on xxs (2 cols)
+      h: 2,
+    }));
+    
+    const smallLayout = layout.map((item, index) => ({
+      ...item,
+      x: (index % 2) * 2,
+      y: Math.floor(index / 2) * 2,
+      w: 2, // Half width on xs (4 cols)
+      h: 2,
+    }));
+    
+    const mediumLayout = layout.map((item, index) => ({
+      ...item,
+      x: (index % 3) * 2,
+      y: Math.floor(index / 3) * 2,
+      w: 2,
+      h: 2,
+    }));
+
+    return {
+      lg: layout,
+      md: layout,
+      sm: mediumLayout,
+      xs: smallLayout,
+      xxs: mobileLayout,
+    };
+  }, [layout]);
 
   const renderWidget = (widgetId: string) => {
     const widget = widgets.find(w => w.id === widgetId);
