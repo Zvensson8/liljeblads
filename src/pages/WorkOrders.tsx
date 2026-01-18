@@ -365,16 +365,16 @@ const WorkOrders = () => {
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
-        <SidebarInset className="flex-1">
-          <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
-            <SidebarTrigger />
+        <SidebarInset className="flex-1 w-full">
+          <header className="sticky top-0 z-10 flex h-14 md:h-16 items-center gap-2 md:gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6">
+            <SidebarTrigger className="hidden md:flex" />
             <div className="flex items-center gap-2">
               <Wrench className="h-5 w-5 text-primary" />
-              <h1 className="text-xl font-semibold">Arbetsordrar</h1>
+              <h1 className="text-lg md:text-xl font-semibold">Arbetsordrar</h1>
             </div>
           </header>
 
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
             <div className="max-w-7xl mx-auto space-y-6">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="text-sm text-muted-foreground">

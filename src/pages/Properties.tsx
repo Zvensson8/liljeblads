@@ -283,18 +283,18 @@ const Properties = () => {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col w-full">
           {/* Modern Header */}
           <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-16 items-center gap-4 px-6">
-              <SidebarTrigger className="hover:bg-muted rounded-md p-2 transition-colors" />
+            <div className="flex h-14 md:h-16 items-center gap-2 md:gap-4 px-4 md:px-6">
+              <SidebarTrigger className="hidden md:flex hover:bg-muted rounded-md p-2 transition-colors" />
               
               <div className="flex items-center gap-2">
                 <Building2 className="h-5 w-5 text-primary" />
-                <h1 className="text-xl font-semibold">Fastigheter</h1>
+                <h1 className="text-lg md:text-xl font-semibold">Fastigheter</h1>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-auto">
                 <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm">
                   <Sparkles className="h-4 w-4" />
                   <span className="font-medium">{properties.length} fastigheter</span>
@@ -303,8 +303,8 @@ const Properties = () => {
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto">
-            <div className="container mx-auto px-6 py-8">
+          <main className="flex-1 overflow-auto pb-20 md:pb-0">
+            <div className="container mx-auto px-4 md:px-6 py-4 md:py-8">
               {/* Stats Bar */}
               <div className="grid gap-4 md:grid-cols-3 mb-8 animate-fade-in">
                 <Card className="border-border/50 bg-gradient-to-br from-blue-500/10 to-blue-600/5 hover-scale">
