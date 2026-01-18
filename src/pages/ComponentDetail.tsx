@@ -234,8 +234,8 @@ export default function ComponentDetail() {
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
-        <SidebarInset className="flex-1">
-          <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+        <SidebarInset className="flex-1 w-full">
+          <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6">
             <Breadcrumb className="py-3">
               <BreadcrumbList>
                 <BreadcrumbItem>
@@ -261,8 +261,8 @@ export default function ComponentDetail() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <div className="flex h-12 items-center gap-4">
-            <SidebarTrigger />
+            <div className="flex h-12 items-center gap-2 md:gap-4">
+            <SidebarTrigger className="hidden md:flex" />
             <Button
               variant="ghost"
               size="sm"
@@ -294,7 +294,7 @@ export default function ComponentDetail() {
             </div>
           </header>
 
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
             <div className="max-w-7xl mx-auto space-y-6">
               {/* Quick Stats */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
