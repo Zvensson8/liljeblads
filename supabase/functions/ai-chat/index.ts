@@ -25,7 +25,8 @@ serve(async (req) => {
     // Validate authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      console.error('Missing or invalid Authorization header');
+      return new Response(JSON.stringify({ error: 'Authorization header required' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -37,17 +38,32 @@ serve(async (req) => {
     });
     
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
     
-    if (claimsError || !claimsData?.claims) {
-      console.error('Auth validation failed:', claimsError);
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Try getClaims first, fall back to getUser if it fails
+    let userId: string | undefined;
+    
+    try {
+      const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+      if (!claimsError && claimsData?.claims?.sub) {
+        userId = claimsData.claims.sub;
+      }
+    } catch (e) {
+      console.log('getClaims failed, trying getUser:', e);
     }
-
-    const userId = claimsData.claims.sub;
+    
+    // Fallback to getUser if getClaims didn't work
+    if (!userId) {
+      const { data: userData, error: userError } = await authClient.auth.getUser();
+      if (userError || !userData?.user?.id) {
+        console.error('Auth validation failed:', userError);
+        return new Response(JSON.stringify({ error: 'Session expired. Please log in again.' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      userId = userData.user.id;
+    }
+    
     console.log(`Authenticated user: ${userId}`);
 
     // Use service role for data access
