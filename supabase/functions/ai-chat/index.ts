@@ -32,38 +32,25 @@ serve(async (req) => {
       });
     }
 
-    // Verify the user's JWT token
+    // Verify the user's JWT token using getUser with token parameter
     const authClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     });
     
     const token = authHeader.replace('Bearer ', '');
     
-    // Try getClaims first, fall back to getUser if it fails
-    let userId: string | undefined;
+    // Use getUser with the token to verify it
+    const { data: userData, error: userError } = await authClient.auth.getUser(token);
     
-    try {
-      const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
-      if (!claimsError && claimsData?.claims?.sub) {
-        userId = claimsData.claims.sub;
-      }
-    } catch (e) {
-      console.log('getClaims failed, trying getUser:', e);
+    if (userError || !userData?.user?.id) {
+      console.error('Auth validation failed:', userError);
+      return new Response(JSON.stringify({ error: 'Session expired. Please log in again.' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
     
-    // Fallback to getUser if getClaims didn't work
-    if (!userId) {
-      const { data: userData, error: userError } = await authClient.auth.getUser();
-      if (userError || !userData?.user?.id) {
-        console.error('Auth validation failed:', userError);
-        return new Response(JSON.stringify({ error: 'Session expired. Please log in again.' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      userId = userData.user.id;
-    }
-    
+    const userId = userData.user.id;
     console.log(`Authenticated user: ${userId}`);
 
     // Use service role for data access
