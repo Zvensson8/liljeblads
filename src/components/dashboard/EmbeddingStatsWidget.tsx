@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
-import { Database, RefreshCw, CheckCircle2, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import { Database, RefreshCw, CheckCircle2, Clock, AlertCircle, Loader2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface EmbeddingStats {
@@ -130,6 +130,31 @@ export function EmbeddingStatsWidget() {
     }
   };
 
+  const handleForceDocumentBackfill = async () => {
+    setProcessing(true);
+    try {
+      const response = await supabase.functions.invoke('backfill-embeddings', {
+        body: { 
+          tables: ['maintenance_history_documents'], 
+          force: true 
+        }
+      });
+      
+      if (response.error) throw response.error;
+      
+      const data = response.data;
+      toast.success(`${data.totalQueued} dokument köade för omprocessning med PDF-parsing`);
+      
+      // Refresh stats
+      await fetchStats();
+    } catch (error) {
+      console.error('Error force backfilling documents:', error);
+      toast.error('Kunde inte köa dokument för omprocessning');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const tableLabels: Record<string, string> = {
     properties: 'Fastigheter',
     components: 'Komponenter',
@@ -137,7 +162,8 @@ export function EmbeddingStatsWidget() {
     projects: 'Projekt',
     property_todos: 'Att göra',
     drift_tasks: 'Driftuppgifter',
-    maintenance_history: 'Servicehistorik'
+    maintenance_history: 'Servicehistorik',
+    maintenance_history_documents: 'Serviceprotokoll'
   };
 
   if (loading) {
@@ -164,6 +190,16 @@ export function EmbeddingStatsWidget() {
             <CardTitle className="text-lg">AI Sökning & Embeddings</CardTitle>
           </div>
           <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleForceDocumentBackfill}
+              disabled={processing}
+              title="Omprocessar alla serviceprotokoll med PDF-parsing"
+            >
+              {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
+              Uppdatera dokument
+            </Button>
             <Button 
               variant="outline" 
               size="sm" 

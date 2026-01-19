@@ -10,6 +10,7 @@ interface BackfillRequest {
   tables?: string[];
   batchSize?: number;
   organizationId?: string;
+  force?: boolean;
 }
 
 serve(async (req) => {
@@ -24,12 +25,41 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { 
-      tables = ['properties', 'components', 'work_orders', 'projects', 'property_todos', 'drift_tasks', 'maintenance_history'],
+      tables = ['properties', 'components', 'work_orders', 'projects', 'property_todos', 'drift_tasks', 'maintenance_history', 'maintenance_history_documents'],
       batchSize = 100,
-      organizationId
+      organizationId,
+      force = false
     }: BackfillRequest = await req.json().catch(() => ({}));
 
-    console.log(`Starting backfill for tables: ${tables.join(', ')}`);
+    console.log(`Starting backfill for tables: ${tables.join(', ')} (force: ${force})`);
+
+    // If force=true, delete existing embeddings and queue entries for these tables
+    if (force) {
+      for (const table of tables) {
+        // Delete existing embeddings
+        const { error: embError } = await supabase
+          .from('embeddings')
+          .delete()
+          .eq('source_table', table);
+        
+        if (embError) {
+          console.error(`Error deleting embeddings for ${table}:`, embError);
+        } else {
+          console.log(`Deleted existing embeddings for ${table}`);
+        }
+
+        // Delete pending queue entries
+        const { error: queueError } = await supabase
+          .from('embedding_queue')
+          .delete()
+          .eq('source_table', table)
+          .eq('processed', false);
+        
+        if (queueError) {
+          console.error(`Error deleting queue entries for ${table}:`, queueError);
+        }
+      }
+    }
 
     const stats: Record<string, { queued: number; existing: number }> = {};
 
@@ -60,6 +90,12 @@ serve(async (req) => {
           .select('id, organization_id')
           .limit(batchSize);
         if (!error) records = data || [];
+      } else if (table === 'maintenance_history_documents') {
+        const { data, error } = await supabase
+          .from(table)
+          .select('id, maintenance_history_id')
+          .limit(batchSize);
+        if (!error) records = data || [];
       } else {
         const { data, error } = await supabase
           .from(table)
@@ -82,6 +118,30 @@ serve(async (req) => {
           // For properties table, use organization_id directly
           if (table === 'properties' && record.organization_id) {
             orgId = record.organization_id;
+          } else if (table === 'maintenance_history_documents' && record.maintenance_history_id) {
+            // For documents, get org via maintenance_history -> component -> property
+            const { data: maintenance } = await supabase
+              .from('maintenance_history')
+              .select('component_id')
+              .eq('id', record.maintenance_history_id)
+              .single();
+            
+            if (maintenance?.component_id) {
+              const { data: component } = await supabase
+                .from('components')
+                .select('property_id')
+                .eq('id', maintenance.component_id)
+                .single();
+              
+              if (component?.property_id) {
+                const { data: property } = await supabase
+                  .from('properties')
+                  .select('organization_id')
+                  .eq('id', component.property_id)
+                  .single();
+                orgId = property?.organization_id;
+              }
+            }
           } else {
             let propertyId = record.property_id;
             
