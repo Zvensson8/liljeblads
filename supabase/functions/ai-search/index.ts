@@ -46,23 +46,24 @@ serve(async (req) => {
       });
     }
 
-    // Verify the user's JWT token
+    // Verify the user's JWT token (robust against missing session)
     const authClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     });
-    
+
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
-    
-    if (claimsError || !claimsData?.claims) {
-      console.error('Auth validation failed:', claimsError);
+
+    const { data: userData, error: userError } = await authClient.auth.getUser(token);
+
+    if (userError || !userData?.user?.id) {
+      console.error('Auth validation failed:', userError);
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = userData.user.id;
     console.log(`Authenticated user: ${userId}`);
 
     // Use service role for data access but enforce organization scoping
@@ -281,7 +282,7 @@ async function getSourceDetails(supabase: any, sourceTable: string, sourceId: st
         .from('work_orders')
         .select(`
           id, action, status, contractor, created_at,
-          component:components(id, name, property:properties(id, name))
+          property:properties(id, name)
         `)
         .eq('id', sourceId)
         .single();

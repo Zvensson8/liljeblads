@@ -270,29 +270,24 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
         .from('work_orders')
         .select(`
           action, comments, contractor, status,
-          component:components!inner(
-            name, type,
-            property:properties!inner(organization_id, name)
-          )
+          property:properties!inner(organization_id, name)
         `)
         .eq('id', sourceId)
         .single();
-      
+
       if (error || !data) return null;
-      
+
       const parts = [
         `Arbetsorder: ${data.action}`,
         data.status ? `Status: ${data.status}` : '',
         data.contractor ? `Entreprenör: ${data.contractor}` : '',
         data.comments ? `Kommentarer: ${data.comments}` : '',
-        data.component?.name ? `Komponent: ${data.component.name}` : '',
-        data.component?.type ? `Komponenttyp: ${data.component.type}` : '',
-        data.component?.property?.name ? `Fastighet: ${data.component.property.name}` : ''
+        data.property?.name ? `Fastighet: ${data.property.name}` : ''
       ].filter(Boolean);
-      
+
       return {
         content: parts.join('. '),
-        organizationId: data.component?.property?.organization_id || null
+        organizationId: data.property?.organization_id || null
       };
     }
 
