@@ -1,103 +1,26 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Simple text extraction from PDF by parsing raw content
-// This extracts readable text from PDF binary without external dependencies
-function extractTextFromPdfBytes(bytes: Uint8Array): string {
-  const decoder = new TextDecoder('utf-8', { fatal: false });
-  const content = decoder.decode(bytes);
-  
-  const textParts: string[] = [];
-  
-  // Method 1: Extract text from BT...ET text blocks
-  const textBlockRegex = /BT\s*([\s\S]*?)\s*ET/g;
-  let match;
-  while ((match = textBlockRegex.exec(content)) !== null) {
-    const block = match[1];
-    
-    // Extract text in parentheses (literal strings)
-    const parenRegex = /\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
-    let textMatch;
-    while ((textMatch = parenRegex.exec(block)) !== null) {
-      let text = textMatch[1];
-      // Unescape common PDF escape sequences
-      text = text
-        .replace(/\\n/g, '\n')
-        .replace(/\\r/g, '\r')
-        .replace(/\\t/g, '\t')
-        .replace(/\\\(/g, '(')
-        .replace(/\\\)/g, ')')
-        .replace(/\\\\/g, '\\');
-      if (text.trim()) {
-        textParts.push(text.trim());
-      }
-    }
-    
-    // Extract text in hex format <hexstring>
-    const hexRegex = /<([0-9A-Fa-f\s]+)>/g;
-    while ((textMatch = hexRegex.exec(block)) !== null) {
-      const hex = textMatch[1].replace(/\s/g, '');
-      try {
-        // Try to decode as UTF-16BE (common in PDFs)
-        const bytes: number[] = [];
-        for (let i = 0; i < hex.length; i += 4) {
-          if (i + 4 <= hex.length) {
-            const charCode = parseInt(hex.substr(i, 4), 16);
-            if (charCode > 0 && charCode < 65535) {
-              bytes.push(charCode);
-            }
-          }
-        }
-        if (bytes.length > 0) {
-          const text = String.fromCharCode(...bytes);
-          if (text.trim() && /[\w\såäöÅÄÖ]/.test(text)) {
-            textParts.push(text.trim());
-          }
-        }
-      } catch (e) {
-        // Ignore hex parsing errors
-      }
-    }
+// Parse Supabase storage URL to extract bucket and path
+function parseStorageUrl(url: string): { bucket: string; path: string } | null {
+  // Match pattern: /storage/v1/object/public/{bucket}/{path}
+  // or: /storage/v1/object/{bucket}/{path}
+  const publicMatch = url.match(/\/storage\/v1\/object\/public\/([^\/]+)\/(.+)$/);
+  if (publicMatch) {
+    return { bucket: publicMatch[1], path: publicMatch[2] };
   }
   
-  // Method 2: Also try to find text streams
-  const streamRegex = /stream\s*([\s\S]*?)\s*endstream/g;
-  while ((match = streamRegex.exec(content)) !== null) {
-    const stream = match[1];
-    
-    // Look for text in parentheses within streams
-    const parenRegex = /\(([^()]{3,100})\)/g;
-    let textMatch;
-    while ((textMatch = parenRegex.exec(stream)) !== null) {
-      let text = textMatch[1];
-      // Only keep if it looks like readable text
-      if (/^[\w\s.,!?:;\-åäöÅÄÖéèêëàâùûôîïç()\/\d%°]+$/.test(text) && text.length > 2) {
-        text = text
-          .replace(/\\n/g, '\n')
-          .replace(/\\r/g, '\r')
-          .replace(/\\\(/g, '(')
-          .replace(/\\\)/g, ')');
-        if (text.trim()) {
-          textParts.push(text.trim());
-        }
-      }
-    }
+  const privateMatch = url.match(/\/storage\/v1\/object\/([^\/]+)\/(.+)$/);
+  if (privateMatch) {
+    return { bucket: privateMatch[1], path: privateMatch[2] };
   }
   
-  // Combine and clean up
-  let fullText = textParts.join(' ');
-  
-  // Clean up common artifacts
-  fullText = fullText
-    .replace(/\s+/g, ' ')
-    .replace(/(\w)\s+(\w)/g, '$1 $2') // Normalize spacing
-    .trim();
-  
-  return fullText;
+  return null;
 }
 
 serve(async (req) => {
@@ -117,24 +40,94 @@ serve(async (req) => {
 
     console.log(`Parsing PDF from URL: ${url}`);
 
-    // Fetch the PDF file
-    const pdfResponse = await fetch(url);
-    if (!pdfResponse.ok) {
-      console.error(`Failed to fetch PDF: ${pdfResponse.status}`);
-      return new Response(JSON.stringify({ error: 'Failed to fetch PDF', text: '' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    let data: Uint8Array;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 
-    const arrayBuffer = await pdfResponse.arrayBuffer();
-    const data = new Uint8Array(arrayBuffer);
+    // Check if this is a Supabase storage URL (may be private bucket)
+    if (url.includes(supabaseUrl) || url.includes('supabase.co/storage')) {
+      const parsed = parseStorageUrl(url);
+      
+      if (parsed) {
+        console.log(`Detected Supabase storage: bucket=${parsed.bucket}, path=${parsed.path}`);
+        
+        // Use service role to download from potentially private bucket
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        
+        const { data: fileData, error: downloadError } = await supabase.storage
+          .from(parsed.bucket)
+          .download(parsed.path);
+        
+        if (downloadError || !fileData) {
+          console.error(`Failed to download from storage: ${downloadError?.message}`);
+          return new Response(JSON.stringify({ error: 'Failed to fetch PDF from storage', text: '' }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const arrayBuffer = await fileData.arrayBuffer();
+        data = new Uint8Array(arrayBuffer);
+        console.log(`Downloaded from Supabase storage, size: ${data.length} bytes`);
+      } else {
+        // Fallback to direct fetch (public URL)
+        const pdfResponse = await fetch(url);
+        if (!pdfResponse.ok) {
+          console.error(`Failed to fetch PDF: ${pdfResponse.status}`);
+          return new Response(JSON.stringify({ error: 'Failed to fetch PDF', text: '' }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const arrayBuffer = await pdfResponse.arrayBuffer();
+        data = new Uint8Array(arrayBuffer);
+      }
+    } else {
+      // External URL - use direct fetch
+      const pdfResponse = await fetch(url);
+      if (!pdfResponse.ok) {
+        console.error(`Failed to fetch PDF: ${pdfResponse.status}`);
+        return new Response(JSON.stringify({ error: 'Failed to fetch PDF', text: '' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const arrayBuffer = await pdfResponse.arrayBuffer();
+      data = new Uint8Array(arrayBuffer);
+    }
 
     console.log(`PDF fetched, size: ${data.length} bytes`);
 
-    // Extract text from PDF
-    let fullText = extractTextFromPdfBytes(data);
+    // Use dynamic import for pdfjs-serverless
+    const { getDocument } = await import('https://esm.sh/pdfjs-serverless');
 
+    const document = await getDocument({
+      data,
+      useSystemFonts: true,
+    }).promise;
+
+    console.log(`PDF loaded, pages: ${document.numPages}`);
+
+    const textParts: string[] = [];
+    const pagesToParse = Math.min(document.numPages, maxPages);
+
+    for (let i = 1; i <= pagesToParse; i++) {
+      try {
+        const page = await document.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        
+        if (pageText.trim()) {
+          textParts.push(`[Sida ${i}]\n${pageText.trim()}`);
+        }
+      } catch (pageError) {
+        console.error(`Error parsing page ${i}:`, pageError);
+      }
+    }
+
+    let fullText = textParts.join('\n\n');
     console.log(`Extracted ${fullText.length} characters from PDF`);
 
     // Limit text length to avoid overly large embeddings
@@ -147,7 +140,9 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       text: fullText,
       truncated,
-      method: 'basic-extraction'
+      pages: pagesToParse,
+      totalPages: document.numPages,
+      method: 'pdfjs-serverless'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
