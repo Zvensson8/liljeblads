@@ -178,7 +178,8 @@ export default function AIChat() {
       
       // Create new conversation if needed
       if (!conversationId) {
-        const title = userMessage.content.slice(0, 50) + (userMessage.content.length > 50 ? '...' : '');
+        const words = userMessage.content.split(' ').slice(0, 4).join(' ');
+        const title = words + (userMessage.content.split(' ').length > 4 ? '...' : '');
         const { data: newConv, error: convError } = await supabase
           .from('ai_conversations')
           .insert({ user_id: user.id, title })
@@ -233,9 +234,11 @@ export default function AIChat() {
       
       // Update title if this was the first message
       if (messages.length === 0) {
+        const words = userMessage.content.split(' ').slice(0, 4).join(' ');
+        const title = words + (userMessage.content.split(' ').length > 4 ? '...' : '');
         updateTitleMutation.mutate({
           id: conversationId,
-          title: userMessage.content.slice(0, 50) + (userMessage.content.length > 50 ? '...' : '')
+          title
         });
       }
     } catch (error) {
@@ -281,16 +284,26 @@ export default function AIChat() {
               Inga konversationer än
             </p>
           ) : (
-            conversations.map((conv) => (
+            conversations.map((conv) => {
+              const handleClick = () => {
+                console.log('Clicked conversation:', conv.id);
+                setSelectedConversationId(conv.id);
+                setSidebarOpen(false);
+              };
+              
+              return (
               <div
                 key={conv.id}
+                role="button"
+                tabIndex={0}
                 className={cn(
-                  "group flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer transition-colors",
+                  "group flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer transition-colors select-none",
                   selectedConversationId === conv.id
                     ? "bg-primary text-primary-foreground"
                     : "hover:bg-muted"
                 )}
-                onClick={() => selectConversation(conv.id)}
+                onClick={handleClick}
+                onKeyDown={(e) => e.key === 'Enter' && handleClick()}
               >
                 <MessageSquare className="h-4 w-4 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -323,7 +336,8 @@ export default function AIChat() {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-            ))
+            );
+            })
           )}
         </div>
       </ScrollArea>
