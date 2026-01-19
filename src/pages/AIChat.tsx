@@ -201,15 +201,28 @@ export default function AIChat() {
           content: userMessage.content
         });
 
-      // Call AI
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: {
-          messages: [...messages, userMessage].map(m => ({
-            role: m.role,
-            content: m.content
-          }))
+      // Call AI (retry once on missing auth session)
+      const invoke = async () => {
+        const { data, error } = await supabase.functions.invoke('ai-chat', {
+          body: {
+            messages: [...messages, userMessage].map(m => ({
+              role: m.role,
+              content: m.content
+            }))
+          }
+        });
+        return { data, error };
+      };
+
+      let { data, error } = await invoke();
+
+      const status = (error as any)?.context?.status ?? (error as any)?.status;
+      if (error && status === 401) {
+        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+        if (!refreshError && refreshed?.session) {
+          ({ data, error } = await invoke());
         }
-      });
+      }
 
       if (error) throw error;
 
@@ -241,7 +254,16 @@ export default function AIChat() {
           title
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      const status = error?.context?.status ?? error?.status;
+      if (status === 401) {
+        toast.error('Sessionen har gått ut. Logga in igen.');
+        // Clean sign-out so a new session is created on next login
+        await supabase.auth.signOut();
+        window.location.href = '/auth';
+        return;
+      }
+
       console.error('AI chat error:', error);
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),

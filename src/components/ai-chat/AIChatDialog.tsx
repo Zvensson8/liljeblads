@@ -50,14 +50,28 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: {
-          messages: [...messages, userMessage].map(m => ({
-            role: m.role,
-            content: m.content
-          }))
+      const invoke = async () => {
+        const { data, error } = await supabase.functions.invoke('ai-chat', {
+          body: {
+            messages: [...messages, userMessage].map(m => ({
+              role: m.role,
+              content: m.content
+            }))
+          }
+        });
+        return { data, error };
+      };
+
+      let { data, error } = await invoke();
+
+      // If auth session in backend is missing, refresh and retry once
+      const status = (error as any)?.context?.status ?? (error as any)?.status;
+      if (error && status === 401) {
+        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+        if (!refreshError && refreshed?.session) {
+          ({ data, error } = await invoke());
         }
-      });
+      }
 
       if (error) throw error;
 
@@ -68,7 +82,17 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
+    } catch (error: any) {
+      const status = error?.context?.status ?? error?.status;
+      if (status === 401) {
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: 'Din session har gått ut. Logga in igen och försök på nytt.'
+        }]);
+        return;
+      }
+
       console.error('AI chat error:', error);
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
