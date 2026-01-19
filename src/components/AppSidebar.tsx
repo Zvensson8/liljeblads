@@ -31,7 +31,7 @@ const navigationItems: Array<{ title: string; url: string; icon: any; moduleName
   { title: "Driftuppföljning", url: "/operations", icon: ClipboardList, moduleName: "operations" },
   { title: "Projekthantering", url: "/projects", icon: Briefcase, moduleName: "projects" },
   { title: "Återkommande kostnader", url: "/recurring-costs", icon: DollarSign, moduleName: "recurring-costs" },
-  { title: "AI Assistent", url: "/ai-chat", icon: Bot, moduleName: "dashboard" },
+  { title: "AI Assistent", url: "/ai-chat", icon: Bot, moduleName: "ai-chat" },
   { title: "Rapporter", url: "/reports", icon: FileText, moduleName: "dashboard", founderOnly: true },
   { title: "Säkerhet", url: "/security", icon: Shield, moduleName: "organization", founderOnly: true },
   { title: "Användare", url: "/users", icon: Users, moduleName: "users" },
