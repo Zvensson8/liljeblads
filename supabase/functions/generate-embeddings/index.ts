@@ -378,26 +378,32 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
       const { data, error } = await supabase
         .from('maintenance_history')
         .select(`
-          action_type, notes, performed_date, cost, supplier, category,
+          action_type, notes, performed_date, cost, supplier, category, drift_task_id,
           component:components(
-            name, type,
+            name, type, registration_number,
             property:properties(organization_id, name)
-          )
+          ),
+          drift_task:drift_tasks(name, quarter, year)
         `)
         .eq('id', sourceId)
         .single();
       
       if (error || !data) return null;
       
+      // Tydlig prefix för att skilja från serviceprotokoll
       const parts = [
-        `Underhållshistorik: ${data.action_type}`,
-        data.performed_date ? `Utfört: ${data.performed_date}` : '',
-        data.cost ? `Kostnad: ${data.cost} kr` : '',
-        data.supplier ? `Leverantör: ${data.supplier}` : '',
-        data.category ? `Kategori: ${data.category}` : '',
-        data.notes ? `Anteckningar: ${data.notes}` : '',
+        `[UNDERHÅLLSPOST] Åtgärdstyp: ${data.action_type}`,
+        data.performed_date ? `Datum: ${data.performed_date}` : '',
         data.component?.name ? `Komponent: ${data.component.name}` : '',
-        data.component?.property?.name ? `Fastighet: ${data.component.property.name}` : ''
+        data.component?.registration_number ? `Reg.nr: ${data.component.registration_number}` : '',
+        data.component?.type ? `Komponenttyp: ${data.component.type}` : '',
+        data.cost ? `Kostnad: ${data.cost} kr` : '',
+        data.supplier ? `Utförare/Leverantör: ${data.supplier}` : '',
+        data.category ? `Kategori: ${data.category}` : '',
+        data.notes ? `Noteringar: ${data.notes}` : '',
+        data.drift_task?.name ? `Kopplad driftuppgift: ${data.drift_task.name} (${data.drift_task.quarter} ${data.drift_task.year})` : '',
+        data.component?.property?.name ? `Fastighet: ${data.component.property.name}` : '',
+        `OBS: För detaljerade mätvärden och avvikelser, se tillhörande SERVICEPROTOKOLL.`
       ].filter(Boolean);
       
       return {
@@ -411,13 +417,14 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
       const { data, error } = await supabase
         .from('maintenance_history_documents')
         .select(`
-          file_name, file_url,
+          file_name, file_url, mime_type,
           maintenance_history:maintenance_history!inner(
-            action_type, performed_date, notes, supplier, cost, category,
+            id, action_type, performed_date, notes, supplier, cost, category, drift_task_id,
             component:components!inner(
-              name, type,
+              name, type, registration_number, manufacturer, model,
               property:properties!inner(organization_id, name)
-            )
+            ),
+            drift_task:drift_tasks(name, quarter, year)
           )
         `)
         .eq('id', sourceId)
@@ -429,14 +436,14 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
       
       // Parse PDF content if it's a PDF file
       let pdfContent = '';
-      if (data.file_url && data.file_name?.toLowerCase().endsWith('.pdf')) {
+      if (data.file_url && (data.file_name?.toLowerCase().endsWith('.pdf') || data.mime_type === 'application/pdf')) {
         try {
           console.log(`Parsing PDF content for: ${data.file_name}`);
           const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
           const parseResponse = await fetch(`${supabaseUrl}/functions/v1/parse-document`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: data.file_url, maxPages: 5 })
+            body: JSON.stringify({ url: data.file_url, maxPages: 10 })
           });
           
           if (parseResponse.ok) {
@@ -451,19 +458,26 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
         }
       }
       
+      // Tydlig struktur som separerar serviceprotokoll från underhållsposter
       const parts = [
-        `Serviceprotokoll: ${data.file_name}`,
-        mh?.action_type ? `Åtgärd: ${mh.action_type}` : '',
-        mh?.performed_date ? `Utfört: ${mh.performed_date}` : '',
-        mh?.supplier ? `Leverantör: ${mh.supplier}` : '',
-        mh?.cost ? `Kostnad: ${mh.cost} kr` : '',
-        mh?.category ? `Kategori: ${mh.category}` : '',
-        mh?.notes ? `Anteckningar: ${mh.notes}` : '',
+        `[SERVICEPROTOKOLL] Dokument: ${data.file_name}`,
+        mh?.performed_date ? `Servicedatum: ${mh.performed_date}` : '',
         mh?.component?.name ? `Komponent: ${mh.component.name}` : '',
+        mh?.component?.registration_number ? `Registreringsnummer: ${mh.component.registration_number}` : '',
         mh?.component?.type ? `Komponenttyp: ${mh.component.type}` : '',
-        mh?.component?.property?.name ? `Fastighet: ${mh.component.property.name}` : '',
-        pdfContent ? `\n\nDOKUMENTINNEHÅLL:\n${pdfContent}` : ''
+        mh?.component?.manufacturer ? `Tillverkare: ${mh.component.manufacturer}` : '',
+        mh?.component?.model ? `Modell: ${mh.component.model}` : '',
+        mh?.supplier ? `Servicetekniker/Företag: ${mh.supplier}` : '',
+        mh?.drift_task?.name ? `Relaterad driftuppgift: ${mh.drift_task.name} (${mh.drift_task.quarter} ${mh.drift_task.year})` : '',
+        mh?.component?.property?.name ? `Fastighet: ${mh.component.property.name}` : ''
       ].filter(Boolean);
+
+      // Lägg till PDF-innehåll med tydlig sektion
+      if (pdfContent) {
+        parts.push(`\n\n=== PROTOKOLLINNEHÅLL (mätvärden, avvikelser, observationer) ===\n${pdfContent}`);
+      } else {
+        parts.push(`\nInget protokollinnehåll kunde extraheras från dokumentet.`);
+      }
 
       return {
         content: parts.join('. '),
