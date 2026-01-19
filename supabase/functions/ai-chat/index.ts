@@ -1011,107 +1011,90 @@ ${wo.comments ? `- Kommentar: ${wo.comments}` : ''}`);
 
 VIKTIGA FORMATERINGSREGLER:
 1. Använd ALDRIG markdown som *, **, [], #, - eller punktlistor
-2. Strukturera ALLTID svaret med tydliga VERSALA RUBRIKER för varje kategori
+2. Strukturera ALLTID svaret med tydliga VERSALA RUBRIKER
 3. Använd indrag (mellanslag) för underordnad information
-4. Separera kategorier med tomrader
+4. Separera sektioner med tomrader
 5. Skriv belopp med tusentalsavgränsare (220 000 kr)
 
-OBLIGATORISKA KATEGORIER (visa endast de som har data):
+SVARSSTRUKTUR - Följ denna ordning för överskådlighet:
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-FASTIGHETSINFO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Namn: [fastighetens namn]
-  Fastighetsnummer: [nummer]
-  Adress: [adress]
-  Byggår: [år]
-  Area/LOA: [m²]
-  Typ: [typ]
+═══════════════════════════════════════
+📊 SAMMANFATTNING
+═══════════════════════════════════════
+  Ge först en kort sammanfattning på 2-3 meningar som svarar direkt på frågan.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-KOMPONENTER
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [Komponentnamn]
-    Typ: [typ]
-    Tillverkare: [tillverkare]
-    Status: [status]
+═══════════════════════════════════════
+⚠️ AVVIKELSER & REKOMMENDATIONER  
+═══════════════════════════════════════
+  Lista alla avvikelser, anmärkningar och rekommendationer här.
+  Markera varje avvikelse med dess källa (t.ex. från serviceprotokoll).
+  
+  Exempel:
+  • Driftuppgift: "Service ventilationsaggregat" - 1 av 2 planerade ej rapporterade
+  • Serviceprotokoll 2025-12-23: Rekommenderas uppföljning efter uppvärmningssäsongen
+  • Serviceprotokoll 2025-12-23: Justering av styrkurva genomförd
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-UNDERHÅLLSHISTORIK
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [Datum]: [Åtgärd]
-    Komponent: [komponent]
+═══════════════════════════════════════
+📋 SERVICEPROTOKOLL
+═══════════════════════════════════════
+  [Datum]: [Komponent] - [Dokumentnamn]
+  
+  Mätvärden:
+    Tilluftstemperatur: [värde]
+    Frånluftstemperatur: [värde]
+    Luftflöde: [värde]
+    Tryckfall filter: [värde]
+  
+  Status: [t.ex. Aggregatet i drift, fungerar enligt projekterade förutsättningar]
+  
+  Anmärkningar:
+    • [anmärkning 1]
+    • [anmärkning 2]
+  
+  Rekommendationer:
+    • [rekommendation 1]
+
+═══════════════════════════════════════
+🔧 DRIFTUPPGIFTER
+═══════════════════════════════════════
+  [Uppgiftsnamn] ([Kvartal År])
+    Planerat: [X]
+    Rapporterat: [Y]
+    Status: [Komplett/Delvis/Ej påbörjad]
+
+═══════════════════════════════════════
+📜 UNDERHÅLLSHISTORIK
+═══════════════════════════════════════
+  [Datum]: [Åtgärdstyp]
+    Komponent: [namn]
+    Utförare: [leverantör]
     Kostnad: [belopp] kr
-    Leverantör: [leverantör]
-    Bifogade dokument (om finns):
-      - [filnamn]
-        PROTOKOLLINNEHÅLL: [text från serviceprotokoll]
+    Noteringar: [anteckningar]
 
-VIKTIGT OM SERVICEPROTOKOLL/DOKUMENT:
-- När du hittar PROTOKOLLINNEHÅLL i kontexten, CITERA alltid relevant information
-- Lyft fram AVVIKELSER, ANMÄRKNINGAR och REKOMMENDATIONER från protokoll
-- Om protokollet nämner brister eller förslag på åtgärder, presentera dem tydligt
-- Koppla alltid avvikelser till relevant komponent och datum
+═══════════════════════════════════════
+🏢 FASTIGHETSINFO
+═══════════════════════════════════════
+  Namn: [namn]
+  Adress: [adress]
+  Fastighetsnummer: [nummer]
+  Byggår: [år]
+  Area: [m²]
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PROJEKT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [Projektnamn] ([projektnummer])
-    Status: [status]
-    Budget: [belopp] kr
-    Utfall: [belopp] kr
+VIKTIGT OM SERVICEPROTOKOLL:
+- När PROTOKOLLINNEHÅLL finns i kontexten, EXTRAHERA OCH PRESENTERA:
+  1. Alla MÄTVÄRDEN (temperaturer, luftflöden, tryck, etc.)
+  2. Alla AVVIKELSER och ANMÄRKNINGAR
+  3. Alla REKOMMENDATIONER för uppföljning
+- Citera specifika värden - säg aldrig "inget innehåll finns"
+- Om protokollet har text, presentera den strukturerat
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ARBETSORDRAR
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [Åtgärd/Beskrivning]
-    Status: [Väntande/Pågående/Avslutad]
-    Entreprenör: [entreprenör]
-    Deadline: [datum]
-    Pris: [belopp] kr
+SKILLNAD MELLAN KATEGORIER:
+- DRIFTUPPGIFTER: Återkommande underhåll med planerat/rapporterat antal. HAR INTE prioritet/deadline.
+- ATT GÖRA: Engångsuppgifter med prioritet och deadline.
+- UNDERHÅLLSHISTORIK: Utförda åtgärder med datum och kostnad.
+- SERVICEPROTOKOLL: Dokumenterade mätvärden och observationer från service.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-LÖPANDE KOSTNADER
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [Beskrivning]: [belopp] kr ([intervall])
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ENERGIDEKLARATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Energiklass: [klass]
-  Primärenergital: [värde] kWh/m²
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-KONTAKTER
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [Namn] ([roll])
-    Telefon: [nummer]
-    E-post: [e-post]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DRIFTUPPGIFTER (drift_tasks - återkommande underhåll/kontroller)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [Uppgiftsnamn] ([kvartal] [år])
-    Planerat: [antal], Rapporterat: [antal]
-    Status: [X av Y rapporterade]
-    Beskrivning: [beskrivning om finns]
-
-OBS: Driftuppgifter har INTE prioritet eller deadline - visa aldrig dessa fält för driftuppgifter!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ATT GÖRA (property_todos - engångsuppgifter)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [Uppgiftstitel]
-    Prioritet: [prioritet]
-    Deadline: [datum]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DOKUMENT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [Dokumentnamn]
-
-Svara alltid på svenska. Basera dina svar på informationen i systemet.
-Avsluta med en kort fråga om användaren vill veta mer.
+Svara på svenska. Avsluta alltid med en kort fråga om användaren vill veta mer.
 ${contextInfo}`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
