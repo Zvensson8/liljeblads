@@ -57,21 +57,27 @@ export default function AIChat() {
   });
 
   // Fetch messages for selected conversation
-  const { data: conversationMessages = [] } = useQuery({
+  const { data: conversationMessages = [], isLoading: messagesLoading, refetch: refetchMessages } = useQuery({
     queryKey: ['ai-messages', selectedConversationId],
     queryFn: async () => {
       if (!selectedConversationId) return [];
       
+      console.log('Fetching messages for conversation:', selectedConversationId);
       const { data, error } = await supabase
         .from('ai_messages')
         .select('*')
         .eq('conversation_id', selectedConversationId)
         .order('created_at', { ascending: true });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching messages:', error);
+        throw error;
+      }
+      console.log('Fetched messages:', data?.length);
       return data as Message[];
     },
-    enabled: !!selectedConversationId
+    enabled: !!selectedConversationId,
+    staleTime: 0, // Always refetch when conversation changes
   });
 
   // Update local messages when conversation messages change
@@ -146,9 +152,12 @@ export default function AIChat() {
     setSidebarOpen(false);
   };
 
-  const selectConversation = (id: string) => {
+  const selectConversation = async (id: string) => {
+    console.log('Selecting conversation:', id);
     setSelectedConversationId(id);
     setSidebarOpen(false);
+    // Force refetch messages for this conversation
+    await queryClient.invalidateQueries({ queryKey: ['ai-messages', id] });
   };
 
   const sendMessage = async () => {
@@ -299,15 +308,19 @@ export default function AIChat() {
                   variant="ghost"
                   size="icon"
                   className={cn(
-                    "h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity",
-                    selectedConversationId === conv.id && "text-primary-foreground hover:bg-primary-foreground/20"
+                    "h-7 w-7 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity",
+                    selectedConversationId === conv.id 
+                      ? "text-primary-foreground hover:bg-primary-foreground/20" 
+                      : "hover:bg-destructive/10 hover:text-destructive"
                   )}
                   onClick={(e) => {
                     e.stopPropagation();
-                    deleteConversationMutation.mutate(conv.id);
+                    if (window.confirm('Är du säker på att du vill ta bort denna konversation?')) {
+                      deleteConversationMutation.mutate(conv.id);
+                    }
                   }}
                 >
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             ))
