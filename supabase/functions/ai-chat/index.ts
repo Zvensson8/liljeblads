@@ -1039,7 +1039,17 @@ KONTAKTER
     E-post: [e-post]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-UPPGIFTER
+DRIFTUPPGIFTER (drift_tasks - återkommande underhåll/kontroller)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  [Uppgiftsnamn] ([kvartal] [år])
+    Planerat: [antal], Rapporterat: [antal]
+    Status: [X av Y rapporterade]
+    Beskrivning: [beskrivning om finns]
+
+OBS: Driftuppgifter har INTE prioritet eller deadline - visa aldrig dessa fält för driftuppgifter!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ATT GÖRA (property_todos - engångsuppgifter)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   [Uppgiftstitel]
     Prioritet: [prioritet]
