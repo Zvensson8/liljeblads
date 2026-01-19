@@ -10,7 +10,8 @@ export type ModuleName =
   | "projects"
   | "recurring-costs"
   | "users"
-  | "organization";
+  | "organization"
+  | "ai-chat";
 
 export const useModuleAccess = () => {
   const { data: session, isLoading: sessionLoading } = useQuery({
@@ -38,6 +39,7 @@ export const useModuleAccess = () => {
           "recurring-costs",
           "users",
           "organization",
+          "ai-chat",
         ] as ModuleName[];
       }
 
@@ -63,6 +65,7 @@ export const useModuleAccess = () => {
           "recurring-costs",
           "users",
           "organization",
+          "ai-chat",
         ] as ModuleName[];
       }
 
@@ -86,6 +89,7 @@ export const useModuleAccess = () => {
           "recurring-costs",
           "users",
           "organization",
+          "ai-chat",
         ] as ModuleName[];
       }
 
