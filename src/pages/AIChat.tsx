@@ -285,58 +285,65 @@ export default function AIChat() {
             </p>
           ) : (
             conversations.map((conv) => {
-              const handleClick = () => {
-                console.log('Clicked conversation:', conv.id);
-                setSelectedConversationId(conv.id);
-                setSidebarOpen(false);
+              const handleSelect = () => {
+                // Clear immediately so det känns responsivt, och ladda sedan rätt historik
+                setMessages([]);
+                selectConversation(conv.id);
               };
-              
+
               return (
-              <div
-                key={conv.id}
-                role="button"
-                tabIndex={0}
-                className={cn(
-                  "group flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer transition-colors select-none",
-                  selectedConversationId === conv.id
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted"
-                )}
-                onClick={handleClick}
-                onKeyDown={(e) => e.key === 'Enter' && handleClick()}
-              >
-                <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{conv.title}</p>
-                  <p className={cn(
-                    "text-xs",
-                    selectedConversationId === conv.id 
-                      ? "text-primary-foreground/70" 
-                      : "text-muted-foreground"
-                  )}>
-                    {format(new Date(conv.updated_at), 'd MMM', { locale: sv })}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <div
+                  key={conv.id}
+                  role="button"
+                  tabIndex={0}
                   className={cn(
-                    "h-7 w-7 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity",
-                    selectedConversationId === conv.id 
-                      ? "text-primary-foreground hover:bg-primary-foreground/20" 
-                      : "hover:bg-destructive/10 hover:text-destructive"
+                    "group flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer transition-colors select-none",
+                    selectedConversationId === conv.id
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted"
                   )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (window.confirm('Är du säker på att du vill ta bort denna konversation?')) {
-                      deleteConversationMutation.mutate(conv.id);
-                    }
-                  }}
+                  onClick={handleSelect}
+                  onPointerUp={handleSelect}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSelect()}
                 >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            );
+                  <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{conv.title}</p>
+                    <p
+                      className={cn(
+                        "text-xs",
+                        selectedConversationId === conv.id
+                          ? "text-primary-foreground/70"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {format(new Date(conv.updated_at), 'd MMM', { locale: sv })}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "h-7 w-7 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity",
+                      selectedConversationId === conv.id
+                        ? "text-primary-foreground hover:bg-primary-foreground/20"
+                        : "hover:bg-destructive/10 hover:text-destructive"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (
+                        window.confirm(
+                          'Är du säker på att du vill ta bort denna konversation?'
+                        )
+                      ) {
+                        deleteConversationMutation.mutate(conv.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
             })
           )}
         </div>
@@ -348,13 +355,13 @@ export default function AIChat() {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
-        
+
         <main className="flex-1 flex flex-col">
           {/* Header */}
           <header className="h-14 border-b flex items-center justify-between px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
-              
+
               {/* Mobile conversation list toggle */}
               {isMobile && (
                 <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
@@ -368,7 +375,7 @@ export default function AIChat() {
                   </SheetContent>
                 </Sheet>
               )}
-              
+
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
                   <Bot className="h-4 w-4 text-primary" />
@@ -395,7 +402,7 @@ export default function AIChat() {
                 {messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground py-20">
                     <Bot className="h-16 w-16 mb-4 opacity-30" />
-                    <h2 className="text-xl font-medium mb-2">Hej! Hur kan jag hjälpa dig?</h2>
+                    <h2 className="text-xl font-medium mb-2">Hur kan jag hjälpa?</h2>
                     <p className="text-sm max-w-md">
                       Ställ frågor om dina fastigheter, komponenter, projekt, arbetsordrar eller andra delar av systemet.
                     </p>
