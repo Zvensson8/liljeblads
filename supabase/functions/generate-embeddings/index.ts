@@ -431,6 +431,31 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
       if (error || !data) return null;
 
       const mh = data.maintenance_history;
+      
+      // Parse PDF content if it's a PDF file
+      let pdfContent = '';
+      if (data.file_url && data.file_name?.toLowerCase().endsWith('.pdf')) {
+        try {
+          console.log(`Parsing PDF content for: ${data.file_name}`);
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+          const parseResponse = await fetch(`${supabaseUrl}/functions/v1/parse-document`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: data.file_url, maxPages: 5 })
+          });
+          
+          if (parseResponse.ok) {
+            const parsed = await parseResponse.json();
+            if (parsed.text && parsed.text.length > 0) {
+              pdfContent = parsed.text;
+              console.log(`Extracted ${pdfContent.length} chars from PDF`);
+            }
+          }
+        } catch (parseError) {
+          console.error('Error parsing PDF:', parseError);
+        }
+      }
+      
       const parts = [
         `Serviceprotokoll: ${data.file_name}`,
         mh?.action_type ? `Åtgärd: ${mh.action_type}` : '',
@@ -441,7 +466,8 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
         mh?.notes ? `Anteckningar: ${mh.notes}` : '',
         mh?.component?.name ? `Komponent: ${mh.component.name}` : '',
         mh?.component?.type ? `Komponenttyp: ${mh.component.type}` : '',
-        mh?.component?.property?.name ? `Fastighet: ${mh.component.property.name}` : ''
+        mh?.component?.property?.name ? `Fastighet: ${mh.component.property.name}` : '',
+        pdfContent ? `\n\nDOKUMENTINNEHÅLL:\n${pdfContent}` : ''
       ].filter(Boolean);
 
       return {

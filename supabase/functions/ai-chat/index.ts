@@ -118,7 +118,7 @@ serve(async (req) => {
         if (orgComponentIds.length > 0) {
           let maintenanceQuery = supabase
             .from('maintenance_history')
-            .select('*, component:components(name, property_id, property:properties(name))')
+            .select('*, component:components(name, property_id, property:properties(name)), documents:maintenance_history_documents(id, file_name, file_url)')
             .in('component_id', orgComponentIds)
             .order('performed_date', { ascending: false });
           
@@ -135,6 +135,23 @@ serve(async (req) => {
             console.error('Maintenance search error:', maintenanceError);
           } else if (maintenanceRecords && maintenanceRecords.length > 0) {
             console.log(`Found ${maintenanceRecords.length} maintenance records`);
+            
+            // Collect all document IDs to fetch their embeddings
+            const allDocIds = maintenanceRecords.flatMap(mh => 
+              (mh.documents || []).map((d: any) => d.id)
+            ).filter(Boolean);
+            
+            // Fetch document embeddings for PDF content
+            let docEmbeddings: any[] = [];
+            if (allDocIds.length > 0) {
+              const { data: embeddingsData } = await supabase
+                .from('embeddings')
+                .select('source_id, content')
+                .eq('source_table', 'maintenance_history_documents')
+                .in('source_id', allDocIds);
+              docEmbeddings = embeddingsData || [];
+              console.log(`Fetched ${docEmbeddings.length} document embeddings`);
+            }
             
             // Filter by search terms if present
             let filteredRecords = maintenanceRecords;
@@ -176,6 +193,25 @@ serve(async (req) => {
                   if (mh.supplier) mhInfo += `\n    Leverantör: ${mh.supplier}`;
                   if (mh.is_warranty) mhInfo += ` (Garanti)`;
                   if (mh.notes) mhInfo += `\n    Anteckningar: ${mh.notes}`;
+                  
+                  // Add document information with content from embeddings
+                  if (mh.documents && mh.documents.length > 0) {
+                    mhInfo += `\n    📄 Bifogade dokument:`;
+                    for (const doc of mh.documents) {
+                      mhInfo += `\n      - ${doc.file_name}`;
+                      
+                      // Find and include parsed document content from embeddings
+                      const docEmbedding = docEmbeddings.find(e => e.source_id === doc.id);
+                      if (docEmbedding?.content) {
+                        // Extract the document content section
+                        const contentMatch = docEmbedding.content.match(/DOKUMENTINNEHÅLL:\s*([\s\S]+)/i);
+                        if (contentMatch && contentMatch[1]) {
+                          const docContent = contentMatch[1].trim().substring(0, 2000);
+                          mhInfo += `\n        📋 PROTOKOLLINNEHÅLL:\n        ${docContent.replace(/\n/g, '\n        ')}`;
+                        }
+                      }
+                    }
+                  }
                 }
                 
                 if (records.length > 1) {
@@ -1002,6 +1038,15 @@ UNDERHÅLLSHISTORIK
     Komponent: [komponent]
     Kostnad: [belopp] kr
     Leverantör: [leverantör]
+    Bifogade dokument (om finns):
+      - [filnamn]
+        PROTOKOLLINNEHÅLL: [text från serviceprotokoll]
+
+VIKTIGT OM SERVICEPROTOKOLL/DOKUMENT:
+- När du hittar PROTOKOLLINNEHÅLL i kontexten, CITERA alltid relevant information
+- Lyft fram AVVIKELSER, ANMÄRKNINGAR och REKOMMENDATIONER från protokoll
+- Om protokollet nämner brister eller förslag på åtgärder, presentera dem tydligt
+- Koppla alltid avvikelser till relevant komponent och datum
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PROJEKT
