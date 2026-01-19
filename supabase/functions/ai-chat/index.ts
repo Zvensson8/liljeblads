@@ -206,11 +206,14 @@ serve(async (req) => {
                       // Find and include parsed document content from embeddings
                       const docEmbedding = docEmbeddings.find(e => e.source_id === doc.id);
                       if (docEmbedding?.content) {
-                        // Extract the document content section
-                        const contentMatch = docEmbedding.content.match(/DOKUMENTINNEHÅLL:\s*([\s\S]+)/i);
+                        // Extract the document content section - check for both old and new format
+                        const contentMatch = docEmbedding.content.match(/(?:DOKUMENTINNEHÅLL|PROTOKOLLINNEHÅLL \(mätvärden, avvikelser, observationer\)|=== PROTOKOLLINNEHÅLL)[\s:=]*\n?([\s\S]+)/i);
                         if (contentMatch && contentMatch[1]) {
-                          const docContent = contentMatch[1].trim().substring(0, 2000);
-                          mhInfo += `\n        📋 PROTOKOLLINNEHÅLL:\n        ${docContent.replace(/\n/g, '\n        ')}`;
+                          const docContent = contentMatch[1].trim().substring(0, 3000);
+                          mhInfo += `\n        📋 SERVICEPROTOKOLL:\n        ${docContent.replace(/\n/g, '\n        ')}`;
+                        } else if (docEmbedding.content.length > 200) {
+                          // Fallback: if no specific section found but content exists, use it
+                          mhInfo += `\n        📋 SERVICEPROTOKOLL:\n        ${docEmbedding.content.substring(200).trim().replace(/\n/g, '\n        ').substring(0, 2500)}`;
                         }
                       }
                     }
