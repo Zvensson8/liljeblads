@@ -67,6 +67,7 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [documents, setDocuments] = useState<MaintenanceDocument[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -127,21 +128,72 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
     setIsSaving(false);
   };
 
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    
-    const { error } = await supabase
-      .from('maintenance_history')
-      .delete()
-      .eq('id', record.id);
+  const getMaintenanceDocPathFromUrl = (fileUrl: string): string | null => {
+    try {
+      const url = new URL(fileUrl);
+      const pathnameParts = url.pathname.split('/').filter(Boolean);
+      const bucketIdx = pathnameParts.findIndex((p) => p === 'maintenance-documents');
+      if (bucketIdx === -1) return null;
+      return pathnameParts.slice(bucketIdx + 1).join('/');
+    } catch {
+      const parts = fileUrl.split('/').filter(Boolean);
+      const bucketIdx = parts.findIndex((p) => p === 'maintenance-documents');
+      if (bucketIdx === -1) return null;
+      return parts.slice(bucketIdx + 1).join('/');
+    }
+  };
 
-    if (error) {
-      toast.error('Kunde inte ta bort service', { description: error.message });
-    } else {
+  const deleteDocumentsAndFiles = async () => {
+    const { data, error } = await supabase
+      .from('maintenance_history_documents')
+      .select('*')
+      .eq('maintenance_history_id', record.id);
+
+    if (error) throw error;
+
+    const docs = (data || []) as MaintenanceDocument[];
+
+    // Delete storage files first (best-effort)
+    await Promise.allSettled(
+      docs.map(async (doc) => {
+        const filePath = getMaintenanceDocPathFromUrl(doc.file_url);
+        if (!filePath) return;
+        await supabase.storage.from('maintenance-documents').remove([filePath]);
+      })
+    );
+
+    // Then delete db rows
+    const { error: docDeleteError } = await supabase
+      .from('maintenance_history_documents')
+      .delete()
+      .eq('maintenance_history_id', record.id);
+
+    if (docDeleteError) throw docDeleteError;
+  };
+
+  const handleDelete = async (): Promise<boolean> => {
+    setIsDeleting(true);
+
+    try {
+      // Ensure FK constraints won't block the record delete
+      await deleteDocumentsAndFiles();
+
+      const { error } = await supabase
+        .from('maintenance_history')
+        .delete()
+        .eq('id', record.id);
+
+      if (error) throw error;
+
       toast.success('Service borttagen');
       onDelete();
+      return true;
+    } catch (error: any) {
+      toast.error('Kunde inte ta bort service', { description: error.message });
+      return false;
+    } finally {
+      setIsDeleting(false);
     }
-    setIsDeleting(false);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -196,16 +248,13 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
   };
 
   const handleDeleteDocument = async (doc: MaintenanceDocument) => {
-    // Extract path from URL
-    const urlParts = doc.file_url.split('/');
-    const pathStartIndex = urlParts.findIndex(p => p === 'maintenance-documents') + 1;
-    const filePath = urlParts.slice(pathStartIndex).join('/');
+    const filePath = getMaintenanceDocPathFromUrl(doc.file_url);
 
     try {
-      // Delete from storage
-      await supabase.storage
-        .from('maintenance-documents')
-        .remove([filePath]);
+      // Delete from storage (only if we can parse the path)
+      if (filePath) {
+        await supabase.storage.from('maintenance-documents').remove([filePath]);
+      }
 
       // Delete from database
       const { error } = await supabase
@@ -360,7 +409,7 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
                 <Pencil className="h-4 w-4" />
               </Button>
               
-              <AlertDialog>
+              <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="ghost"
@@ -385,10 +434,11 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel disabled={isDeleting}>Avbryt</AlertDialogCancel>
-                    <AlertDialogAction 
+                    <AlertDialogAction
                       onClick={async (e) => {
                         e.preventDefault();
-                        await handleDelete();
+                        const ok = await handleDelete();
+                        if (ok) setDeleteConfirmOpen(false);
                       }}
                       disabled={isDeleting}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
