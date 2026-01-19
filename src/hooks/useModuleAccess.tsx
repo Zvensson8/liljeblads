@@ -76,29 +76,40 @@ export const useModuleAccess = () => {
 
       if (error) throw error;
 
+      // Default all modules
+      const allModules: ModuleName[] = [
+        "dashboard",
+        "properties",
+        "components",
+        "work-orders",
+        "operations",
+        "projects",
+        "recurring-costs",
+        "users",
+        "organization",
+        "ai-chat",
+      ];
+
       // If no specific access rules exist, grant access to all modules by default
-      // Admins can then explicitly restrict access for specific users
       if (!data || data.length === 0) {
-        return [
-          "dashboard",
-          "properties",
-          "components",
-          "work-orders",
-          "operations",
-          "projects",
-          "recurring-costs",
-          "users",
-          "organization",
-          "ai-chat",
-        ] as ModuleName[];
+        return allModules;
       }
 
-      // Filter only enabled modules
-      const enabledModules = data
-        .filter((item) => item.is_enabled)
-        .map((item) => item.module_name as ModuleName);
+      // Build a map of explicit rules
+      const accessMap = new Map<string, boolean>();
+      data.forEach((item) => {
+        accessMap.set(item.module_name, item.is_enabled);
+      });
+
+      // For each module: if there's an explicit rule, use it; otherwise allow by default
+      const enabledModules = allModules.filter((moduleName) => {
+        if (accessMap.has(moduleName)) {
+          return accessMap.get(moduleName) === true;
+        }
+        // No explicit rule for this module - allow by default
+        return true;
+      });
       
-      // If all modules are disabled, return empty array (user has no access)
       return enabledModules;
     },
     // Only run when session loading is complete
