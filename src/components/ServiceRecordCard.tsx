@@ -368,7 +368,11 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
                     className="text-muted-foreground hover:text-destructive"
                     disabled={isDeleting}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {isDeleting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -380,12 +384,23 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                    <AlertDialogCancel disabled={isDeleting}>Avbryt</AlertDialogCancel>
                     <AlertDialogAction 
-                      onClick={handleDelete}
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        await handleDelete();
+                      }}
+                      disabled={isDeleting}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
-                      Ta bort
+                      {isDeleting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Tar bort...
+                        </>
+                      ) : (
+                        'Ta bort'
+                      )}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
