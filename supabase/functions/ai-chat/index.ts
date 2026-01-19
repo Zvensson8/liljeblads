@@ -233,7 +233,7 @@ serve(async (req) => {
         if (orgPropertyIds.length > 0) {
           let workOrderQuery = supabase
             .from('work_orders')
-            .select('*, property:properties(name), component:components(name)')
+            .select('*, property:properties(name)')
             .in('property_id', orgPropertyIds)
             .order('created_at', { ascending: false });
           
@@ -253,7 +253,7 @@ serve(async (req) => {
             let filteredOrders = workOrders;
             if (searchTerms.length > 0) {
               filteredOrders = workOrders.filter(wo => {
-                const searchText = `${wo.action || ''} ${wo.comments || ''} ${wo.contractor || ''} ${wo.property?.name || ''} ${wo.component?.name || ''}`.toLowerCase();
+                const searchText = `${wo.action || ''} ${wo.comments || ''} ${wo.contractor || ''} ${wo.property?.name || ''}`.toLowerCase();
                 return searchTerms.some(term => searchText.includes(term.toLowerCase()));
               });
             }
@@ -293,7 +293,6 @@ serve(async (req) => {
                   woInfo += `\n    Status: ${statusLabel(wo.status)}`;
                   if (wo.priority) woInfo += `, Prioritet: ${wo.priority}`;
                   if (wo.contractor) woInfo += `\n    Entreprenör: ${wo.contractor}`;
-                  if (wo.component?.name) woInfo += `\n    Komponent: ${wo.component.name}`;
                   if (wo.due_date) woInfo += `\n    Deadline: ${wo.due_date}`;
                   if (wo.quarter) woInfo += `, Kvartal: ${wo.quarter}`;
                   if (wo.price) {
