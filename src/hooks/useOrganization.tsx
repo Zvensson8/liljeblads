@@ -40,9 +40,9 @@ export function useOrganization() {
         return;
       }
 
-      // Hämta organisationsdata
+      // Hämta organisationsdata via säker vy (exkluderar faktureringsinfo)
       const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
+        .from('organizations_public')
         .select('id, name, logo_url, primary_color')
         .eq('id', memberData.organization_id)
         .single();

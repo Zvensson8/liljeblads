@@ -63,9 +63,10 @@ export default function OrganizationSettings() {
       setLoading(true);
 
       // Hämta användarens organisations-medlemskap
+      // Använd organizations_public vy för säkerhet (exkluderar faktureringsinfo för vanliga medlemmar)
       const { data: memberData, error: memberError } = await supabase
         .from("organization_members")
-        .select("*, organization:organizations(*)")
+        .select("*, organization:organizations_public(*)")
         .eq("user_id", user?.id)
         .single();
 
