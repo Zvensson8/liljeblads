@@ -15,12 +15,13 @@ interface Document {
   created_at: string;
   version?: number;
   is_latest?: boolean;
+  signedUrl?: string; // Optional signed URL for private storage access
 }
 
 interface DocumentPreviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  document: Document | null;
+  document: (Document & { signedUrl?: string }) | null;
   versions?: Document[];
   onVersionSelect?: (version: Document) => void;
 }
@@ -35,6 +36,9 @@ export function DocumentPreviewDialog({
   const [showVersions, setShowVersions] = useState(false);
 
   if (!document) return null;
+
+  // Use signed URL if available, otherwise fall back to file_url (for legacy public URLs)
+  const accessUrl = document.signedUrl || document.file_url;
 
   const isImage = document.mime_type?.startsWith("image/");
   const isPdf = document.mime_type === "application/pdf";
@@ -82,7 +86,7 @@ export function DocumentPreviewDialog({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.open(document.file_url, "_blank")}
+                onClick={() => window.open(accessUrl, "_blank")}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Öppna
@@ -92,7 +96,7 @@ export function DocumentPreviewDialog({
                 size="sm"
                 onClick={() => {
                   const a = window.document.createElement("a");
-                  a.href = document.file_url;
+                  a.href = accessUrl;
                   a.download = document.name;
                   a.click();
                 }}
@@ -151,7 +155,7 @@ export function DocumentPreviewDialog({
           ) : isImage ? (
             <div className="h-full overflow-auto bg-muted/30 rounded-lg flex items-center justify-center">
               <img
-                src={document.file_url}
+                src={accessUrl}
                 alt={document.name}
                 className="max-w-full max-h-full object-contain"
               />
@@ -167,7 +171,7 @@ export function DocumentPreviewDialog({
                   Öppna PDF-filen i en ny flik för att visa den
                 </p>
                 <Button
-                  onClick={() => window.open(document.file_url, "_blank")}
+                  onClick={() => window.open(accessUrl, "_blank")}
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Öppna PDF
@@ -185,7 +189,7 @@ export function DocumentPreviewDialog({
                   Denna filtyp kan inte förhandsvisas i webbläsaren
                 </p>
                 <Button
-                  onClick={() => window.open(document.file_url, "_blank")}
+                  onClick={() => window.open(accessUrl, "_blank")}
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Öppna i ny flik
