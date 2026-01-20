@@ -70,16 +70,16 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("component-documents")
-        .getPublicUrl(filePath);
+      // Store the file path (not public URL) since bucket is now private
+      // We'll generate signed URLs when accessing the file
+      const storagePath = filePath;
 
       const { error: dbError } = await supabase
         .from("component_documents")
         .insert([{
           component_id: componentId,
           name: file.name,
-          file_url: publicUrl,
+          file_url: storagePath,
           file_size: file.size,
           mime_type: file.type,
           version: nextVersion,
@@ -97,9 +97,47 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
     }
   };
 
+  // Get signed URL for accessing private storage
+  const getSignedUrl = async (storagePath: string): Promise<string | null> => {
+    // Handle legacy public URLs that contain the full supabase URL
+    if (storagePath.includes('supabase.co')) {
+      // Extract the path from the URL
+      const urlParts = storagePath.split('/storage/v1/object/public/component-documents/');
+      if (urlParts.length > 1) {
+        storagePath = urlParts[1];
+      }
+    }
+    
+    const { data, error } = await supabase.storage
+      .from("component-documents")
+      .createSignedUrl(storagePath, 3600); // 1 hour expiry
+    
+    if (error) {
+      console.error("Error creating signed URL:", error);
+      return null;
+    }
+    return data.signedUrl;
+  };
+
+  const handleDownload = async (doc: any) => {
+    const signedUrl = await getSignedUrl(doc.file_url);
+    if (signedUrl) {
+      window.open(signedUrl, "_blank");
+    } else {
+      toast.error("Kunde inte hämta dokument");
+    }
+  };
+
   const handleDeleteDocument = async (docId: string, fileUrl: string) => {
     try {
-      const filePath = fileUrl.split("/").slice(-3).join("/");
+      // Handle both legacy full URLs and new storage paths
+      let filePath = fileUrl;
+      if (fileUrl.includes('supabase.co')) {
+        const urlParts = fileUrl.split('/storage/v1/object/public/component-documents/');
+        if (urlParts.length > 1) {
+          filePath = urlParts[1];
+        }
+      }
       
       const { error: storageError } = await supabase.storage
         .from("component-documents")
@@ -123,7 +161,9 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
 
   const handlePreview = async (doc: any) => {
     const versions = await getDocumentVersions(doc.name);
-    setSelectedDoc({ ...doc, versions });
+    // Get signed URL for preview
+    const signedUrl = await getSignedUrl(doc.file_url);
+    setSelectedDoc({ ...doc, versions, signedUrl });
     setPreviewOpen(true);
   };
 
@@ -170,7 +210,8 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
                       onClick={async () => {
                         const versions = await getDocumentVersions(doc.name);
                         if (versions.length > 1) {
-                          setSelectedDoc({ ...doc, versions });
+                          const signedUrl = await getSignedUrl(doc.file_url);
+                          setSelectedDoc({ ...doc, versions, signedUrl });
                           setPreviewOpen(true);
                         } else {
                           toast.info("Endast en version finns");
@@ -183,7 +224,7 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => window.open(doc.file_url, "_blank")}
+                      onClick={() => handleDownload(doc)}
                       title="Ladda ner"
                     >
                       <Download className="h-4 w-4" />
