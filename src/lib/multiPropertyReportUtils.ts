@@ -95,12 +95,52 @@ async function fetchTasksForProperty(
   return allTasks;
 }
 
+interface DeviationData {
+  propertyName: string;
+  quarter: string;
+  taskName: string;
+  planned: number;
+  reported: number;
+  deviationPercent: number;
+  deviationType: string;
+}
+
+function calculateDeviations(tasks: TaskData[], threshold: number = 0.2): DeviationData[] {
+  return tasks
+    .map((task) => {
+      const deviation =
+        task.planned > 0
+          ? Math.abs(task.reported - task.planned) / task.planned
+          : task.reported > 0 ? 1 : 0;
+      const deviationPercent = Math.round(deviation * 100);
+
+      return {
+        propertyName: task.propertyName,
+        quarter: task.quarter,
+        taskName: task.name,
+        planned: task.planned,
+        reported: task.reported,
+        deviationPercent,
+        deviationType:
+          task.reported > task.planned
+            ? "Överrapporterad"
+            : task.reported < task.planned
+            ? "Underrapporterad"
+            : "OK",
+        deviation,
+      };
+    })
+    .filter((d) => d.deviation >= threshold)
+    .sort((a, b) => b.deviationPercent - a.deviationPercent);
+}
+
 function calculatePropertyStats(tasks: TaskData[], propertyName: string) {
   const total = tasks.length;
   const completed = tasks.filter((t) => t.status === "Klar").length;
   const inProgress = tasks.filter((t) => t.status === "Pågår").length;
   const missing = tasks.filter((t) => t.status === "Saknas").length;
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const deviations = calculateDeviations(tasks);
 
   return {
     propertyName,
@@ -109,6 +149,7 @@ function calculatePropertyStats(tasks: TaskData[], propertyName: string) {
     inProgress,
     missing,
     completionRate,
+    deviationCount: deviations.length,
   };
 }
 
@@ -261,11 +302,35 @@ async function generateExcelReport(
     XLSX.utils.book_append_sheet(wb, quarterWs, "Kvartalsöversikt");
   }
 
+  // Deviation summary sheet
+  const allDeviations = calculateDeviations(allTasks);
+  if (allDeviations.length > 0) {
+    const deviationSheetData = [
+      ["Avvikelserapport - Uppgifter med >20% avvikelse"],
+      [`Totalt antal avvikelser: ${allDeviations.length}`],
+      [],
+      ["Fastighet", "Kvartal", "Uppgift", "Planerat", "Redovisat", "Avvikelse %", "Typ"],
+      ...allDeviations.map((d) => [
+        d.propertyName,
+        d.quarter,
+        d.taskName,
+        d.planned,
+        d.reported,
+        `${d.deviationPercent}%`,
+        d.deviationType,
+      ]),
+    ];
+
+    const deviationWs = XLSX.utils.aoa_to_sheet(deviationSheetData);
+    XLSX.utils.book_append_sheet(wb, deviationWs, "Avvikelser");
+  }
+
   // Detailed sheets per property
   properties.forEach((property) => {
     const tasks = allPropertyTasks.get(property.id) || [];
     if (tasks.length === 0) return;
 
+    const propertyDeviations = calculateDeviations(tasks);
     const taskData = [
       ["Kvartal", "Kategori", "Uppgift", "Planerat", "Redovisat", "Status", "%"],
       ...tasks.map((t) => [
@@ -278,6 +343,24 @@ async function generateExcelReport(
         `${t.completionPercent}%`,
       ]),
     ];
+
+    // Add deviation summary for this property
+    if (propertyDeviations.length > 0) {
+      taskData.push(
+        [],
+        ["--- AVVIKELSER (>20%) ---"],
+        ["Kvartal", "Uppgift", "", "Planerat", "Redovisat", "Avvikelse", "Typ"],
+        ...propertyDeviations.map((d) => [
+          d.quarter,
+          d.taskName,
+          "",
+          d.planned,
+          d.reported,
+          `${d.deviationPercent}%`,
+          d.deviationType,
+        ])
+      );
+    }
 
     const ws = XLSX.utils.aoa_to_sheet(taskData);
     // Truncate sheet name to 31 chars (Excel limit)
@@ -380,6 +463,47 @@ async function generatePdfReport(
     });
   }
 
+  // Deviation summary page
+  const allDeviations = calculateDeviations(allTasks);
+  if (allDeviations.length > 0) {
+    doc.addPage();
+    doc.setFontSize(14);
+    doc.text("Avvikelserapport", 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Uppgifter med >20% avvikelse mellan planerat och redovisat`, 14, 28);
+    doc.text(`Totalt antal avvikelser: ${allDeviations.length}`, 14, 34);
+
+    const deviationData = allDeviations.slice(0, 50).map((d) => [
+      d.propertyName.substring(0, 15),
+      d.quarter,
+      d.taskName.substring(0, 25),
+      d.planned,
+      d.reported,
+      `${d.deviationPercent}%`,
+      d.deviationType,
+    ]);
+
+    autoTable(doc, {
+      startY: 40,
+      head: [["Fastighet", "Kv.", "Uppgift", "Plan.", "Red.", "Avv. %", "Typ"]],
+      body: deviationData,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [220, 38, 38] },
+      columnStyles: {
+        0: { cellWidth: 25 },
+        2: { cellWidth: 40 },
+      },
+    });
+
+    if (allDeviations.length > 50) {
+      doc.text(
+        `... och ${allDeviations.length - 50} fler avvikelser (se Excel för fullständig lista)`,
+        14,
+        (doc as any).lastAutoTable.finalY + 10
+      );
+    }
+  }
+
   // Detailed pages per property
   properties.forEach((property) => {
     const tasks = allPropertyTasks.get(property.id) || [];
@@ -390,12 +514,20 @@ async function generatePdfReport(
     doc.text(property.name, 14, 20);
 
     const stats = calculatePropertyStats(tasks, property.name);
+    const propertyDeviations = calculateDeviations(tasks);
+    
     doc.setFontSize(10);
     doc.text(
       `Totalt: ${stats.total} | Klara: ${stats.completed} | Saknas: ${stats.missing} | Completion: ${stats.completionRate}%`,
       14,
       28
     );
+    
+    if (propertyDeviations.length > 0) {
+      doc.setTextColor(220, 38, 38);
+      doc.text(`⚠ ${propertyDeviations.length} avvikelse${propertyDeviations.length > 1 ? 'r' : ''} upptäckt${propertyDeviations.length > 1 ? 'a' : ''}`, 14, 34);
+      doc.setTextColor(0, 0, 0);
+    }
 
     const taskData = tasks.map((t) => [
       t.quarter,
@@ -406,7 +538,7 @@ async function generatePdfReport(
     ]);
 
     autoTable(doc, {
-      startY: 34,
+      startY: propertyDeviations.length > 0 ? 40 : 34,
       head: [["Kvartal", "Uppgift", "Plan.", "Red.", "Status"]],
       body: taskData,
       styles: { fontSize: 8 },
@@ -415,6 +547,31 @@ async function generatePdfReport(
         1: { cellWidth: 60 },
       },
     });
+
+    // Add property-specific deviations
+    if (propertyDeviations.length > 0) {
+      const yPos = (doc as any).lastAutoTable.finalY + 10;
+      
+      if (yPos < 250) {
+        doc.setFontSize(11);
+        doc.text("Avvikelser för denna fastighet:", 14, yPos);
+
+        autoTable(doc, {
+          startY: yPos + 5,
+          head: [["Kvartal", "Uppgift", "Plan.", "Red.", "Avv. %", "Typ"]],
+          body: propertyDeviations.slice(0, 10).map((d) => [
+            d.quarter,
+            d.taskName.substring(0, 25),
+            d.planned,
+            d.reported,
+            `${d.deviationPercent}%`,
+            d.deviationType,
+          ]),
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [220, 38, 38] },
+        });
+      }
+    }
   });
 
   // Save
