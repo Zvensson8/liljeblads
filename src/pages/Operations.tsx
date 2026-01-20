@@ -13,13 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Copy, Download, ClipboardList, FileSpreadsheet, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { Loader2, Copy, Download, ClipboardList, FileSpreadsheet, ChevronLeft, ChevronRight, Calendar, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { QuarterCard } from "@/components/operations/QuarterCard";
 import { CategoryDialog } from "@/components/operations/CategoryDialog";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TaskTemplateLibrary } from "@/components/operations/TaskTemplateLibrary";
 import { ReportGenerator } from "@/components/operations/ReportGenerator";
+import { MultiPropertyReportDialog } from "@/components/operations/MultiPropertyReportDialog";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { exportYearToExcel } from "@/lib/operationsExport";
 import {
@@ -47,6 +48,7 @@ export default function Operations() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [templateLibraryOpen, setTemplateLibraryOpen] = useState(false);
   const [reportGeneratorOpen, setReportGeneratorOpen] = useState(false);
+  const [multiPropertyReportOpen, setMultiPropertyReportOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -231,6 +233,16 @@ export default function Operations() {
                   variant="outline"
                   size="sm"
                   className="h-8"
+                  onClick={() => setMultiPropertyReportOpen(true)}
+                >
+                  <Building2 className="h-4 w-4 mr-1.5" />
+                  <span className="hidden sm:inline">Samlad rapport</span>
+                  <span className="sm:hidden">Samlad</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
                   onClick={() => setTemplateLibraryOpen(true)}
                   disabled={!selectedProperty}
                 >
@@ -366,6 +378,11 @@ export default function Operations() {
                   />
                 </>
               )}
+
+              <MultiPropertyReportDialog
+                open={multiPropertyReportOpen}
+                onOpenChange={setMultiPropertyReportOpen}
+              />
             </div>
           </main>
         </SidebarInset>
