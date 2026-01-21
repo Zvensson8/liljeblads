@@ -70,7 +70,8 @@ export default function Operations() {
     }
 
     setProperties(data || []);
-    if (data && data.length > 0) {
+    // Only set default property if none is selected yet
+    if (data && data.length > 0 && !selectedProperty) {
       setSelectedProperty(data[0].id);
     }
   };
