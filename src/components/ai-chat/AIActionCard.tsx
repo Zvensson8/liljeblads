@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export interface AIAction {
   id: string;
@@ -23,6 +24,9 @@ interface AIActionCardProps {
   onApprove: (id: string) => Promise<void>;
   onReject: (id: string, reason?: string) => Promise<void>;
   mini?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectChange?: (id: string, selected: boolean) => void;
 }
 
 const actionConfig: Record<string, { icon: typeof Wrench; label: string; colorClass: string }> = {
@@ -58,7 +62,15 @@ const actionConfig: Record<string, { icon: typeof Wrench; label: string; colorCl
   },
 };
 
-export function AIActionCard({ action, onApprove, onReject, mini = false }: AIActionCardProps) {
+export function AIActionCard({ 
+  action, 
+  onApprove, 
+  onReject, 
+  mini = false,
+  selectable = false,
+  selected = false,
+  onSelectChange
+}: AIActionCardProps) {
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [showRejectInput, setShowRejectInput] = useState(false);
@@ -100,6 +112,13 @@ export function AIActionCard({ action, onApprove, onReject, mini = false }: AIAc
         "flex items-center gap-3 p-3 rounded-lg border-l-4 bg-muted/50",
         config.colorClass
       )}>
+        {selectable && action.status === 'pending' && (
+          <Checkbox
+            checked={selected}
+            onCheckedChange={(checked) => onSelectChange?.(action.id, !!checked)}
+            className="flex-shrink-0"
+          />
+        )}
         <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">
@@ -109,7 +128,7 @@ export function AIActionCard({ action, onApprove, onReject, mini = false }: AIAc
             {confidencePercent}% säker
           </p>
         </div>
-        {action.status === 'pending' && (
+        {action.status === 'pending' && !selectable && (
           <div className="flex gap-1">
             <Button 
               size="icon" 

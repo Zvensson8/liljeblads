@@ -1,16 +1,21 @@
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, ArrowRight, Loader2 } from 'lucide-react';
+import { Zap, ArrowRight, Loader2, Check, X, ListChecks } from 'lucide-react';
 import { AIActionCard, type AIAction } from '@/components/ai-chat/AIActionCard';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export function PendingActionsWidget() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [selectedActions, setSelectedActions] = useState<Set<string>>(new Set());
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
   const { data: pendingActions = [], isLoading } = useQuery({
     queryKey: ['pending-ai-actions'],
@@ -20,7 +25,7 @@ export function PendingActionsWidget() {
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10);
       
       if (error) throw error;
       return (data || []) as AIAction[];
@@ -30,7 +35,6 @@ export function PendingActionsWidget() {
 
   const handleApprove = async (actionId: string) => {
     try {
-      // First update status to approved
       await (supabase as any)
         .from('ai_suggested_actions')
         .update({ 
@@ -40,7 +44,6 @@ export function PendingActionsWidget() {
         })
         .eq('id', actionId);
 
-      // Then execute the action
       const { data, error } = await supabase.functions.invoke('execute-ai-action', {
         body: { actionId }
       });
@@ -77,6 +80,104 @@ export function PendingActionsWidget() {
     }
   };
 
+  const handleSelectChange = (actionId: string, selected: boolean) => {
+    setSelectedActions(prev => {
+      const next = new Set(prev);
+      if (selected) {
+        next.add(actionId);
+      } else {
+        next.delete(actionId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedActions.size === pendingActions.length) {
+      setSelectedActions(new Set());
+    } else {
+      setSelectedActions(new Set(pendingActions.map(a => a.id)));
+    }
+  };
+
+  const handleBatchApprove = async () => {
+    if (selectedActions.size === 0) return;
+    
+    setIsBatchProcessing(true);
+    const actionIds = Array.from(selectedActions);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const actionId of actionIds) {
+      try {
+        await (supabase as any)
+          .from('ai_suggested_actions')
+          .update({ 
+            status: 'approved', 
+            reviewed_by: user?.id,
+            reviewed_at: new Date().toISOString()
+          })
+          .eq('id', actionId);
+
+        await supabase.functions.invoke('execute-ai-action', {
+          body: { actionId }
+        });
+
+        successCount++;
+      } catch (error) {
+        console.error('Error executing action:', actionId, error);
+        errorCount++;
+      }
+    }
+
+    setIsBatchProcessing(false);
+    setSelectedActions(new Set());
+    setIsBatchMode(false);
+
+    if (successCount > 0) {
+      toast.success(`${successCount} åtgärd${successCount > 1 ? 'er' : ''} utförd${successCount > 1 ? 'a' : ''}!`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} åtgärd${errorCount > 1 ? 'er' : ''} misslyckades`);
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['pending-ai-actions'] });
+    queryClient.invalidateQueries({ queryKey: ['ai-actions'] });
+  };
+
+  const handleBatchReject = async () => {
+    if (selectedActions.size === 0) return;
+    
+    setIsBatchProcessing(true);
+    const actionIds = Array.from(selectedActions);
+
+    try {
+      await (supabase as any)
+        .from('ai_suggested_actions')
+        .update({ 
+          status: 'rejected',
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+          rejection_reason: 'Batch-avvisad'
+        })
+        .in('id', actionIds);
+
+      toast.success(`${actionIds.length} förslag avvisade`);
+    } catch (error) {
+      console.error('Error batch rejecting:', error);
+      toast.error('Kunde inte avvisa förslagen');
+    }
+
+    setIsBatchProcessing(false);
+    setSelectedActions(new Set());
+    setIsBatchMode(false);
+    queryClient.invalidateQueries({ queryKey: ['pending-ai-actions'] });
+    queryClient.invalidateQueries({ queryKey: ['ai-actions'] });
+  };
+
+  const allSelected = pendingActions.length > 0 && selectedActions.size === pendingActions.length;
+  const someSelected = selectedActions.size > 0;
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -84,15 +185,37 @@ export function PendingActionsWidget() {
           <CardTitle className="flex items-center gap-2 text-base">
             <Zap className="h-5 w-5 text-yellow-500" />
             AI-förslag
+            {pendingActions.length > 0 && (
+              <span className="text-xs text-muted-foreground font-normal">
+                ({pendingActions.length})
+              </span>
+            )}
           </CardTitle>
-          {pendingActions.length > 0 && (
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/ai-chat" className="flex items-center gap-1">
-                Visa alla
-                <ArrowRight className="h-3 w-3" />
-              </Link>
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {pendingActions.length > 1 && (
+              <Button 
+                variant={isBatchMode ? "secondary" : "ghost"} 
+                size="sm"
+                onClick={() => {
+                  setIsBatchMode(!isBatchMode);
+                  if (isBatchMode) {
+                    setSelectedActions(new Set());
+                  }
+                }}
+              >
+                <ListChecks className="h-3 w-3 mr-1" />
+                {isBatchMode ? 'Avbryt' : 'Välj flera'}
+              </Button>
+            )}
+            {pendingActions.length > 0 && !isBatchMode && (
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/ai-chat" className="flex items-center gap-1">
+                  Visa alla
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -106,6 +229,45 @@ export function PendingActionsWidget() {
           </p>
         ) : (
           <div className="space-y-2">
+            {isBatchMode && (
+              <div className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-lg mb-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={handleSelectAll}
+                    id="select-all"
+                  />
+                  <label htmlFor="select-all" className="text-sm cursor-pointer">
+                    {allSelected ? 'Avmarkera alla' : 'Markera alla'}
+                  </label>
+                </div>
+                {someSelected && (
+                  <div className="flex gap-1">
+                    <Button 
+                      size="sm" 
+                      onClick={handleBatchApprove}
+                      disabled={isBatchProcessing}
+                    >
+                      {isBatchProcessing ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : (
+                        <Check className="h-3 w-3 mr-1" />
+                      )}
+                      Godkänn ({selectedActions.size})
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={handleBatchReject}
+                      disabled={isBatchProcessing}
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Avvisa
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
             {pendingActions.map((action) => (
               <AIActionCard
                 key={action.id}
@@ -113,6 +275,9 @@ export function PendingActionsWidget() {
                 onApprove={handleApprove}
                 onReject={handleReject}
                 mini
+                selectable={isBatchMode}
+                selected={selectedActions.has(action.id)}
+                onSelectChange={handleSelectChange}
               />
             ))}
           </div>
