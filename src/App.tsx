@@ -2,7 +2,7 @@ import React, { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { NotificationsProvider } from "@/hooks/useNotifications";
@@ -13,6 +13,7 @@ import { BottomNavigation } from "@/components/BottomNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import AIChatBubble from "@/components/ai-chat/AIChatBubble";
 import { InstallPWAPrompt } from "@/components/InstallPWAPrompt";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Lazy load all routes for better performance
 const Index = lazy(() => import("./pages/Index"));
@@ -88,19 +89,21 @@ const AppContent = () => {
 import { queryClient } from './lib/queryClient';
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <NotificationsProvider>
-            <AppContent />
-          </NotificationsProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <NotificationsProvider>
+              <AppContent />
+            </NotificationsProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, Compass, Sparkles, MapPin, Layers, Trash2, MoreVertical, Search, Filter, Wrench, FileText, StickyNote, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { Building2, Plus, Sparkles, MapPin, Layers, Trash2, Search, Filter, Wrench, StickyNote, LayoutGrid, Table as TableIcon, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { getEnergyGradeColor } from '@/lib/energyUtils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -16,7 +15,6 @@ import { PropertyFilterChips } from '@/components/PropertyFilterChips';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -30,10 +28,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from '@/hooks/useAuth';
-import { useOrganization } from '@/hooks/useOrganization';
 import { z } from 'zod';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
+import { useProperties, useCreateProperty, useDeleteProperty, Property } from '@/hooks/useProperties';
 
 const propertySchema = z.object({
   name: z.string().trim().min(1, 'Namn är obligatoriskt').max(200, 'Namn får vara max 200 tecken'),
@@ -41,24 +39,7 @@ const propertySchema = z.object({
   description: z.string().max(2000, 'Beskrivning får vara max 2000 tecken').optional().or(z.literal('')),
 });
 
-interface Property {
-  id: string;
-  name: string;
-  address: string | null;
-  description: string | null;
-  area_sqm: number | null;
-  construction_year: number | null;
-  property_type: string | null;
-  loa: string | null;
-  property_number: string | null;
-  invoice_address: string | null;
-  floors?: any[];
-  energy_grade?: string | null;
-}
-
 const Properties = () => {
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
@@ -72,70 +53,17 @@ const Properties = () => {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const { toast } = useToast();
   const { signOut, user } = useAuth();
-  const { organization } = useOrganization();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchProperties();
-  }, []);
+  // React Query hooks
+  const { data: properties = [], isLoading } = useProperties();
+  const createProperty = useCreateProperty();
+  const deleteProperty = useDeleteProperty();
 
-  const fetchProperties = async () => {
-    const { data, error } = await supabase
-      .from('properties')
-      .select(`
-        *,
-        floors (
-          id,
-          name,
-          level
-        )
-      `)
-      .order('created_at', { ascending: false });
 
-    if (error) {
-      toast({
-        title: 'Fel vid hämtning',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      // Fetch energy grades for all properties
-      if (data) {
-        const propertiesWithEnergyGrades = await Promise.all(
-          data.map(async (property) => {
-            const { data: historyData } = await supabase
-              .from('property_energy_history')
-              .select('energy_grade')
-              .eq('property_id', property.id)
-              .order('recorded_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            
-            return {
-              ...property,
-              energy_grade: historyData?.energy_grade || null
-            };
-          })
-        );
-        setProperties(propertiesWithEnergyGrades);
-      } else {
-        setProperties([]);
-      }
-    }
-    setLoading(false);
-  };
 
   const handleCreateProperty = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!organization?.id) {
-      toast({
-        title: 'Fel',
-        description: 'Du måste tillhöra en organisation för att skapa fastigheter.',
-        variant: 'destructive',
-      });
-      return;
-    }
 
     try {
       // Validate input data
@@ -145,33 +73,11 @@ const Properties = () => {
         description: description || '',
       });
 
-      const { error } = await supabase
-        .from('properties')
-        .insert([{ 
-          name: name.trim(), 
-          address: address.trim() || null, 
-          description: description.trim() || null, 
-          owner_id: user?.id,
-          organization_id: organization.id
-        }]);
-
-      if (error) {
-        toast({
-          title: 'Fel vid skapande',
-          description: error.message,
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Fastighet skapad!',
-          description: `${name} har lagts till.`,
-        });
-        setDialogOpen(false);
-        setName('');
-        setAddress('');
-        setDescription('');
-        fetchProperties();
-      }
+      await createProperty.mutateAsync({ name, address, description });
+      setDialogOpen(false);
+      setName('');
+      setAddress('');
+      setDescription('');
     } catch (error: any) {
       // Handle Zod validation errors
       if (error instanceof z.ZodError) {
@@ -181,39 +87,16 @@ const Properties = () => {
           description: firstError.message,
           variant: 'destructive',
         });
-      } else {
-        toast({
-          title: 'Fel',
-          description: error.message,
-          variant: 'destructive',
-        });
       }
     }
   };
 
   const handleDeleteProperty = async () => {
     if (!propertyToDelete) return;
-
-    const { error } = await supabase
-      .from('properties')
-      .delete()
-      .eq('id', propertyToDelete.id);
-
-    if (error) {
-      toast({
-        title: 'Fel vid borttagning',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Fastighet borttagen',
-        description: `${propertyToDelete.name} har tagits bort.`,
-      });
-      setDeleteDialogOpen(false);
-      setPropertyToDelete(null);
-      fetchProperties();
-    }
+    
+    await deleteProperty.mutateAsync(propertyToDelete.id);
+    setDeleteDialogOpen(false);
+    setPropertyToDelete(null);
   };
 
   const addFilter = () => {
@@ -270,10 +153,10 @@ const Properties = () => {
     });
   });
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-muted-foreground">Laddar...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }

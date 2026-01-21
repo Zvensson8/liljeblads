@@ -10,10 +10,23 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2 } from 'lucide-react';
 import { z } from 'zod';
 
+const passwordSchema = z.string()
+  .min(12, 'Lösenord måste vara minst 12 tecken')
+  .regex(/[A-Z]/, 'Lösenord måste innehålla minst en stor bokstav')
+  .regex(/[a-z]/, 'Lösenord måste innehålla minst en liten bokstav')
+  .regex(/[0-9]/, 'Lösenord måste innehålla minst en siffra')
+  .regex(/[^A-Za-z0-9]/, 'Lösenord måste innehålla minst ett specialtecken');
+
 const authSchema = z.object({
   email: z.string().trim().email('Ogiltig e-postadress').max(255, 'E-postadress får vara max 255 tecken'),
-  password: z.string().min(6, 'Lösenord måste vara minst 6 tecken'),
+  password: passwordSchema,
   fullName: z.string().trim().max(200, 'Namn får vara max 200 tecken').optional(),
+});
+
+// Simpler schema for login (don't enforce full password rules on existing passwords)
+const loginSchema = z.object({
+  email: z.string().trim().email('Ogiltig e-postadress').max(255, 'E-postadress får vara max 255 tecken'),
+  password: z.string().min(1, 'Lösenord krävs'),
 });
 
 const Auth = () => {
@@ -37,8 +50,8 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      // Validate input
-      authSchema.parse({ email, password });
+      // Validate input (use simpler schema for login)
+      loginSchema.parse({ email, password });
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -196,6 +209,9 @@ const Auth = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Minst 12 tecken, stor och liten bokstav, siffra och specialtecken
+                  </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? 'Skapar konto...' : 'Skapa konto'}
