@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Bot, User, Plus, Trash2, MessageSquare, Menu } from 'lucide-react';
+import { Send, Loader2, Bot, User, Plus, Trash2, MessageSquare, Menu, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -14,6 +14,8 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface Message {
   id: string;
@@ -38,6 +40,7 @@ export default function AIChat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [streamingEnabled, setStreamingEnabled] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -77,7 +80,7 @@ export default function AIChat() {
       return data as Message[];
     },
     enabled: !!selectedConversationId,
-    staleTime: 0, // Always refetch when conversation changes
+    staleTime: 0,
   });
 
   // Update local messages when conversation messages change
@@ -156,8 +159,90 @@ export default function AIChat() {
     console.log('Selecting conversation:', id);
     setSelectedConversationId(id);
     setSidebarOpen(false);
-    // Force refetch messages for this conversation
     await queryClient.invalidateQueries({ queryKey: ['ai-messages', id] });
+  };
+
+  // Stream chat response
+  const streamChatResponse = async (
+    messagesToSend: { role: string; content: string }[],
+    onDelta: (delta: string) => void,
+    onDone: () => void
+  ) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error('No session');
+
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ messages: messagesToSend, stream: true }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+
+    if (!response.body) throw new Error('No response body');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete lines
+      let newlineIndex: number;
+      while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+        let line = buffer.slice(0, newlineIndex);
+        buffer = buffer.slice(newlineIndex + 1);
+
+        if (line.endsWith('\r')) line = line.slice(0, -1);
+        if (line.startsWith(':') || line.trim() === '') continue;
+        if (!line.startsWith('data: ')) continue;
+
+        const jsonStr = line.slice(6).trim();
+        if (jsonStr === '[DONE]') {
+          onDone();
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) onDelta(content);
+        } catch {
+          // Incomplete JSON, put back in buffer
+          buffer = line + '\n' + buffer;
+          break;
+        }
+      }
+    }
+
+    // Process any remaining buffer
+    if (buffer.trim()) {
+      for (let raw of buffer.split('\n')) {
+        if (!raw) continue;
+        if (raw.endsWith('\r')) raw = raw.slice(0, -1);
+        if (raw.startsWith(':') || raw.trim() === '') continue;
+        if (!raw.startsWith('data: ')) continue;
+        const jsonStr = raw.slice(6).trim();
+        if (jsonStr === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) onDelta(content);
+        } catch { /* ignore */ }
+      }
+    }
+
+    onDone();
   };
 
   const sendMessage = async () => {
@@ -201,49 +286,72 @@ export default function AIChat() {
           content: userMessage.content
         });
 
-      // Call AI (retry once on missing auth session)
-      const invoke = async () => {
-        const { data, error } = await supabase.functions.invoke('ai-chat', {
-          body: {
-            messages: [...messages, userMessage].map(m => ({
-              role: m.role,
-              content: m.content
-            }))
+      const messagesToSend = [...messages, userMessage].map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+
+      let assistantContent = '';
+
+      if (streamingEnabled) {
+        // Streaming mode
+        const assistantId = crypto.randomUUID();
+        
+        // Add empty assistant message that we'll update
+        setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
+
+        await streamChatResponse(
+          messagesToSend,
+          (delta) => {
+            assistantContent += delta;
+            setMessages(prev => 
+              prev.map(m => m.id === assistantId ? { ...m, content: assistantContent } : m)
+            );
+          },
+          () => {
+            // Done streaming
           }
-        });
-        return { data, error };
-      };
+        );
+      } else {
+        // Non-streaming mode
+        const invoke = async () => {
+          const { data, error } = await supabase.functions.invoke('ai-chat', {
+            body: { messages: messagesToSend }
+          });
+          return { data, error };
+        };
 
-      let { data, error } = await invoke();
+        let { data, error } = await invoke();
 
-      const status = (error as any)?.context?.status ?? (error as any)?.status;
-      if (error && status === 401) {
-        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-        if (!refreshError && refreshed?.session) {
-          ({ data, error } = await invoke());
+        const status = (error as any)?.context?.status ?? (error as any)?.status;
+        if (error && status === 401) {
+          const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+          if (!refreshError && refreshed?.session) {
+            ({ data, error } = await invoke());
+          }
         }
-      }
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const assistantContent = data.message || 'Jag kunde inte generera ett svar just nu.';
-      
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: assistantContent
-      };
-
-      // Save assistant message to database
-      await supabase
-        .from('ai_messages')
-        .insert({
-          conversation_id: conversationId,
+        assistantContent = data.message || 'Jag kunde inte generera ett svar just nu.';
+        
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
           role: 'assistant',
           content: assistantContent
-        });
+        }]);
+      }
 
-      setMessages(prev => [...prev, assistantMessage]);
+      // Save assistant message to database
+      if (assistantContent) {
+        await supabase
+          .from('ai_messages')
+          .insert({
+            conversation_id: conversationId,
+            role: 'assistant',
+            content: assistantContent
+          });
+      }
       
       // Update title if this was the first message
       if (messages.length === 0) {
@@ -258,13 +366,22 @@ export default function AIChat() {
       const status = error?.context?.status ?? error?.status;
       if (status === 401) {
         toast.error('Sessionen har gått ut. Logga in igen.');
-        // Clean sign-out so a new session is created on next login
         await supabase.auth.signOut();
         window.location.href = '/auth';
         return;
       }
 
-      console.error('AI chat error:', error);
+      if (status === 503) {
+        toast.error('AI-tjänsten är tillfälligt otillgänglig. Försök igen om en stund.');
+      } else if (status === 429) {
+        toast.error('För många förfrågningar. Vänta en stund och försök igen.');
+      } else if (status === 402) {
+        toast.error('Krediter slut. Lägg till mer i inställningarna.');
+      } else {
+        console.error('AI chat error:', error);
+        toast.error('Ett fel uppstod. Försök igen.');
+      }
+
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -308,7 +425,6 @@ export default function AIChat() {
           ) : (
             conversations.map((conv) => {
               const handleSelect = () => {
-                // Clear immediately so det känns responsivt, och ladda sedan rätt historik
                 setMessages([]);
                 selectConversation(conv.id);
               };
@@ -407,6 +523,19 @@ export default function AIChat() {
                 </div>
               </div>
             </div>
+
+            {/* Streaming toggle */}
+            <div className="flex items-center gap-2">
+              <Switch
+                id="streaming"
+                checked={streamingEnabled}
+                onCheckedChange={setStreamingEnabled}
+              />
+              <Label htmlFor="streaming" className="text-xs text-muted-foreground flex items-center gap-1">
+                <Zap className="h-3 w-3" />
+                Streaming
+              </Label>
+            </div>
           </header>
 
           <div className="flex-1 flex overflow-hidden">
@@ -457,11 +586,13 @@ export default function AIChat() {
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted"
                         )}>
-                          {message.content}
+                          {message.content || (isLoading && message.role === 'assistant' ? (
+                            <span className="text-muted-foreground">...</span>
+                          ) : null)}
                         </div>
                       </div>
                     ))}
-                    {isLoading && (
+                    {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                       <div className="flex gap-4">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
                           <Bot className="h-5 w-5" />
@@ -488,16 +619,20 @@ export default function AIChat() {
                     onKeyDown={handleKeyDown}
                     placeholder="Skriv ett meddelande..."
                     disabled={isLoading}
-                    className="min-h-[44px] max-h-32 resize-none"
+                    className="min-h-[52px] max-h-32 resize-none"
                     rows={1}
                   />
                   <Button
                     onClick={sendMessage}
                     disabled={!input.trim() || isLoading}
                     size="icon"
-                    className="h-11 w-11 shrink-0"
+                    className="h-[52px] w-[52px] shrink-0"
                   >
-                    <Send className="h-5 w-5" />
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Send className="h-5 w-5" />
+                    )}
                   </Button>
                 </div>
               </div>
