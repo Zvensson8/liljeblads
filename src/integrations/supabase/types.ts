@@ -154,6 +154,108 @@ export type Database = {
           },
         ]
       }
+      ai_suggested_actions: {
+        Row: {
+          action_type: string
+          confidence_score: number | null
+          conversation_id: string | null
+          created_at: string
+          executed_at: string | null
+          execution_error: string | null
+          execution_result: Json | null
+          id: string
+          message_id: string | null
+          organization_id: string
+          payload: Json
+          reasoning: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          target_id: string | null
+          target_table: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          confidence_score?: number | null
+          conversation_id?: string | null
+          created_at?: string
+          executed_at?: string | null
+          execution_error?: string | null
+          execution_result?: Json | null
+          id?: string
+          message_id?: string | null
+          organization_id: string
+          payload?: Json
+          reasoning?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_id?: string | null
+          target_table?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          confidence_score?: number | null
+          conversation_id?: string | null
+          created_at?: string
+          executed_at?: string | null
+          execution_error?: string | null
+          execution_result?: Json | null
+          id?: string
+          message_id?: string | null
+          organization_id?: string
+          payload?: Json
+          reasoning?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_id?: string | null
+          target_table?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_suggested_actions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_suggested_actions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "ai_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_suggested_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_suggested_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_suggested_actions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string

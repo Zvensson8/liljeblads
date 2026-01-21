@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useDashboardStore } from '@/store/dashboardStore';
-import { Building2, Wrench, FolderKanban, CheckSquare, TrendingUp, Calendar } from 'lucide-react';
+import { Building2, Wrench, FolderKanban, CheckSquare, TrendingUp, Calendar, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface AddWidgetDialogProps {
@@ -72,6 +72,14 @@ const availableWidgets = [
     title: 'Kommande uppgifter',
     description: 'Uppgifter med närmaste deadline',
     icon: Calendar,
+    config: {},
+  },
+  {
+    id: 'pending-ai-actions',
+    type: 'pending-ai-actions',
+    title: 'AI-förslag',
+    description: 'Väntande AI-åtgärdsförslag att godkänna',
+    icon: Zap,
     config: {},
   },
 ];

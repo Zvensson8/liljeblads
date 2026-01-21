@@ -83,7 +83,7 @@ serve(async (req) => {
     // Check circuit breaker before proceeding
     checkCircuitBreaker();
 
-    const { messages, stream: streamRequested } = await req.json();
+    const { messages, stream: streamRequested, conversationId } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -691,7 +691,67 @@ serve(async (req) => {
       }
     }
 
-    // Build system prompt
+    // Define tools for AI action suggestions
+    const actionTools = [
+      {
+        type: "function",
+        function: {
+          name: "suggest_work_order",
+          description: "Föreslå att skapa en arbetsorder baserat på konversationen. Använd detta när användaren beskriver ett problem som behöver åtgärdas.",
+          parameters: {
+            type: "object",
+            properties: {
+              action: { type: "string", description: "Beskrivning av åtgärden som ska utföras" },
+              property_name: { type: "string", description: "Fastighetens namn om det nämns" },
+              priority: { type: "string", enum: ["low", "medium", "high"], description: "Prioritet baserat på problembeskrivningen" },
+              reasoning: { type: "string", description: "Kort förklaring på svenska varför denna åtgärd rekommenderas" },
+              confidence: { type: "number", description: "Säkerhet 0.0-1.0 på att detta är rätt åtgärd" }
+            },
+            required: ["action", "reasoning", "confidence"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "suggest_todo",
+          description: "Föreslå att skapa en att-göra-uppgift. Använd detta för uppföljningar eller uppgifter som inte är reparationer.",
+          parameters: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "Titel på uppgiften" },
+              description: { type: "string", description: "Beskrivning av uppgiften" },
+              property_name: { type: "string", description: "Fastighetens namn om det nämns" },
+              due_date: { type: "string", description: "Föreslagen deadline i format YYYY-MM-DD" },
+              priority: { type: "string", enum: ["low", "medium", "high"] },
+              reasoning: { type: "string", description: "Varför denna uppgift bör skapas" },
+              confidence: { type: "number", description: "Säkerhet 0.0-1.0" }
+            },
+            required: ["title", "reasoning", "confidence"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "suggest_maintenance",
+          description: "Föreslå att schemalägga underhåll för en komponent. Använd vid diskussion om förebyggande underhåll.",
+          parameters: {
+            type: "object",
+            properties: {
+              component_name: { type: "string", description: "Komponentens namn" },
+              maintenance_type: { type: "string", description: "Typ av underhåll" },
+              suggested_date: { type: "string", description: "Föreslagen datum i format YYYY-MM-DD" },
+              reasoning: { type: "string", description: "Varför detta underhåll behövs" },
+              confidence: { type: "number", description: "Säkerhet 0.0-1.0" }
+            },
+            required: ["maintenance_type", "reasoning", "confidence"]
+          }
+        }
+      }
+    ];
+
+    // Build system prompt with action instructions
     const systemPrompt = `Du är en AI-assistent för fastighetssystemet. Du hjälper användare att hitta information om fastigheter, komponenter, underhåll, arbetsordrar, projekt och driftuppgifter.
 
 VIKTIGA REGLER:
@@ -701,6 +761,19 @@ VIKTIGA REGLER:
 4. Skillnad mellan DRIFTUPPGIFTER (kvartalsvis, räknas i antal) och ATT GÖRA (todos med deadline)
 5. Formatera svar tydligt med rubriker och punktlistor
 6. Om information saknas, förklara vad som behövs
+
+ÅTGÄRDSFÖRSLAG:
+När du identifierar konkreta behov i konversationen, använd verktygen för att föreslå åtgärder:
+- suggest_work_order: Om det behövs en reparation eller underhållsåtgärd
+- suggest_maintenance: Om en komponent behöver service
+- suggest_todo: Om det finns en uppgift som bör följas upp
+
+Var PROAKTIV men FÖRSIKTIG - föreslå bara åtgärder när:
+- Användaren beskriver ett problem som kräver en åtgärd
+- Det finns tydliga tecken på att något behöver göras
+- Du är minst 70% säker (confidence >= 0.7)
+
+Inkludera alltid en tydlig "reasoning" på svenska som förklarar varför du föreslår åtgärden.
 
 SVARSFORMAT för servicerapporter:
 📊 SAMMANFATTNING
@@ -714,22 +787,33 @@ SVARSFORMAT för servicerapporter:
 
 ${contextInfo}`;
 
+    // Decide whether to use tools (not compatible with streaming)
+    const useTools = !streamRequested;
+
     // Make AI request with retry logic
     const makeAIRequest = async () => {
+      const requestBody: any = {
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages
+        ],
+        stream: streamRequested || false,
+      };
+
+      // Add tools only for non-streaming requests
+      if (useTools) {
+        requestBody.tools = actionTools;
+        requestBody.tool_choice = "auto";
+      }
+
       const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...messages
-          ],
-          stream: streamRequested || false,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -766,14 +850,80 @@ ${contextInfo}`;
       });
     }
 
-    // Handle regular response
+    // Handle regular response with potential tool calls
     const data = await response.json();
     console.log('AI response received');
     recordSuccess();
     
-    const message = data.choices?.[0]?.message?.content || 'Kunde inte generera svar.';
+    const choice = data.choices?.[0];
+    const message = choice?.message?.content || '';
+    const toolCalls = choice?.message?.tool_calls || [];
 
-    return new Response(JSON.stringify({ message }), {
+    // Process tool calls and save suggested actions
+    const suggestedActions: any[] = [];
+    
+    if (toolCalls.length > 0 && conversationId) {
+      console.log(`Processing ${toolCalls.length} tool calls`);
+      
+      for (const toolCall of toolCalls) {
+        try {
+          const args = JSON.parse(toolCall.function.arguments);
+          
+          // Map tool name to action type
+          const actionTypeMap: Record<string, string> = {
+            'suggest_work_order': 'create_work_order',
+            'suggest_todo': 'create_todo',
+            'suggest_maintenance': 'schedule_maintenance'
+          };
+          
+          const actionType = actionTypeMap[toolCall.function.name] || toolCall.function.name;
+          
+          // Only save high-confidence suggestions
+          if (args.confidence >= 0.5) {
+            const { data: insertedAction, error: insertError } = await supabase
+              .from('ai_suggested_actions')
+              .insert({
+                organization_id: verifiedOrgId,
+                conversation_id: conversationId,
+                action_type: actionType,
+                payload: {
+                  action: args.action,
+                  title: args.title,
+                  description: args.description,
+                  property_name: args.property_name,
+                  component_name: args.component_name,
+                  priority: args.priority,
+                  due_date: args.due_date,
+                  suggested_date: args.suggested_date,
+                  maintenance_type: args.maintenance_type
+                },
+                confidence_score: args.confidence,
+                reasoning: args.reasoning
+              })
+              .select()
+              .single();
+            
+            if (insertError) {
+              console.error('Error saving action:', insertError);
+            } else if (insertedAction) {
+              suggestedActions.push({
+                id: insertedAction.id,
+                type: actionType,
+                ...args
+              });
+              console.log('Saved suggested action:', insertedAction.id);
+            }
+          }
+        } catch (parseError) {
+          console.error('Error parsing tool call:', parseError);
+        }
+      }
+    }
+
+    return new Response(JSON.stringify({ 
+      message: message || 'Jag förstår. Finns det något mer jag kan hjälpa till med?',
+      suggestedActions 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {

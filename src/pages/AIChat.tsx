@@ -16,6 +16,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { AIActionCard, type AIAction } from '@/components/ai-chat/AIActionCard';
 
 interface Message {
   id: string;
@@ -78,6 +79,28 @@ export default function AIChat() {
       }
       console.log('Fetched messages:', data?.length);
       return data as Message[];
+    },
+    enabled: !!selectedConversationId,
+    staleTime: 0,
+  });
+
+  // Fetch AI suggested actions for selected conversation
+  const { data: conversationActions = [], refetch: refetchActions } = useQuery({
+    queryKey: ['ai-actions', selectedConversationId],
+    queryFn: async () => {
+      if (!selectedConversationId) return [];
+      
+      const { data, error } = await (supabase as any)
+        .from('ai_suggested_actions')
+        .select('*')
+        .eq('conversation_id', selectedConversationId)
+        .order('created_at', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching actions:', error);
+        throw error;
+      }
+      return (data || []) as AIAction[];
     },
     enabled: !!selectedConversationId,
     staleTime: 0,
@@ -313,10 +336,10 @@ export default function AIChat() {
           }
         );
       } else {
-        // Non-streaming mode
+        // Non-streaming mode - supports AI actions
         const invoke = async () => {
           const { data, error } = await supabase.functions.invoke('ai-chat', {
-            body: { messages: messagesToSend }
+            body: { messages: messagesToSend, conversationId }
           });
           return { data, error };
         };
@@ -340,6 +363,12 @@ export default function AIChat() {
           role: 'assistant',
           content: assistantContent
         }]);
+
+        // If there are suggested actions, refetch them
+        if (data.suggestedActions && data.suggestedActions.length > 0) {
+          console.log('AI suggested actions:', data.suggestedActions);
+          refetchActions();
+        }
       }
 
       // Save assistant message to database
@@ -396,6 +425,56 @@ export default function AIChat() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
+    }
+  };
+
+  // Action handlers
+  const handleApproveAction = async (actionId: string) => {
+    try {
+      // First update status to approved
+      await (supabase as any)
+        .from('ai_suggested_actions')
+        .update({ 
+          status: 'approved', 
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', actionId);
+
+      // Then execute the action
+      const { data, error } = await supabase.functions.invoke('execute-ai-action', {
+        body: { actionId }
+      });
+
+      if (error) throw error;
+
+      toast.success('Åtgärd utförd!');
+      refetchActions();
+      queryClient.invalidateQueries({ queryKey: ['pending-ai-actions'] });
+    } catch (error) {
+      console.error('Error executing action:', error);
+      toast.error('Kunde inte utföra åtgärden');
+    }
+  };
+
+  const handleRejectAction = async (actionId: string, reason?: string) => {
+    try {
+      await (supabase as any)
+        .from('ai_suggested_actions')
+        .update({ 
+          status: 'rejected',
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+          rejection_reason: reason || null
+        })
+        .eq('id', actionId);
+
+      toast.success('Förslag avvisat');
+      refetchActions();
+      queryClient.invalidateQueries({ queryKey: ['pending-ai-actions'] });
+    } catch (error) {
+      console.error('Error rejecting action:', error);
+      toast.error('Kunde inte avvisa förslaget');
     }
   };
 
@@ -560,36 +639,53 @@ export default function AIChat() {
                   </div>
                 ) : (
                   <div className="max-w-3xl mx-auto space-y-6">
-                    {messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={cn(
-                          "flex gap-4",
-                          message.role === 'user' && "flex-row-reverse"
-                        )}
-                      >
-                        <div className={cn(
-                          "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                          message.role === 'user' 
-                            ? "bg-primary text-primary-foreground" 
-                            : "bg-muted"
-                        )}>
-                          {message.role === 'user' ? (
-                            <User className="h-5 w-5" />
-                          ) : (
-                            <Bot className="h-5 w-5" />
+                    {messages.map((message, index) => (
+                      <div key={message.id}>
+                        <div
+                          className={cn(
+                            "flex gap-4",
+                            message.role === 'user' && "flex-row-reverse"
                           )}
+                        >
+                          <div className={cn(
+                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                            message.role === 'user' 
+                              ? "bg-primary text-primary-foreground" 
+                              : "bg-muted"
+                          )}>
+                            {message.role === 'user' ? (
+                              <User className="h-5 w-5" />
+                            ) : (
+                              <Bot className="h-5 w-5" />
+                            )}
+                          </div>
+                          <div className={cn(
+                            "rounded-2xl px-4 py-3 max-w-[80%] whitespace-pre-wrap",
+                            message.role === 'user'
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted"
+                          )}>
+                            {message.content || (isLoading && message.role === 'assistant' ? (
+                              <span className="text-muted-foreground">...</span>
+                            ) : null)}
+                          </div>
                         </div>
-                        <div className={cn(
-                          "rounded-2xl px-4 py-3 max-w-[80%] whitespace-pre-wrap",
-                          message.role === 'user'
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted"
-                        )}>
-                          {message.content || (isLoading && message.role === 'assistant' ? (
-                            <span className="text-muted-foreground">...</span>
-                          ) : null)}
-                        </div>
+                        {/* Show AI action cards after assistant messages */}
+                        {message.role === 'assistant' && conversationActions.length > 0 && (
+                          <div className="ml-14 mt-3 space-y-2">
+                            {conversationActions
+                              .filter((_, i) => i === conversationActions.length - 1 || index === messages.length - 1)
+                              .slice(-3)
+                              .map((action) => (
+                                <AIActionCard
+                                  key={action.id}
+                                  action={action}
+                                  onApprove={handleApproveAction}
+                                  onReject={handleRejectAction}
+                                />
+                              ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                     {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
