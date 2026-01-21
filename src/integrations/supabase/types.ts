@@ -171,6 +171,8 @@ export type Database = {
           rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          source_document_id: string | null
+          source_document_type: string | null
           status: string
           target_id: string | null
           target_table: string | null
@@ -192,6 +194,8 @@ export type Database = {
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          source_document_id?: string | null
+          source_document_type?: string | null
           status?: string
           target_id?: string | null
           target_table?: string | null
@@ -213,6 +217,8 @@ export type Database = {
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          source_document_id?: string | null
+          source_document_type?: string | null
           status?: string
           target_id?: string | null
           target_table?: string | null
@@ -3040,6 +3046,7 @@ export type Database = {
         | "SC7.1"
         | "SC7.2"
       project_status:
+        | "forslag"
         | "planerat"
         | "invantar_offert"
         | "offert_finns"
@@ -3215,6 +3222,7 @@ export const Constants = {
         "SC7.2",
       ],
       project_status: [
+        "forslag",
         "planerat",
         "invantar_offert",
         "offert_finns",

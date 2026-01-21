@@ -28,10 +28,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Filter, FolderArchive, Briefcase, Edit, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Search, Filter, FolderArchive, Briefcase, Edit, ArrowUpDown, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
 import { ProjectDashboard } from "@/components/projects/ProjectDashboard";
+import { ProjectProposals } from "@/components/projects/ProjectProposals";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
@@ -173,7 +174,8 @@ export default function Projects() {
   };
 
   const getStatusBadge = (status: ProjectStatus) => {
-    const statusConfig = {
+    const statusConfig: Record<string, { label: string; className: string }> = {
+      forslag: { label: "Förslag", className: "bg-yellow-500" },
       planerat: { label: "Planerat", className: "bg-gray-500" },
       invantar_offert: { label: "Inväntar offert", className: "bg-yellow-500" },
       offert_finns: { label: "Offert finns", className: "bg-blue-500" },
@@ -181,7 +183,7 @@ export default function Projects() {
       pausat: { label: "Pausat", className: "bg-orange-500" },
       avslutat: { label: "Avslutat", className: "bg-gray-700" },
     };
-    const config = statusConfig[status];
+    const config = statusConfig[status] || statusConfig.planerat;
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
@@ -335,21 +337,25 @@ export default function Projects() {
 
           <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <Tabs value={showArchived ? 'archived' : 'active'} className="w-full" onValueChange={(value) => {
-                const shouldShowArchived = value === 'archived';
-                setShowArchived(shouldShowArchived);
-                fetchProjects(shouldShowArchived);
-              }}>
+              <Tabs defaultValue="active" className="w-full">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                   <TabsList>
-                    <TabsTrigger value="active">Aktiva projekt</TabsTrigger>
-                    <TabsTrigger value="archived">Arkiverade projekt</TabsTrigger>
+                    <TabsTrigger value="active" onClick={() => { setShowArchived(false); fetchProjects(false); }}>Aktiva projekt</TabsTrigger>
+                    <TabsTrigger value="proposals" className="flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" />
+                      Förslag
+                    </TabsTrigger>
+                    <TabsTrigger value="archived" onClick={() => { setShowArchived(true); fetchProjects(true); }}>Arkiverade</TabsTrigger>
                   </TabsList>
                   <Button onClick={() => { setEditingProject(null); setFormDialogOpen(true); }}>
                     <Plus className="h-4 w-4 mr-2" />
                     Nytt projekt
                   </Button>
                 </div>
+
+                <TabsContent value="proposals" className="space-y-6">
+                  <ProjectProposals />
+                </TabsContent>
 
                 <TabsContent value="active" className="space-y-6">
                   {/* Filters */}

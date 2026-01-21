@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.execute-ai-action]
 verify_jwt = false
+
+[functions.analyze-protocol]
+verify_jwt = false
