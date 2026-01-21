@@ -18,6 +18,7 @@ import { PropertyInfoCategoryManager } from "@/components/property-info/Property
 import { ProjectTemplates } from "@/components/organization/ProjectTemplates";
 import { NotificationSettings } from "@/components/organization/NotificationSettings";
 import { OrganizationModuleAccess } from "@/components/organization/OrganizationModuleAccess";
+import { OrganizationCapacity } from "@/components/organization/OrganizationCapacity";
 
 
 interface Organization {
@@ -197,9 +198,10 @@ export default function OrganizationSettings() {
 
             {/* Tabs för olika inställningar */}
             <Tabs defaultValue="info" className="space-y-4">
-              <TabsList>
+              <TabsList className="flex flex-wrap">
                 <TabsTrigger value="info">Information</TabsTrigger>
                 <TabsTrigger value="members">Medlemmar</TabsTrigger>
+                {isAdmin && <TabsTrigger value="capacity">Kapacitet</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="module-access">Modulåtkomst</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="invitations">Inbjudningar</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="audit">Säkerhetslogg</TabsTrigger>}
@@ -224,6 +226,12 @@ export default function OrganizationSettings() {
                   currentUserId={user?.id || ""}
                 />
               </TabsContent>
+
+              {isAdmin && (
+                <TabsContent value="capacity">
+                  <OrganizationCapacity organization={organization as any} />
+                </TabsContent>
+              )}
 
               {isAdmin && (
                 <TabsContent value="module-access">

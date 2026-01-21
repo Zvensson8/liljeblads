@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -28,22 +28,43 @@ export function OrganizationCapacity({ organization, onUpgrade }: OrganizationCa
   const [loading, setLoading] = useState(true);
   const tier = getTierById(organization.subscription_tier);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const { count: propCount } = await supabase.from("properties").select("*", { count: "exact", head: true }).eq("organization_id", organization.id);
-        const { count: memberCount } = await supabase.from("organization_members").select("*", { count: "exact", head: true }).eq("organization_id", organization.id);
-        const { count: projectCount } = await supabase.from("projects").select("*", { count: "exact", head: true }).eq("organization_id", organization.id);
-        setStats({ properties: propCount ?? 0, users: memberCount ?? 0, projects: projectCount ?? 0 });
-      } catch (e) {
-        console.error("Error:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
+  const fetchStats = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Use any to avoid TS2589 deep type instantiation error with Supabase
+      const client = supabase as any;
+      
+      const propResult = await client
+        .from("properties")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organization.id);
+      
+      const memberResult = await client
+        .from("organization_members")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organization.id);
+      
+      const projectResult = await client
+        .from("projects")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organization.id);
+      
+      setStats({ 
+        properties: propResult.count ?? 0, 
+        users: memberResult.count ?? 0, 
+        projects: projectResult.count ?? 0 
+      });
+    } catch (e) {
+      console.error("Error fetching capacity stats:", e);
+    } finally {
+      setLoading(false);
+    }
   }, [organization.id]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   const limits = {
     properties: organization.max_properties || tier?.limits.properties || 10,
@@ -58,7 +79,15 @@ export function OrganizationCapacity({ organization, onUpgrade }: OrganizationCa
   ];
 
   if (loading) {
-    return <Card><CardContent className="py-8"><div className="flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div></CardContent></Card>;
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   const criticalItems = capacityItems.filter(item => (item.current / item.max) * 100 >= 90);
@@ -77,7 +106,9 @@ export function OrganizationCapacity({ organization, onUpgrade }: OrganizationCa
       <Card>
         <CardHeader>
           <CardTitle>Kapacitetsöversikt</CardTitle>
-          <CardDescription>Prenumeration: <Badge variant="outline">{tier?.name || organization.subscription_tier}</Badge></CardDescription>
+          <CardDescription>
+            Prenumeration: <Badge variant="outline">{tier?.name || organization.subscription_tier}</Badge>
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-6 md:grid-cols-3">
@@ -86,8 +117,13 @@ export function OrganizationCapacity({ organization, onUpgrade }: OrganizationCa
               return (
                 <div key={item.label} className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-medium">{item.icon}{item.label}</div>
-                    <span className="text-sm text-muted-foreground">{item.current} / {item.max}</span>
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      {item.icon}
+                      {item.label}
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {item.current} / {item.max}
+                    </span>
                   </div>
                   <Progress value={percent} className="h-2" />
                   <p className="text-xs text-muted-foreground">{percent.toFixed(0)}% använt</p>
@@ -99,22 +135,75 @@ export function OrganizationCapacity({ organization, onUpgrade }: OrganizationCa
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Prenumerationsnivåer</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Prenumerationsnivåer</CardTitle>
+          <CardDescription>Jämför gränser mellan olika nivåer</CardDescription>
+        </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2">Resurs</th>
-                  {SUBSCRIPTION_TIERS.map(t => <th key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>{t.name}</th>)}
+                  <th className="text-left py-2 font-medium">Resurs</th>
+                  {SUBSCRIPTION_TIERS.map(t => (
+                    <th 
+                      key={t.id} 
+                      className={`text-center py-2 font-medium ${t.id === organization.subscription_tier ? 'bg-primary/10 rounded' : ''}`}
+                    >
+                      {t.name}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b"><td className="py-2">Fastigheter</td>{SUBSCRIPTION_TIERS.map(t => <td key={t.id} className="text-center py-2">{t.limits.properties.toLocaleString()}</td>)}</tr>
-                <tr className="border-b"><td className="py-2">Användare</td>{SUBSCRIPTION_TIERS.map(t => <td key={t.id} className="text-center py-2">{t.limits.users.toLocaleString()}</td>)}</tr>
-                <tr className="border-b"><td className="py-2">Komponenter</td>{SUBSCRIPTION_TIERS.map(t => <td key={t.id} className="text-center py-2">{t.limits.components.toLocaleString()}</td>)}</tr>
-                <tr className="border-b"><td className="py-2">Projekt</td>{SUBSCRIPTION_TIERS.map(t => <td key={t.id} className="text-center py-2">{t.limits.projects.toLocaleString()}</td>)}</tr>
-                <tr><td className="py-2">Lagring</td>{SUBSCRIPTION_TIERS.map(t => <td key={t.id} className="text-center py-2">{formatStorage(t.limits.storageMb)}</td>)}</tr>
+                <tr className="border-b">
+                  <td className="py-2">Fastigheter</td>
+                  {SUBSCRIPTION_TIERS.map(t => (
+                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
+                      {t.limits.properties.toLocaleString("sv-SE")}
+                    </td>
+                  ))}
+                </tr>
+                <tr className="border-b">
+                  <td className="py-2">Användare</td>
+                  {SUBSCRIPTION_TIERS.map(t => (
+                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
+                      {t.limits.users.toLocaleString("sv-SE")}
+                    </td>
+                  ))}
+                </tr>
+                <tr className="border-b">
+                  <td className="py-2">Komponenter</td>
+                  {SUBSCRIPTION_TIERS.map(t => (
+                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
+                      {t.limits.components.toLocaleString("sv-SE")}
+                    </td>
+                  ))}
+                </tr>
+                <tr className="border-b">
+                  <td className="py-2">Arbetsordrar</td>
+                  {SUBSCRIPTION_TIERS.map(t => (
+                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
+                      {t.limits.workOrders.toLocaleString("sv-SE")}
+                    </td>
+                  ))}
+                </tr>
+                <tr className="border-b">
+                  <td className="py-2">Projekt</td>
+                  {SUBSCRIPTION_TIERS.map(t => (
+                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
+                      {t.limits.projects.toLocaleString("sv-SE")}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="py-2">Lagring</td>
+                  {SUBSCRIPTION_TIERS.map(t => (
+                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
+                      {formatStorage(t.limits.storageMb)}
+                    </td>
+                  ))}
+                </tr>
               </tbody>
             </table>
           </div>
