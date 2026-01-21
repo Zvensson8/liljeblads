@@ -235,7 +235,7 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     toast.success("Komponent tillagd");
     setSelectedComponentId(prev => ({ ...prev, [taskId]: "" }));
     fetchTaskObjects(taskId);
-    fetchTasks();
+    // Removed fetchTasks() - no need to reload all tasks
   };
 
   const handleAddObjectByName = async (taskId: string) => {
@@ -263,37 +263,70 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     toast.success("Objekt tillagt");
     setNewObjectName(prev => ({ ...prev, [taskId]: "" }));
     fetchTaskObjects(taskId);
-    fetchTasks();
+    // Removed fetchTasks() - no need to reload all tasks
   };
 
   const handleToggleReported = async (taskId: string, objectId: string, isReported: boolean) => {
-    await supabase
+    // Optimistic update - update local state immediately
+    const newObjects = (taskObjects[taskId] || []).map(o =>
+      o.id === objectId ? { ...o, is_reported: isReported } : o
+    );
+    setTaskObjects(prev => ({ ...prev, [taskId]: newObjects }));
+    
+    const reportedCount = newObjects.filter(o => o.is_reported).length;
+    
+    // Update tasks locally
+    const updatedTasks = tasks.map(t =>
+      t.id === taskId ? { ...t, reported_count: reportedCount } : t
+    );
+    setTasks(updatedTasks);
+    calculateStats(updatedTasks);
+
+    // Save to database in background
+    const { error: objError } = await supabase
       .from("drift_task_components")
       .update({ is_reported: isReported })
       .eq("id", objectId);
 
-    const newObjects = (taskObjects[taskId] || []).map(o =>
-      o.id === objectId ? { ...o, is_reported: isReported } : o
-    );
-    const reportedCount = newObjects.filter(o => o.is_reported).length;
-
-    await supabase
+    const { error: taskError } = await supabase
       .from("drift_tasks")
       .update({ reported_count: reportedCount })
       .eq("id", taskId);
 
-    fetchTaskObjects(taskId);
-    fetchTasks();
+    if (objError || taskError) {
+      toast.error("Kunde inte spara ändring");
+      // Revert on error
+      fetchTaskObjects(taskId);
+      fetchTasks();
+    }
   };
 
   const handleRemoveObject = async (taskId: string, objectId: string) => {
-    await supabase.from("drift_task_components").delete().eq("id", objectId);
+    // Optimistic update - remove from local state immediately
+    const currentObjects = taskObjects[taskId] || [];
+    const newObjects = currentObjects.filter(o => o.id !== objectId);
+    setTaskObjects(prev => ({ ...prev, [taskId]: newObjects }));
+
+    const { error } = await supabase.from("drift_task_components").delete().eq("id", objectId);
+    
+    if (error) {
+      toast.error("Kunde inte ta bort objekt");
+      // Revert on error
+      fetchTaskObjects(taskId);
+      return;
+    }
+    
     toast.success("Objekt borttaget");
-    fetchTaskObjects(taskId);
-    fetchTasks();
   };
 
   const handleUpdateField = async (taskId: string, field: keyof Task, value: any) => {
+    // Optimistic update - update local state immediately (already done via onChange)
+    const updatedTasks = tasks.map(t =>
+      t.id === taskId ? { ...t, [field]: value } : t
+    );
+    setTasks(updatedTasks);
+    calculateStats(updatedTasks);
+
     const { error } = await supabase
       .from("drift_tasks")
       .update({ [field]: value })
@@ -301,10 +334,9 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
 
     if (error) {
       toast.error("Kunde inte uppdatera uppgift");
-      return;
+      // Revert on error
+      fetchTasks();
     }
-
-    fetchTasks();
   };
 
   const handleExportQuarter = async () => {
@@ -320,6 +352,11 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
   const handleDeleteTask = async (taskId: string) => {
     if (!confirm("Är du säker på att du vill ta bort denna uppgift?")) return;
 
+    // Optimistic update - remove from local state immediately
+    const updatedTasks = tasks.filter(t => t.id !== taskId);
+    setTasks(updatedTasks);
+    calculateStats(updatedTasks);
+
     const { error } = await supabase
       .from("drift_tasks")
       .delete()
@@ -327,11 +364,12 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
 
     if (error) {
       toast.error("Kunde inte ta bort uppgift");
+      // Revert on error
+      fetchTasks();
       return;
     }
 
     toast.success("Uppgift borttagen");
-    fetchTasks();
   };
 
   const handleToggleTaskSelection = (taskId: string) => {
