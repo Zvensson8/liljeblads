@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.ai-chat]
 verify_jwt = false
+
+[functions.execute-ai-action]
+verify_jwt = false
