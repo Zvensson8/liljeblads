@@ -21,19 +21,16 @@ interface ContentResult {
 }
 
 // Simple hash-based embedding generator using content characteristics
-// This creates a deterministic vector based on the text content
 function generateSimpleEmbedding(text: string, dimensions: number = 768): number[] {
   const embedding = new Array(dimensions).fill(0);
   const normalizedText = text.toLowerCase();
   
-  // Use character codes and positions to create a unique vector
   for (let i = 0; i < normalizedText.length; i++) {
     const charCode = normalizedText.charCodeAt(i);
     const position = i % dimensions;
     embedding[position] += charCode * (i + 1) * 0.0001;
   }
   
-  // Add word-level features
   const words = normalizedText.split(/\s+/);
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
@@ -42,7 +39,6 @@ function generateSimpleEmbedding(text: string, dimensions: number = 768): number
     embedding[position] += 0.01 * (i + 1);
   }
   
-  // Normalize the vector
   const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
   if (magnitude > 0) {
     for (let i = 0; i < dimensions; i++) {
@@ -92,7 +88,6 @@ serve(async (req) => {
     for (const item of queueItems as QueueItem[]) {
       try {
         if (item.operation === 'delete' || item.operation === 'DELETE') {
-          // Delete existing embedding
           const { error: deleteError } = await supabase
             .from('embeddings')
             .delete()
@@ -101,7 +96,6 @@ serve(async (req) => {
 
           if (deleteError) throw deleteError;
 
-          // Mark as processed
           await supabase
             .from('embedding_queue')
             .update({ processed: true, processed_at: new Date().toISOString() })
@@ -116,10 +110,41 @@ serve(async (req) => {
         
         if (!contentResult || !contentResult.content) {
           console.log(`No content found for ${item.source_table}:${item.source_id}`);
-          await supabase
-            .from('embedding_queue')
-            .update({ processed: true, processed_at: new Date().toISOString(), error: 'No content found' })
-            .eq('id', item.id);
+          
+          // Check if source record exists
+          const tableCheckResult = await checkSourceExists(supabase, item.source_table, item.source_id);
+          
+          if (!tableCheckResult) {
+            // Source was deleted, mark as processed with "source_deleted" status
+            await supabase
+              .from('embedding_queue')
+              .update({ 
+                processed: true, 
+                processed_at: new Date().toISOString(), 
+                error: 'source_deleted' 
+              })
+              .eq('id', item.id);
+            
+            // Also delete any orphaned embedding
+            await supabase
+              .from('embeddings')
+              .delete()
+              .eq('source_table', item.source_table)
+              .eq('source_id', item.source_id);
+            
+            results.push({ id: item.id, status: 'source_deleted' });
+          } else {
+            // Source exists but couldn't get content
+            await supabase
+              .from('embedding_queue')
+              .update({ 
+                processed: true, 
+                processed_at: new Date().toISOString(), 
+                error: 'No content found' 
+              })
+              .eq('id', item.id);
+            results.push({ id: item.id, status: 'no_content' });
+          }
           continue;
         }
 
@@ -148,7 +173,7 @@ serve(async (req) => {
           continue;
         }
 
-        // Generate embedding using simple hash-based approach
+        // Generate embedding
         console.log(`Generating embedding for ${item.source_table}:${item.source_id}`);
         const embedding = generateSimpleEmbedding(contentResult.content);
 
@@ -169,7 +194,6 @@ serve(async (req) => {
 
         if (upsertError) throw upsertError;
 
-        // Mark queue item as processed
         await supabase
           .from('embedding_queue')
           .update({ processed: true, processed_at: new Date().toISOString() })
@@ -203,6 +227,21 @@ serve(async (req) => {
     });
   }
 });
+
+// Check if source record exists
+async function checkSourceExists(supabase: any, sourceTable: string, sourceId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from(sourceTable)
+      .select('id')
+      .eq('id', sourceId)
+      .single();
+    
+    return !error && data !== null;
+  } catch {
+    return false;
+  }
+}
 
 async function getContentForEmbedding(supabase: any, sourceTable: string, sourceId: string): Promise<ContentResult | null> {
   switch (sourceTable) {
@@ -390,7 +429,6 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
       
       if (error || !data) return null;
       
-      // Tydlig prefix för att skilja från serviceprotokoll
       const parts = [
         `[UNDERHÅLLSPOST] Åtgärdstyp: ${data.action_type}`,
         data.performed_date ? `Datum: ${data.performed_date}` : '',
@@ -413,7 +451,6 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
     }
 
     case 'maintenance_history_documents': {
-      // Fetch the document info along with its related maintenance history
       const { data, error } = await supabase
         .from('maintenance_history_documents')
         .select(`
@@ -458,7 +495,6 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
         }
       }
       
-      // Tydlig struktur som separerar serviceprotokoll från underhållsposter
       const parts = [
         `[SERVICEPROTOKOLL] Dokument: ${data.file_name}`,
         mh?.performed_date ? `Servicedatum: ${mh.performed_date}` : '',
@@ -471,21 +507,107 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
         mh?.drift_task?.name ? `Relaterad driftuppgift: ${mh.drift_task.name} (${mh.drift_task.quarter} ${mh.drift_task.year})` : '',
         mh?.component?.property?.name ? `Fastighet: ${mh.component.property.name}` : ''
       ].filter(Boolean);
-
-      // Lägg till PDF-innehåll med tydlig sektion
+      
       if (pdfContent) {
-        parts.push(`\n\n=== PROTOKOLLINNEHÅLL (mätvärden, avvikelser, observationer) ===\n${pdfContent}`);
-      } else {
-        parts.push(`\nInget protokollinnehåll kunde extraheras från dokumentet.`);
+        parts.push(`\n\n=== PROTOKOLLINNEHÅLL (mätvärden, avvikelser, observationer) ===\n${pdfContent.substring(0, 8000)}`);
       }
-
+      
       return {
         content: parts.join('. '),
         organizationId: mh?.component?.property?.organization_id || null
       };
     }
 
+    case 'recurring_costs': {
+      const { data, error } = await supabase
+        .from('recurring_costs')
+        .select(`
+          description, amount, payment_interval, contractor_name, contractor_phone, contractor_email,
+          property:properties(organization_id, name),
+          account_code:account_codes(code, name)
+        `)
+        .eq('id', sourceId)
+        .single();
+      
+      if (error || !data) return null;
+      
+      const intervalLabel = (interval: string) => {
+        if (interval === 'monthly') return 'månadsvis';
+        if (interval === 'quarterly') return 'kvartalsvis';
+        if (interval === 'yearly') return 'årsvis';
+        return interval;
+      };
+      
+      const parts = [
+        `Löpande kostnad: ${data.description}`,
+        data.amount ? `Belopp: ${data.amount} kr` : '',
+        data.payment_interval ? `Intervall: ${intervalLabel(data.payment_interval)}` : '',
+        data.contractor_name ? `Leverantör: ${data.contractor_name}` : '',
+        data.contractor_phone ? `Telefon: ${data.contractor_phone}` : '',
+        data.contractor_email ? `E-post: ${data.contractor_email}` : '',
+        data.account_code ? `Konto: ${data.account_code.code} - ${data.account_code.name}` : '',
+        data.property?.name ? `Fastighet: ${data.property.name}` : ''
+      ].filter(Boolean);
+      
+      return {
+        content: parts.join('. '),
+        organizationId: data.property?.organization_id || null
+      };
+    }
+
+    case 'property_contacts': {
+      const { data, error } = await supabase
+        .from('property_contacts')
+        .select(`
+          name, role, company, phone, email,
+          property:properties(organization_id, name)
+        `)
+        .eq('id', sourceId)
+        .single();
+      
+      if (error || !data) return null;
+      
+      const parts = [
+        `Kontakt: ${data.name}`,
+        data.role ? `Roll: ${data.role}` : '',
+        data.company ? `Företag: ${data.company}` : '',
+        data.phone ? `Telefon: ${data.phone}` : '',
+        data.email ? `E-post: ${data.email}` : '',
+        data.property?.name ? `Fastighet: ${data.property.name}` : ''
+      ].filter(Boolean);
+      
+      return {
+        content: parts.join('. '),
+        organizationId: data.property?.organization_id || null
+      };
+    }
+
+    case 'property_notes': {
+      const { data, error } = await supabase
+        .from('property_notes')
+        .select(`
+          content, created_at,
+          property:properties(organization_id, name)
+        `)
+        .eq('id', sourceId)
+        .single();
+      
+      if (error || !data) return null;
+      
+      const parts = [
+        `Anteckning: ${data.content}`,
+        data.created_at ? `Skapad: ${data.created_at.split('T')[0]}` : '',
+        data.property?.name ? `Fastighet: ${data.property.name}` : ''
+      ].filter(Boolean);
+      
+      return {
+        content: parts.join('. '),
+        organizationId: data.property?.organization_id || null
+      };
+    }
+
     default:
+      console.log(`Unknown source table: ${sourceTable}`);
       return null;
   }
 }
