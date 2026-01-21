@@ -1178,8 +1178,13 @@ export type Database = {
           invoice_email: string | null
           last_payment_date: string | null
           logo_url: string | null
+          max_components: number | null
+          max_documents: number | null
+          max_projects: number | null
           max_properties: number
+          max_storage_mb: number | null
           max_users: number
+          max_work_orders: number | null
           name: string
           next_billing_date: string | null
           notes: string | null
@@ -1196,8 +1201,13 @@ export type Database = {
           invoice_email?: string | null
           last_payment_date?: string | null
           logo_url?: string | null
+          max_components?: number | null
+          max_documents?: number | null
+          max_projects?: number | null
           max_properties?: number
+          max_storage_mb?: number | null
           max_users?: number
+          max_work_orders?: number | null
           name: string
           next_billing_date?: string | null
           notes?: string | null
@@ -1214,8 +1224,13 @@ export type Database = {
           invoice_email?: string | null
           last_payment_date?: string | null
           logo_url?: string | null
+          max_components?: number | null
+          max_documents?: number | null
+          max_projects?: number | null
           max_properties?: number
+          max_storage_mb?: number | null
           max_users?: number
+          max_work_orders?: number | null
           name?: string
           next_billing_date?: string | null
           notes?: string | null
