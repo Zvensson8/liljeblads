@@ -5,12 +5,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Trash2, Download, Eye, History } from "lucide-react";
+import { FileText, Trash2, Download, Eye, History, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { DocumentUploadZone } from "@/components/documents/DocumentUploadZone";
 import { DocumentPreviewDialog } from "@/components/documents/DocumentPreviewDialog";
+import { ProtocolAnalysisDialog } from "@/components/component/ProtocolAnalysisDialog";
 
 interface ComponentDocumentsProps {
   componentId: string;
@@ -21,6 +22,7 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
   const [uploading, setUploading] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<any>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [analysisDoc, setAnalysisDoc] = useState<{ id: string; name: string } | null>(null);
 
   const { data: documents, refetch } = useQuery({
     queryKey: ["component-documents", componentId],
@@ -74,7 +76,7 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
       // We'll generate signed URLs when accessing the file
       const storagePath = filePath;
 
-      const { error: dbError } = await supabase
+      const { data: insertedDoc, error: dbError } = await supabase
         .from("component_documents")
         .insert([{
           component_id: componentId,
@@ -84,12 +86,26 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
           mime_type: file.type,
           version: nextVersion,
           is_latest: true,
-        }]);
+        }])
+        .select()
+        .single();
 
       if (dbError) throw dbError;
 
       toast.success(nextVersion > 1 ? `Ny version (v${nextVersion}) uppladdad` : "Dokument uppladdat");
       refetch();
+
+      // Check if this looks like a service protocol (PDF)
+      const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const looksLikeProtocol = file.name.toLowerCase().includes('protokoll') || 
+                                file.name.toLowerCase().includes('service') ||
+                                file.name.toLowerCase().includes('besiktning') ||
+                                file.name.toLowerCase().includes('rapport');
+
+      if (isPDF && insertedDoc) {
+        // Show analysis dialog
+        setAnalysisDoc({ id: insertedDoc.id, name: file.name });
+      }
     } catch (error: any) {
       toast.error("Kunde inte ladda upp dokument: " + error.message);
     } finally {
@@ -167,6 +183,10 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
     setPreviewOpen(true);
   };
 
+  const isPdfDocument = (doc: any) => {
+    return doc.mime_type === 'application/pdf' || doc.name?.toLowerCase().endsWith('.pdf');
+  };
+
   return (
     <div className="space-y-4 animate-fade-in">
       <DocumentUploadZone onFileSelect={uploadFile} uploading={uploading} />
@@ -196,6 +216,17 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    {isPdfDocument(doc) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setAnalysisDoc({ id: doc.id, name: doc.name })}
+                        title="AI-analysera protokoll"
+                        className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -258,6 +289,16 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
           setSelectedDoc(version);
         }}
       />
+
+      {analysisDoc && (
+        <ProtocolAnalysisDialog
+          open={!!analysisDoc}
+          onOpenChange={(open) => !open && setAnalysisDoc(null)}
+          documentId={analysisDoc.id}
+          documentName={analysisDoc.name}
+          componentId={componentId}
+        />
+      )}
     </div>
   );
 }
