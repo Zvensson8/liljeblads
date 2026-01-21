@@ -6,12 +6,13 @@ import { useOrganization } from '@/hooks/useOrganization';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Sparkles, Check, X, FolderKanban, ArrowRight, Lightbulb } from 'lucide-react';
+import { Loader2, Sparkles, Check, X, FolderKanban, ArrowRight, Lightbulb, Plus, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ManualProposalDialog } from './ManualProposalDialog';
 
 interface ProjectProposal {
   id: string;
@@ -38,6 +39,7 @@ export function ProjectProposals() {
   const navigate = useNavigate();
   const [selectedProposals, setSelectedProposals] = useState<Set<string>>(new Set());
   const [processing, setProcessing] = useState(false);
+  const [showManualDialog, setShowManualDialog] = useState(false);
 
   const { data: proposals = [], isLoading } = useQuery({
     queryKey: ['project-proposals', organization?.id],
@@ -223,16 +225,30 @@ export function ProjectProposals() {
 
   if (proposals.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Lightbulb className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-          <h3 className="text-lg font-medium mb-2">Inga projektförslag</h3>
-          <p className="text-muted-foreground text-sm max-w-md mx-auto">
-            När du laddar upp serviceprotokoll och AI:n identifierar behov av större investeringar
-            eller underhållsprojekt kommer de att visas här som förslag.
-          </p>
-        </CardContent>
-      </Card>
+      <>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Lightbulb className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg font-medium mb-2">Inga projektförslag</h3>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
+              När du laddar upp serviceprotokoll och AI:n identifierar behov av större investeringar
+              eller underhållsprojekt kommer de att visas här som förslag.
+            </p>
+            <Button onClick={() => setShowManualDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Lägg till projektförslag manuellt
+            </Button>
+          </CardContent>
+        </Card>
+        <ManualProposalDialog
+          open={showManualDialog}
+          onOpenChange={setShowManualDialog}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['project-proposals'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-ai-actions'] });
+          }}
+        />
+      </>
     );
   }
 
@@ -240,6 +256,17 @@ export function ProjectProposals() {
 
   return (
     <div className="space-y-4">
+      {/* Header with add button */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {proposals.length} projektförslag att granska
+        </p>
+        <Button size="sm" variant="outline" onClick={() => setShowManualDialog(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Lägg till manuellt
+        </Button>
+      </div>
+
       {/* Batch actions header */}
       {proposals.length > 1 && (
         <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
@@ -284,66 +311,89 @@ export function ProjectProposals() {
 
       {/* Proposals list */}
       <div className="space-y-3">
-        {proposals.map((proposal) => (
-          <Card key={proposal.id} className="border-l-4 border-l-purple-500">
-            <CardHeader className="pb-2">
-              <div className="flex items-start gap-3">
-                {proposals.length > 1 && (
-                  <Checkbox
-                    checked={selectedProposals.has(proposal.id)}
-                    onCheckedChange={(checked) => handleSelectChange(proposal.id, !!checked)}
-                    className="mt-1"
-                  />
-                )}
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Sparkles className="h-4 w-4 text-yellow-500" />
-                    <CardTitle className="text-base">{proposal.payload.name}</CardTitle>
-                    {getTypeBadge(proposal.payload.type)}
-                    <Badge variant="outline" className="text-xs">
-                      {Math.round(proposal.confidence_score * 100)}% säker
-                    </Badge>
+        {proposals.map((proposal) => {
+          const isManual = !proposal.source_document_id && proposal.confidence_score === 1;
+          return (
+            <Card key={proposal.id} className={`border-l-4 ${isManual ? 'border-l-blue-500' : 'border-l-purple-500'}`}>
+              <CardHeader className="pb-2">
+                <div className="flex items-start gap-3">
+                  {proposals.length > 1 && (
+                    <Checkbox
+                      checked={selectedProposals.has(proposal.id)}
+                      onCheckedChange={(checked) => handleSelectChange(proposal.id, !!checked)}
+                      className="mt-1"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {isManual ? (
+                        <User className="h-4 w-4 text-blue-500" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 text-yellow-500" />
+                      )}
+                      <CardTitle className="text-base">{proposal.payload.name}</CardTitle>
+                      {getTypeBadge(proposal.payload.type)}
+                      {!isManual && (
+                        <Badge variant="outline" className="text-xs">
+                          {Math.round(proposal.confidence_score * 100)}% säker
+                        </Badge>
+                      )}
+                      {isManual && (
+                        <Badge variant="secondary" className="text-xs">
+                          Manuellt
+                        </Badge>
+                      )}
+                    </div>
+                    <CardDescription className="mt-1">
+                      {format(new Date(proposal.created_at), 'PPP', { locale: sv })}
+                    </CardDescription>
                   </div>
-                  <CardDescription className="mt-1">
-                    {format(new Date(proposal.created_at), 'PPP', { locale: sv })}
-                  </CardDescription>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {proposal.payload.description && (
-                <p className="text-sm">{proposal.payload.description}</p>
-              )}
-              
-              <div className="flex flex-wrap gap-4 text-sm">
-                {proposal.payload.budget && (
-                  <div>
-                    <span className="text-muted-foreground">Uppskattat budget: </span>
-                    <span className="font-medium">{formatCurrency(proposal.payload.budget)}</span>
-                  </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {proposal.payload.description && (
+                  <p className="text-sm">{proposal.payload.description}</p>
                 )}
-              </div>
+                
+                <div className="flex flex-wrap gap-4 text-sm">
+                  {proposal.payload.budget && (
+                    <div>
+                      <span className="text-muted-foreground">Uppskattat budget: </span>
+                      <span className="font-medium">{formatCurrency(proposal.payload.budget)}</span>
+                    </div>
+                  )}
+                </div>
 
-              {proposal.reasoning && (
-                <p className="text-xs text-muted-foreground italic bg-muted/50 rounded p-2">
-                  💡 {proposal.reasoning}
-                </p>
-              )}
+                {proposal.reasoning && (
+                  <p className="text-xs text-muted-foreground italic bg-muted/50 rounded p-2">
+                    💡 {proposal.reasoning}
+                  </p>
+                )}
 
-              <div className="flex gap-2 pt-2">
-                <Button size="sm" onClick={() => handleApprove(proposal.id)}>
-                  <Check className="h-4 w-4 mr-1" />
-                  Skapa projekt
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => handleReject(proposal.id)}>
-                  <X className="h-4 w-4 mr-1" />
-                  Avvisa
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <div className="flex gap-2 pt-2">
+                  <Button size="sm" onClick={() => handleApprove(proposal.id)}>
+                    <Check className="h-4 w-4 mr-1" />
+                    Skapa projekt
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleReject(proposal.id)}>
+                    <X className="h-4 w-4 mr-1" />
+                    Avvisa
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
+
+      <ManualProposalDialog
+        open={showManualDialog}
+        onOpenChange={setShowManualDialog}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['project-proposals'] });
+          queryClient.invalidateQueries({ queryKey: ['pending-ai-actions'] });
+        }}
+      />
     </div>
   );
 }
