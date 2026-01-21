@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Check, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { SUBSCRIPTION_TIERS, getTierById } from "@/lib/subscriptionTiers";
 
 interface OrganizationSubscriptionProps {
   organization: {
@@ -13,6 +14,11 @@ interface OrganizationSubscriptionProps {
     subscription_tier: string;
     max_properties: number;
     max_users: number;
+    max_components?: number;
+    max_work_orders?: number;
+    max_projects?: number;
+    max_documents?: number;
+    max_storage_mb?: number;
   };
   stats: {
     propertyCount: number;
@@ -20,69 +26,6 @@ interface OrganizationSubscriptionProps {
   };
   onUpdate: () => void;
 }
-
-const SUBSCRIPTION_TIERS = [
-  {
-    id: "small",
-    name: "Liten",
-    price: 45000,
-    maxProperties: 10,
-    maxUsers: 5,
-    features: [
-      "Upp till 10 fastigheter",
-      "Upp till 5 användare",
-      "Grundläggande underhållshantering",
-      "Kostnadsuppföljning",
-      "E-postsupport",
-    ],
-  },
-  {
-    id: "medium",
-    name: "Mellan",
-    price: 150000,
-    maxProperties: 50,
-    maxUsers: 20,
-    features: [
-      "Upp till 50 fastigheter",
-      "Upp till 20 användare",
-      "Avancerad underhållshantering",
-      "Kostnadsanalys & budgetering",
-      "Projekthantering",
-      "Prioriterad support",
-    ],
-  },
-  {
-    id: "large",
-    name: "Stor",
-    price: 450000,
-    maxProperties: 150,
-    maxUsers: 40,
-    features: [
-      "Upp till 150 fastigheter",
-      "Upp till 40 användare",
-      "Full funktionalitet",
-      "Avancerad rapportering",
-      "API-åtkomst",
-      "Dedikerad support",
-    ],
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: 900000,
-    maxProperties: 300,
-    maxUsers: 60,
-    features: [
-      "Upp till 300 fastigheter",
-      "Upp till 60 användare",
-      "Obegränsad funktionalitet",
-      "Anpassad branding",
-      "SSO integration",
-      "24/7 premium support",
-      "Dedikerad kundansvarig",
-    ],
-  },
-];
 
 export function OrganizationSubscription({
   organization,
@@ -105,8 +48,13 @@ export function OrganizationSubscription({
         .from("organizations")
         .update({
           subscription_tier: tier.id,
-          max_properties: tier.maxProperties,
-          max_users: tier.maxUsers,
+          max_properties: tier.limits.properties,
+          max_users: tier.limits.users,
+          max_components: tier.limits.components,
+          max_work_orders: tier.limits.workOrders,
+          max_projects: tier.limits.projects,
+          max_documents: tier.limits.documents,
+          max_storage_mb: tier.limits.storageMb,
         })
         .eq("id", organization.id);
 

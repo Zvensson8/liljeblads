@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner";
 import { Pencil, Trash2, Search, Building } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { TIER_CONFIGS, SUBSCRIPTION_TIERS } from "@/lib/subscriptionTiers";
 
 interface Organization {
   id: string;
@@ -38,16 +39,14 @@ interface Organization {
   subscription_tier: string;
   max_properties: number;
   max_users: number;
+  max_components: number;
+  max_work_orders: number;
+  max_projects: number;
+  max_documents: number;
+  max_storage_mb: number;
   notes: string | null;
   created_at: string;
 }
-
-const TIER_CONFIGS = {
-  small: { name: "Liten", maxProperties: 10, maxUsers: 5 },
-  medium: { name: "Mellan", maxProperties: 50, maxUsers: 20 },
-  large: { name: "Stor", maxProperties: 150, maxUsers: 40 },
-  enterprise: { name: "Enterprise", maxProperties: 300, maxUsers: 60 },
-};
 
 export function FounderOrganizations() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -146,8 +145,13 @@ export function FounderOrganizations() {
         .insert({
           name: createForm.name,
           subscription_tier: createForm.subscription_tier,
-          max_properties: tierConfig.maxProperties,
-          max_users: tierConfig.maxUsers,
+          max_properties: tierConfig.limits.properties,
+          max_users: tierConfig.limits.users,
+          max_components: tierConfig.limits.components,
+          max_work_orders: tierConfig.limits.workOrders,
+          max_projects: tierConfig.limits.projects,
+          max_documents: tierConfig.limits.documents,
+          max_storage_mb: tierConfig.limits.storageMb,
         });
 
       if (error) throw error;
@@ -189,8 +193,8 @@ export function FounderOrganizations() {
       setEditForm({
         ...editForm,
         subscription_tier: tier,
-        max_properties: config.maxProperties,
-        max_users: config.maxUsers,
+        max_properties: config.limits.properties,
+        max_users: config.limits.users,
       });
     }
   };
@@ -318,9 +322,9 @@ export function FounderOrganizations() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(TIER_CONFIGS).map(([key, config]) => (
-                    <SelectItem key={key} value={key}>
-                      {config.name} ({config.maxProperties} fastigheter, {config.maxUsers} användare)
+                  {SUBSCRIPTION_TIERS.map((tier) => (
+                    <SelectItem key={tier.id} value={tier.id}>
+                      {tier.name} ({tier.limits.properties} fastigheter, {tier.limits.users} användare)
                     </SelectItem>
                   ))}
                 </SelectContent>
