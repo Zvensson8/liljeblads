@@ -21,12 +21,36 @@ interface TaskData {
   propertyName: string;
   quarter: string;
   category: string;
+  taskId: string;
   name: string;
   description: string;
   planned: number;
   reported: number;
   status: string;
   completionPercent: number;
+}
+
+interface TaskObject {
+  id: string;
+  object_name: string | null;
+  is_reported: boolean;
+  component?: {
+    name: string;
+    type: string;
+    registration_number: string | null;
+    serial_number: string | null;
+  } | null;
+}
+
+interface DeviationData {
+  propertyName: string;
+  quarter: string;
+  taskName: string;
+  planned: number;
+  reported: number;
+  deviationPercent: number;
+  deviationType: string;
+  objects: TaskObject[];
 }
 
 async function fetchTasksForProperty(
@@ -73,6 +97,7 @@ async function fetchTasksForProperty(
           propertyName: propData?.name || "Okänd",
           quarter,
           category: task.drift_categories?.name || "Ingen",
+          taskId: task.id,
           name: task.name,
           description: task.description || "",
           planned: task.planned_count,
@@ -95,26 +120,51 @@ async function fetchTasksForProperty(
   return allTasks;
 }
 
-interface DeviationData {
-  propertyName: string;
-  quarter: string;
-  taskName: string;
-  planned: number;
-  reported: number;
-  deviationPercent: number;
-  deviationType: string;
+async function fetchTaskObjects(taskId: string): Promise<TaskObject[]> {
+  const { data, error } = await supabase
+    .from("drift_task_components")
+    .select(`
+      id,
+      object_name,
+      is_reported,
+      component:components (
+        name,
+        type,
+        registration_number,
+        serial_number
+      )
+    `)
+    .eq("task_id", taskId);
+
+  if (error) {
+    console.error(`Error fetching task objects for task ${taskId}:`, error);
+    return [];
+  }
+
+  return (data || []).map((obj: any) => ({
+    id: obj.id,
+    object_name: obj.object_name,
+    is_reported: obj.is_reported,
+    component: obj.component,
+  }));
 }
 
-function calculateDeviations(tasks: TaskData[], threshold: number = 0.2): DeviationData[] {
-  return tasks
-    .map((task) => {
+async function calculateDeviations(tasks: TaskData[]): Promise<DeviationData[]> {
+  const deviations: DeviationData[] = [];
+
+  for (const task of tasks) {
+    // Include ALL deviations where planned != reported
+    if (task.planned !== task.reported) {
       const deviation =
         task.planned > 0
           ? Math.abs(task.reported - task.planned) / task.planned
           : task.reported > 0 ? 1 : 0;
       const deviationPercent = Math.round(deviation * 100);
 
-      return {
+      // Fetch objects for this task
+      const objects = await fetchTaskObjects(task.taskId);
+
+      deviations.push({
         propertyName: task.propertyName,
         quarter: task.quarter,
         taskName: task.name,
@@ -124,23 +174,23 @@ function calculateDeviations(tasks: TaskData[], threshold: number = 0.2): Deviat
         deviationType:
           task.reported > task.planned
             ? "Överrapporterad"
-            : task.reported < task.planned
-            ? "Underrapporterad"
-            : "OK",
-        deviation,
-      };
-    })
-    .filter((d) => d.deviation >= threshold)
-    .sort((a, b) => b.deviationPercent - a.deviationPercent);
+            : "Underrapporterad",
+        objects,
+      });
+    }
+  }
+
+  return deviations.sort((a, b) => b.deviationPercent - a.deviationPercent);
 }
 
-function calculatePropertyStats(tasks: TaskData[], propertyName: string) {
+function calculatePropertyStatsSync(tasks: TaskData[], propertyName: string) {
   const total = tasks.length;
   const completed = tasks.filter((t) => t.status === "Klar").length;
   const inProgress = tasks.filter((t) => t.status === "Pågår").length;
   const missing = tasks.filter((t) => t.status === "Saknas").length;
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
-  const deviations = calculateDeviations(tasks);
+  // Count tasks with any deviation (planned != reported)
+  const deviationCount = tasks.filter((t) => t.planned !== t.reported).length;
 
   return {
     propertyName,
@@ -149,7 +199,7 @@ function calculatePropertyStats(tasks: TaskData[], propertyName: string) {
     inProgress,
     missing,
     completionRate,
-    deviationCount: deviations.length,
+    deviationCount,
   };
 }
 
@@ -195,11 +245,15 @@ export async function generateMultiPropertyReport(
     throw new Error("Inga uppgifter hittades för de valda fastigheterna");
   }
 
+  // Calculate all deviations once
+  const allDeviations = await calculateDeviations(allTasks);
+
   if (format === "excel") {
     await generateExcelReport(
       properties,
       allPropertyTasks,
       allTasks,
+      allDeviations,
       reportType,
       year,
       quarters
@@ -209,6 +263,7 @@ export async function generateMultiPropertyReport(
       properties,
       allPropertyTasks,
       allTasks,
+      allDeviations,
       reportType,
       year,
       quarters
@@ -220,6 +275,7 @@ async function generateExcelReport(
   properties: Property[],
   allPropertyTasks: Map<string, TaskData[]>,
   allTasks: TaskData[],
+  allDeviations: DeviationData[],
   reportType: string,
   year: number,
   quarters: string[]
@@ -229,7 +285,7 @@ async function generateExcelReport(
   // Sheet 1: Combined Summary
   const summaryData = properties.map((property) => {
     const tasks = allPropertyTasks.get(property.id) || [];
-    return calculatePropertyStats(tasks, property.name);
+    return calculatePropertyStatsSync(tasks, property.name);
   });
 
   // Add totals row
@@ -249,7 +305,7 @@ async function generateExcelReport(
     [`Genererad: ${new Date().toLocaleDateString("sv-SE")}`],
     [`Antal fastigheter: ${properties.length}`],
     [],
-    ["Fastighet", "Totalt", "Klara", "Pågår", "Saknas", "Completion %"],
+    ["Fastighet", "Totalt", "Klara", "Pågår", "Saknas", "Completion %", "Avvikelser"],
     ...summaryData.map((s) => [
       s.propertyName,
       s.total,
@@ -257,6 +313,7 @@ async function generateExcelReport(
       s.inProgress,
       s.missing,
       `${s.completionRate}%`,
+      s.deviationCount,
     ]),
     [],
     [
@@ -266,6 +323,7 @@ async function generateExcelReport(
       totalInProgress,
       totalMissing,
       `${overallRate}%`,
+      allDeviations.length,
     ],
   ];
 
@@ -286,7 +344,7 @@ async function generateExcelReport(
       const q2 = calculateQuarterStats(tasks, "Q2");
       const q3 = calculateQuarterStats(tasks, "Q3");
       const q4 = calculateQuarterStats(tasks, "Q4");
-      const overall = calculatePropertyStats(tasks, property.name);
+      const overall = calculatePropertyStatsSync(tasks, property.name);
 
       quarterBreakdownData.push([
         property.name,
@@ -302,15 +360,28 @@ async function generateExcelReport(
     XLSX.utils.book_append_sheet(wb, quarterWs, "Kvartalsöversikt");
   }
 
-  // Deviation summary sheet
-  const allDeviations = calculateDeviations(allTasks);
+  // Deviation summary sheet with objects
   if (allDeviations.length > 0) {
-    const deviationSheetData = [
-      ["Avvikelserapport - Uppgifter med >20% avvikelse"],
+    const deviationSheetData: any[] = [
+      ["Avvikelserapport - Alla avvikelser"],
       [`Totalt antal avvikelser: ${allDeviations.length}`],
       [],
-      ["Fastighet", "Kvartal", "Uppgift", "Planerat", "Redovisat", "Avvikelse %", "Typ"],
-      ...allDeviations.map((d) => [
+      ["Fastighet", "Kvartal", "Uppgift", "Planerat", "Redovisat", "Avvikelse %", "Typ", "Objekt"],
+    ];
+
+    allDeviations.forEach((d) => {
+      // Format objects list
+      const objectsList = d.objects.length > 0 
+        ? d.objects.map(obj => {
+            if (obj.component) {
+              const regNum = obj.component.registration_number ? ` (${obj.component.registration_number})` : '';
+              return `${obj.component.name}${regNum}`;
+            }
+            return obj.object_name || 'Okänt objekt';
+          }).join(', ')
+        : 'Inga objekt';
+
+      deviationSheetData.push([
         d.propertyName,
         d.quarter,
         d.taskName,
@@ -318,20 +389,21 @@ async function generateExcelReport(
         d.reported,
         `${d.deviationPercent}%`,
         d.deviationType,
-      ]),
-    ];
+        objectsList,
+      ]);
+    });
 
     const deviationWs = XLSX.utils.aoa_to_sheet(deviationSheetData);
     XLSX.utils.book_append_sheet(wb, deviationWs, "Avvikelser");
   }
 
   // Detailed sheets per property
-  properties.forEach((property) => {
+  for (const property of properties) {
     const tasks = allPropertyTasks.get(property.id) || [];
-    if (tasks.length === 0) return;
+    if (tasks.length === 0) continue;
 
-    const propertyDeviations = calculateDeviations(tasks);
-    const taskData = [
+    const propertyDeviations = allDeviations.filter(d => d.propertyName === property.name);
+    const taskData: any[] = [
       ["Kvartal", "Kategori", "Uppgift", "Planerat", "Redovisat", "Status", "%"],
       ...tasks.map((t) => [
         t.quarter,
@@ -344,21 +416,26 @@ async function generateExcelReport(
       ]),
     ];
 
-    // Add deviation summary for this property
+    // Add deviation summary for this property with objects
     if (propertyDeviations.length > 0) {
       taskData.push(
         [],
-        ["--- AVVIKELSER (>20%) ---"],
-        ["Kvartal", "Uppgift", "", "Planerat", "Redovisat", "Avvikelse", "Typ"],
-        ...propertyDeviations.map((d) => [
-          d.quarter,
-          d.taskName,
-          "",
-          d.planned,
-          d.reported,
-          `${d.deviationPercent}%`,
-          d.deviationType,
-        ])
+        ["--- AVVIKELSER ---"],
+        ["Kvartal", "Uppgift", "Planerat", "Redovisat", "Avvikelse", "Typ", "Objekt"],
+        ...propertyDeviations.map((d) => {
+          const objectsList = d.objects.length > 0 
+            ? d.objects.map(obj => obj.component?.name || obj.object_name || 'Okänt').join(', ')
+            : 'Inga objekt';
+          return [
+            d.quarter,
+            d.taskName,
+            d.planned,
+            d.reported,
+            `${d.deviationPercent}%`,
+            d.deviationType,
+            objectsList,
+          ];
+        })
       );
     }
 
@@ -366,7 +443,7 @@ async function generateExcelReport(
     // Truncate sheet name to 31 chars (Excel limit)
     const sheetName = property.name.substring(0, 31);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  });
+  }
 
   // Generate filename
   const filename =
@@ -381,6 +458,7 @@ async function generatePdfReport(
   properties: Property[],
   allPropertyTasks: Map<string, TaskData[]>,
   allTasks: TaskData[],
+  allDeviations: DeviationData[],
   reportType: string,
   year: number,
   quarters: string[]
@@ -404,13 +482,14 @@ async function generatePdfReport(
   // Summary table
   const summaryData = properties.map((property) => {
     const tasks = allPropertyTasks.get(property.id) || [];
-    const stats = calculatePropertyStats(tasks, property.name);
+    const stats = calculatePropertyStatsSync(tasks, property.name);
     return [
       stats.propertyName,
       stats.total,
       stats.completed,
       stats.missing,
       `${stats.completionRate}%`,
+      stats.deviationCount,
     ];
   });
 
@@ -421,11 +500,11 @@ async function generatePdfReport(
   const overallRate =
     totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
 
-  summaryData.push(["TOTALT", totalTasks, totalCompleted, totalMissing, `${overallRate}%`]);
+  summaryData.push(["TOTALT", totalTasks, totalCompleted, totalMissing, `${overallRate}%`, allDeviations.length]);
 
   autoTable(doc, {
     startY: 42,
-    head: [["Fastighet", "Totalt", "Klara", "Saknas", "Completion"]],
+    head: [["Fastighet", "Totalt", "Klara", "Saknas", "Completion", "Avvikelser"]],
     body: summaryData,
     styles: { fontSize: 10 },
     headStyles: { fillColor: [59, 130, 246] },
@@ -463,41 +542,47 @@ async function generatePdfReport(
     });
   }
 
-  // Deviation summary page
-  const allDeviations = calculateDeviations(allTasks);
+  // Deviation summary page with objects
   if (allDeviations.length > 0) {
     doc.addPage();
     doc.setFontSize(14);
     doc.text("Avvikelserapport", 14, 20);
     doc.setFontSize(10);
-    doc.text(`Uppgifter med >20% avvikelse mellan planerat och redovisat`, 14, 28);
+    doc.text(`Alla avvikelser mellan planerat och redovisat`, 14, 28);
     doc.text(`Totalt antal avvikelser: ${allDeviations.length}`, 14, 34);
 
-    const deviationData = allDeviations.slice(0, 50).map((d) => [
-      d.propertyName.substring(0, 15),
-      d.quarter,
-      d.taskName.substring(0, 25),
-      d.planned,
-      d.reported,
-      `${d.deviationPercent}%`,
-      d.deviationType,
-    ]);
+    const deviationData = allDeviations.slice(0, 40).map((d) => {
+      const objectsCount = d.objects.length;
+      const objectsText = objectsCount > 0 
+        ? `${objectsCount} obj.`
+        : '-';
+      return [
+        d.propertyName.substring(0, 12),
+        d.quarter,
+        d.taskName.substring(0, 20),
+        d.planned,
+        d.reported,
+        `${d.deviationPercent}%`,
+        d.deviationType.substring(0, 8),
+        objectsText,
+      ];
+    });
 
     autoTable(doc, {
       startY: 40,
-      head: [["Fastighet", "Kv.", "Uppgift", "Plan.", "Red.", "Avv. %", "Typ"]],
+      head: [["Fastighet", "Kv.", "Uppgift", "Plan.", "Red.", "Avv. %", "Typ", "Objekt"]],
       body: deviationData,
-      styles: { fontSize: 8 },
+      styles: { fontSize: 7 },
       headStyles: { fillColor: [220, 38, 38] },
       columnStyles: {
-        0: { cellWidth: 25 },
-        2: { cellWidth: 40 },
+        0: { cellWidth: 22 },
+        2: { cellWidth: 35 },
       },
     });
 
-    if (allDeviations.length > 50) {
+    if (allDeviations.length > 40) {
       doc.text(
-        `... och ${allDeviations.length - 50} fler avvikelser (se Excel för fullständig lista)`,
+        `... och ${allDeviations.length - 40} fler avvikelser (se Excel för fullständig lista)`,
         14,
         (doc as any).lastAutoTable.finalY + 10
       );
@@ -505,16 +590,16 @@ async function generatePdfReport(
   }
 
   // Detailed pages per property
-  properties.forEach((property) => {
+  for (const property of properties) {
     const tasks = allPropertyTasks.get(property.id) || [];
-    if (tasks.length === 0) return;
+    if (tasks.length === 0) continue;
 
     doc.addPage();
     doc.setFontSize(14);
     doc.text(property.name, 14, 20);
 
-    const stats = calculatePropertyStats(tasks, property.name);
-    const propertyDeviations = calculateDeviations(tasks);
+    const stats = calculatePropertyStatsSync(tasks, property.name);
+    const propertyDeviations = allDeviations.filter(d => d.propertyName === property.name);
     
     doc.setFontSize(10);
     doc.text(
@@ -525,7 +610,7 @@ async function generatePdfReport(
     
     if (propertyDeviations.length > 0) {
       doc.setTextColor(220, 38, 38);
-      doc.text(`⚠ ${propertyDeviations.length} avvikelse${propertyDeviations.length > 1 ? 'r' : ''} upptäckt${propertyDeviations.length > 1 ? 'a' : ''}`, 14, 34);
+      doc.text(`⚠ ${propertyDeviations.length} avvikelse${propertyDeviations.length > 1 ? 'r' : ''}`, 14, 34);
       doc.setTextColor(0, 0, 0);
     }
 
@@ -548,31 +633,37 @@ async function generatePdfReport(
       },
     });
 
-    // Add property-specific deviations
+    // Add property-specific deviations with objects
     if (propertyDeviations.length > 0) {
       const yPos = (doc as any).lastAutoTable.finalY + 10;
       
-      if (yPos < 250) {
+      if (yPos < 240) {
         doc.setFontSize(11);
-        doc.text("Avvikelser för denna fastighet:", 14, yPos);
+        doc.text("Avvikelser med objekt:", 14, yPos);
 
         autoTable(doc, {
           startY: yPos + 5,
-          head: [["Kvartal", "Uppgift", "Plan.", "Red.", "Avv. %", "Typ"]],
-          body: propertyDeviations.slice(0, 10).map((d) => [
-            d.quarter,
-            d.taskName.substring(0, 25),
-            d.planned,
-            d.reported,
-            `${d.deviationPercent}%`,
-            d.deviationType,
-          ]),
-          styles: { fontSize: 8 },
+          head: [["Kv.", "Uppgift", "Plan.", "Red.", "Avv. %", "Objekt"]],
+          body: propertyDeviations.slice(0, 8).map((d) => {
+            const objectsList = d.objects.length > 0 
+              ? d.objects.slice(0, 2).map(obj => obj.component?.name || obj.object_name || '?').join(', ')
+                + (d.objects.length > 2 ? ` +${d.objects.length - 2}` : '')
+              : '-';
+            return [
+              d.quarter,
+              d.taskName.substring(0, 20),
+              d.planned,
+              d.reported,
+              `${d.deviationPercent}%`,
+              objectsList,
+            ];
+          }),
+          styles: { fontSize: 7 },
           headStyles: { fillColor: [220, 38, 38] },
         });
       }
     }
-  });
+  }
 
   // Save
   const filename =

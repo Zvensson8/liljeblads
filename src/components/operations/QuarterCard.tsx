@@ -651,11 +651,11 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
                               )}
 
                               <div className="rounded-md border">
-                                <Tabs defaultValue="auto-detect" className="w-full">
+                                <Tabs defaultValue="dropdown" className="w-full">
                                   <TabsList className="w-full grid grid-cols-3">
-                                    <TabsTrigger value="auto-detect">Auto-detektera</TabsTrigger>
                                     <TabsTrigger value="dropdown">Välj från lista</TabsTrigger>
                                     <TabsTrigger value="manual">Skapa fristående</TabsTrigger>
+                                    <TabsTrigger value="auto-detect">Auto-detektera</TabsTrigger>
                                   </TabsList>
                                   
                                   <TabsContent value="auto-detect" className="p-4">
