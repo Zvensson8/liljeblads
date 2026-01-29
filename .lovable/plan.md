@@ -1,144 +1,187 @@
 
-# Plan: Förbättra Driftuppföljning
+
+# Plan: Förbättra Projektmodulen
 
 ## Sammanfattning
-Fem förbättringar för att göra Driftuppföljning enklare och snabbare att använda:
-1. Aktivera Årsöversikten med visuella cirkeldiagram
-2. Kompaktare kvartalsvy med grid-layout på desktop
-3. Nytt "Snabbrapportera"-läge för effektiv inmatning
-4. Mobilanpassning med kort-layout och swipe-gester
-5. Förbättrad Dashboard-widget med trendpilar
+En omfattande uppgradering av projektmodulen för att göra den mer effektiv och användarvänlig - både i projektlistan och inne i enskilda projekt.
 
 ---
 
-## 1. Aktivera Årsöversikten
+## Nuvarande utmaningar
 
-### Vad ändras
-Den befintliga `YearOverview`-komponenten aktiveras och kopplas till riktiga data. Just nu visar fliken bara "Välj ett kvartal ovan för att se detaljer".
+### Projektlistan (`Projects.tsx`)
+- Dashboard visas inte - bara projektlista och filter
+- Mycket vertikal scrollning för att se alla projekt
+- Ingen snabb överblick av projektstatus
 
-### Resultat
-- Fyra klickbara kvartalskort med cirkeldiagram
-- Färgkodning: Grön (80%+), Gul (40-79%), Röd (<40%)
-- Klick på ett kvartal scrollar till och öppnar det kvartalet
-
----
-
-## 2. Kompaktare kvartalsvy (Desktop)
-
-### Vad ändras
-På desktop (lg+) visas kvartalen i ett 2x2 grid istället för vertikalt staplade. Varje kvartals-header blir mer kompakt med inline-statistik.
-
-### Före
-```text
-┌─ Q1 ──────────────────────────────┐
-│ (hela skärmens bredd)             │
-└───────────────────────────────────┘
-┌─ Q2 ──────────────────────────────┐
-│ (hela skärmens bredd)             │
-└───────────────────────────────────┘
-... (scrollar långt nedåt)
-```
-
-### Efter
-```text
-┌─ Q1 ────────────────┐  ┌─ Q2 ────────────────┐
-│ Kompakt header      │  │ Kompakt header      │
-│ ▶ Expandera         │  │ ▶ Expandera         │
-└─────────────────────┘  └─────────────────────┘
-┌─ Q3 ────────────────┐  ┌─ Q4 ────────────────┐
-│ Kompakt header      │  │ Kompakt header      │
-│ ▶ Expandera         │  │ ▶ Expandera         │
-└─────────────────────┘  └─────────────────────┘
-```
+### Projektdetalj (`ProjectDetail.tsx`)
+- 6 flikar som kräver mycket klickande
+- KPI-kort högst upp visar bara siffror utan kontext
+- Headern har för många knappar som gömmer sig på mobil
+- Checklistan har ingen prioritering eller gruppering
+- Ekonomifliken kräver två klick för att se kostnader
 
 ---
 
-## 3. Snabbrapportera-läge
+## Förbättringar
 
-### Vad ändras
-En ny flik "Snabbrapportera" läggs till som visar en fokuserad lista med **endast** uppgifter som saknar rapportering (reported_count < planned_count).
+### 1. Projektlista - Dashboard-vy
 
-### Funktioner
-- Platt lista utan att behöva expandera kvartal
-- Checkbox för att markera som klar med ett klick
-- Siffror visar "X av Y" för varje uppgift
-- Filtrering per kvartal eller alla
+**Vad ändras:**
+Lägg till en "Översikt"-flik som standard som visar `ProjectDashboard`-komponenten (som redan finns men inte används).
 
-### Gränssnitt
+**Resultat:**
 ```text
-┌─ Snabbrapportera ─────────────────────────────────────────┐
-│ [Q1] [Q2] [Q3] [Q4] [Alla]                               │
+┌─ Projekt ─────────────────────────────────────────────────┐
+│ [Översikt] [Aktiva projekt] [Förslag] [Arkiverade]       │
 ├───────────────────────────────────────────────────────────┤
-│ ☐ Byte av filter (Q1)                    0 / 5 objekt    │
-│ ☐ Inspektion ventiler (Q1)               2 / 10 objekt   │
-│ ☐ Rengöring fläktar (Q2)                 0 / 3 objekt    │
-│ ☑ Service värmepump (Q2)                 4 / 4 objekt    │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐     │
+│  │ 12       │ │ 4.2M kr  │ │ 3.8M kr  │ │ 2        │     │
+│  │ Projekt  │ │ Budget   │ │ Utfall   │ │ Varning  │     │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘     │
+│                                                           │
+│  ┌─────────────────────┐  ┌─────────────────────────────┐│
+│  │ Projekt per status  │  │ Projekt per typ             ││
+│  └─────────────────────┘  └─────────────────────────────┘│
 └───────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Mobilanpassning
+### 2. Projektdetalj - Ny startsida
 
-### Vad ändras
-På mobil (sm och mindre) ersätts tabellen med ett kort-baserat gränssnitt som använder `SwipeableCard`.
+**Vad ändras:**
+Ersätt "Information"-fliken med en kombinerad överblick som visar det viktigaste direkt.
 
-### Funktioner
-- Varje uppgift visas som ett kort
-- Swipe vänster → Ta bort
-- Swipe höger → Markera som klar
-- Kompakt info: Namn, status-badge, "X/Y objekt"
-- Expanderbar för att se länkade objekt
-
-### Kort-layout (mobil)
+**Ny layout:**
 ```text
-┌────────────────────────────────────────┐
-│ Byte av filter                  [Kvar] │
-│ 2 / 5 objekt                    ▼      │
-├────────────────────────────────────────┤
-│ [Swipe: ← Ta bort | → Markera klar]   │
-└────────────────────────────────────────┘
+┌─ Projektöversikt ─────────────────────────────────────────┐
+│                                                           │
+│  ┌─ Ekonomi ─────────┐  ┌─ Framsteg ─────────────────┐   │
+│  │ Budget: 500k      │  │ Checklista: ████████░░ 80% │   │
+│  │ Utfall: 380k      │  │ 8 av 10 punkter klara      │   │
+│  │ Prognos: 520k     │  │                            │   │
+│  │                   │  │ Nästa deadline:            │   │
+│  │ ███████░░░ 76%    │  │ "Beställ material" - 3 feb │   │
+│  └───────────────────┘  └────────────────────────────┘   │
+│                                                           │
+│  ┌─ Senaste aktivitet ───────────────────────────────┐   │
+│  │ • Kostnad tillagd: Konsulttimmar (15 000 kr)      │   │
+│  │ • Dokument uppladdad: Offert.pdf                  │   │
+│  │ • Checklistpunkt klar: "Granska ritningar"        │   │
+│  └───────────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. Förbättrad Dashboard-widget
+### 3. Kompaktare header med Action Menu
 
-### Vad ändras
-`OperationsProgress`-widgeten får trendpilar och en mini-sammanfattning per kvartal.
+**Vad ändras:**
+Samla alla sekundära åtgärder (Export, Rapport, Beställningsutkast, Arkivera) i en dropdown-meny.
 
-### Nya funktioner
-- Trendpil (↑/↓) baserad på förra veckans data
-- 4 små staplar som visar alla kvartals status
-- "Saknas att rapportera: X uppgifter" som snabb-länk
-
-### Före
+**Före:**
 ```text
-┌─ Driftuppgifter - Q1 2026 ────────────┐
-│ Uppgifter slutförda         65%       │
-│ ████████░░░░░                         │
-│ 13 av 20 uppgifter                    │
-│                                        │
-│ Objekt rapporterade         45%       │
-│ █████░░░░░░░░░                        │
-│ 45 av 100 objekt                      │
-└────────────────────────────────────────┘
+[Redigera] [Beställningsutkast] [Exportera] [Rapport] [Arkivera]
 ```
 
-### Efter
+**Efter:**
 ```text
-┌─ Driftuppgifter - Q1 2026 ────────────┐
-│ Uppgifter slutförda     ↑ 65%         │
-│ ████████░░░░░                         │
-│ 13 av 20 uppgifter (+3 denna vecka)   │
-│                                        │
-│ ┌──┐ ┌──┐ ┌──┐ ┌──┐                   │
-│ │Q1│ │Q2│ │Q3│ │Q4│  (mini-staplar)   │
-│ └──┘ └──┘ └──┘ └──┘                   │
-│                                        │
-│ ⚠ 7 uppgifter saknar rapportering     │
-│ [Visa alla driftuppgifter]            │
-└────────────────────────────────────────┘
+[Redigera] [Åtgärder ▼]
+              ├─ Beställningsutkast
+              ├─ Exportera ZIP
+              ├─ Generera rapport
+              └─ Arkivera projekt
+```
+
+---
+
+### 4. Förbättrad checklista
+
+**Vad ändras:**
+- Drag-and-drop för att ändra ordning
+- Gruppering efter kategori (Planering, Genomförande, Avslut)
+- Prioritetsnivåer (Hög, Normal, Låg)
+- Inline-redigering av titel
+
+**Ny layout:**
+```text
+┌─ Checklista ──────────────────────────────────────────────┐
+│ Framsteg: ████████░░░░ 65% (8 av 12 klara)               │
+├───────────────────────────────────────────────────────────┤
+│ ▼ Planering (3 av 3 klara)                               │
+│   ☑ Granska ritningar                                    │
+│   ☑ Inhämta offerter                                     │
+│   ☑ Godkänn budget                                       │
+│                                                           │
+│ ▼ Genomförande (4 av 7 klara)                            │
+│   ☑ Beställ material                                     │
+│   ☑ Starta byggnation                                    │
+│   ☐ Mellanbesiktning          [!] 5 feb  @Erik          │
+│   ☐ Slutbesiktning                   -   @Anna          │
+│   ...                                                     │
+│                                                           │
+│ ▼ Avslut (1 av 2 klara)                                  │
+│   ☐ Dokumentera                                          │
+│   ☑ Fakturering                                          │
+└───────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 5. Snabb-åtgärder från KPI-kort
+
+**Vad ändras:**
+Gör KPI-korten klickbara så att de leder direkt till relevant information.
+
+**Interaktivitet:**
+| Klick på | Åtgärd |
+|----------|--------|
+| Budget | Öppna Ekonomi-fliken |
+| Prognos | Öppna Simulering |
+| Utfall | Öppna Ekonomi-fliken med kostnader synliga |
+| Avvikelse | Visa varning och förslag |
+
+---
+
+### 6. Mobilanpassning
+
+**Vad ändras:**
+- Tabs blir en swipebar horisontell lista
+- KPI-kort staplas 2x2 istället för 4 i rad
+- Action-knappen blir en floating button
+- Checklistan får swipe-gester
+
+**Mobil KPI-layout:**
+```text
+┌────────────┐ ┌────────────┐
+│ Budget     │ │ Prognos    │
+│ 500 000 kr │ │ 520 000 kr │
+└────────────┘ └────────────┘
+┌────────────┐ ┌────────────┐
+│ Utfall     │ │ Avvikelse  │
+│ 380 000 kr │ │ +4%        │
+└────────────┘ └────────────┘
+
+[+ Lägg till] (Floating action button)
+```
+
+---
+
+### 7. Snabbstatus-ändring
+
+**Vad ändras:**
+Klick på status-badge öppnar en snabb dropdown för att byta status utan att gå via "Redigera".
+
+**Interaktion:**
+```text
+[Pågående ▼]
+ ├─ Planerat
+ ├─ Inväntar offert
+ ├─ Offert finns
+ ├─ ● Pågående (nuvarande)
+ ├─ Pausat
+ └─ Avslutat
 ```
 
 ---
@@ -149,77 +192,83 @@ På mobil (sm och mindre) ersätts tabellen med ett kort-baserat gränssnitt som
 
 | Fil | Ändring |
 |-----|---------|
-| `src/pages/Operations.tsx` | Lägg till ny flik "Snabbrapportera", grid-layout för kvartal, aktivera YearOverview |
-| `src/components/operations/QuarterCard.tsx` | Mobilanpassning med kort-layout, kompaktare header |
-| `src/components/operations/YearOverview.tsx` | Koppla till live-data, klickbara kvartal |
-| `src/components/dashboard/OperationsProgress.tsx` | Trendpilar, mini-kvartalsstaplar, varning för saknade |
-| `src/components/operations/QuickReportView.tsx` | **NY FIL** - Snabbrapportera-komponenten |
+| `src/pages/Projects.tsx` | Lägg till "Översikt"-flik med ProjectDashboard |
+| `src/pages/ProjectDetail.tsx` | Ny startsida, kompakt header, klickbara KPI |
+| `src/components/projects/ProjectOverview.tsx` | **NY FIL** - Kombinerad översiktsvy |
+| `src/components/projects/ProjectQuickStatus.tsx` | **NY FIL** - Snabb statusändring |
+| `src/components/projects/ProjectActionsMenu.tsx` | **NY FIL** - Dropdown för åtgärder |
+| `src/components/projects/ProjectChecklistManagement.tsx` | Gruppering, prioritet, drag-and-drop |
 
-### Imports som läggs till
+### Nya komponenter
+
+**ProjectOverview.tsx:**
 ```tsx
-// Operations.tsx
-import { QuickReportView } from "@/components/operations/QuickReportView";
-import { YearOverview } from "@/components/operations/YearOverview";
-
-// QuarterCard.tsx
-import { SwipeableCard } from "@/components/SwipeableCard";
-import { useIsMobile } from "@/hooks/use-mobile";
-```
-
-### Ny QuickReportView-komponent
-```tsx
-interface QuickReportViewProps {
-  propertyId: string;
-  year: number;
+interface ProjectOverviewProps {
+  project: Project;
+  onNavigate: (tab: string) => void;
 }
 
-export function QuickReportView({ propertyId, year }: QuickReportViewProps) {
-  const [quarterFilter, setQuarterFilter] = useState<string>("all");
-  const [tasks, setTasks] = useState<Task[]>([]);
-  
-  // Hämta endast uppgifter med reported_count < planned_count
-  // Visa som enkel lista med checkbox för snabb markering
+// Visar:
+// - Ekonomi-sammanfattning med progress bar
+// - Checklista-progress med nästa deadline
+// - Senaste 3 aktiviteter
+// - Klickbara kort som navigerar till rätt flik
+```
+
+**ProjectQuickStatus.tsx:**
+```tsx
+interface ProjectQuickStatusProps {
+  projectId: string;
+  currentStatus: ProjectStatus;
+  onStatusChange: () => void;
 }
+
+// Dropdown-komponent för snabb statusändring
 ```
 
-### QuarterCard mobilvy
+**ProjectActionsMenu.tsx:**
 ```tsx
-// I QuarterCard.tsx
-const isMobile = useIsMobile();
+interface ProjectActionsMenuProps {
+  project: Project;
+  onExport: () => void;
+  onSendDraft: () => void;
+  onArchive: () => void;
+}
 
-// Render-logik:
-{isMobile ? (
-  <div className="space-y-2">
-    {filteredTasks.map((task) => (
-      <SwipeableCard
-        key={task.id}
-        onSwipeLeft={() => handleDeleteTask(task.id)}
-        onSwipeRight={() => handleMarkComplete(task.id)}
-      >
-        <TaskMobileCard task={task} />
-      </SwipeableCard>
-    ))}
-  </div>
-) : (
-  <Table>
-    {/* Befintlig tabell */}
-  </Table>
-)}
+// DropdownMenu med alla sekundära åtgärder
 ```
 
-### OperationsProgress trendberäkning
-```tsx
-// Hämta förra veckans data för jämförelse
-const { data: lastWeekTasks } = await supabase
-  .from('drift_tasks')
-  .select('reported_count')
-  .eq('year', currentYear)
-  .eq('quarter', currentQuarter)
-  .lt('updated_at', oneWeekAgo);
+### Checklista-förbättringar
 
-// Beräkna trend
-const trend = currentCompleted - lastWeekCompleted;
-const trendIcon = trend > 0 ? "↑" : trend < 0 ? "↓" : "→";
+```tsx
+// Nya fält i project_checklist_items
+interface ChecklistItem {
+  // ... befintliga fält
+  category: string | null;  // "planning" | "execution" | "closing"
+  priority: string | null;  // "high" | "normal" | "low"
+}
+
+// Gruppering i UI:
+const groupedItems = useMemo(() => {
+  return {
+    planning: items.filter(i => i.category === "planning"),
+    execution: items.filter(i => i.category === "execution"),
+    closing: items.filter(i => i.category === "closing"),
+    uncategorized: items.filter(i => !i.category),
+  };
+}, [items]);
+```
+
+---
+
+## Databasändringar
+
+Lägg till nya kolumner för checklista-kategorier:
+
+```sql
+ALTER TABLE project_checklist_items 
+ADD COLUMN category TEXT DEFAULT NULL,
+ADD COLUMN priority TEXT DEFAULT 'normal';
 ```
 
 ---
@@ -228,18 +277,22 @@ const trendIcon = trend > 0 ? "↑" : trend < 0 ? "↓" : "→";
 
 | Steg | Funktion | Komplexitet |
 |------|----------|-------------|
-| 1 | Aktivera Årsöversikten | Låg |
-| 2 | Grid-layout för kvartal | Låg |
-| 3 | Dashboard-widget förbättring | Medel |
-| 4 | Snabbrapportera-läge | Medel |
-| 5 | Mobilanpassning | Medel-Hög |
+| 1 | Aktivera Dashboard i projektlistan | Låg |
+| 2 | Kompakt header med Action Menu | Låg |
+| 3 | Snabb statusändring | Låg |
+| 4 | Ny Projektöversikt-flik | Medel |
+| 5 | Mobilanpassning | Medel |
+| 6 | Klickbara KPI-kort | Låg |
+| 7 | Förbättrad checklista med kategorier | Medel-Hög |
 
 ---
 
 ## Fördelar
 
-- **Årsöversikt**: Snabb visuell överblick utan att scrolla
-- **Grid-layout**: Halverar vertikal scrollning på desktop
-- **Snabbrapportera**: Fokuserad vy för att "klara av" uppgifter
-- **Mobilanpassning**: Naturlig touch-interaktion med swipe
-- **Dashboard**: Proaktiv varning om saknade rapporter
+- **Dashboard**: Direkt överblick utan att klicka på varje projekt
+- **Ny översikt**: Viktigaste informationen synlig direkt
+- **Kompakt header**: Renare gränssnitt, bättre på mobil
+- **Snabb status**: Färre klick för vanliga åtgärder
+- **Kategoriserad checklista**: Bättre struktur för större projekt
+- **Mobilanpassning**: Fungerar lika bra på telefon som desktop
+
