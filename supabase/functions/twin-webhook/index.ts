@@ -39,6 +39,44 @@ async function hashApiKey(key: string): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// Validate JWT token and return organization context
+async function validateJwtToken(
+  supabase: any,
+  authHeader: string
+): Promise<{ organizationId: string; userId: string } | null> {
+  try {
+    const token = authHeader.replace("Bearer ", "");
+
+    // Verify JWT with getUser
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !userData?.user?.id) {
+      console.error("JWT validation failed:", userError);
+      return null;
+    }
+
+    // Get user's organization from profile
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", userData.user.id)
+      .single();
+
+    if (profileError || !profile?.organization_id) {
+      console.error("Profile lookup failed:", profileError);
+      return null;
+    }
+
+    return {
+      organizationId: profile.organization_id,
+      userId: userData.user.id,
+    };
+  } catch (error) {
+    console.error("JWT validation error:", error);
+    return null;
+  }
+}
+
 // Validate API key and return organization context
 async function validateApiKey(
   supabase: any,
@@ -417,6 +455,35 @@ async function handleListComponents(
   return { components, count: components?.length || 0 };
 }
 
+// Route action to appropriate handler
+async function routeAction(
+  supabase: any,
+  organizationId: string,
+  action: ActionType,
+  data: Record<string, any>
+): Promise<any> {
+  switch (action) {
+    case "create_work_order":
+      return await handleCreateWorkOrder(supabase, organizationId, data);
+    case "create_todo":
+      return await handleCreateTodo(supabase, organizationId, data);
+    case "create_project":
+      return await handleCreateProject(supabase, organizationId, data);
+    case "update_work_order_status":
+      return await handleUpdateWorkOrderStatus(supabase, organizationId, data);
+    case "get_pending_actions":
+      return await handleGetPendingActions(supabase, organizationId);
+    case "execute_action":
+      return await handleExecuteAction(supabase, organizationId, data);
+    case "list_properties":
+      return await handleListProperties(supabase, organizationId);
+    case "list_components":
+      return await handleListComponents(supabase, organizationId, data);
+    default:
+      throw new Error(`Unknown action: ${action}`);
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -432,141 +499,146 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get API key from header
-    const apiKey = req.headers.get("x-api-key");
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Missing X-API-Key header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Create Supabase client with service role for validation
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Validate API key
-    const apiKeyData = await validateApiKey(supabase, apiKey);
-    if (!apiKeyData) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Invalid or expired API key" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Get authentication headers
+    const apiKey = req.headers.get("x-api-key");
+    const authHeader = req.headers.get("authorization");
 
-    // Parse request body
-    const body: WebhookRequest = await req.json();
-    const { action, data = {} } = body;
+    let organizationId: string;
+    let authMethod: "api_key" | "jwt";
 
-    if (!action) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Missing action field" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Try API key first, then JWT
+    if (apiKey) {
+      // Validate API key
+      const apiKeyData = await validateApiKey(supabase, apiKey);
+      if (!apiKeyData) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Invalid or expired API key" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      organizationId = apiKeyData.organization_id;
+      authMethod = "api_key";
 
-    // Check permission
-    if (!hasPermission(apiKeyData, action)) {
+      // Parse request body early to check permissions
+      const body: WebhookRequest = await req.json();
+      const { action, data = {} } = body;
+
+      if (!action) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Missing action field" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check permission for API keys
+      if (!hasPermission(apiKeyData, action)) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Permission denied for action: ${action}`,
+          }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log(`Processing action: ${action} for org: ${organizationId} (auth: ${authMethod})`);
+
+      // Route to handler
+      const result = await routeAction(supabase, organizationId, action, data);
+
+      // Log successful action (only for write operations)
+      if (
+        [
+          "create_work_order",
+          "create_todo",
+          "create_project",
+          "update_work_order_status",
+          "execute_action",
+        ].includes(action)
+      ) {
+        await logAction(
+          supabase,
+          organizationId,
+          action,
+          data,
+          result,
+          true
+        );
+      }
+
+      return new Response(JSON.stringify({ success: true, result }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
+    } else if (authHeader?.startsWith("Bearer ")) {
+      // JWT authentication
+      const jwtData = await validateJwtToken(supabase, authHeader);
+      if (!jwtData) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Invalid or expired token" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      organizationId = jwtData.organizationId;
+      authMethod = "jwt";
+
+      // Parse request body
+      const body: WebhookRequest = await req.json();
+      const { action, data = {} } = body;
+
+      if (!action) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Missing action field" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // JWT users have full access (no permission check)
+      console.log(`Processing action: ${action} for org: ${organizationId} (auth: ${authMethod}, user: ${jwtData.userId})`);
+
+      // Route to handler
+      const result = await routeAction(supabase, organizationId, action, data);
+
+      // Log successful action (only for write operations)
+      if (
+        [
+          "create_work_order",
+          "create_todo",
+          "create_project",
+          "update_work_order_status",
+          "execute_action",
+        ].includes(action)
+      ) {
+        await logAction(
+          supabase,
+          organizationId,
+          action,
+          data,
+          result,
+          true
+        );
+      }
+
+      return new Response(JSON.stringify({ success: true, result }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
+    } else {
       return new Response(
         JSON.stringify({
           success: false,
-          error: `Permission denied for action: ${action}`,
+          error: "Authentication required. Use X-API-Key header or Authorization: Bearer <jwt>",
         }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    console.log(`Processing action: ${action} for org: ${apiKeyData.organization_id}`);
-
-    // Route to handler
-    let result;
-    switch (action) {
-      case "create_work_order":
-        result = await handleCreateWorkOrder(
-          supabase,
-          apiKeyData.organization_id,
-          data
-        );
-        break;
-      case "create_todo":
-        result = await handleCreateTodo(
-          supabase,
-          apiKeyData.organization_id,
-          data
-        );
-        break;
-      case "create_project":
-        result = await handleCreateProject(
-          supabase,
-          apiKeyData.organization_id,
-          data
-        );
-        break;
-      case "update_work_order_status":
-        result = await handleUpdateWorkOrderStatus(
-          supabase,
-          apiKeyData.organization_id,
-          data
-        );
-        break;
-      case "get_pending_actions":
-        result = await handleGetPendingActions(
-          supabase,
-          apiKeyData.organization_id
-        );
-        break;
-      case "execute_action":
-        result = await handleExecuteAction(
-          supabase,
-          apiKeyData.organization_id,
-          data
-        );
-        break;
-      case "list_properties":
-        result = await handleListProperties(
-          supabase,
-          apiKeyData.organization_id
-        );
-        break;
-      case "list_components":
-        result = await handleListComponents(
-          supabase,
-          apiKeyData.organization_id,
-          data
-        );
-        break;
-      default:
-        return new Response(
-          JSON.stringify({ success: false, error: `Unknown action: ${action}` }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-    }
-
-    // Log successful action (only for write operations)
-    if (
-      [
-        "create_work_order",
-        "create_todo",
-        "create_project",
-        "update_work_order_status",
-        "execute_action",
-      ].includes(action)
-    ) {
-      await logAction(
-        supabase,
-        apiKeyData.organization_id,
-        action,
-        data,
-        result,
-        true
-      );
-    }
-
-    return new Response(JSON.stringify({ success: true, result }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   } catch (error) {
     console.error("Webhook error:", error);
 
