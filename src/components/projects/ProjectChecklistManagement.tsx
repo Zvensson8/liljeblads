@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,10 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
-import { CheckCircle2, Circle, Calendar, Plus, ListTodo, CalendarIcon } from "lucide-react";
+import { CheckCircle2, Circle, Calendar, Plus, ListTodo, CalendarIcon, ChevronDown, ChevronRight, AlertCircle, ArrowUp, ArrowRight, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChecklistItem {
@@ -22,12 +25,27 @@ interface ChecklistItem {
   deadline: string | null;
   responsible: string | null;
   order_index: number;
+  category: string | null;
+  priority: string | null;
 }
 
 interface ProjectChecklistManagementProps {
   projectId: string;
   propertyId: string;
 }
+
+const categoryConfig: Record<string, { label: string; order: number }> = {
+  planning: { label: "Planering", order: 1 },
+  execution: { label: "Genomförande", order: 2 },
+  closing: { label: "Avslut", order: 3 },
+  uncategorized: { label: "Okategoriserade", order: 4 },
+};
+
+const priorityConfig: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
+  high: { label: "Hög", icon: <ArrowUp className="h-3 w-3" />, className: "text-red-600 bg-red-100" },
+  normal: { label: "Normal", icon: <ArrowRight className="h-3 w-3" />, className: "text-gray-600 bg-gray-100" },
+  low: { label: "Låg", icon: <ArrowDown className="h-3 w-3" />, className: "text-blue-600 bg-blue-100" },
+};
 
 export function ProjectChecklistManagement({
   projectId,
@@ -40,8 +58,16 @@ export function ProjectChecklistManagement({
   const [newDescription, setNewDescription] = useState("");
   const [newResponsible, setNewResponsible] = useState("");
   const [newDeadline, setNewDeadline] = useState<Date>();
+  const [newCategory, setNewCategory] = useState<string>("uncategorized");
+  const [newPriority, setNewPriority] = useState<string>("normal");
   const [submitting, setSubmitting] = useState(false);
   const [existingTodos, setExistingTodos] = useState<string[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+    planning: true,
+    execution: true,
+    closing: true,
+    uncategorized: true,
+  });
 
   useEffect(() => {
     fetchChecklistItems();
@@ -81,6 +107,36 @@ export function ProjectChecklistManagement({
     }
   };
 
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, ChecklistItem[]> = {
+      planning: [],
+      execution: [],
+      closing: [],
+      uncategorized: [],
+    };
+
+    items.forEach(item => {
+      const category = item.category || "uncategorized";
+      if (groups[category]) {
+        groups[category].push(item);
+      } else {
+        groups.uncategorized.push(item);
+      }
+    });
+
+    // Sort by priority within each category
+    const priorityOrder = { high: 0, normal: 1, low: 2 };
+    Object.keys(groups).forEach(key => {
+      groups[key].sort((a, b) => {
+        const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 1;
+        const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 1;
+        return aPriority - bPriority;
+      });
+    });
+
+    return groups;
+  }, [items]);
+
   const handleToggleComplete = async (item: ChecklistItem) => {
     try {
       const { error } = await supabase
@@ -99,7 +155,6 @@ export function ProjectChecklistManagement({
         )
       );
 
-      // Log activity
       await supabase.from("project_activity_log").insert({
         project_id: projectId,
         activity_type: "checklist_update",
@@ -134,6 +189,8 @@ export function ProjectChecklistManagement({
           deadline: newDeadline ? newDeadline.toISOString().split("T")[0] : null,
           order_index: maxOrder + 1,
           completed: false,
+          category: newCategory === "uncategorized" ? null : newCategory,
+          priority: newPriority,
         })
         .select()
         .single();
@@ -142,7 +199,6 @@ export function ProjectChecklistManagement({
 
       setItems(prev => [...prev, data]);
 
-      // Log activity
       await supabase.from("project_activity_log").insert({
         project_id: projectId,
         activity_type: "checklist_update",
@@ -155,6 +211,8 @@ export function ProjectChecklistManagement({
       setNewDescription("");
       setNewResponsible("");
       setNewDeadline(undefined);
+      setNewCategory("uncategorized");
+      setNewPriority("normal");
     } catch (error: any) {
       toast.error("Kunde inte lägga till checklistpunkt");
     } finally {
@@ -176,24 +234,31 @@ export function ProjectChecklistManagement({
       if (error) throw error;
 
       toast.success("Tillagd i att göra-listan");
-      fetchExistingTodos(); // Uppdatera listan över befintliga todos
+      fetchExistingTodos();
     } catch (error: any) {
       toast.error("Kunde inte lägga till i att göra-listan");
     }
+  };
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
   };
 
   const isTodoAlreadyAdded = (title: string) => {
     return existingTodos.includes(title);
   };
 
-  const completedCount = items.filter((i) => i.completed).length;
-  const totalCount = items.length;
-  const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-
   const isOverdue = (deadline: string | null, completed: boolean) => {
     if (!deadline || completed) return false;
     return new Date(deadline) < new Date();
   };
+
+  const completedCount = items.filter((i) => i.completed).length;
+  const totalCount = items.length;
+  const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   if (loading) {
     return (
@@ -203,115 +268,158 @@ export function ProjectChecklistManagement({
     );
   }
 
+  const renderChecklistItem = (item: ChecklistItem) => (
+    <div
+      key={item.id}
+      className={cn(
+        "flex items-start gap-3 p-3 border rounded-lg transition-colors",
+        item.completed ? "bg-muted/50" : "bg-background",
+        isOverdue(item.deadline, item.completed) && "border-red-300 bg-red-50/50 dark:bg-red-950/20"
+      )}
+    >
+      <Button
+        variant="ghost"
+        size="sm"
+        className="p-0 h-auto hover:bg-transparent flex-shrink-0 mt-0.5"
+        onClick={() => handleToggleComplete(item)}
+      >
+        {item.completed ? (
+          <CheckCircle2 className="h-5 w-5 text-green-600" />
+        ) : (
+          <Circle className="h-5 w-5 text-muted-foreground" />
+        )}
+      </Button>
+
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className={cn(
+                "font-medium",
+                item.completed && "line-through text-muted-foreground"
+              )}
+            >
+              {item.title}
+            </span>
+            {item.priority && item.priority !== "normal" && (
+              <Badge variant="outline" className={cn("text-xs px-1.5 py-0", priorityConfig[item.priority]?.className)}>
+                {priorityConfig[item.priority]?.icon}
+              </Badge>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isOverdue(item.deadline, item.completed) && (
+              <Badge variant="destructive" className="text-xs">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Försenad
+              </Badge>
+            )}
+            {item.deadline && !isOverdue(item.deadline, item.completed) && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                {format(new Date(item.deadline), "d MMM", { locale: sv })}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {item.description && (
+          <p className="text-sm text-muted-foreground">{item.description}</p>
+        )}
+
+        <div className="flex items-center gap-3 flex-wrap">
+          {item.responsible && (
+            <span className="text-xs text-muted-foreground">
+              @{item.responsible}
+            </span>
+          )}
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => handleAddToPropertyTodos(item)}
+            disabled={item.completed || isTodoAlreadyAdded(item.title)}
+          >
+            <ListTodo className="h-3 w-3 mr-1" />
+            {isTodoAlreadyAdded(item.title) ? "I att-göra" : "Lägg i att-göra"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderCategorySection = (categoryKey: string, categoryItems: ChecklistItem[]) => {
+    const config = categoryConfig[categoryKey];
+    const completedInCategory = categoryItems.filter(i => i.completed).length;
+    const isExpanded = expandedCategories[categoryKey];
+
+    if (categoryItems.length === 0) return null;
+
+    return (
+      <Collapsible
+        key={categoryKey}
+        open={isExpanded}
+        onOpenChange={() => toggleCategory(categoryKey)}
+      >
+        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted/50 rounded-lg hover:bg-muted/80 transition-colors">
+          <div className="flex items-center gap-2">
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+            <span className="font-medium">{config.label}</span>
+            <Badge variant="secondary" className="text-xs">
+              {completedInCategory} / {categoryItems.length}
+            </Badge>
+          </div>
+          <Progress 
+            value={(completedInCategory / categoryItems.length) * 100} 
+            className="w-20 h-1.5"
+          />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-2 mt-2 pl-2">
+          {categoryItems.map(renderChecklistItem)}
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Progress Overview */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Framsteg</h3>
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold">Framsteg</h3>
             <span className="text-sm text-muted-foreground">
               {completedCount} av {totalCount} klara
             </span>
-            <Button size="sm" onClick={() => setAddDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Lägg till punkt
-            </Button>
           </div>
+          <Button size="sm" onClick={() => setAddDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Lägg till
+          </Button>
         </div>
         <Progress value={progress} className="h-2" />
       </div>
 
-      {/* Checklist Items */}
+      {/* Grouped Checklist Items */}
       {items.length === 0 ? (
         <div className="text-center py-12">
           <Circle className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
           <p className="text-lg mb-2 text-muted-foreground">Ingen checklista</p>
           <p className="text-sm text-muted-foreground">
-            Inga checklistpunkter har lagts till för detta projekt
+            Klicka på "Lägg till" för att skapa din första checklistpunkt
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className={`flex items-start gap-4 p-4 border rounded-lg transition-colors ${
-                item.completed ? "bg-muted/50" : "bg-background"
-              } ${
-                isOverdue(item.deadline, item.completed)
-                  ? "border-red-300 bg-red-50/50"
-                  : ""
-              }`}
-            >
-              <Button
-                variant="ghost"
-                size="sm"
-                className="p-0 h-auto hover:bg-transparent"
-                onClick={() => handleToggleComplete(item)}
-              >
-                {item.completed ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                ) : (
-                  <Circle className="h-5 w-5 text-muted-foreground" />
-                )}
-              </Button>
-
-              <div className="flex-1 space-y-1">
-                <div className="flex items-start justify-between gap-4">
-                  <h4
-                    className={`font-medium ${
-                      item.completed
-                        ? "line-through text-muted-foreground"
-                        : ""
-                    }`}
-                  >
-                    {item.title}
-                  </h4>
-                  {isOverdue(item.deadline, item.completed) && (
-                    <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded whitespace-nowrap">
-                      Försenad
-                    </span>
-                  )}
-                </div>
-
-                {item.description && (
-                  <p className="text-sm text-muted-foreground">
-                    {item.description}
-                  </p>
-                )}
-
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  {item.responsible && (
-                    <span className="flex items-center gap-1">
-                      <span className="font-medium">Ansvarig:</span>{" "}
-                      {item.responsible}
-                    </span>
-                  )}
-                  {item.deadline && (
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {format(new Date(item.deadline), "PPP", { locale: sv })}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleAddToPropertyTodos(item)}
-                    disabled={item.completed || isTodoAlreadyAdded(item.title)}
-                  >
-                    <ListTodo className="h-4 w-4 mr-2" />
-                    {isTodoAlreadyAdded(item.title) 
-                      ? "Redan tillagd i att göra-lista" 
-                      : "Lägg till i att göra-lista"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="space-y-4">
+          {Object.entries(categoryConfig)
+            .sort(([, a], [, b]) => a.order - b.order)
+            .map(([key]) => renderCategorySection(key, groupedItems[key] || []))}
         </div>
       )}
 
@@ -332,6 +440,52 @@ export function ProjectChecklistManagement({
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Kategori</label>
+                <Select value={newCategory} onValueChange={setNewCategory}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="planning">Planering</SelectItem>
+                    <SelectItem value="execution">Genomförande</SelectItem>
+                    <SelectItem value="closing">Avslut</SelectItem>
+                    <SelectItem value="uncategorized">Okategoriserad</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Prioritet</label>
+                <Select value={newPriority} onValueChange={setNewPriority}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">
+                      <span className="flex items-center gap-2">
+                        <ArrowUp className="h-3 w-3 text-red-600" />
+                        Hög
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="normal">
+                      <span className="flex items-center gap-2">
+                        <ArrowRight className="h-3 w-3 text-gray-600" />
+                        Normal
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="low">
+                      <span className="flex items-center gap-2">
+                        <ArrowDown className="h-3 w-3 text-blue-600" />
+                        Låg
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div>
               <label className="text-sm font-medium mb-2 block">Beskrivning</label>
               <Textarea
@@ -342,40 +496,42 @@ export function ProjectChecklistManagement({
               />
             </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">Ansvarig</label>
-              <Input
-                value={newResponsible}
-                onChange={(e) => setNewResponsible(e.target.value)}
-                placeholder="Namn på ansvarig"
-              />
-            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Ansvarig</label>
+                <Input
+                  value={newResponsible}
+                  onChange={(e) => setNewResponsible(e.target.value)}
+                  placeholder="Namn"
+                />
+              </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">Deadline</label>
-              <Popover modal={true}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !newDeadline && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {newDeadline ? format(newDeadline, "PPP", { locale: sv }) : "Välj datum"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[200]" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={newDeadline}
-                    onSelect={setNewDeadline}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Deadline</label>
+                <Popover modal={true}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !newDeadline && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newDeadline ? format(newDeadline, "d MMM", { locale: sv }) : "Datum"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 z-[200]" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={newDeadline}
+                      onSelect={setNewDeadline}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           </div>
 

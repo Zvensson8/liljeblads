@@ -1574,6 +1574,7 @@ export type Database = {
       }
       project_checklist_items: {
         Row: {
+          category: string | null
           completed: boolean | null
           completed_at: string | null
           completed_by: string | null
@@ -1582,11 +1583,13 @@ export type Database = {
           description: string | null
           id: string
           order_index: number | null
+          priority: string | null
           project_id: string
           responsible: string | null
           title: string
         }
         Insert: {
+          category?: string | null
           completed?: boolean | null
           completed_at?: string | null
           completed_by?: string | null
@@ -1595,11 +1598,13 @@ export type Database = {
           description?: string | null
           id?: string
           order_index?: number | null
+          priority?: string | null
           project_id: string
           responsible?: string | null
           title: string
         }
         Update: {
+          category?: string | null
           completed?: boolean | null
           completed_at?: string | null
           completed_by?: string | null
@@ -1608,6 +1613,7 @@ export type Database = {
           description?: string | null
           id?: string
           order_index?: number | null
+          priority?: string | null
           project_id?: string
           responsible?: string | null
           title?: string

@@ -337,9 +337,10 @@ export default function Projects() {
 
           <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <Tabs defaultValue="active" className="w-full">
+              <Tabs defaultValue="overview" className="w-full">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                   <TabsList>
+                    <TabsTrigger value="overview">Översikt</TabsTrigger>
                     <TabsTrigger value="active" onClick={() => { setShowArchived(false); fetchProjects(false); }}>Aktiva projekt</TabsTrigger>
                     <TabsTrigger value="proposals" className="flex items-center gap-1">
                       <Sparkles className="h-3 w-3" />
@@ -352,6 +353,10 @@ export default function Projects() {
                     Nytt projekt
                   </Button>
                 </div>
+
+                <TabsContent value="overview" className="space-y-6">
+                  <ProjectDashboard projects={projects} />
+                </TabsContent>
 
                 <TabsContent value="proposals" className="space-y-6">
                   <ProjectProposals />
