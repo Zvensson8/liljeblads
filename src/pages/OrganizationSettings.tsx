@@ -46,6 +46,7 @@ export default function OrganizationSettings() {
   const [loading, setLoading] = useState(true);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [userRole, setUserRole] = useState<string>("member");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [stats, setStats] = useState({
     propertyCount: 0,
     memberCount: 0,
@@ -82,6 +83,24 @@ export default function OrganizationSettings() {
 
       setOrganization(memberData.organization as any);
       setUserRole(memberData.role);
+
+      // Kolla om användaren är founder/admin i user_roles
+      const { data: systemRoles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user?.id);
+
+      const isSystemAdmin = systemRoles?.some(
+        (r) => r.role === "admin" || r.role === "founder"
+      ) || false;
+
+      // isAdmin = true om antingen organization_members har owner/admin
+      // ELLER user_roles har admin/founder
+      setIsAdmin(
+        memberData.role === "owner" || 
+        memberData.role === "admin" || 
+        isSystemAdmin
+      );
 
       // Hämta statistik
       const [propertiesResult, membersResult, componentsResult] = await Promise.all([
@@ -131,8 +150,6 @@ export default function OrganizationSettings() {
   }
 
   if (!organization) return null;
-
-  const isAdmin = userRole === "owner" || userRole === "admin";
 
   return (
     <SidebarProvider>
