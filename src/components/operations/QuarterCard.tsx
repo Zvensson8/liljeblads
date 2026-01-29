@@ -610,7 +610,6 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
                     )}
                     <TableHead className="w-[30px]"></TableHead>
                     <TableHead>Uppgift</TableHead>
-                    <TableHead>Beskrivning</TableHead>
                     <TableHead className="w-[100px]">Planerade</TableHead>
                     <TableHead className="w-[100px]">Redovisade</TableHead>
                     <TableHead className="w-[100px]">Objekt</TableHead>
@@ -654,19 +653,6 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
                             }}
                             onBlur={(e) => handleUpdateField(task.id, "name", e.target.value)}
                             className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={task.description || ""}
-                            onChange={(e) => {
-                              setTasks(tasks.map(t => 
-                                t.id === task.id ? { ...t, description: e.target.value } : t
-                              ));
-                            }}
-                            onBlur={(e) => handleUpdateField(task.id, "description", e.target.value || null)}
-                            className="h-8 border-0 bg-transparent focus:bg-background focus:border-input"
-                            placeholder="-"
                           />
                         </TableCell>
                         <TableCell>

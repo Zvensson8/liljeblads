@@ -320,8 +320,8 @@ export default function Operations() {
                   </TabsList>
 
                   <TabsContent value="quarters" className="space-y-4 mt-4">
-                    {/* 2x2 Grid on desktop, vertical on mobile */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* One quarter per row */}
+                    <div className="grid grid-cols-1 gap-4">
                       {(["Q1", "Q2", "Q3", "Q4"] as const).map((quarter) => {
                         const property = properties.find(p => p.id === selectedProperty);
                         return (
