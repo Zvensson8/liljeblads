@@ -36,9 +36,13 @@ import { ProjectActivityLog } from "@/components/projects/ProjectActivityLog";
 import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
 import { ProjectEconomyOverview } from "@/components/projects/ProjectEconomyOverview";
 import { ProjectReportButton } from "@/components/projects/ProjectReportButton";
+import { ProjectActionsMenu } from "@/components/projects/ProjectActionsMenu";
+import { ProjectQuickStatus } from "@/components/projects/ProjectQuickStatus";
+import { ProjectOverviewTab } from "@/components/projects/ProjectOverviewTab";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
 import { exportProjectToZip } from "@/lib/zipExport";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type ProjectStatus = Database["public"]["Enums"]["project_status"];
 type ProjectType = Database["public"]["Enums"]["project_type"];
@@ -76,9 +80,11 @@ export default function ProjectDetail() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [sendingDraft, setSendingDraft] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const { addRecentItem } = useRecentlyVisited();
+  const isMobile = useIsMobile();
   
-  const activeTab = searchParams.get("tab") || "info";
+  const activeTab = searchParams.get("tab") || "overview";
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -287,19 +293,24 @@ export default function ProjectDetail() {
               </BreadcrumbList>
             </Breadcrumb>
             <div className="flex h-12 items-center gap-4">
-            <SidebarTrigger />
+            <SidebarTrigger className="hidden md:flex" />
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate("/projects")}
+              className="hidden sm:flex"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Tillbaka
             </Button>
-            <div className="flex items-center gap-2 flex-1">
-              <Briefcase className="h-5 w-5 text-primary" />
-              <h1 className="text-xl font-semibold">{project.name}</h1>
-              {getStatusBadge(project.status)}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Briefcase className="h-5 w-5 text-primary flex-shrink-0" />
+              <h1 className="text-lg md:text-xl font-semibold truncate">{project.name}</h1>
+              <ProjectQuickStatus
+                projectId={project.id}
+                currentStatus={project.status}
+                onStatusChange={fetchProject}
+              />
               {project.is_archived && (
                 <Badge variant="outline" className="bg-gray-400">
                   Arkiverat
@@ -308,99 +319,84 @@ export default function ProjectDetail() {
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(true)}>
-                <Edit className="h-4 w-4 mr-2" />
-                Redigera
+                <Edit className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Redigera</span>
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleSendOrderDraft}
-                disabled={sendingDraft}
-              >
-                {sendingDraft ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Skickar...
-                  </>
-                ) : (
-                  <>
-                    <Mail className="h-4 w-4 mr-2" />
-                    Beställningsutkast
-                  </>
-                )}
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
-                <Download className="h-4 w-4 mr-2" />
-                {exporting ? "Exporterar..." : "Exportera"}
-              </Button>
-              <ProjectReportButton projectId={project.id} />
-              {project.is_archived ? (
-                <Button variant="outline" size="sm" onClick={handleReactivate}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Återaktivera
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" onClick={handleArchive}>
-                  <Archive className="h-4 w-4 mr-2" />
-                  Arkivera
-                </Button>
-              )}
+              <ProjectActionsMenu
+                isArchived={project.is_archived}
+                exporting={exporting}
+                sendingDraft={sendingDraft}
+                onExport={handleExport}
+                onSendDraft={handleSendOrderDraft}
+                onArchive={handleArchive}
+                onReactivate={handleReactivate}
+                onGenerateReport={() => setReportDialogOpen(true)}
+              />
             </div>
             </div>
           </header>
 
           <main className="flex-1 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              {/* Project Info Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
+              {/* Clickable KPI Cards - 2x2 on mobile, 4-col on desktop */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card 
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setSearchParams({ tab: "economy" })}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                       Budget
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-2xl font-bold">
-                      {project.budget.toLocaleString("sv-SE")} kr
+                    <p className="text-xl md:text-2xl font-bold">
+                      {(project.budget / 1000).toFixed(0)}k
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                <Card 
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setSearchParams({ tab: "simulation" })}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                       Prognos
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-2xl font-bold">
-                      {project.forecast.toLocaleString("sv-SE")} kr
+                    <p className="text-xl md:text-2xl font-bold">
+                      {(project.forecast / 1000).toFixed(0)}k
                     </p>
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                <Card 
+                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setSearchParams({ tab: "economy" })}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                       Utfall
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-2xl font-bold">
-                      {project.actual_cost.toLocaleString("sv-SE")} kr
+                    <p className="text-xl md:text-2xl font-bold">
+                      {(project.actual_cost / 1000).toFixed(0)}k
                     </p>
                   </CardContent>
                 </Card>
 
                 <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                       Avvikelse
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p
-                      className={`text-2xl font-bold ${
+                      className={`text-xl md:text-2xl font-bold ${
                         variance > 10
                           ? "text-red-600"
                           : variance > 0
@@ -422,14 +418,24 @@ export default function ProjectDetail() {
                 onValueChange={(value) => setSearchParams({ tab: value })} 
                 className="w-full"
               >
-                <TabsList className="grid w-full grid-cols-6">
-                  <TabsTrigger value="info">Information</TabsTrigger>
-                  <TabsTrigger value="economy">Ekonomi</TabsTrigger>
-                  <TabsTrigger value="simulation">Simulering</TabsTrigger>
-                  <TabsTrigger value="documents">Dokument</TabsTrigger>
-                  <TabsTrigger value="checklist">Checklista</TabsTrigger>
-                  <TabsTrigger value="activity">Aktivitetslogg</TabsTrigger>
-                </TabsList>
+                <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+                  <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-7">
+                    <TabsTrigger value="overview">Översikt</TabsTrigger>
+                    <TabsTrigger value="info">Information</TabsTrigger>
+                    <TabsTrigger value="economy">Ekonomi</TabsTrigger>
+                    <TabsTrigger value="simulation">Simulering</TabsTrigger>
+                    <TabsTrigger value="documents">Dokument</TabsTrigger>
+                    <TabsTrigger value="checklist">Checklista</TabsTrigger>
+                    <TabsTrigger value="activity">Aktivitet</TabsTrigger>
+                  </TabsList>
+                </div>
+
+                <TabsContent value="overview" className="space-y-4">
+                  <ProjectOverviewTab 
+                    project={project}
+                    onNavigate={(tab) => setSearchParams({ tab })}
+                  />
+                </TabsContent>
 
                 <TabsContent value="info" className="space-y-4">
                   <Card>
