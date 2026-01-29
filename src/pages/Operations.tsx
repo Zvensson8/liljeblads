@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Copy, Download, ClipboardList, FileSpreadsheet, ChevronLeft, ChevronRight, Calendar, Building2 } from "lucide-react";
+import { Loader2, Copy, Download, ClipboardList, FileSpreadsheet, ChevronLeft, ChevronRight, Calendar, Building2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { QuarterCard } from "@/components/operations/QuarterCard";
 import { CategoryDialog } from "@/components/operations/CategoryDialog";
@@ -32,6 +32,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { YearOverview } from "@/components/operations/YearOverview";
+import { QuickReportView } from "@/components/operations/QuickReportView";
 
 interface Property {
   id: string;
@@ -49,6 +51,8 @@ export default function Operations() {
   const [templateLibraryOpen, setTemplateLibraryOpen] = useState(false);
   const [reportGeneratorOpen, setReportGeneratorOpen] = useState(false);
   const [multiPropertyReportOpen, setMultiPropertyReportOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("quarters");
+  const quarterRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -299,49 +303,66 @@ export default function Operations() {
               </div>
 
               {selectedProperty && (
-                <Tabs defaultValue="quarters" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:inline-flex">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
                     <TabsTrigger value="quarters" className="gap-1.5">
                       <Calendar className="h-4 w-4" />
-                      <span>Kvartal</span>
+                      <span className="hidden sm:inline">Kvartal</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="quick-report" className="gap-1.5">
+                      <Zap className="h-4 w-4" />
+                      <span className="hidden sm:inline">Snabbrapportera</span>
                     </TabsTrigger>
                     <TabsTrigger value="year-overview" className="gap-1.5">
                       <ClipboardList className="h-4 w-4" />
-                      <span>Årsöversikt</span>
+                      <span className="hidden sm:inline">Årsöversikt</span>
                     </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="quarters" className="space-y-4 mt-4">
-                    <div className="space-y-4">
+                    {/* 2x2 Grid on desktop, vertical on mobile */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {(["Q1", "Q2", "Q3", "Q4"] as const).map((quarter) => {
                         const property = properties.find(p => p.id === selectedProperty);
                         return (
-                          <QuarterCard
+                          <div
                             key={quarter}
-                            quarter={quarter}
-                            propertyId={selectedProperty}
-                            propertyName={property?.name || ""}
-                            year={selectedYear}
-                          />
+                            ref={(el) => (quarterRefs.current[quarter] = el)}
+                          >
+                            <QuarterCard
+                              quarter={quarter}
+                              propertyId={selectedProperty}
+                              propertyName={property?.name || ""}
+                              year={selectedYear}
+                            />
+                          </div>
                         );
                       })}
                     </div>
                   </TabsContent>
 
+                  <TabsContent value="quick-report" className="mt-4">
+                    <QuickReportView
+                      propertyId={selectedProperty}
+                      year={selectedYear}
+                    />
+                  </TabsContent>
+
                   <TabsContent value="year-overview" className="mt-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Calendar className="h-5 w-5" />
-                          Årsöversikt {selectedYear}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-muted-foreground">
-                          Välj ett kvartal ovan för att se detaljer.
-                        </p>
-                      </CardContent>
-                    </Card>
+                    <YearOverview
+                      propertyId={selectedProperty}
+                      propertyName={properties.find(p => p.id === selectedProperty)?.name || ""}
+                      year={selectedYear}
+                      onQuarterClick={(quarter) => {
+                        setActiveTab("quarters");
+                        setTimeout(() => {
+                          quarterRefs.current[quarter]?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          });
+                        }, 100);
+                      }}
+                    />
                   </TabsContent>
                 </Tabs>
               )}

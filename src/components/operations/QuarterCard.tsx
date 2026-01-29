@@ -30,6 +30,8 @@ import { exportQuarterToExcel } from "@/lib/operationsExport";
 import { ComponentAutoDetect } from "./ComponentAutoDetect";
 import { LinkedComponentCard } from "./LinkedComponentCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { TaskMobileCard } from "./TaskMobileCard";
 
 interface Task {
   id: string;
@@ -74,6 +76,7 @@ interface QuarterCardProps {
 }
 
 export function QuarterCard({ quarter, propertyId, propertyName, year }: QuarterCardProps) {
+  const isMobile = useIsMobile();
   const [expanded, setExpanded] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
@@ -425,6 +428,31 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     fetchTasks();
   };
 
+  const handleMarkTaskComplete = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Optimistic update
+    const updatedTasks = tasks.map(t =>
+      t.id === taskId ? { ...t, reported_count: t.planned_count } : t
+    );
+    setTasks(updatedTasks);
+    calculateStats(updatedTasks);
+
+    const { error } = await supabase
+      .from("drift_tasks")
+      .update({ reported_count: task.planned_count })
+      .eq("id", taskId);
+
+    if (error) {
+      toast.error("Kunde inte uppdatera");
+      fetchTasks();
+      return;
+    }
+
+    toast.success("Uppgift markerad som klar");
+  };
+
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = 
       task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -547,7 +575,28 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
               <div className="text-center py-8 text-muted-foreground">
                 {tasks.length === 0 ? "Inga uppgifter för detta kvartal" : "Inga uppgifter matchar filtret"}
               </div>
+            ) : isMobile ? (
+              /* Mobile card view */
+              <div className="space-y-3">
+                {filteredTasks.map((task) => (
+                  <TaskMobileCard
+                    key={task.id}
+                    task={task}
+                    objects={taskObjects[task.id]}
+                    onToggleReported={(objectId, isReported) =>
+                      handleToggleReported(task.id, objectId, isReported)
+                    }
+                    onMarkComplete={() => handleMarkTaskComplete(task.id)}
+                    onDelete={() => handleDeleteTask(task.id)}
+                    onExpand={() => {
+                      handleToggleTaskExpanded(task.id);
+                    }}
+                    isExpanded={expandedTaskId === task.id}
+                  />
+                ))}
+              </div>
             ) : (
+              /* Desktop table view */
               <Table>
                 <TableHeader>
                   <TableRow>
