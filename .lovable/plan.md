@@ -1,41 +1,42 @@
 
-# Plan: Förbättra fastighetslistan
+# Plan: Förbättra Arbetsordrar-sidan
 
 ## Sammanfattning
-Förenkla fastighetssidan genom att ta bort statistikkorten i toppen och förenkla fastighetskorten så de visar endast den viktigaste informationen. Detta gör sidan renare och lättare att skanna.
+Förenkla arbetsordersidan genom att slå ihop de tre separata tabellerna till en enda tabell, minska antalet kolumner, flytta filter till en popover, och ta bort onödiga knappar. Prioritet visas som färgindikator på raden istället för en egen kolumn.
 
 ## Vad som ändras
 
-### 1. Ta bort statistikkorten (rad 192-234)
-De tre statistikkorten i toppen tas bort helt:
-- "Totalt fastigheter" (redundant - visas redan i headern och som rubrik)
-- "Med ritningar" (sekundär info)
-- "Totalt våningar" (sekundär info)
+### 1. En enda tabell istället för tre
+De tre separata tabellerna (Ej påbörjad, Inväntar offert, Beställt) slås ihop till en enda tabell.
 
-### 2. Förenklade fastighetskort
-Varje kort kommer visa endast:
+### 2. Färre kolumner
 
-| Fält | Beskrivning |
-|------|-------------|
-| **Namn** | Fastighetens namn (rubrik) |
-| **Fastighetsnummer** | Om det finns |
-| **Adress** | Med kartikon |
-| **LOA** | Lokalarea i m² |
+| Före (9 kolumner) | Efter (5 kolumner) |
+|-------------------|-------------------|
+| Fastighet | Åtgärd |
+| Åtgärd | Fastighet |
+| Entreprenör | Status |
+| Pris | Pris |
+| Datum | Datum |
+| Prioritet | _(borttagen - visas som färgindikator)_ |
+| Kvartal | _(borttagen - finns på detaljsidan)_ |
+| Status | |
+| Åtgärder | _(borttagen - klick på rad)_ |
 
-### 3. Vad som tas bort från korten
-- ❌ Byggår
-- ❌ Typ (Kontor, Bostäder etc.)
-- ❌ Area (area_sqm) - behåller endast LOA
-- ❌ Energiklass-badge
-- ❌ Actionknappar (Arbetsorder, Ritningar, Anteckningar)
-- ❌ Edit/Delete knappar (behålls endast delete som hover-state)
+### 3. Prioritet som färgindikator
+Istället för en egen kolumn visas prioritet som en färgad vänsterkant på varje rad:
+- **Hög prioritet**: Röd kant (`border-l-4 border-l-red-500`)
+- **Medel prioritet**: Gul kant (`border-l-4 border-l-yellow-500`)
+- **Låg prioritet**: Grön kant (`border-l-4 border-l-green-500`)
 
-### 4. Tabellvyn uppdateras också
-Tabellvyn förenklas till samma fält:
-- Fastighet (namn + fastighetsnummer)
-- Adress
-- LOA
-- Åtgärder (endast delete)
+### 4. Kompaktare filter
+Filtren flyttas till en "Filter"-knapp som öppnar en Popover istället för att ta upp en hel rad.
+
+### 5. Interaktioner
+- **Klick på rad** → Öppnar detaljdialog
+- **Klick på Status** → Inline-redigering (behålls)
+- **Klick på Pris** → Inline-redigering (behålls)
+- **Ta bort Edit/Delete-knappar** → Redigering sker i detaljdialogen
 
 ## Tekniska detaljer
 
@@ -43,166 +44,204 @@ Tabellvyn förenklas till samma fält:
 
 | Fil | Ändring |
 |-----|---------|
-| `src/pages/Properties.tsx` | Ta bort stats-sektionen, förenkla kort och tabell |
+| `src/pages/WorkOrders.tsx` | En tabell, färre kolumner, filter i popover, färgindikator för prioritet |
 
-### Kodändringar
-
-**1. Ta bort statistikkort (rad 191-235):**
-Hela sektionen med de tre statistikkorten tas bort.
-
-**2. Förenklat kortinnehåll:**
+### Imports som läggs till
 ```tsx
-<Card 
-  key={property.id} 
-  className="group cursor-pointer border-border card-hover animate-scale-in"
-  style={{ animationDelay: `${0.05 * index}s` }}
-  onClick={() => navigate(`/property/${property.id}`)}
->
-  <CardHeader className="pb-3">
-    <div className="flex items-start justify-between">
-      <div className="p-2 rounded-lg bg-primary/10">
-        <Building2 className="h-5 w-5 text-primary" />
-      </div>
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-        onClick={(e) => {
-          e.stopPropagation();
-          setPropertyToDelete(property);
-          setDeleteDialogOpen(true);
-        }}
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
-    </div>
-    <CardTitle className="text-xl group-hover:text-primary transition-colors mt-2">
-      {property.name}
-    </CardTitle>
-    {property.property_number && (
-      <CardDescription className="text-primary/80 font-mono text-sm">
-        {property.property_number}
-      </CardDescription>
-    )}
-  </CardHeader>
-  <CardContent className="space-y-2 pt-0">
-    {property.address && (
-      <div className="flex items-start gap-2 text-sm">
-        <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-        <span className="text-muted-foreground">{property.address}</span>
-      </div>
-    )}
-    {property.loa && (
-      <div className="text-sm">
-        <span className="text-muted-foreground">LOA: </span>
-        <span className="font-medium text-foreground">{property.loa} m²</span>
-      </div>
-    )}
-  </CardContent>
-</Card>
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Filter } from "lucide-react";
 ```
 
-**3. Förenklad tabellvy:**
+### Imports som tas bort
 ```tsx
-<table className="w-full">
-  <thead>
-    <tr className="border-b text-sm text-muted-foreground">
-      <th className="text-left py-3 px-4 font-medium">Fastighet</th>
-      <th className="text-left py-3 px-4 font-medium">Adress</th>
-      <th className="text-left py-3 px-4 font-medium">LOA</th>
-      <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
-    </tr>
-  </thead>
-  <tbody>
-    {filteredProperties.map((property) => (
-      <tr key={property.id} className="border-b hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/property/${property.id}`)}>
-        <td className="py-3 px-4">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-primary" />
-            <div>
-              <div className="font-medium">{property.name}</div>
-              {property.property_number && (
-                <div className="text-xs text-muted-foreground font-mono">
-                  {property.property_number}
-                </div>
-              )}
-            </div>
+// Edit2 behövs inte längre (ingen edit-knapp)
+import { Edit2 } from "lucide-react";
+```
+
+### Ny renderOrdersTable-funktion
+Funktionen förenklas och visar alla ordrar i en enda tabell:
+
+```tsx
+const renderOrdersTable = () => {
+  const allFilteredOrders = filteredOrders(workOrders || []);
+  
+  const getPriorityBorderColor = (priority: string) => {
+    const colors = {
+      high: "border-l-red-500",
+      medium: "border-l-yellow-500",
+      low: "border-l-green-500",
+    };
+    return colors[priority as keyof typeof colors] || "border-l-transparent";
+  };
+
+  return (
+    <Card className="border-border">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg font-medium">
+          Arbetsordrar
+        </CardTitle>
+        <div className="text-sm text-muted-foreground">
+          {allFilteredOrders.length} ordrar
+        </div>
+      </CardHeader>
+      <CardContent>
+        {allFilteredOrders.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+            Inga arbetsordrar
           </div>
-        </td>
-        <td className="py-3 px-4">
-          {property.address ? (
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span>{property.address}</span>
-            </div>
-          ) : '-'}
-        </td>
-        <td className="py-3 px-4 text-sm">
-          {property.loa ? `${property.loa} m²` : '-'}
-        </td>
-        <td className="py-3 px-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-destructive"
-            onClick={(e) => {
-              e.stopPropagation();
-              setPropertyToDelete(property);
-              setDeleteDialogOpen(true);
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b text-sm text-muted-foreground">
+                  <th className="text-left py-3 px-3 font-medium">Åtgärd</th>
+                  <th className="text-left py-3 px-3 font-medium">Fastighet</th>
+                  <th className="text-left py-3 px-3 font-medium">Status</th>
+                  <th className="text-left py-3 px-3 font-medium">Pris</th>
+                  <th className="text-left py-3 px-3 font-medium">Datum</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allFilteredOrders.map((order) => (
+                  <tr 
+                    key={order.id} 
+                    className={`border-b border-l-4 ${getPriorityBorderColor(order.priority)} hover:bg-muted/50 cursor-pointer`}
+                    onClick={() => {
+                      setDetailOrder(order);
+                      setDetailDialogOpen(true);
+                    }}
+                  >
+                    <td className="py-3 px-3 font-medium">{order.action}</td>
+                    <td className="py-3 px-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">🏢</span>
+                        <span>{order.properties?.name}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3">
+                      {/* Inline status editing - behålls */}
+                    </td>
+                    <td className="py-3 px-3">
+                      {/* Inline pris editing - behålls */}
+                    </td>
+                    <td className="py-3 px-3">
+                      {order.due_date
+                        ? format(new Date(order.due_date), "yyyy-MM-dd", { locale: sv })
+                        : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+```
+
+### Filter i Popover
+```tsx
+<Popover>
+  <PopoverTrigger asChild>
+    <Button variant="outline" size="sm" className="h-9">
+      <Filter className="h-4 w-4 mr-2" />
+      Filter
+      {activeFilterCount > 0 && (
+        <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+          {activeFilterCount}
+        </Badge>
+      )}
+    </Button>
+  </PopoverTrigger>
+  <PopoverContent className="w-80 p-4" align="start">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium">Filter</h4>
+        {activeFilterCount > 0 && (
+          <Button variant="ghost" size="sm" onClick={clearAllFilters}>
+            Rensa alla
           </Button>
-        </td>
-      </tr>
-    ))}
-  </tbody>
-</table>
+        )}
+      </div>
+      
+      <div className="space-y-3">
+        <div>
+          <label className="text-sm text-muted-foreground mb-1.5 block">Fastighet</label>
+          <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Alla fastigheter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alla fastigheter</SelectItem>
+              {uniqueProperties.map((property) => (
+                <SelectItem key={property} value={...}>
+                  {property}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div>
+          <label className="text-sm text-muted-foreground mb-1.5 block">Entreprenör</label>
+          <Select value={selectedContractor} onValueChange={setSelectedContractor}>
+            ...
+          </Select>
+        </div>
+        
+        <div>
+          <label className="text-sm text-muted-foreground mb-1.5 block">Status</label>
+          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+            ...
+          </Select>
+        </div>
+      </div>
+    </div>
+  </PopoverContent>
+</Popover>
 ```
 
 ## Visuell jämförelse
 
-**Före (kort):**
+**Före:**
 ```text
-┌─────────────────────────────────────┐
-│ 🏢  [A]                    [✏️] [🗑️]│
-│                                     │
-│ Storgatan 1                         │
-│ FST-2024-001                        │
-├─────────────────────────────────────┤
-│ 📍 Storgatan 1, 123 45 Stockholm    │
-│ 📅 Byggår: 1985                     │
-│ Typ: Kontor                         │
-│ LOA: 2500 m²                        │
-│ Area: 3000 m²                       │
-├─────────────────────────────────────┤
-│ [Arbetsorder] [Ritningar] [Anteckn.]│
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Filter: [Alla fastigheter ▼] [Alla entreprenörer ▼] [Alla statusar ▼] [Rensa]  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ Ej påbörjad ─────────────────────────────────────────────────────────────────┐
+│ Fastighet │ Åtgärd │ Entreprenör │ Pris │ Datum │ Prioritet │ Kvartal │ Status │ Åtgärder │
+├───────────┼────────┼─────────────┼──────┼───────┼───────────┼─────────┼────────┼──────────┤
+│ ...       │ ...    │ ...         │ ...  │ ...   │ [Medel]   │ Q2      │ [...]  │ [✏️][🗑️]│
+└───────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ Inväntar offert ─────────────────────────────────────────────────────────────┐
+│ (samma 9 kolumner igen)                                                        │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ Beställt ────────────────────────────────────────────────────────────────────┐
+│ (samma 9 kolumner igen)                                                        │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Efter (kort):**
+**Efter:**
 ```text
-┌─────────────────────────────────────┐
-│ 🏢                             [🗑️] │
-│                                     │
-│ Storgatan 1                         │
-│ FST-2024-001                        │
-├─────────────────────────────────────┤
-│ 📍 Storgatan 1, 123 45 Stockholm    │
-│ LOA: 2500 m²                        │
-└─────────────────────────────────────┘
-```
+[🔍 Sök...] [Filter (2)] [Arkiverade] [+ Ny Arbetsorder]
 
-## Imports som kan tas bort
-Följande imports blir oanvända och kan tas bort:
-- `Layers` (användes för ritningar-knapp)
-- `Wrench` (användes för arbetsorder-knapp)  
-- `StickyNote` (användes för anteckningar-knapp)
-- `getEnergyGradeColor` (användes för energiklass-badge)
+┌─ Arbetsordrar (12 ordrar) ────────────────────────────────────────┐
+│ Åtgärd           │ Fastighet      │ Status           │ Pris    │ Datum      │
+├──────────────────┼────────────────┼──────────────────┼─────────┼────────────┤
+│ ▌Byt filter      │ 🏢 Storgatan 1 │ [Ej påbörjad ▼]  │ -       │ 2024-03-15 │  ← röd kant (hög)
+│ ▌Serva ventil    │ 🏢 Parkvägen 5 │ [Beställt ▼]     │ 5 400 kr│ 2024-03-20 │  ← gul kant (medel)
+│ ▌Rengöring       │ 🏢 Storgatan 1 │ [Inväntar ▼]     │ -       │ 2024-04-01 │  ← grön kant (låg)
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ## Fördelar
-- Sidan laddar snabbare utan statistik-beräkningar
-- Korten blir ~50% kortare och lättare att skanna
-- Fokus på identifierande information (namn, nummer, adress, LOA)
-- All detaljerad info (byggår, typ, energiklass etc.) finns på detaljsidan
-- Renare visuell hierarki
+- Sidan blir enklare att skanna (en tabell, färre kolumner)
+- Prioritet syns direkt visuellt utan att ta plats
+- Filter tar mindre plats men är fortfarande lättillgängliga
+- Färre klick för att navigera (klick på rad istället för edit-knapp)
+- Fokus på viktig info: Åtgärd, Fastighet, Status, Pris, Datum
