@@ -20,6 +20,32 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { FloorSelector } from '@/components/FloorSelector';
 import { QuickServiceButton } from '@/components/QuickServiceButton';
 import { LastServiceBadge } from '@/components/LastServiceBadge';
+// Type display name mapping
+const getTypeDisplayName = (typeCode: string): string => {
+  const typeMap: Record<string, string> = {
+    'SC1': 'SC1 Styr och övervakningssystem',
+    'SC2.1.1': 'SC2.1.1 Takbeläggningar och Tätskikt',
+    'SC2.3': 'SC2.3 Entréer Portar mm',
+    'SC2.3.1': 'SC2.3.1 Entrépartier Karuselldörrar',
+    'SC2.3.3': 'SC2.3.3 Manuella Portar',
+    'SC2.3.4': 'SC2.3.4 Maskindrivna Portar',
+    'SC2.3.7': 'SC2.3.7 Lastbryggor',
+    'SC2.6.2': 'SC2.6.2 Skyddsrum',
+    'SC4.1.2.5.1': 'SC4.1.2.5.1 Fettavskiljare',
+    'SC4.1.2.5.3': 'SC4.1.2.5.3 Oljeavskiljare',
+    'SC4.1.6.9': 'SC4.1.6.9 Fjärrvärmeväxlare',
+    'SC4.2.4.6': 'SC4.2.4.6 Port Vertikal',
+    'SC4.2.4.7': 'SC4.2.4.7 Port Horisontell',
+    'SC4.5.1': 'SC4.5.1 Kylanläggning',
+    'SC4.6.2.6': 'SC4.6.2.6 Värmepump',
+    'SC4.6.2.6.1': 'SC4.6.2.6.1 Värmeväxlare',
+    'SC4.7': 'SC4.7 Ventsystem',
+    'SC5.5': 'SC5.5 Reserv eller nödkraftsystem',
+    'SC7.1': 'SC7.1 Hiss',
+    'SC7.2': 'SC7.2 Rulltrappor och Rullramper',
+  };
+  return typeMap[typeCode] || typeCode;
+};
 
 interface Component {
   id: string;
@@ -416,104 +442,34 @@ const Components = () => {
                           onClick={() => navigate(`/components/${component.id}`)}
                         >
                       <CardHeader className="pb-2">
-                        <div className="flex justify-between items-start mb-1">
-                          <CardTitle className="text-lg">{component.name}</CardTitle>
-                          <Badge className={getStatusColor(component.status)}>
-                            {getStatusText(component.status)}
-                          </Badge>
-                        </div>
+                        <CardTitle className="text-lg">{component.name}</CardTitle>
                         <CardDescription className="text-sm font-medium text-foreground/70">
-                          {component.type}
+                          {getTypeDisplayName(component.type)}
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-3">
-                        {/* Service badge - always visible */}
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <LastServiceBadge componentId={component.id} />
+                      <CardContent className="pt-0 space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Building2 className="h-4 w-4 text-primary" />
+                          <span>{component.property_name || 'Ej kopplad'}</span>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          {component.manufacturer && (
-                            <div>
-                              <span className="text-muted-foreground">Tillverkare: </span>
-                              <span className="font-medium">{component.manufacturer}</span>
-                            </div>
-                          )}
-                          {component.model && (
-                            <div>
-                              <span className="text-muted-foreground">Modell: </span>
-                              <span className="font-medium">{component.model}</span>
-                            </div>
-                          )}
-                          {component.installation_year && (
-                            <div>
-                              <span className="text-muted-foreground">Installerad: </span>
-                              <span className="font-medium">{component.installation_year}</span>
-                            </div>
-                          )}
-                          {component.room_zone && (
-                            <div>
-                              <span className="text-muted-foreground">Rum: </span>
-                              <span className="font-medium">{component.room_zone}</span>
-                            </div>
-                          )}
-                        </div>
+                        {component.serial_number && (
+                          <div className="text-sm text-muted-foreground">
+                            Serienr: <span className="font-medium text-foreground">{component.serial_number}</span>
+                          </div>
+                        )}
                         
-                        <div className="pt-3 border-t border-border space-y-2">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Building2 className="h-4 w-4 text-primary" />
-                            <span className="font-medium">{component.property_name}</span>
+                        {component.registration_number && (
+                          <div className="text-sm text-muted-foreground">
+                            Regnr: <span className="font-medium text-foreground">{component.registration_number}</span>
                           </div>
-                          
-                          {/* Floor selector - inline */}
-                          <div onClick={(e) => e.stopPropagation()}>
-                            {component.property_id ? (
-                              <FloorSelector
-                                componentId={component.id}
-                                propertyId={component.property_id}
-                                currentFloorId={component.floor_id}
-                                onSuccess={fetchComponents}
-                                compact
-                              />
-                            ) : (
-                              <span className="text-xs text-muted-foreground italic">Ingen fastighet</span>
-                            )}
+                        )}
+                        
+                        {component.installation_year && (
+                          <div className="text-sm text-muted-foreground">
+                            Installerad: <span className="font-medium text-foreground">{component.installation_year}</span>
                           </div>
-                          
-                          {/* Action buttons - always visible now */}
-                          <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-border/50">
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <QuickServiceButton
-                                componentId={component.id}
-                                componentName={component.name}
-                                onSuccess={fetchComponents}
-                              />
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/components/${component.id}`);
-                              }}
-                            >
-                              <Edit className="h-3.5 w-3.5 mr-1" />
-                              Detaljer
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 text-destructive hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteComponent(component.id, component.name);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
+                        )}
                       </CardContent>
                       </Card>
                     ))}
