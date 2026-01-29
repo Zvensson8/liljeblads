@@ -21,7 +21,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const logoutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasWarnedRef = useRef(false);
 
   const signOut = useCallback(async () => {
@@ -36,12 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const resetTimeout = () => {
       hasWarnedRef.current = false;
       
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+      // Clear both timeouts
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+      if (logoutTimeoutRef.current) {
+        clearTimeout(logoutTimeoutRef.current);
       }
 
       // Warn 2 minutes before logout
-      timeoutRef.current = setTimeout(() => {
+      warningTimeoutRef.current = setTimeout(() => {
         if (!hasWarnedRef.current) {
           hasWarnedRef.current = true;
           toast.warning('Du kommer loggas ut om 2 minuter på grund av inaktivitet', {
@@ -50,8 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }, INACTIVITY_TIMEOUT_MS - 2 * 60 * 1000);
 
-      // Actual logout
-      setTimeout(() => {
+      // Actual logout - now properly tracked and cleared on activity
+      logoutTimeoutRef.current = setTimeout(() => {
         toast.info('Du har loggats ut på grund av inaktivitet');
         signOut();
       }, INACTIVITY_TIMEOUT_MS);
@@ -69,8 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       events.forEach(event => {
         window.removeEventListener(event, resetTimeout);
       });
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+      if (logoutTimeoutRef.current) {
+        clearTimeout(logoutTimeoutRef.current);
       }
     };
   }, [session, signOut]);
