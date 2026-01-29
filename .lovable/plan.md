@@ -1,172 +1,145 @@
 
-# Plan: Lägg till JWT-autentisering i twin-webhook
+# Plan: Förbättra komponentlistan - Uppdaterad
 
-## Bakgrund
-Twin.so förväntar sig att kunna använda standard Supabase JWT-tokens (som börjar med `eyJ`), men den nuvarande `twin-webhook` edge function stöder endast egna API-nycklar (som börjar med `lbl_`). 
+## Sammanfattning
+Förenkla komponentkorten så att de visar endast den mest relevanta informationen för snabb scanning. Statusbadgen tas bort och ersätts med installationsår.
 
-## Lösning
-Utöka edge function till att stödja **två autentiseringsmetoder**:
-1. **API-nyckel** via `X-API-Key` header (befintligt) - för externa integrationer med behörighetskontroll
-2. **JWT-token** via `Authorization: Bearer` header (ny) - för autentiserade användare
+## Vad varje kort kommer visa
+
+| Fält | Beskrivning |
+|------|-------------|
+| **Namn** | Komponentens namn (rubrik) |
+| **Typ** | Fullständigt typnamn, t.ex. "SC4.7 Ventsystem" |
+| **Fastighet** | Fastighetens namn med ikon |
+| **Serienummer** | Om det finns |
+| **Regnummer** | Registreringsnummer om det finns |
+| **Installationsår** | Om det finns (nytt fält) |
+
+## Vad som tas bort från kortet
+- ❌ Statusbadge (active/maintenance/inactive)
+- ❌ LastServiceBadge
+- ❌ Tillverkare, Modell, Rum
+- ❌ FloorSelector
+- ❌ QuickServiceButton
+- ❌ Alla actionknappar (Service, Detaljer, Ta bort)
 
 ## Tekniska detaljer
 
-### Autentiseringsflöde (uppdaterat)
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    INKOMMANDE REQUEST                        │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Finns X-API-Key header?                        │
-├──────────────────────────┬──────────────────────────────────┤
-│           JA             │             NEJ                  │
-│    ▼                     │              ▼                   │
-│ Validera lbl_nyckel      │    Finns Authorization header?   │
-│ mot api_keys-tabellen    │              │                   │
-│    ▼                     │    ┌─────────┴─────────┐         │
-│ Hämta org_id från        │   JA                 NEJ         │
-│ api_keys                 │    ▼                  ▼          │
-│    ▼                     │ Validera JWT     401 Unauthorized│
-│ Kolla permissions        │ via getUser()                    │
-│                          │    ▼                             │
-│                          │ Hämta org_id                     │
-│                          │ från profiles                    │
-│                          │    ▼                             │
-│                          │ ALLA permissions                 │
-│                          │ tillåtna                         │
-└──────────────────────────┴──────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  UTFÖR ÅTGÄRD                               │
-└─────────────────────────────────────────────────────────────┘
-```
-
 ### Fil som ändras
+
 | Fil | Ändring |
 |-----|---------|
-| `supabase/functions/twin-webhook/index.ts` | Lägg till JWT-validering som alternativ autentisering |
+| `src/pages/Components.tsx` | Uppdatera kortinnehåll, lägg till typnamn-mappning |
 
 ### Kodändringar
 
-**1. Lägg till ny funktion för JWT-validering:**
+**1. Lägg till typnamn-mappning (baserad på useComponentLibrary):**
 ```typescript
-async function validateJwtToken(
-  supabase: any,
-  authHeader: string
-): Promise<{ organizationId: string; userId: string } | null> {
-  const token = authHeader.replace('Bearer ', '');
-  
-  // Verifiera JWT med getUser
-  const { data: userData, error: userError } = await supabase.auth.getUser(token);
-  
-  if (userError || !userData?.user?.id) {
-    console.error('JWT validation failed:', userError);
-    return null;
-  }
-  
-  // Hämta användarens organisation
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('organization_id')
-    .eq('id', userData.user.id)
-    .single();
-  
-  if (profileError || !profile?.organization_id) {
-    console.error('Profile lookup failed:', profileError);
-    return null;
-  }
-  
-  return {
-    organizationId: profile.organization_id,
-    userId: userData.user.id
+const getTypeDisplayName = (typeCode: string): string => {
+  const typeMap: Record<string, string> = {
+    'SC1': 'SC1 Styr och övervakningssystem',
+    'SC2.1.1': 'SC2.1.1 Takbeläggningar och Tätskikt',
+    'SC2.3': 'SC2.3 Entréer Portar mm',
+    'SC2.3.1': 'SC2.3.1 Entrépartier Karuselldörrar',
+    'SC2.3.3': 'SC2.3.3 Manuella Portar',
+    'SC2.3.4': 'SC2.3.4 Maskindrivna Portar',
+    'SC2.3.7': 'SC2.3.7 Lastbryggor',
+    'SC2.6.2': 'SC2.6.2 Skyddsrum',
+    'SC4.1.2.5.1': 'SC4.1.2.5.1 Fettavskiljare',
+    'SC4.1.2.5.3': 'SC4.1.2.5.3 Oljeavskiljare',
+    'SC4.1.6.9': 'SC4.1.6.9 Fjärrvärmeväxlare',
+    'SC4.2.4.6': 'SC4.2.4.6 Port Vertikal',
+    'SC4.2.4.7': 'SC4.2.4.7 Port Horisontell',
+    'SC4.5.1': 'SC4.5.1 Kylanläggning',
+    'SC4.6.2.6': 'SC4.6.2.6 Värmepump',
+    'SC4.6.2.6.1': 'SC4.6.2.6.1 Värmeväxlare',
+    'SC4.7': 'SC4.7 Ventsystem',
+    'SC5.5': 'SC5.5 Reserv eller nödkraftsystem',
+    'SC7.1': 'SC7.1 Hiss',
+    'SC7.2': 'SC7.2 Rulltrappor och Rullramper',
   };
-}
+  return typeMap[typeCode] || typeCode;
+};
 ```
 
-**2. Uppdatera huvudflödet:**
-```typescript
-// Försök med X-API-Key först
-const apiKey = req.headers.get("x-api-key");
-const authHeader = req.headers.get("authorization");
-
-let organizationId: string;
-let authMethod: "api_key" | "jwt";
-let skipPermissionCheck = false;
-
-if (apiKey) {
-  // Befintlig API-nyckel-validering
-  const apiKeyData = await validateApiKey(supabase, apiKey);
-  if (!apiKeyData) {
-    return new Response(
-      JSON.stringify({ success: false, error: "Invalid or expired API key" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-  organizationId = apiKeyData.organization_id;
-  authMethod = "api_key";
-  
-  // Kolla permissions för API-nycklar
-  if (!hasPermission(apiKeyData, action)) {
-    return new Response(
-      JSON.stringify({ success: false, error: `Permission denied: ${action}` }),
-      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-} else if (authHeader?.startsWith('Bearer ')) {
-  // JWT-autentisering
-  const jwtData = await validateJwtToken(supabase, authHeader);
-  if (!jwtData) {
-    return new Response(
-      JSON.stringify({ success: false, error: "Invalid or expired token" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-  organizationId = jwtData.organizationId;
-  authMethod = "jwt";
-  skipPermissionCheck = true; // JWT-användare har alla rättigheter
-} else {
-  return new Response(
-    JSON.stringify({ 
-      success: false, 
-      error: "Authentication required. Use X-API-Key header or Authorization: Bearer <jwt>" 
-    }),
-    { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}
+**2. Förenklat kortinnehåll:**
+```tsx
+<Card
+  key={component.id}
+  className="group hover:shadow-lg transition-all duration-300 cursor-pointer"
+  onClick={() => navigate(`/components/${component.id}`)}
+>
+  <CardHeader className="pb-2">
+    <CardTitle className="text-lg">{component.name}</CardTitle>
+    <CardDescription className="text-sm font-medium text-foreground/70">
+      {getTypeDisplayName(component.type)}
+    </CardDescription>
+  </CardHeader>
+  <CardContent className="pt-0 space-y-1.5">
+    <div className="flex items-center gap-2 text-sm">
+      <Building2 className="h-4 w-4 text-primary" />
+      <span>{component.property_name || 'Ej kopplad'}</span>
+    </div>
+    
+    {component.serial_number && (
+      <div className="text-sm text-muted-foreground">
+        Serienr: <span className="font-medium text-foreground">{component.serial_number}</span>
+      </div>
+    )}
+    
+    {component.registration_number && (
+      <div className="text-sm text-muted-foreground">
+        Regnr: <span className="font-medium text-foreground">{component.registration_number}</span>
+      </div>
+    )}
+    
+    {component.installation_year && (
+      <div className="text-sm text-muted-foreground">
+        Installerad: <span className="font-medium text-foreground">{component.installation_year}</span>
+      </div>
+    )}
+  </CardContent>
+</Card>
 ```
 
-### Användning för Twin.so
+## Visuell jämförelse
 
-Med denna ändring kan Twin.so konfigurera integrationen på två sätt:
-
-**Alternativ 1: Med JWT (som Twin.so föredrar)**
-```http
-POST /functions/v1/twin-webhook
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-Content-Type: application/json
-
-{
-  "action": "list_properties"
-}
+**Före:**
+```text
+┌─────────────────────────────────────┐
+│ Namn                        [Aktiv] │
+│ SC4.7                               │
+├─────────────────────────────────────┤
+│ ⏰ Senaste service: 2024-01-15      │
+│                                     │
+│ Tillverkare: Carrier                │
+│ Modell: XYZ-123                     │
+│ Installerad: 2019                   │
+│ Rum: Teknikrum                      │
+├─────────────────────────────────────┤
+│ 🏢 Fastighet ABC                    │
+│ [Välj våning ▼]                     │
+├─────────────────────────────────────┤
+│ [Service] [Detaljer] [🗑️]           │
+└─────────────────────────────────────┘
 ```
 
-**Alternativ 2: Med API-nyckel (ursprunglig metod)**
-```http
-POST /functions/v1/twin-webhook
-X-API-Key: lbl_...
-Content-Type: application/json
-
-{
-  "action": "list_properties"
-}
+**Efter:**
+```text
+┌─────────────────────────────────────┐
+│ Namn                                │
+│ SC4.7 Ventsystem                    │
+├─────────────────────────────────────┤
+│ 🏢 Fastighet ABC                    │
+│ Serienr: ABC-12345                  │
+│ Regnr: REG-2024-001                 │
+│ Installerad: 2019                   │
+└─────────────────────────────────────┘
 ```
 
-### Säkerhetsöverväganden
-- JWT-tokens valideras mot Supabase Auth
-- Användaren måste ha en giltig profil med koppling till en organisation
-- JWT-användare får full åtkomst (de är redan autentiserade användare)
-- API-nycklar behåller sin granulära behörighetskontroll
-- Loggning visar vilken autentiseringsmetod som användes
+## Fördelar
+- Korten blir ~60% kortare och lättare att skanna
+- Fokus på identifierande information (serienr, regnr, år)
+- Typnamnet blir begripligt utan att behöva kunna koderna
+- All detaljerad info (status, service, tillverkare etc.) finns på detaljsidan
+- Renare visuell hierarki utan statusbadge
