@@ -74,6 +74,12 @@ const WorkOrders = () => {
   };
 
   const activeCount = (workOrders?.filter((wo) => wo.status !== "archived") || []).length;
+  
+  // Group orders by status
+  const notStarted = workOrders?.filter((wo) => wo.status === "not_started") || [];
+  const awaitingQuote = workOrders?.filter((wo) => wo.status === "awaiting_quote") || [];
+  const ordered = workOrders?.filter((wo) => wo.status === "ordered") || [];
+  const orderedTotal = ordered.reduce((sum, wo) => sum + (Number(wo.price) || 0), 0);
 
   const filteredOrders = (orders: any[]) => {
     let filtered = orders;
@@ -183,25 +189,25 @@ const WorkOrders = () => {
     return colors[priority as keyof typeof colors] || "border-l-transparent";
   };
 
-  const renderUnifiedTable = () => {
-    const allFilteredOrders = filteredOrders(workOrders || []);
-    const totalPrice = allFilteredOrders.reduce((sum, wo) => sum + (Number(wo.price) || 0), 0);
-
+  const renderOrdersTable = (orders: any[], title: string, icon: string, total?: number) => {
+    const tableOrders = filteredOrders(orders);
+    
     return (
       <Card className="border-border">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-medium">
-              Arbetsordrar
+            <CardTitle className="text-lg font-medium flex items-center gap-2">
+              <span>{icon}</span>
+              {title}
             </CardTitle>
             <div className="text-sm text-muted-foreground">
-              {allFilteredOrders.length} ordrar
-              {totalPrice > 0 && ` • ${totalPrice.toLocaleString("sv-SE")} kr`}
+              {tableOrders.length} ordrar
+              {total !== undefined && total > 0 && ` • ${total.toLocaleString("sv-SE")} kr`}
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {allFilteredOrders.length === 0 ? (
+          {tableOrders.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
               Inga arbetsordrar
             </div>
@@ -218,7 +224,7 @@ const WorkOrders = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {allFilteredOrders.map((order) => (
+                  {tableOrders.map((order) => (
                     <tr 
                       key={order.id} 
                       className={`border-b border-l-4 ${getPriorityBorderColor(order.priority)} hover:bg-muted/50 cursor-pointer transition-colors`}
@@ -488,7 +494,11 @@ const WorkOrders = () => {
                   onRefetch={refetch}
                 />
               ) : (
-                renderUnifiedTable()
+                <div className="space-y-4">
+                  {renderOrdersTable(notStarted, "Ej påbörjad", "⏱")}
+                  {renderOrdersTable(awaitingQuote, "Inväntar offert", "⚠️")}
+                  {renderOrdersTable(ordered, "Beställt", "✅", orderedTotal)}
+                </div>
               )}
             </div>
           </main>
