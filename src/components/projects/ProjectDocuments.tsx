@@ -67,6 +67,25 @@ export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumen
   const [selectedDoc, setSelectedDoc] = useState<any>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  // Get signed URL for accessing private storage
+  const getSignedUrl = async (storagePath: string): Promise<string | null> => {
+    // Handle legacy public URLs that contain the full supabase URL
+    if (storagePath.includes('supabase.co')) {
+      // For legacy public URLs, return as-is
+      return storagePath;
+    }
+    
+    const { data, error } = await supabase.storage
+      .from("project-documents")
+      .createSignedUrl(storagePath, 3600); // 1 hour expiry
+    
+    if (error) {
+      console.error("Error creating signed URL:", error);
+      return null;
+    }
+    return data.signedUrl;
+  };
+
   useEffect(() => {
     fetchDocuments();
   }, [projectId]);
@@ -105,15 +124,18 @@ export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumen
     return data || [];
   };
 
-  const uploadFile = async (file: File) => {
+const uploadFile = async (file: File) => {
     setUploading(true);
     try {
       const existingDocs = await getDocumentVersions(file.name);
       const nextVersion = existingDocs.length > 0 ? Math.max(...existingDocs.map(d => d.version || 1)) + 1 : 1;
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
       const fileExt = file.name.split(".").pop();
-      // Use flat structure: projectId-folder-timestamp.ext
-      const filePath = `${projectId}-${selectedFolder.replace(/[^a-zA-Z0-9]/g, '_')}-${Date.now()}.${fileExt}`;
+      // Use path structure: userId/projectId/timestamp.ext for RLS to work
+      const filePath = `${user.id}/${projectId}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("project-documents")
@@ -121,16 +143,14 @@ export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumen
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("project-documents")
-        .getPublicUrl(filePath);
-
+      // Store the file path (not public URL) since bucket is now private
+      // We'll generate signed URLs when accessing the file
       const { error: dbError } = await supabase
         .from("project_documents")
         .insert({
           project_id: projectId,
           name: file.name,
-          file_url: publicUrl,
+          file_url: filePath,
           file_size: file.size,
           mime_type: file.type,
           folder: selectedFolder,
@@ -180,10 +200,21 @@ export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumen
     }
   };
 
-  const handlePreview = async (doc: Document) => {
+const handlePreview = async (doc: Document) => {
     const versions = await getDocumentVersions(doc.name);
-    setSelectedDoc({ ...doc, versions });
+    // Get signed URL for preview
+    const signedUrl = await getSignedUrl(doc.file_url);
+    setSelectedDoc({ ...doc, versions, signedUrl });
     setPreviewOpen(true);
+  };
+
+  const handleDownload = async (doc: Document) => {
+    const signedUrl = await getSignedUrl(doc.file_url);
+    if (signedUrl) {
+      window.open(signedUrl, "_blank");
+    } else {
+      toast.error("Kunde inte hämta dokument");
+    }
   };
 
   const formatFileSize = (bytes: number | null) => {
@@ -299,7 +330,8 @@ export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumen
                         onClick={async () => {
                           const versions = await getDocumentVersions(doc.name);
                           if (versions.length > 1) {
-                            setSelectedDoc({ ...doc, versions });
+                            const signedUrl = await getSignedUrl(doc.file_url);
+                            setSelectedDoc({ ...doc, versions, signedUrl });
                             setPreviewOpen(true);
                           } else {
                             toast.info("Endast en version finns");
@@ -312,7 +344,7 @@ export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumen
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => window.open(doc.file_url, "_blank")}
+                        onClick={() => handleDownload(doc)}
                         title="Ladda ner"
                       >
                         <Download className="h-4 w-4" />
