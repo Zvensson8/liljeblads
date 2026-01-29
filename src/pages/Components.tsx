@@ -362,13 +362,15 @@ const Components = () => {
                       </div>
                       
                       <Select value={filterType} onValueChange={setFilterType}>
-                        <SelectTrigger className="w-[160px] h-9">
-                          <SelectValue placeholder="Komponenttyp" />
+                        <SelectTrigger className="w-[220px] h-9">
+                          <SelectValue placeholder="Komponenttyp">
+                            {filterType !== 'all' ? getTypeDisplayName(filterType) : 'Alla typer'}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Alla typer</SelectItem>
                           {uniqueTypes.map(type => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                            <SelectItem key={type} value={type}>{getTypeDisplayName(type)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
