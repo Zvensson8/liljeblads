@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, Sparkles, MapPin, Trash2, Search, Filter, LayoutGrid, Table as TableIcon, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { getEnergyGradeColor } from '@/lib/energyUtils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PropertyFilterChips } from '@/components/PropertyFilterChips';
 import {
@@ -384,8 +386,17 @@ const Properties = () => {
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
-                          <div className="p-2 rounded-lg bg-primary/10">
-                            <Building2 className="h-5 w-5 text-primary" />
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-lg bg-primary/10">
+                              <Building2 className="h-5 w-5 text-primary" />
+                            </div>
+                            {property.energy_grade && (
+                              <Badge 
+                                className={`${getEnergyGradeColor(property.energy_grade).bg} ${getEnergyGradeColor(property.energy_grade).text} ${getEnergyGradeColor(property.energy_grade).border} border font-bold text-xs px-2 py-0.5`}
+                              >
+                                {property.energy_grade}
+                              </Badge>
+                            )}
                           </div>
                           <Button 
                             variant="ghost" 
@@ -436,6 +447,7 @@ const Properties = () => {
                             <th className="text-left py-3 px-4 font-medium">Fastighet</th>
                             <th className="text-left py-3 px-4 font-medium">Adress</th>
                             <th className="text-left py-3 px-4 font-medium">LOA</th>
+                            <th className="text-left py-3 px-4 font-medium">Energiklass</th>
                             <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
                           </tr>
                         </thead>
@@ -469,6 +481,17 @@ const Properties = () => {
                               </td>
                               <td className="py-3 px-4 text-sm">
                                 {property.loa ? `${property.loa} m²` : '-'}
+                              </td>
+                              <td className="py-3 px-4">
+                                {property.energy_grade ? (
+                                  <Badge 
+                                    className={`${getEnergyGradeColor(property.energy_grade).bg} ${getEnergyGradeColor(property.energy_grade).text} ${getEnergyGradeColor(property.energy_grade).border} border font-bold text-xs px-2 py-0.5`}
+                                  >
+                                    {property.energy_grade}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">-</span>
+                                )}
                               </td>
                               <td className="py-3 px-4">
                                 <Button
