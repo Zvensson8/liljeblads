@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.analyze-protocol]
 verify_jwt = false
+
+[functions.twin-webhook]
+verify_jwt = false

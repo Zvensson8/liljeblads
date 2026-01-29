@@ -19,6 +19,7 @@ import { ProjectTemplates } from "@/components/organization/ProjectTemplates";
 import { NotificationSettings } from "@/components/organization/NotificationSettings";
 import { OrganizationModuleAccess } from "@/components/organization/OrganizationModuleAccess";
 import { OrganizationCapacity } from "@/components/organization/OrganizationCapacity";
+import { OrganizationApiKeys } from "@/components/organization/OrganizationApiKeys";
 
 
 interface Organization {
@@ -203,6 +204,7 @@ export default function OrganizationSettings() {
                 <TabsTrigger value="members">Medlemmar</TabsTrigger>
                 {isAdmin && <TabsTrigger value="capacity">Kapacitet</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="module-access">Modulåtkomst</TabsTrigger>}
+                {isAdmin && <TabsTrigger value="integrations">Integrationer</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="invitations">Inbjudningar</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="audit">Säkerhetslogg</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="branding">Varumärke</TabsTrigger>}
@@ -236,6 +238,12 @@ export default function OrganizationSettings() {
               {isAdmin && (
                 <TabsContent value="module-access">
                   <OrganizationModuleAccess />
+                </TabsContent>
+              )}
+
+              {isAdmin && (
+                <TabsContent value="integrations">
+                  <OrganizationApiKeys organizationId={organization.id} />
                 </TabsContent>
               )}
 
