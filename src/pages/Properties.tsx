@@ -7,9 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, Sparkles, MapPin, Layers, Trash2, Search, Filter, Wrench, StickyNote, LayoutGrid, Table as TableIcon, Loader2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { getEnergyGradeColor } from '@/lib/energyUtils';
+import { Building2, Plus, Sparkles, MapPin, Trash2, Search, Filter, LayoutGrid, Table as TableIcon, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PropertyFilterChips } from '@/components/PropertyFilterChips';
 import {
@@ -188,50 +186,6 @@ const Properties = () => {
 
           <main className="flex-1 overflow-auto pb-20 md:pb-0">
             <div className="container mx-auto px-4 md:px-6 py-4 md:py-8">
-              {/* Stats Bar */}
-              <div className="grid gap-4 md:grid-cols-3 mb-8 animate-fade-in">
-                <Card className="border-border/50 bg-gradient-to-br from-blue-500/10 to-blue-600/5 hover-scale">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Totalt fastigheter</p>
-                        <p className="text-3xl font-bold">{properties.length}</p>
-                      </div>
-                      <div className="p-3 rounded-lg bg-blue-500/20">
-                        <Building2 className="h-6 w-6 text-blue-500" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="border-border/50 bg-gradient-to-br from-green-500/10 to-green-600/5 hover-scale">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Med ritningar</p>
-                        <p className="text-3xl font-bold">{properties.filter(p => p.floors && p.floors.length > 0).length}</p>
-                      </div>
-                      <div className="p-3 rounded-lg bg-green-500/20">
-                        <MapPin className="h-6 w-6 text-green-500" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="border-border/50 bg-gradient-to-br from-purple-500/10 to-purple-600/5 hover-scale">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Totalt våningar</p>
-                        <p className="text-3xl font-bold">
-                          {properties.reduce((acc, p) => acc + (p.floors?.length || 0), 0)}
-                        </p>
-                      </div>
-                      <div className="p-3 rounded-lg bg-purple-500/20">
-                        <Layers className="h-6 w-6 text-purple-500" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
               
               {/* Search and Filter Bar */}
               <div className="space-y-4 mb-8 animate-fade-in" style={{ animationDelay: '0.1s' }}>
@@ -429,47 +383,24 @@ const Properties = () => {
                       onClick={() => navigate(`/property/${property.id}`)}
                     >
                       <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className="p-2 rounded-lg bg-primary/10">
-                              <Building2 className="h-5 w-5 text-primary" />
-                            </div>
-                            {property.energy_grade && (
-                              <Badge 
-                                className={`${getEnergyGradeColor(property.energy_grade).bg} ${getEnergyGradeColor(property.energy_grade).text} ${getEnergyGradeColor(property.energy_grade).border} border font-bold text-xs px-2 py-0.5`}
-                              >
-                                {property.energy_grade}
-                              </Badge>
-                            )}
+                        <div className="flex items-start justify-between">
+                          <div className="p-2 rounded-lg bg-primary/10">
+                            <Building2 className="h-5 w-5 text-primary" />
                           </div>
-                          <div className="flex gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/property/${property.id}`);
-                              }}
-                            >
-                              <span className="sr-only">Redigera</span>
-                              ✏️
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPropertyToDelete(property);
-                                setDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPropertyToDelete(property);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <CardTitle className="text-xl group-hover:text-primary transition-colors">
+                        <CardTitle className="text-xl group-hover:text-primary transition-colors mt-2">
                           {property.name}
                         </CardTitle>
                         {property.property_number && (
@@ -478,77 +409,19 @@ const Properties = () => {
                           </CardDescription>
                         )}
                       </CardHeader>
-                      <CardContent className="space-y-3">
+                      <CardContent className="space-y-2 pt-0">
                         {property.address && (
                           <div className="flex items-start gap-2 text-sm">
                             <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                             <span className="text-muted-foreground">{property.address}</span>
                           </div>
                         )}
-                        {property.construction_year && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <span className="text-muted-foreground">📅</span>
-                            <span className="text-muted-foreground">Byggår: {property.construction_year}</span>
-                          </div>
-                        )}
-                        {property.property_type && (
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Typ: </span>
-                            <span className="text-foreground">{property.property_type}</span>
-                          </div>
-                        )}
                         {property.loa && (
                           <div className="text-sm">
                             <span className="text-muted-foreground">LOA: </span>
-                            <span className="text-foreground">{property.loa} m²</span>
+                            <span className="font-medium text-foreground">{property.loa} m²</span>
                           </div>
                         )}
-                        {property.area_sqm && (
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Area: </span>
-                            <span className="text-foreground">{property.area_sqm} m²</span>
-                          </div>
-                        )}
-                        <div className="pt-3 mt-3 border-t border-border/50">
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 gap-1.5 min-w-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate('/work-orders', { state: { propertyId: property.id } });
-                              }}
-                            >
-                              <Wrench className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">Arbetsorder</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 gap-1.5 min-w-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/property/${property.id}?tab=drawings`);
-                              }}
-                            >
-                              <Layers className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">Ritningar</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 gap-1.5 min-w-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/property/${property.id}?tab=notes`);
-                              }}
-                            >
-                              <StickyNote className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">Anteckn.</span>
-                            </Button>
-                          </div>
-                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -562,9 +435,7 @@ const Properties = () => {
                           <tr className="border-b text-sm text-muted-foreground">
                             <th className="text-left py-3 px-4 font-medium">Fastighet</th>
                             <th className="text-left py-3 px-4 font-medium">Adress</th>
-                            <th className="text-left py-3 px-4 font-medium">Typ</th>
-                            <th className="text-left py-3 px-4 font-medium">Byggår</th>
-                            <th className="text-left py-3 px-4 font-medium">Energiklass</th>
+                            <th className="text-left py-3 px-4 font-medium">LOA</th>
                             <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
                           </tr>
                         </thead>
@@ -594,49 +465,24 @@ const Properties = () => {
                                     <MapPin className="h-4 w-4 text-muted-foreground" />
                                     <span>{property.address}</span>
                                   </div>
-                                ) : (
-                                  '-'
-                                )}
+                                ) : '-'}
                               </td>
-                              <td className="py-3 px-4 text-sm">{property.property_type || '-'}</td>
-                              <td className="py-3 px-4 text-sm">{property.construction_year || '-'}</td>
-                              <td className="py-3 px-4">
-                                {property.energy_grade ? (
-                                  <Badge 
-                                    className={`${getEnergyGradeColor(property.energy_grade).bg} ${getEnergyGradeColor(property.energy_grade).text} ${getEnergyGradeColor(property.energy_grade).border} border font-bold text-xs px-2 py-0.5`}
-                                  >
-                                    {property.energy_grade}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground text-sm">-</span>
-                                )}
+                              <td className="py-3 px-4 text-sm">
+                                {property.loa ? `${property.loa} m²` : '-'}
                               </td>
                               <td className="py-3 px-4">
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigate(`/property/${property.id}`);
-                                    }}
-                                  >
-                                    <span>✏️</span>
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setPropertyToDelete(property);
-                                      setDeleteDialogOpen(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPropertyToDelete(property);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </td>
                             </tr>
                           ))}
