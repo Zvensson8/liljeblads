@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { generateYearReport } from '@/lib/reportUtils';
 import { exportComponentsToExcel } from '@/lib/exportUtils';
+import { createWorkbook, addJsonSheet, downloadWorkbook } from '@/lib/excelUtils';
 
 interface Property {
   id: string;
@@ -158,23 +159,20 @@ export const ReportGeneratorDialog = ({
     if (error) throw error;
 
     if (workOrders) {
-      const XLSX = await import('xlsx');
-      const ws = XLSX.utils.json_to_sheet(
-        workOrders.map((wo: any) => ({
-          'Åtgärd': wo.action,
-          'Status': wo.status,
-          'Prioritet': wo.priority,
-          'Entreprenör': wo.contractor || '-',
-          'Pris': wo.price || 0,
-          'Förfallodatum': wo.due_date || '-',
-          'Skapad': new Date(wo.created_at).toLocaleDateString('sv-SE'),
-          'Kommentarer': wo.comments || '-',
-        }))
-      );
+      const wb = createWorkbook();
+      const data = workOrders.map((wo: any) => ({
+        'Åtgärd': wo.action,
+        'Status': wo.status,
+        'Prioritet': wo.priority,
+        'Entreprenör': wo.contractor || '-',
+        'Pris': wo.price || 0,
+        'Förfallodatum': wo.due_date || '-',
+        'Skapad': new Date(wo.created_at).toLocaleDateString('sv-SE'),
+        'Kommentarer': wo.comments || '-',
+      }));
 
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Arbetsordrar');
-      XLSX.writeFile(wb, `Arbetsordrar_${property.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      addJsonSheet(wb, 'Arbetsordrar', data);
+      await downloadWorkbook(wb, `Arbetsordrar_${property.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
   };
 
@@ -191,21 +189,18 @@ export const ReportGeneratorDialog = ({
     if (error) throw error;
 
     if (costs) {
-      const XLSX = await import('xlsx');
-      const ws = XLSX.utils.json_to_sheet(
-        costs.map((cost: any) => ({
-          'Projekt': cost.projects?.name || '-',
-          'Beskrivning': cost.description,
-          'Belopp': cost.amount,
-          'Kategori': cost.category || '-',
-          'Aktör': cost.actor || '-',
-          'Datum': new Date(cost.cost_date).toLocaleDateString('sv-SE'),
-        }))
-      );
+      const wb = createWorkbook();
+      const data = costs.map((cost: any) => ({
+        'Projekt': cost.projects?.name || '-',
+        'Beskrivning': cost.description,
+        'Belopp': cost.amount,
+        'Kategori': cost.category || '-',
+        'Aktör': cost.actor || '-',
+        'Datum': new Date(cost.cost_date).toLocaleDateString('sv-SE'),
+      }));
 
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Kostnader');
-      XLSX.writeFile(wb, `Kostnadsanalys_${property.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      addJsonSheet(wb, 'Kostnader', data);
+      await downloadWorkbook(wb, `Kostnadsanalys_${property.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
   };
 

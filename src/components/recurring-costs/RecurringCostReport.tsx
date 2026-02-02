@@ -11,7 +11,7 @@ import { FileDown, Loader2, FileText, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
+import { createWorkbook, addAoASheet, downloadWorkbook } from "@/lib/excelUtils";
 import { RecurringCost, calculatePaymentDates, groupByQuarter } from "@/lib/recurringCostUtils";
 
 interface Property {
@@ -254,7 +254,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
     toast.success("PDF-rapport genererad");
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     if (!reportData) return;
 
     const worksheetData: any[] = [];
@@ -303,11 +303,10 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
       });
     });
 
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Återkommande Kostnader");
+    const wb = createWorkbook();
+    addAoASheet(wb, "Återkommande Kostnader", worksheetData);
 
-    XLSX.writeFile(workbook, `återkommande-kostnader-${startQuarter}-${endQuarter}.xlsx`);
+    await downloadWorkbook(wb, `återkommande-kostnader-${startQuarter}-${endQuarter}.xlsx`);
     toast.success("Excel-rapport genererad");
   };
 

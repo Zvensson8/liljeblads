@@ -1,7 +1,7 @@
-import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "@/integrations/supabase/client";
+import { createWorkbook, addJsonSheet, downloadWorkbook } from "./excelUtils";
 
 interface Task {
   id: string;
@@ -72,7 +72,7 @@ export async function generateYearReport(
     }
 
     if (format === "excel") {
-      const wb = XLSX.utils.book_new();
+      const wb = createWorkbook();
 
       // Summary sheet
       const summaryData = quarters.map((q) => {
@@ -93,23 +93,20 @@ export async function generateYearReport(
         };
       });
 
-      const summaryWs = XLSX.utils.json_to_sheet(summaryData);
-      XLSX.utils.book_append_sheet(wb, summaryWs, "Sammanfattning");
+      addJsonSheet(wb, "Sammanfattning", summaryData);
 
       // All tasks sheet
-      const allTasksWs = XLSX.utils.json_to_sheet(allData);
-      XLSX.utils.book_append_sheet(wb, allTasksWs, "Alla uppgifter");
+      addJsonSheet(wb, "Alla uppgifter", allData);
 
       // Quarter-specific sheets
       quarters.forEach((q) => {
         const qData = allData.filter((d) => d.Kvartal === q);
         if (qData.length > 0) {
-          const ws = XLSX.utils.json_to_sheet(qData);
-          XLSX.utils.book_append_sheet(wb, ws, q);
+          addJsonSheet(wb, q, qData);
         }
       });
 
-      XLSX.writeFile(wb, `${propertyName}_Årsrapport_${year}.xlsx`);
+      await downloadWorkbook(wb, `${propertyName}_Årsrapport_${year}.xlsx`);
     } else {
       // PDF format
       const doc = new jsPDF();
@@ -199,7 +196,7 @@ export async function generateCategoryReport(
     }, {});
 
     if (format === "excel") {
-      const wb = XLSX.utils.book_new();
+      const wb = createWorkbook();
 
       // Category summary
       const summaryData = Object.entries(grouped).map(([cat, tasks]: any) => {
@@ -218,8 +215,7 @@ export async function generateCategoryReport(
         };
       });
 
-      const summaryWs = XLSX.utils.json_to_sheet(summaryData);
-      XLSX.utils.book_append_sheet(wb, summaryWs, "Sammanfattning");
+      addJsonSheet(wb, "Sammanfattning", summaryData);
 
       // Detailed sheets per category
       Object.entries(grouped).forEach(([cat, tasks]: any) => {
@@ -235,15 +231,10 @@ export async function generateCategoryReport(
               ? "Klar"
               : "Pågår",
         }));
-        const ws = XLSX.utils.json_to_sheet(taskData);
-        XLSX.utils.book_append_sheet(
-          wb,
-          ws,
-          cat.substring(0, 31)
-        ); // Excel sheet name limit
+        addJsonSheet(wb, cat.substring(0, 31), taskData);
       });
 
-      XLSX.writeFile(
+      await downloadWorkbook(
         wb,
         `${propertyName}_Kategorirapport_${quarter}_${year}.xlsx`
       );
@@ -357,11 +348,10 @@ export async function generateDeviationReport(
     }));
 
     if (format === "excel") {
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(reportData);
-      XLSX.utils.book_append_sheet(wb, ws, "Avvikelser");
+      const wb = createWorkbook();
+      addJsonSheet(wb, "Avvikelser", reportData);
 
-      XLSX.writeFile(wb, `${propertyName}_Avvikelser_${year}.xlsx`);
+      await downloadWorkbook(wb, `${propertyName}_Avvikelser_${year}.xlsx`);
     } else {
       const doc = new jsPDF();
 

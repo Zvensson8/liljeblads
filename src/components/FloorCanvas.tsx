@@ -256,20 +256,22 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
 
     canvas.on('mouse:move', (e) => {
       // Handle panning with Space or Pan tool
-      if (isPanning && e.pointer) {
+      // Fabric v7: use getScenePoint() or scenePoint instead of pointer
+      const scenePoint = e.scenePoint || (e as any).pointer;
+      if (isPanning && scenePoint) {
         const vpt = canvas.viewportTransform;
         if (vpt) {
-          vpt[4] += e.pointer.x - panStart.current.x;
-          vpt[5] += e.pointer.y - panStart.current.y;
+          vpt[4] += scenePoint.x - panStart.current.x;
+          vpt[5] += scenePoint.y - panStart.current.y;
           canvas.requestRenderAll();
-          panStart.current = { x: e.pointer.x, y: e.pointer.y };
+          panStart.current = { x: scenePoint.x, y: scenePoint.y };
         }
         return;
       }
 
       // Handle hover effect for components
       const target: any = e.target;
-      if (target && target.componentId && e.pointer) {
+      if (target && target.componentId && scenePoint) {
         target.set({ 
           strokeWidth: 4,
           stroke: '#2563eb',
@@ -372,13 +374,15 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
 
     canvas.on('mouse:down', (e) => {
       // Enable panning with Space key or Pan tool or middle mouse button
+      // Fabric v7: use scenePoint instead of pointer
+      const scenePoint = e.scenePoint || (e as any).pointer;
       const isMiddleButton = e.e instanceof MouseEvent && e.e.button === 1;
-      if ((activeTool === 'pan' || spacePressed || isMiddleButton) && e.pointer) {
+      if ((activeTool === 'pan' || spacePressed || isMiddleButton) && scenePoint) {
         if (isMiddleButton) {
           e.e.preventDefault();
         }
         setIsPanning(true);
-        panStart.current = { x: e.pointer.x, y: e.pointer.y };
+        panStart.current = { x: scenePoint.x, y: scenePoint.y };
         canvas.selection = false;
         canvas.defaultCursor = 'grabbing';
       }
