@@ -1,5 +1,5 @@
-import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
+import { createWorkbook, addAoASheet, downloadWorkbook } from "./excelUtils";
 
 interface ExportTask {
   name: string;
@@ -73,7 +73,7 @@ export async function exportQuarterToExcel(
   );
 
   // Create workbook
-  const wb = XLSX.utils.book_new();
+  const wb = createWorkbook();
 
   // Summary sheet
   const summaryData = [
@@ -107,8 +107,7 @@ export async function exportQuarterToExcel(
     ],
   ];
 
-  const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-  XLSX.utils.book_append_sheet(wb, summarySheet, "Sammanfattning");
+  addAoASheet(wb, "Sammanfattning", summaryData);
 
   // Tasks overview sheet
   const tasksData = [
@@ -122,8 +121,7 @@ export async function exportQuarterToExcel(
     ]),
   ];
 
-  const tasksSheet = XLSX.utils.aoa_to_sheet(tasksData);
-  XLSX.utils.book_append_sheet(wb, tasksSheet, "Uppgifter");
+  addAoASheet(wb, "Uppgifter", tasksData);
 
   // Detailed objects sheet
   const objectsData = [
@@ -142,14 +140,13 @@ export async function exportQuarterToExcel(
     });
   });
 
-  const objectsSheet = XLSX.utils.aoa_to_sheet(objectsData);
-  XLSX.utils.book_append_sheet(wb, objectsSheet, "Objekt");
+  addAoASheet(wb, "Objekt", objectsData);
 
   // Generate filename and download
   const filename = `Drift_${propertyName}_${year}_${quarter}_${
     new Date().toISOString().split("T")[0]
   }.xlsx`;
-  XLSX.writeFile(wb, filename);
+  await downloadWorkbook(wb, filename);
 }
 
 export async function exportYearToExcel(
@@ -158,10 +155,10 @@ export async function exportYearToExcel(
   year: number
 ) {
   const quarters = ["Q1", "Q2", "Q3", "Q4"];
-  const wb = XLSX.utils.book_new();
+  const wb = createWorkbook();
 
   // Summary for all quarters
-  const yearSummaryData: any[] = [
+  const yearSummaryData: any[][] = [
     ["Årssammanfattning - Driftuppföljning"],
     ["Fastighet:", propertyName],
     ["År:", year.toString()],
@@ -197,8 +194,7 @@ export async function exportYearToExcel(
     }
   }
 
-  const summarySheet = XLSX.utils.aoa_to_sheet(yearSummaryData);
-  XLSX.utils.book_append_sheet(wb, summarySheet, "Årsöversikt");
+  addAoASheet(wb, "Årsöversikt", yearSummaryData);
 
   // Export each quarter to separate sheet
   for (const quarter of quarters) {
@@ -231,13 +227,12 @@ export async function exportYearToExcel(
         ]);
       }
 
-      const sheet = XLSX.utils.aoa_to_sheet(tasksData);
-      XLSX.utils.book_append_sheet(wb, sheet, quarter);
+      addAoASheet(wb, quarter, tasksData);
     }
   }
 
   const filename = `Drift_${propertyName}_${year}_Årssammanfattning_${
     new Date().toISOString().split("T")[0]
   }.xlsx`;
-  XLSX.writeFile(wb, filename);
+  await downloadWorkbook(wb, filename);
 }

@@ -1,8 +1,9 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
+import { createWorkbook, addJsonSheet, downloadWorkbook } from './excelUtils';
 
 interface Component {
   id: string;
@@ -31,12 +32,12 @@ interface MaintenanceRecord {
   notes: string | null;
 }
 
-export const exportComponentsToExcel = (
+export const exportComponentsToExcel = async (
   components: Component[],
   maintenanceRecords: Record<string, MaintenanceRecord[]>,
   filename: string
 ) => {
-  const wb = XLSX.utils.book_new();
+  const wb = createWorkbook();
   
   // Components sheet
   const componentsData = components.map(comp => ({
@@ -56,8 +57,7 @@ export const exportComponentsToExcel = (
     'Köldmedietyp': comp.refrigerant_type || '-',
   }));
   
-  const wsComponents = XLSX.utils.json_to_sheet(componentsData);
-  XLSX.utils.book_append_sheet(wb, wsComponents, 'Komponenter');
+  addJsonSheet(wb, 'Komponenter', componentsData);
   
   // Maintenance history sheet
   const maintenanceData: any[] = [];
@@ -76,11 +76,10 @@ export const exportComponentsToExcel = (
   });
   
   if (maintenanceData.length > 0) {
-    const wsMaintenance = XLSX.utils.json_to_sheet(maintenanceData);
-    XLSX.utils.book_append_sheet(wb, wsMaintenance, 'Underhållshistorik');
+    addJsonSheet(wb, 'Underhållshistorik', maintenanceData);
   }
   
-  XLSX.writeFile(wb, filename);
+  await downloadWorkbook(wb, filename);
 };
 
 export const exportComponentsToPDF = (

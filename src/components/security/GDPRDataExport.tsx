@@ -4,7 +4,7 @@ import { Download, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
+import { createWorkbook, addJsonSheet, downloadWorkbook } from '@/lib/excelUtils';
 
 export const GDPRDataExport = () => {
   const [loading, setLoading] = useState(false);
@@ -33,41 +33,35 @@ export const GDPRDataExport = () => {
       ]);
 
       // Create workbook
-      const wb = XLSX.utils.book_new();
+      const wb = createWorkbook();
 
       // Add sheets for each data type
       if (profile) {
-        const profileWs = XLSX.utils.json_to_sheet([profile]);
-        XLSX.utils.book_append_sheet(wb, profileWs, 'Profil');
+        addJsonSheet(wb, 'Profil', [profile]);
       }
 
       if (properties && properties.length > 0) {
-        const propertiesWs = XLSX.utils.json_to_sheet(properties);
-        XLSX.utils.book_append_sheet(wb, propertiesWs, 'Fastigheter');
+        addJsonSheet(wb, 'Fastigheter', properties);
       }
 
       if (components && components.length > 0) {
-        const componentsWs = XLSX.utils.json_to_sheet(components);
-        XLSX.utils.book_append_sheet(wb, componentsWs, 'Komponenter');
+        addJsonSheet(wb, 'Komponenter', components);
       }
 
       if (workOrders && workOrders.length > 0) {
-        const workOrdersWs = XLSX.utils.json_to_sheet(workOrders);
-        XLSX.utils.book_append_sheet(wb, workOrdersWs, 'Arbetsordrar');
+        addJsonSheet(wb, 'Arbetsordrar', workOrders);
       }
 
       if (projects && projects.length > 0) {
-        const projectsWs = XLSX.utils.json_to_sheet(projects);
-        XLSX.utils.book_append_sheet(wb, projectsWs, 'Projekt');
+        addJsonSheet(wb, 'Projekt', projects);
       }
 
       if (todos && todos.length > 0) {
-        const todosWs = XLSX.utils.json_to_sheet(todos);
-        XLSX.utils.book_append_sheet(wb, todosWs, 'Todos');
+        addJsonSheet(wb, 'Todos', todos);
       }
 
       // Download the file
-      XLSX.writeFile(wb, `Min_Data_GDPR_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+      await downloadWorkbook(wb, `Min_Data_GDPR_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
       
       toast.success('Data exporterad!');
     } catch (error) {
