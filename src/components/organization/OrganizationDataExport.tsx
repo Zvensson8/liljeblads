@@ -5,9 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Download, Database, Loader2 } from "lucide-react";
+import { Download, Database, Loader2, FileText, FileSpreadsheet } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
+import { createWorkbook, addJsonSheet, downloadWorkbook } from "@/lib/excelUtils";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { format } from "date-fns";
+import { sv } from "date-fns/locale";
 
 interface OrganizationDataExportProps {
   organizationId: string;
@@ -19,9 +24,124 @@ interface Property {
   address: string | null;
 }
 
+type ExportFormat = "zip" | "xlsx" | "pdf";
+
+const SECTION_LABELS: Record<string, string> = {
+  organization: "Organisation",
+  properties: "Fastigheter",
+  floors: "Våningsplan",
+  property_contacts: "Kontakter",
+  property_notes: "Anteckningar",
+  property_todos: "Att göra",
+  components: "Komponenter",
+  component_purchase_info: "Komponentinköp",
+  maintenance_history: "Underhåll",
+  projects: "Projekt",
+  project_budget: "Projektbudget",
+  project_costs: "Projektkostnader",
+  project_checklist: "Projektchecklista",
+  project_activity: "Projektaktivitet",
+  work_orders: "Arbetsordrar",
+  recurring_costs: "Återkommande kostnader",
+  drift_categories: "Driftkategorier",
+  drift_tasks: "Driftuppgifter",
+  drift_task_components: "Driftkomponenter",
+  component_documents: "Komponentdokument",
+  property_documents: "Fastighetsdokument",
+  project_documents: "Projektdokument",
+};
+
+function downloadZip(zipData: string, filename: string) {
+  const binaryString = atob(zipData);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: "application/zip" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${filename}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+async function exportRawAsXlsx(rawData: any, filename: string) {
+  const wb = createWorkbook();
+  const sections = Object.keys(SECTION_LABELS);
+
+  for (const key of sections) {
+    const data = rawData[key];
+    if (!data) continue;
+    const arr = Array.isArray(data) ? data : [data];
+    if (arr.length === 0) continue;
+    addJsonSheet(wb, SECTION_LABELS[key], arr);
+  }
+
+  await downloadWorkbook(wb, `${filename}.xlsx`);
+}
+
+function addPdfSection(doc: jsPDF, title: string, records: Record<string, any>[], startY: number): number {
+  if (!records.length) return startY;
+  const headers = Object.keys(records[0]).filter(h => !h.endsWith("_id") && h !== "id");
+  if (headers.length === 0) return startY;
+
+  const body = records.map(r =>
+    headers.map(h => {
+      const v = r[h];
+      if (v === null || v === undefined) return "-";
+      return String(v).substring(0, 50);
+    })
+  );
+
+  if (startY > 250) {
+    doc.addPage();
+    startY = 20;
+  }
+
+  doc.setFontSize(13);
+  doc.text(title, 14, startY);
+
+  autoTable(doc, {
+    startY: startY + 4,
+    head: [headers.map(h => SECTION_LABELS[h] || h.replace(/_/g, " "))],
+    body,
+    theme: "grid",
+    headStyles: { fillColor: [59, 130, 246], fontSize: 6 },
+    styles: { fontSize: 5, cellPadding: 1.5 },
+  });
+
+  return (doc as any).lastAutoTable.finalY + 10;
+}
+
+function exportRawAsPdf(rawData: any, filename: string, orgName: string) {
+  const doc = new jsPDF({ orientation: "landscape" });
+
+  doc.setFontSize(18);
+  doc.text(`Dataexport - ${orgName}`, 14, 20);
+  doc.setFontSize(10);
+  doc.text(`Genererad: ${format(new Date(), "PPP", { locale: sv })}`, 14, 28);
+
+  let y = 38;
+  const sections = Object.keys(SECTION_LABELS);
+
+  for (const key of sections) {
+    const data = rawData[key];
+    if (!data) continue;
+    const arr = Array.isArray(data) ? data : [data];
+    if (arr.length === 0) continue;
+    y = addPdfSection(doc, SECTION_LABELS[key], arr, y);
+  }
+
+  doc.save(`${filename}.pdf`);
+}
+
 export function OrganizationDataExport({ organizationId }: OrganizationDataExportProps) {
   const [loading, setLoading] = useState(false);
   const [exportType, setExportType] = useState<"all" | "user" | "properties">("all");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("zip");
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>([]);
   const [members, setMembers] = useState<any[]>([]);
@@ -41,7 +161,6 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
         .from("organization_members")
         .select("user_id, profiles(id, email, full_name)")
         .eq("organization_id", organizationId);
-
       if (error) throw error;
       setMembers(data || []);
     } catch (error: any) {
@@ -60,7 +179,6 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
         .select("id, name, address")
         .eq("organization_id", organizationId)
         .order("name");
-
       if (error) throw error;
       setProperties(data || []);
     } catch (error: any) {
@@ -92,7 +210,6 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
       toast.error("Välj minst en fastighet att exportera");
       return;
     }
-
     if (exportType === "user" && !selectedUserId) {
       toast.error("Välj en användare att exportera");
       return;
@@ -100,9 +217,7 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
 
     setLoading(true);
     try {
-      // Get current session to ensure we have auth token
       const { data: { session } } = await supabase.auth.getSession();
-      
       if (!session) {
         toast.error("Du måste vara inloggad för att exportera data");
         return;
@@ -119,29 +234,38 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
 
       if (error) throw error;
 
-      // Download the ZIP file
-      const binaryString = atob(data.zipData);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: 'application/zip' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = data.filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const baseFilename = data.filename;
+      const orgName = data.rawData?.organization?.name || "Organisation";
 
-      toast.success(`Data exporterad! Totalt ${data.summary.properties_count} fastigheter, ${data.summary.components_count} komponenter, ${data.summary.projects_count} projekt`);
+      if (exportFormat === "zip") {
+        downloadZip(data.zipData, baseFilename);
+      } else if (exportFormat === "xlsx") {
+        await exportRawAsXlsx(data.rawData, baseFilename);
+      } else {
+        exportRawAsPdf(data.rawData, baseFilename, orgName);
+      }
+
+      toast.success(
+        `Data exporterad som ${exportFormat.toUpperCase()}! Totalt ${data.summary.properties_count} fastigheter, ${data.summary.components_count} komponenter, ${data.summary.projects_count} projekt`
+      );
     } catch (error: any) {
       console.error("Export error:", error);
       toast.error("Kunde inte exportera data: " + error.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatIcon = {
+    zip: <Download className="h-4 w-4 mr-2" />,
+    xlsx: <FileSpreadsheet className="h-4 w-4 mr-2" />,
+    pdf: <FileText className="h-4 w-4 mr-2" />,
+  };
+
+  const formatLabel = {
+    zip: "ZIP (textfiler)",
+    xlsx: "Excel (.xlsx)",
+    pdf: "PDF",
   };
 
   return (
@@ -152,45 +276,54 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
           Exportera organisationsdata
         </CardTitle>
         <CardDescription>
-          Exportera all data för organisationen eller en specifik användare till en ZIP-fil.
-          Använd detta för att ta ut er data eller för backup-syfte.
+          Exportera all data för organisationen eller en specifik användare.
+          Välj format: ZIP med textfiler, Excel eller PDF.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <Alert>
           <AlertDescription>
-            Exporten inkluderar: Fastigheter, våningsplan, komponenter, projekt, arbetsordrar, 
+            Exporten inkluderar: Fastigheter, våningsplan, komponenter, projekt, arbetsordrar,
             kostnader, drift/underhåll, dokument och all annan relaterad data.
           </AlertDescription>
         </Alert>
 
         <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block">
-              Välj export-typ
-            </label>
-            <Select value={exportType} onValueChange={(value: any) => setExportType(value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All organisationsdata</SelectItem>
-                <SelectItem value="properties">Specifika fastigheter</SelectItem>
-                <SelectItem value="user">Specifik användare</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Export-typ</label>
+              <Select value={exportType} onValueChange={(value: any) => setExportType(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All organisationsdata</SelectItem>
+                  <SelectItem value="properties">Specifika fastigheter</SelectItem>
+                  <SelectItem value="user">Specifik användare</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Filformat</label>
+              <Select value={exportFormat} onValueChange={(value: any) => setExportFormat(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="zip">ZIP (textfiler)</SelectItem>
+                  <SelectItem value="xlsx">Excel (.xlsx)</SelectItem>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {exportType === "properties" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Välj fastigheter</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={toggleAllProperties}
-                >
+                <Button type="button" variant="ghost" size="sm" onClick={toggleAllProperties}>
                   {selectedPropertyIds.length === properties.length ? "Avmarkera alla" : "Markera alla"}
                 </Button>
               </div>
@@ -255,12 +388,7 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
             </div>
           )}
 
-          <Button
-            onClick={handleExport}
-            disabled={loading}
-            className="w-full"
-            size="lg"
-          >
+          <Button onClick={handleExport} disabled={loading} className="w-full" size="lg">
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -268,8 +396,8 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
               </>
             ) : (
               <>
-                <Download className="h-4 w-4 mr-2" />
-                Exportera till ZIP
+                {formatIcon[exportFormat]}
+                Exportera som {formatLabel[exportFormat]}
               </>
             )}
           </Button>
