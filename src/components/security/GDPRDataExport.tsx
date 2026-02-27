@@ -1,74 +1,117 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, FileText, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { createWorkbook, addJsonSheet, downloadWorkbook } from '@/lib/excelUtils';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { format } from 'date-fns';
+import { sv } from 'date-fns/locale';
+
+type ExportFormat = 'xlsx' | 'pdf';
+
+const fetchUserData = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const [
+    { data: profile },
+    { data: properties },
+    { data: components },
+    { data: workOrders },
+    { data: projects },
+    { data: todos },
+  ] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('properties').select('*').eq('owner_id', user.id),
+    supabase.from('components').select('*').eq('property_id', user.id),
+    supabase.from('work_orders').select('*'),
+    supabase.from('projects').select('*'),
+    supabase.from('property_todos').select('*'),
+  ]);
+
+  return { profile, properties, components, workOrders, projects, todos };
+};
+
+const exportAsXlsx = async (data: Awaited<ReturnType<typeof fetchUserData>>) => {
+  const wb = createWorkbook();
+  if (data.profile) addJsonSheet(wb, 'Profil', [data.profile]);
+  if (data.properties?.length) addJsonSheet(wb, 'Fastigheter', data.properties);
+  if (data.components?.length) addJsonSheet(wb, 'Komponenter', data.components);
+  if (data.workOrders?.length) addJsonSheet(wb, 'Arbetsordrar', data.workOrders);
+  if (data.projects?.length) addJsonSheet(wb, 'Projekt', data.projects);
+  if (data.todos?.length) addJsonSheet(wb, 'Todos', data.todos);
+  await downloadWorkbook(wb, `Min_Data_GDPR_Export_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+};
+
+const addPdfTable = (doc: jsPDF, title: string, records: Record<string, any>[], startY: number): number => {
+  if (!records.length) return startY;
+
+  const headers = Object.keys(records[0]);
+  const body = records.map(r => headers.map(h => {
+    const v = r[h];
+    return v === null || v === undefined ? '-' : String(v).substring(0, 60);
+  }));
+
+  if (startY > 250) {
+    doc.addPage();
+    startY = 20;
+  }
+
+  doc.setFontSize(13);
+  doc.text(title, 14, startY);
+
+  autoTable(doc, {
+    startY: startY + 4,
+    head: [headers],
+    body,
+    theme: 'grid',
+    headStyles: { fillColor: [59, 130, 246], fontSize: 7 },
+    styles: { fontSize: 6, cellPadding: 2 },
+    columnStyles: headers.reduce((acc, _, i) => ({ ...acc, [i]: { cellWidth: 'auto' } }), {}),
+  });
+
+  return (doc as any).lastAutoTable.finalY + 12;
+};
+
+const exportAsPdf = (data: Awaited<ReturnType<typeof fetchUserData>>) => {
+  const doc = new jsPDF({ orientation: 'landscape' });
+  doc.setFontSize(18);
+  doc.text('GDPR Dataexport', 14, 20);
+  doc.setFontSize(10);
+  doc.text(`Genererad: ${format(new Date(), 'PPP', { locale: sv })}`, 14, 28);
+
+  let y = 38;
+  if (data.profile) y = addPdfTable(doc, 'Profil', [data.profile], y);
+  if (data.properties?.length) y = addPdfTable(doc, 'Fastigheter', data.properties, y);
+  if (data.components?.length) y = addPdfTable(doc, 'Komponenter', data.components, y);
+  if (data.workOrders?.length) y = addPdfTable(doc, 'Arbetsordrar', data.workOrders, y);
+  if (data.projects?.length) y = addPdfTable(doc, 'Projekt', data.projects, y);
+  if (data.todos?.length) y = addPdfTable(doc, 'Todos', data.todos, y);
+
+  doc.save(`Min_Data_GDPR_Export_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+};
 
 export const GDPRDataExport = () => {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<ExportFormat | null>(null);
 
-  const handleExportData = async () => {
-    setLoading(true);
+  const handleExport = async (fmt: ExportFormat) => {
+    setLoading(fmt);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // Fetch all user data from various tables
-      const [
-        { data: profile },
-        { data: properties },
-        { data: components },
-        { data: workOrders },
-        { data: projects },
-        { data: todos },
-      ] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase.from('properties').select('*').eq('owner_id', user.id),
-        supabase.from('components').select('*').eq('property_id', user.id),
-        supabase.from('work_orders').select('*'),
-        supabase.from('projects').select('*'),
-        supabase.from('property_todos').select('*'),
-      ]);
-
-      // Create workbook
-      const wb = createWorkbook();
-
-      // Add sheets for each data type
-      if (profile) {
-        addJsonSheet(wb, 'Profil', [profile]);
+      const data = await fetchUserData();
+      if (fmt === 'xlsx') {
+        await exportAsXlsx(data);
+      } else {
+        exportAsPdf(data);
       }
-
-      if (properties && properties.length > 0) {
-        addJsonSheet(wb, 'Fastigheter', properties);
-      }
-
-      if (components && components.length > 0) {
-        addJsonSheet(wb, 'Komponenter', components);
-      }
-
-      if (workOrders && workOrders.length > 0) {
-        addJsonSheet(wb, 'Arbetsordrar', workOrders);
-      }
-
-      if (projects && projects.length > 0) {
-        addJsonSheet(wb, 'Projekt', projects);
-      }
-
-      if (todos && todos.length > 0) {
-        addJsonSheet(wb, 'Todos', todos);
-      }
-
-      // Download the file
-      await downloadWorkbook(wb, `Min_Data_GDPR_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
-      
       toast.success('Data exporterad!');
     } catch (error) {
       console.error('Export failed:', error);
       toast.error('Kunde inte exportera data');
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   };
 
@@ -81,21 +124,26 @@ export const GDPRDataExport = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Button onClick={handleExportData} disabled={loading}>
-          {loading ? (
-            <>
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={() => handleExport('xlsx')} disabled={!!loading}>
+            {loading === 'xlsx' ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Exporterar...
-            </>
-          ) : (
-            <>
+            ) : (
               <Download className="h-4 w-4 mr-2" />
-              Exportera all min data
-            </>
-          )}
-        </Button>
+            )}
+            Exportera som Excel
+          </Button>
+          <Button variant="outline" onClick={() => handleExport('pdf')} disabled={!!loading}>
+            {loading === 'pdf' ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4 mr-2" />
+            )}
+            Exportera som PDF
+          </Button>
+        </div>
         <p className="text-sm text-muted-foreground mt-4">
-          Exporten inkluderar din profil, fastigheter, komponenter, arbetsordrar, projekt och todos i Excel-format.
+          Exporten inkluderar din profil, fastigheter, komponenter, arbetsordrar, projekt och todos.
         </p>
       </CardContent>
     </Card>
