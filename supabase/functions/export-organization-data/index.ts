@@ -1155,13 +1155,14 @@ ${i + 1}. ${doc.name || 'Namnlöst dokument'}
     // Generate ZIP as base64
     const zipBase64 = await zip.generateAsync({ type: 'base64' });
 
-    // Return the ZIP file
+    // Return the ZIP file + raw JSON data for client-side XLSX/PDF generation
     return new Response(
       JSON.stringify({
         success: true,
         zipData: zipBase64,
-        filename: `${baseFilename}.zip`,
+        filename: baseFilename,
         summary: exportData.summary,
+        rawData: exportData,
       }),
       {
         headers: {
