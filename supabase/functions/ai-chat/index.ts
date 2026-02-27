@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -123,6 +124,15 @@ serve(async (req) => {
     
     const userId = userData.user.id;
     console.log(`Authenticated user: ${userId}`);
+
+    // Rate limiting: 20 requests per minute for ai-chat
+    const rateResult = await checkRateLimit(userId, {
+      endpoint: 'ai-chat',
+      maxRequests: 20,
+      windowSeconds: 60,
+    });
+    const rateLimited = rateLimitResponse(rateResult, corsHeaders);
+    if (rateLimited) return rateLimited;
 
     // Use service role for data access
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
