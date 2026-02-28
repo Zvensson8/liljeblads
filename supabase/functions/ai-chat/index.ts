@@ -178,23 +178,109 @@ serve(async (req) => {
         const foundMaintenanceIds = new Set<string>();
         const foundWorkOrderIds = new Set<string>();
         
-        // Get all properties and components for user's organization
+        // Get all properties with full details for user's organization
         const { data: orgProperties } = await supabase
           .from('properties')
-          .select('id, name')
+          .select('id, name, address, property_number, area_sqm, type, year_built, floors_count')
           .eq('organization_id', verifiedOrgId);
         const orgPropertyIds = orgProperties?.map(p => p.id) || [];
         const propertyNameMap = new Map(orgProperties?.map(p => [p.id, p.name]) || []);
         
-        // Get all component IDs for the organization's properties
+        // Get all components with details for the organization's properties
         const { data: orgComponents } = await supabase
           .from('components')
-          .select('id, name, property_id')
+          .select('id, name, property_id, type, status, manufacturer, model, installation_year, next_service_date')
           .in('property_id', orgPropertyIds);
         const orgComponentIds = orgComponents?.map(c => c.id) || [];
         const componentNameMap = new Map(orgComponents?.map(c => [c.id, c.name]) || []);
         const componentPropertyMap = new Map(orgComponents?.map(c => [c.id, c.property_id]) || []);
         
+        // ============================================
+        // OVERVIEW: Always include organization summary
+        // ============================================
+        if (orgProperties && orgProperties.length > 0) {
+          let overview = `🏢 ORGANISATIONSÖVERSIKT:`;
+          overview += `\n  Antal fastigheter: ${orgProperties.length}`;
+          overview += `\n  Antal komponenter: ${orgComponentIds.length}`;
+          for (const prop of orgProperties) {
+            overview += `\n\n  📍 ${prop.name}`;
+            if (prop.address) overview += ` — ${prop.address}`;
+            if (prop.property_number) overview += ` (${prop.property_number})`;
+            if (prop.area_sqm) overview += `\n    Yta: ${prop.area_sqm} m²`;
+            if (prop.year_built) overview += `, Byggår: ${prop.year_built}`;
+            if (prop.type) overview += `, Typ: ${prop.type}`;
+            
+            const propComponents = orgComponents?.filter(c => c.property_id === prop.id) || [];
+            if (propComponents.length > 0) {
+              overview += `\n    Komponenter (${propComponents.length}):`;
+              for (const comp of propComponents.slice(0, 15)) {
+                overview += `\n      - ${comp.name} (${comp.type || 'Ej angiven typ'})`;
+                if (comp.status && comp.status !== 'active') overview += ` [${comp.status}]`;
+                if (comp.next_service_date) overview += ` — nästa service: ${comp.next_service_date}`;
+              }
+              if (propComponents.length > 15) {
+                overview += `\n      ... och ${propComponents.length - 15} fler`;
+              }
+            }
+          }
+          contextParts.push(overview);
+        }
+
+        // ============================================
+        // SEMANTIC SEARCH: Use vector embeddings for relevance
+        // ============================================
+        try {
+          const embeddingResponse = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'text-embedding-3-small',
+              input: lastUserMessage.content,
+            }),
+          });
+          
+          if (embeddingResponse.ok) {
+            const embeddingData = await embeddingResponse.json();
+            const queryEmbedding = embeddingData?.data?.[0]?.embedding;
+            
+            if (queryEmbedding) {
+              const { data: vectorResults, error: vecError } = await supabase.rpc('semantic_search_ranked', {
+                query_embedding: JSON.stringify(queryEmbedding),
+                match_threshold: 0.25,
+                match_count: 20,
+                org_id: verifiedOrgId,
+                boost_recent: true,
+                boost_popular: true
+              });
+              
+              if (!vecError && vectorResults && vectorResults.length > 0) {
+                console.log(`Semantic search returned ${vectorResults.length} results`);
+                let semanticInfo = `🔎 SEMANTISK SÖKNING (mest relevant data för frågan):`;
+                for (const r of vectorResults.slice(0, 12)) {
+                  semanticInfo += `\n\n  [${r.source_table}] (relevans: ${(r.final_score * 100).toFixed(0)}%)`;
+                  semanticInfo += `\n  ${r.content.substring(0, 500)}`;
+                  
+                  if (r.source_table === 'properties') foundPropertyIds.add(r.source_id);
+                  if (r.source_table === 'components') foundComponentIds.add(r.source_id);
+                  if (r.source_table === 'projects') foundProjectIds.add(r.source_id);
+                  if (r.source_table === 'maintenance_history') foundMaintenanceIds.add(r.source_id);
+                  if (r.source_table === 'work_orders') foundWorkOrderIds.add(r.source_id);
+                }
+                contextParts.push(semanticInfo);
+              } else if (vecError) {
+                console.error('Semantic search error:', vecError);
+              }
+            }
+          } else {
+            console.log('Embedding generation skipped, falling back to text search only');
+          }
+        } catch (semErr) {
+          console.error('Semantic search failed:', semErr);
+        }
+
         // ============================================
         // SEARCH 1: Maintenance History by Year/Terms
         // ============================================
@@ -502,7 +588,7 @@ serve(async (req) => {
         // ============================================
         // SEARCH 5: Property Contacts
         // ============================================
-        if (searchTerms.some(t => ['kontakt', 'kontakter', 'telefon', 'email', 'ansvarig'].includes(t.toLowerCase())) && orgPropertyIds.length > 0) {
+        if (searchTerms.some(t => ['kontakt', 'kontakter', 'telefon', 'email', 'ansvarig', 'leverantör', 'entreprenör', 'firma', 'ring', 'nå', 'person'].includes(t.toLowerCase())) && orgPropertyIds.length > 0) {
           const { data: contacts, error: contactsError } = await supabase
             .from('property_contacts')
             .select('*, property:properties(name)')
@@ -541,7 +627,7 @@ serve(async (req) => {
         // ============================================
         // SEARCH 6: Recurring Costs
         // ============================================
-        if (searchTerms.some(t => ['kostnad', 'kostnader', 'löpande', 'månadsvis', 'avtalet', 'avtal'].includes(t.toLowerCase())) && orgPropertyIds.length > 0) {
+        if (searchTerms.some(t => ['kostnad', 'kostnader', 'löpande', 'månadsvis', 'avtalet', 'avtal', 'faktura', 'budget', 'pris', 'betala', 'hyra', 'el', 'vatten', 'värme', 'försäkring', 'driftskostnad'].includes(t.toLowerCase())) && orgPropertyIds.length > 0) {
           const { data: recurringCosts, error: rcError } = await supabase
             .from('recurring_costs')
             .select('*, property:properties(name), account_code:account_codes(code, name)')
@@ -590,7 +676,7 @@ serve(async (req) => {
         // ============================================
         // SEARCH 7: Property Notes
         // ============================================
-        if (searchTerms.some(t => ['anteckning', 'anteckningar', 'notering', 'noteringar'].includes(t.toLowerCase())) && orgPropertyIds.length > 0) {
+        if (searchTerms.some(t => ['anteckning', 'anteckningar', 'notering', 'noteringar', 'kommentar', 'kommentarer', 'info', 'historik'].includes(t.toLowerCase())) && orgPropertyIds.length > 0) {
           const { data: notes, error: notesError } = await supabase
             .from('property_notes')
             .select('*, property:properties(name)')
@@ -627,7 +713,7 @@ serve(async (req) => {
         // ============================================
         // SEARCH 8: Todos
         // ============================================
-        if (searchTerms.some(t => ['todo', 'todos', 'göra', 'uppgift', 'uppgifter', 'checklist'].includes(t.toLowerCase())) && orgPropertyIds.length > 0) {
+        if (searchTerms.some(t => ['todo', 'todos', 'göra', 'uppgift', 'uppgifter', 'checklist', 'påminnelse', 'deadline', 'förfaller', 'planerat', 'agenda'].includes(t.toLowerCase())) && orgPropertyIds.length > 0) {
           const { data: todos, error: todosError } = await supabase
             .from('property_todos')
             .select('*, property:properties(name)')
@@ -690,6 +776,72 @@ serve(async (req) => {
           }
         }
         
+        // ============================================
+        // ALWAYS: Recent activity summary (no keywords needed)
+        // ============================================
+        if (orgPropertyIds.length > 0) {
+          // Recent work orders (last 30 days)
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          const { data: recentWOs } = await supabase
+            .from('work_orders')
+            .select('id, action, status, priority, created_at, due_date, property:properties(name)')
+            .in('property_id', orgPropertyIds)
+            .gte('created_at', thirtyDaysAgo)
+            .order('created_at', { ascending: false })
+            .limit(10);
+          
+          if (recentWOs && recentWOs.length > 0) {
+            const newWOs = recentWOs.filter(wo => !foundWorkOrderIds.has(wo.id));
+            if (newWOs.length > 0) {
+              let recentInfo = `📋 SENASTE ARBETSORDRAR (30 dagar):`;
+              for (const wo of newWOs) {
+                recentInfo += `\n  - ${wo.action} (${wo.property?.name || '?'}) — ${wo.status}${wo.priority ? `, prio: ${wo.priority}` : ''}`;
+              }
+              contextParts.push(recentInfo);
+            }
+          }
+          
+          // Upcoming todos
+          const { data: upcomingTodos } = await supabase
+            .from('property_todos')
+            .select('id, title, due_date, priority, completed, property:properties(name)')
+            .in('property_id', orgPropertyIds)
+            .eq('completed', false)
+            .order('due_date', { ascending: true })
+            .limit(10);
+          
+          if (upcomingTodos && upcomingTodos.length > 0) {
+            let todoInfo = `⏰ KOMMANDE ATT-GÖRA (ej avklarade):`;
+            for (const t of upcomingTodos) {
+              todoInfo += `\n  - ${t.title} (${t.property?.name || '?'})`;
+              if (t.due_date) todoInfo += ` — deadline: ${t.due_date}`;
+              if (t.priority) todoInfo += ` [${t.priority}]`;
+            }
+            contextParts.push(todoInfo);
+          }
+          
+          // Active projects
+          const { data: activeProjects } = await supabase
+            .from('projects')
+            .select('id, name, status, budget, actual_cost, start_date, end_date, property:properties(name)')
+            .in('property_id', orgPropertyIds)
+            .in('status', ['pagaende', 'planerat'])
+            .limit(10);
+          
+          if (activeProjects && activeProjects.length > 0) {
+            const newProjects = activeProjects.filter(p => !foundProjectIds.has(p.id));
+            if (newProjects.length > 0) {
+              let projInfo = `🚧 AKTIVA/PLANERADE PROJEKT:`;
+              for (const p of newProjects) {
+                projInfo += `\n  - ${p.name} (${p.property?.name || '?'}) — ${p.status}`;
+                if (p.budget) projInfo += `, budget: ${p.budget.toLocaleString('sv-SE')} kr`;
+                if (p.actual_cost) projInfo += `, utfall: ${p.actual_cost.toLocaleString('sv-SE')} kr`;
+              }
+              contextParts.push(projInfo);
+            }
+          }
+        }
+
         // Combine context
         if (contextParts.length > 0) {
           contextInfo = `\n\n--- RELEVANT DATA FRÅN SYSTEMET ---\n${contextParts.join('\n\n')}\n--- SLUT PÅ DATA ---`;
@@ -762,38 +914,36 @@ serve(async (req) => {
     ];
 
     // Build system prompt with action instructions
-    const systemPrompt = `Du är en AI-assistent för fastighetssystemet. Du hjälper användare att hitta information om fastigheter, komponenter, underhåll, arbetsordrar, projekt och driftuppgifter.
+    const systemPrompt = `Du är en expert AI-assistent för fastighetsförvaltning. Du har tillgång till organisationens alla data: fastigheter, komponenter, underhållshistorik, arbetsordrar, projekt, driftuppgifter, kontakter, löpande kostnader, anteckningar och att-göra-listor.
 
 VIKTIGA REGLER:
 1. Svara ALLTID på svenska
-2. Var konkret och hänvisa till specifika data när du har det
-3. Om du hittar serviceprotokoll med mätvärden, lyft fram dessa tydligt
-4. Skillnad mellan DRIFTUPPGIFTER (kvartalsvis, räknas i antal) och ATT GÖRA (todos med deadline)
-5. Formatera svar tydligt med rubriker och punktlistor
-6. Om information saknas, förklara vad som behövs
+2. Var KONKRET och SPECIFIK — referera alltid till faktisk data, namn, siffror och datum
+3. Om du har data, presentera den strukturerat med siffror och detaljer. Generiska svar utan datagrund är oacceptabla.
+4. Om serviceprotokoll finns, lyft fram mätvärden, avvikelser och rekommendationer
+5. Skillnad mellan DRIFTUPPGIFTER (kvartalsvis återkommande underhåll, räknas i antal) och ATT GÖRA (todos med deadline)
+6. Om information saknas i den medföljande datan, säg EXAKT vilken data som saknas och föreslå hur användaren kan komplettera
+7. Vid frågor om översikter/status — ge alltid siffror (antal, kronor, procent)
+8. Jämför gärna mot tidsperioder eller andra fastigheter om data finns
+
+DATAKVALITET:
+- Under "ORGANISATIONSÖVERSIKT" ser du alla fastigheter och komponenter i systemet
+- Under "SEMANTISK SÖKNING" visas data som bäst matchar användarens fråga
+- Under specifika sökningar (UNDERHÅLL, ARBETSORDRAR, etc.) finns detaljerad data
+- Använd ALLTID denna data som grund — gissa aldrig
 
 ÅTGÄRDSFÖRSLAG:
-När du identifierar konkreta behov i konversationen, använd verktygen för att föreslå åtgärder:
-- suggest_work_order: Om det behövs en reparation eller underhållsåtgärd
-- suggest_maintenance: Om en komponent behöver service
-- suggest_todo: Om det finns en uppgift som bör följas upp
+Använd verktygen för att föreslå åtgärder:
+- suggest_work_order: Reparationer eller underhåll som behövs
+- suggest_maintenance: Komponent som behöver service
+- suggest_todo: Uppgifter att följa upp
 
-Var PROAKTIV men FÖRSIKTIG - föreslå bara åtgärder när:
-- Användaren beskriver ett problem som kräver en åtgärd
-- Det finns tydliga tecken på att något behöver göras
-- Du är minst 70% säker (confidence >= 0.7)
-
-Inkludera alltid en tydlig "reasoning" på svenska som förklarar varför du föreslår åtgärden.
+Var PROAKTIV men kräv minst 70% säkerhet (confidence >= 0.7).
 
 SVARSFORMAT för servicerapporter:
-📊 SAMMANFATTNING
-- Översikt av utfört arbete
-
-🔍 MÄTVÄRDEN
-- Lista specifika mätvärden från protokoll
-
-⚠️ AVVIKELSER & REKOMMENDATIONER
-- Notera eventuella problem eller rekommendationer
+📊 SAMMANFATTNING — Översikt av utfört arbete
+🔍 MÄTVÄRDEN — Specifika mätvärden från protokoll
+⚠️ AVVIKELSER & REKOMMENDATIONER — Problem och åtgärdsförslag
 
 ${contextInfo}`;
 
