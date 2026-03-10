@@ -71,7 +71,7 @@ async function buildContext(
   // 1. Org overview with properties & components
   const { data: props, error: propsError } = await supabase
     .from('properties')
-    .select('id, name, address, property_number, area_sqm, type, year_built')
+    .select('id, name, address, property_number, area_sqm, property_type, construction_year')
     .eq('organization_id', orgId);
   
   if (propsError) console.error('Properties query error:', propsError.message);
