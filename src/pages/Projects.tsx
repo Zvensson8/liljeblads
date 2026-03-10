@@ -72,7 +72,7 @@ export default function Projects() {
   const [loading, setLoading] = useState(false);
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
