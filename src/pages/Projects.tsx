@@ -89,7 +89,7 @@ export default function Projects() {
     if (!authLoading && !user) {
       navigate("/auth");
     } else if (user && organization) {
-      fetchProjects(showArchived);
+      fetchProjects(activeTab === "archived");
       fetchProperties();
       
       // Check if we should open edit dialog from URL
@@ -98,7 +98,7 @@ export default function Projects() {
         handleEditFromUrl(editId);
       }
     }
-  }, [user, authLoading, navigate, showArchived, searchParams, organization]);
+  }, [user, authLoading, navigate, activeTab, searchParams, organization]);
 
   const handleEditFromUrl = async (projectId: string) => {
     try {
