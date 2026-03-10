@@ -479,10 +479,12 @@ serve(async (req) => {
     let contextInfo = '';
     if (lastUserMsg?.content) {
       try {
+        console.log(`Building context for org: ${orgId}, msg: "${lastUserMsg.content.substring(0, 50)}"`);
         contextInfo = await buildContext(supabase, orgId, lastUserMsg.content);
         console.log(`Context built (${contextInfo.length} chars)`);
       } catch (e) {
-        console.error('Context build error:', e);
+        console.error('Context build error:', e instanceof Error ? e.message : e);
+        console.error('Context build stack:', e instanceof Error ? e.stack : '');
       }
     }
 
