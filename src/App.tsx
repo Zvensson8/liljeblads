@@ -90,8 +90,8 @@ const AppContent = () => {
 import { queryClient } from './lib/queryClient';
 
 const App = () => (
-  <ErrorBoundary>
-    <ThemeProvider>
+  <ThemeProvider>
+    <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
@@ -105,8 +105,8 @@ const App = () => (
           </BrowserRouter>
         </TooltipProvider>
       </QueryClientProvider>
-    </ThemeProvider>
-  </ErrorBoundary>
+    </ErrorBoundary>
+  </ThemeProvider>
 );
 
 export default App;
