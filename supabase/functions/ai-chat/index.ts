@@ -69,10 +69,14 @@ async function buildContext(
   const parts: string[] = [];
 
   // 1. Org overview with properties & components
-  const { data: props } = await supabase
+  const { data: props, error: propsError } = await supabase
     .from('properties')
-    .select('id, name, address, property_number, area_sqm, type, year_built')
+    .select('id, name, address, property_number, area_sqm, property_type, construction_year')
     .eq('organization_id', orgId);
+  
+  if (propsError) console.error('Properties query error:', propsError.message);
+  console.log(`Properties found: ${props?.length || 0} for org ${orgId}`);
+  
   const propIds = props?.map(p => p.id) || [];
   const propMap = new Map(props?.map(p => [p.id, p.name]) || []);
 
@@ -93,7 +97,7 @@ async function buildContext(
       if (p.address) ov += ` — ${p.address}`;
       if (p.property_number) ov += ` (${p.property_number})`;
       if (p.area_sqm) ov += `\n    Yta: ${p.area_sqm} m²`;
-      if (p.year_built) ov += `, Byggår: ${p.year_built}`;
+      if (p.construction_year) ov += `, Byggår: ${p.construction_year}`;
       const pc = comps.filter(c => c.property_id === p.id);
       if (pc.length > 0) {
         ov += `\n    Komponenter (${pc.length}):`;
@@ -479,10 +483,12 @@ serve(async (req) => {
     let contextInfo = '';
     if (lastUserMsg?.content) {
       try {
+        console.log(`Building context for org: ${orgId}, msg: "${lastUserMsg.content.substring(0, 50)}"`);
         contextInfo = await buildContext(supabase, orgId, lastUserMsg.content);
         console.log(`Context built (${contextInfo.length} chars)`);
       } catch (e) {
-        console.error('Context build error:', e);
+        console.error('Context build error:', e instanceof Error ? e.message : e);
+        console.error('Context build stack:', e instanceof Error ? e.stack : '');
       }
     }
 
