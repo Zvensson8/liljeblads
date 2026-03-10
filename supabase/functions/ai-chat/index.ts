@@ -69,10 +69,14 @@ async function buildContext(
   const parts: string[] = [];
 
   // 1. Org overview with properties & components
-  const { data: props } = await supabase
+  const { data: props, error: propsError } = await supabase
     .from('properties')
     .select('id, name, address, property_number, area_sqm, type, year_built')
     .eq('organization_id', orgId);
+  
+  if (propsError) console.error('Properties query error:', propsError.message);
+  console.log(`Properties found: ${props?.length || 0} for org ${orgId}`);
+  
   const propIds = props?.map(p => p.id) || [];
   const propMap = new Map(props?.map(p => [p.id, p.name]) || []);
 
