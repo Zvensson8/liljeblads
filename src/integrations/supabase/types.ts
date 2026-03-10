@@ -2518,6 +2518,7 @@ export type Database = {
           reminder_email: string | null
           title: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           category?: string | null
@@ -2534,6 +2535,7 @@ export type Database = {
           reminder_email?: string | null
           title: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           category?: string | null
@@ -2550,6 +2552,7 @@ export type Database = {
           reminder_email?: string | null
           title?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {

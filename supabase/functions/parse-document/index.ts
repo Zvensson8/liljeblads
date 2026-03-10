@@ -3,23 +3,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Parse Supabase storage URL to extract bucket and path
 function parseStorageUrl(url: string): { bucket: string; path: string } | null {
-  // Match pattern: /storage/v1/object/public/{bucket}/{path}
-  // or: /storage/v1/object/{bucket}/{path}
   const publicMatch = url.match(/\/storage\/v1\/object\/public\/([^\/]+)\/(.+)$/);
-  if (publicMatch) {
-    return { bucket: publicMatch[1], path: publicMatch[2] };
-  }
-  
+  if (publicMatch) return { bucket: publicMatch[1], path: publicMatch[2] };
   const privateMatch = url.match(/\/storage\/v1\/object\/([^\/]+)\/(.+)$/);
-  if (privateMatch) {
-    return { bucket: privateMatch[1], path: privateMatch[2] };
-  }
-  
+  if (privateMatch) return { bucket: privateMatch[1], path: privateMatch[2] };
   return null;
 }
 
@@ -29,6 +20,32 @@ serve(async (req) => {
   }
 
   try {
+    // 1. Validate authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: userData, error: userError } = await authClient.auth.getUser(token);
+
+    if (userError || !userData?.user?.id) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { url, maxPages = 10 } = await req.json();
 
     if (!url) {
@@ -38,42 +55,36 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Parsing PDF from URL: ${url}`);
+    console.log(`User ${userData.user.id} parsing PDF from URL: ${url}`);
 
     let data: Uint8Array;
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 
-    // Check if this is a Supabase storage URL (may be private bucket)
+    // Check if this is a Supabase storage URL
     if (url.includes(supabaseUrl) || url.includes('supabase.co/storage')) {
       const parsed = parseStorageUrl(url);
-      
+
       if (parsed) {
-        console.log(`Detected Supabase storage: bucket=${parsed.bucket}, path=${parsed.path}`);
-        
-        // Use service role to download from potentially private bucket
-        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-        
-        const { data: fileData, error: downloadError } = await supabase.storage
+        console.log(`Detected storage: bucket=${parsed.bucket}, path=${parsed.path}`);
+
+        // Use the USER's auth client to download - this enforces storage RLS
+        const { data: fileData, error: downloadError } = await authClient.storage
           .from(parsed.bucket)
           .download(parsed.path);
-        
+
         if (downloadError || !fileData) {
-          console.error(`Failed to download from storage: ${downloadError?.message}`);
-          return new Response(JSON.stringify({ error: 'Failed to fetch PDF from storage', text: '' }), {
-            status: 200,
+          console.error(`Storage download failed: ${downloadError?.message}`);
+          return new Response(JSON.stringify({ error: 'Access denied or file not found', text: '' }), {
+            status: 403,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        
+
         const arrayBuffer = await fileData.arrayBuffer();
         data = new Uint8Array(arrayBuffer);
-        console.log(`Downloaded from Supabase storage, size: ${data.length} bytes`);
+        console.log(`Downloaded from storage, size: ${data.length} bytes`);
       } else {
-        // Fallback to direct fetch (public URL)
         const pdfResponse = await fetch(url);
         if (!pdfResponse.ok) {
-          console.error(`Failed to fetch PDF: ${pdfResponse.status}`);
           return new Response(JSON.stringify({ error: 'Failed to fetch PDF', text: '' }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -83,10 +94,9 @@ serve(async (req) => {
         data = new Uint8Array(arrayBuffer);
       }
     } else {
-      // External URL - use direct fetch
+      // External URL - direct fetch (user authenticated, so this is allowed)
       const pdfResponse = await fetch(url);
       if (!pdfResponse.ok) {
-        console.error(`Failed to fetch PDF: ${pdfResponse.status}`);
         return new Response(JSON.stringify({ error: 'Failed to fetch PDF', text: '' }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -98,7 +108,6 @@ serve(async (req) => {
 
     console.log(`PDF fetched, size: ${data.length} bytes`);
 
-    // Use dynamic import for pdfjs-serverless
     const { getDocument } = await import('https://esm.sh/pdfjs-serverless');
 
     const document = await getDocument({
@@ -118,7 +127,7 @@ serve(async (req) => {
         const pageText = textContent.items
           .map((item: any) => item.str)
           .join(' ');
-        
+
         if (pageText.trim()) {
           textParts.push(`[Sida ${i}]\n${pageText.trim()}`);
         }
@@ -130,14 +139,13 @@ serve(async (req) => {
     let fullText = textParts.join('\n\n');
     console.log(`Extracted ${fullText.length} characters from PDF`);
 
-    // Limit text length to avoid overly large embeddings
     const maxLength = 15000;
     const truncated = fullText.length > maxLength;
     if (truncated) {
       fullText = fullText.substring(0, maxLength) + '... [text trunkerad]';
     }
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       text: fullText,
       truncated,
       pages: pagesToParse,
@@ -149,8 +157,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error parsing PDF:', error);
-    
-    return new Response(JSON.stringify({ 
+
+    return new Response(JSON.stringify({
       text: '',
       error: error instanceof Error ? error.message : 'Unknown error'
     }), {

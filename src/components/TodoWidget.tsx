@@ -190,6 +190,12 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
       category: newCategory === "none" ? null : newCategory || null,
     });
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Du måste vara inloggad");
+      return;
+    }
+
     const { data, error } = await (supabase as any)
       .from("property_todos")
       .insert([{
@@ -198,6 +204,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
         due_date: newDueDate || null,
         priority: newPriority,
         category: newCategory === "none" ? null : newCategory || null,
+        user_id: user.id,
       }])
       .select();
 
