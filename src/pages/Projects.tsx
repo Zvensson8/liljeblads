@@ -963,7 +963,7 @@ export default function Projects() {
           if (!open) setEditingProject(null);
         }}
         onSuccess={() => {
-          fetchProjects(showArchived);
+          fetchProjects(activeTab === "archived");
           setEditingProject(null);
         }}
         editingProject={editingProject}
