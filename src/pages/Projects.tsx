@@ -72,12 +72,13 @@ export default function Projects() {
   const [loading, setLoading] = useState(false);
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
+  const [activeTab, setActiveTab] = useState("overview");
   const [sortField, setSortField] = useState<string>("updated_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [editingCell, setEditingCell] = useState<{ projectId: string; field: string } | null>(null);
@@ -88,7 +89,7 @@ export default function Projects() {
     if (!authLoading && !user) {
       navigate("/auth");
     } else if (user && organization) {
-      fetchProjects(showArchived);
+      fetchProjects(activeTab === "archived");
       fetchProperties();
       
       // Check if we should open edit dialog from URL
@@ -97,7 +98,7 @@ export default function Projects() {
         handleEditFromUrl(editId);
       }
     }
-  }, [user, authLoading, navigate, showArchived, searchParams, organization]);
+  }, [user, authLoading, navigate, activeTab, searchParams, organization]);
 
   const handleEditFromUrl = async (projectId: string) => {
     try {
@@ -337,16 +338,16 @@ export default function Projects() {
 
           <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <Tabs defaultValue="overview" className="w-full">
+               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                   <TabsList>
                     <TabsTrigger value="overview">Översikt</TabsTrigger>
-                    <TabsTrigger value="active" onClick={() => { setShowArchived(false); fetchProjects(false); }}>Aktiva projekt</TabsTrigger>
+                    <TabsTrigger value="active">Aktiva projekt</TabsTrigger>
                     <TabsTrigger value="proposals" className="flex items-center gap-1">
                       <Sparkles className="h-3 w-3" />
                       Förslag
                     </TabsTrigger>
-                    <TabsTrigger value="archived" onClick={() => { setShowArchived(true); fetchProjects(true); }}>Arkiverade</TabsTrigger>
+                    <TabsTrigger value="archived">Arkiverade</TabsTrigger>
                   </TabsList>
                   <Button onClick={() => { setEditingProject(null); setFormDialogOpen(true); }}>
                     <Plus className="h-4 w-4 mr-2" />
@@ -962,7 +963,7 @@ export default function Projects() {
           if (!open) setEditingProject(null);
         }}
         onSuccess={() => {
-          fetchProjects(showArchived);
+          fetchProjects(activeTab === "archived");
           setEditingProject(null);
         }}
         editingProject={editingProject}
