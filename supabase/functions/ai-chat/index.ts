@@ -97,7 +97,7 @@ async function buildContext(
       if (p.address) ov += ` — ${p.address}`;
       if (p.property_number) ov += ` (${p.property_number})`;
       if (p.area_sqm) ov += `\n    Yta: ${p.area_sqm} m²`;
-      if (p.year_built) ov += `, Byggår: ${p.year_built}`;
+      if (p.construction_year) ov += `, Byggår: ${p.construction_year}`;
       const pc = comps.filter(c => c.property_id === p.id);
       if (pc.length > 0) {
         ov += `\n    Komponenter (${pc.length}):`;
