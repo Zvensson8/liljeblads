@@ -222,6 +222,9 @@ export function ProjectChecklistManagement({
 
   const handleAddToPropertyTodos = async (item: ChecklistItem) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
       const { error } = await supabase
         .from("property_todos")
         .insert({
@@ -229,6 +232,7 @@ export function ProjectChecklistManagement({
           title: item.title,
           due_date: item.deadline,
           completed: false,
+          user_id: user.id,
         });
 
       if (error) throw error;

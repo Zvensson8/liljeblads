@@ -134,6 +134,12 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
   const handleAddTodo = async () => {
     if (!newTodo.trim()) return;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Du måste vara inloggad");
+      return;
+    }
+
     const { error } = await supabase
       .from("property_todos")
       .insert([{
@@ -142,6 +148,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
         due_date: newDueDate || null,
         priority: newPriority,
         category: newCategory === "none" ? null : newCategory || null,
+        user_id: user.id,
       }]);
 
     if (error) {
