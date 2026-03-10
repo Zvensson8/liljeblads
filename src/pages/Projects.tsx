@@ -78,6 +78,7 @@ export default function Projects() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
+  const [activeTab, setActiveTab] = useState("overview");
   const [sortField, setSortField] = useState<string>("updated_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [editingCell, setEditingCell] = useState<{ projectId: string; field: string } | null>(null);
