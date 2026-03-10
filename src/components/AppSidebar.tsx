@@ -204,7 +204,8 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* Footer with sign out */}
-      <SidebarFooter className="border-t border-border p-4">
+      <SidebarFooter className="border-t border-border p-4 space-y-1">
+        <ThemeToggle collapsed={isCollapsed} />
         <Button
           variant="ghost"
           onClick={signOut}
