@@ -1,4 +1,5 @@
 import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown, UserCog, User, FileText, Shield, Bot } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
 import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
