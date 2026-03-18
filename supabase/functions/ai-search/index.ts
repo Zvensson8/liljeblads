@@ -35,12 +35,11 @@ async function generateQueryEmbedding(text: string): Promise<number[]> {
   }
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'models/text-embedding-004',
         content: { parts: [{ text }] },
         taskType: 'RETRIEVAL_QUERY',
       }),
