@@ -178,7 +178,7 @@ serve(async (req) => {
 
         // Generate embedding
         console.log(`Generating embedding for ${item.source_table}:${item.source_id}`);
-        const embedding = generateSimpleEmbedding(contentResult.content);
+        const embedding = await generateGoogleEmbedding(contentResult.content);
 
         // Upsert embedding
         const { error: upsertError } = await supabase
