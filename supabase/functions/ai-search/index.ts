@@ -173,7 +173,6 @@ serve(async (req) => {
 });
 
 function formatResponse(query: string, results: SearchResult[]) {
-  // Group results by source table
   const groupedResults = {
     properties: results.filter(r => r.source_table === 'properties'),
     components: results.filter(r => r.source_table === 'components'),
@@ -205,9 +204,9 @@ async function enrichResults(supabase: any, results: any[]): Promise<SearchResul
       source_id: result.source_id,
       content: result.content,
       similarity: result.similarity,
-      recency_boost: result.recencyBoost,
-      popularity_boost: result.popularityBoost,
-      final_score: result.finalScore,
+      recency_boost: result.recency_boost,
+      popularity_boost: result.popularity_boost,
+      final_score: result.final_score,
       details
     });
   }
