@@ -42,7 +42,7 @@ export default function AIChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [streamingEnabled, setStreamingEnabled] = useState(true);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Fetch conversations
@@ -113,9 +113,7 @@ export default function AIChat() {
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   // Create new conversation mutation
@@ -628,7 +626,7 @@ export default function AIChat() {
             {/* Chat area */}
             <div className="flex-1 flex flex-col">
               {/* Messages */}
-              <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+              <div className="flex-1 overflow-y-auto p-4">
                 {messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground py-20">
                     <Bot className="h-16 w-16 mb-4 opacity-30" />
@@ -701,9 +699,10 @@ export default function AIChat() {
                         </div>
                       </div>
                     )}
+                    <div ref={messagesEndRef} />
                   </div>
                 )}
-              </ScrollArea>
+              </div>
 
               {/* Input */}
               <div className="border-t p-4 bg-background">
