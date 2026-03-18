@@ -20,33 +20,36 @@ interface ContentResult {
   organizationId: string | null;
 }
 
-// Simple hash-based embedding generator using content characteristics
-function generateSimpleEmbedding(text: string, dimensions: number = 768): number[] {
-  const embedding = new Array(dimensions).fill(0);
-  const normalizedText = text.toLowerCase();
-  
-  for (let i = 0; i < normalizedText.length; i++) {
-    const charCode = normalizedText.charCodeAt(i);
-    const position = i % dimensions;
-    embedding[position] += charCode * (i + 1) * 0.0001;
+// Google text-embedding-004 via Generative AI API
+async function generateGoogleEmbedding(text: string): Promise<number[]> {
+  const apiKey = Deno.env.get('GOOGLE_AI_API_KEY');
+  if (!apiKey) {
+    throw new Error('GOOGLE_AI_API_KEY is not configured');
   }
-  
-  const words = normalizedText.split(/\s+/);
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const wordHash = word.split('').reduce((acc, char, idx) => acc + char.charCodeAt(0) * (idx + 1), 0);
-    const position = wordHash % dimensions;
-    embedding[position] += 0.01 * (i + 1);
-  }
-  
-  const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
-  if (magnitude > 0) {
-    for (let i = 0; i < dimensions; i++) {
-      embedding[i] = embedding[i] / magnitude;
+
+  // Truncate text to ~8000 chars to stay within token limits
+  const truncatedText = text.length > 8000 ? text.substring(0, 8000) : text;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'models/text-embedding-004',
+        content: { parts: [{ text: truncatedText }] },
+        taskType: 'RETRIEVAL_DOCUMENT',
+      }),
     }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Google Embedding API error [${response.status}]: ${errorBody}`);
   }
-  
-  return embedding;
+
+  const data = await response.json();
+  return data.embedding.values;
 }
 
 serve(async (req) => {
