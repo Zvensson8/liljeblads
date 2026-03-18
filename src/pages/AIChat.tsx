@@ -568,10 +568,10 @@ export default function AIChat() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="h-screen flex w-full bg-background overflow-hidden">
         <AppSidebar />
 
-        <main className="flex-1 flex flex-col">
+        <main className="flex-1 flex flex-col min-h-0">
           {/* Header */}
           <header className="h-14 border-b flex items-center justify-between px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center gap-2">
@@ -624,7 +624,7 @@ export default function AIChat() {
             )}
 
             {/* Chat area */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-h-0">
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4">
                 {messages.length === 0 ? (
