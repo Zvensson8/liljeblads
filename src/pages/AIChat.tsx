@@ -618,7 +618,7 @@ export default function AIChat() {
           <div className="flex-1 flex overflow-hidden">
             {/* Desktop conversation sidebar */}
             {!isMobile && (
-              <aside className="w-72 border-r flex-shrink-0 bg-muted/30">
+              <aside className="w-72 border-r flex-shrink-0 bg-muted/30 min-h-0 overflow-hidden">
                 <ConversationList />
               </aside>
             )}
