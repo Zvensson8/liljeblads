@@ -16,6 +16,7 @@ interface TodoSubtaskListProps {
 }
 
 export function TodoSubtaskList({ parentTodoId, propertyId, onUpdate }: TodoSubtaskListProps) {
+  const { user } = useAuth();
   const [newSubtask, setNewSubtask] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
