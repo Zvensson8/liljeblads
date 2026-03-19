@@ -46,6 +46,7 @@ export function TodoSubtaskList({ parentTodoId, propertyId, onUpdate }: TodoSubt
         parent_todo_id: parentTodoId,
         title: newSubtask,
         order: (subtasks?.length || 0) + 1,
+        user_id: user?.id,
       });
 
     setIsAdding(false);
