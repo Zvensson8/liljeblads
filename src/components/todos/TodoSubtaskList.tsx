@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ interface TodoSubtaskListProps {
 }
 
 export function TodoSubtaskList({ parentTodoId, propertyId, onUpdate }: TodoSubtaskListProps) {
+  const { user } = useAuth();
   const [newSubtask, setNewSubtask] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
@@ -44,6 +46,7 @@ export function TodoSubtaskList({ parentTodoId, propertyId, onUpdate }: TodoSubt
         parent_todo_id: parentTodoId,
         title: newSubtask,
         order: (subtasks?.length || 0) + 1,
+        user_id: user?.id,
       });
 
     setIsAdding(false);
