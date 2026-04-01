@@ -420,10 +420,11 @@ export default function ProjectDetail() {
                 className="w-full"
               >
                 <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-                  <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-7">
+                  <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-8">
                     <TabsTrigger value="overview">Översikt</TabsTrigger>
                     <TabsTrigger value="info">Information</TabsTrigger>
                     <TabsTrigger value="economy">Ekonomi</TabsTrigger>
+                    <TabsTrigger value="work-orders">Arbetsordrar</TabsTrigger>
                     <TabsTrigger value="simulation">Simulering</TabsTrigger>
                     <TabsTrigger value="documents">Dokument</TabsTrigger>
                     <TabsTrigger value="checklist">Checklista</TabsTrigger>

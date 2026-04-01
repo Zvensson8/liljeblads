@@ -104,35 +104,44 @@ const handler = async (req: Request): Promise<Response> => {
 
     const organization = workOrder.property.organization || { name: "Er organisation", logo_url: null };
 
-    // Skapa HTML-mall med enkel vänsterjusterad layout
-    const htmlContent = `
+    // Build HTML content - use customText if provided, otherwise use template
+    let htmlContent: string;
+    
+    if (customText) {
+      // Wrap custom text in simple HTML
+      const escapedText = escapeHtml(customText);
+      htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      color: #000000;
-      max-width: 800px;
-      margin: 0;
-      padding: 20px;
-      background-color: #ffffff;
-    }
-    .content {
-      text-align: left;
-    }
-    p {
-      margin: 0 0 16px 0;
-    }
-    .section {
-      margin: 24px 0;
-    }
-    strong {
-      font-weight: bold;
-    }
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #000000; max-width: 800px; margin: 0; padding: 20px; background-color: #ffffff; }
+  </style>
+</head>
+<body>
+  <div style="white-space: pre-line;">${escapedText}</div>
+  <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
+    <p>Detta meddelande är skickat från ${escapeHtml(organization.name)}</p>
+    <p>Genererat ${escapeHtml(timestamp)}</p>
+  </div>
+</body>
+</html>`;
+    } else {
+      // Original template
+      htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #000000; max-width: 800px; margin: 0; padding: 20px; background-color: #ffffff; }
+    .content { text-align: left; }
+    p { margin: 0 0 16px 0; }
+    .section { margin: 24px 0; }
+    strong { font-weight: bold; }
   </style>
 </head>
 <body>
@@ -181,8 +190,8 @@ const handler = async (req: Request): Promise<Response> => {
     </div>
   </div>
 </body>
-</html>
-    `;
+</html>`;
+    }
 
     const emailResponse = await resend.emails.send({
       from: "Fastighetssystem <info@liljeblads.com>",

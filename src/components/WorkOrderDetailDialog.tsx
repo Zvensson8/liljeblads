@@ -469,6 +469,12 @@ export function WorkOrderDetailDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <WorkOrderPreviewSheet
+        open={previewSheetOpen}
+        onOpenChange={setPreviewSheetOpen}
+        workOrder={workOrder}
+      />
     </>
   );
 }
