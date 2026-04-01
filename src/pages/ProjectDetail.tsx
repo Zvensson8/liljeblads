@@ -39,6 +39,7 @@ import { ProjectReportButton } from "@/components/projects/ProjectReportButton";
 import { ProjectActionsMenu } from "@/components/projects/ProjectActionsMenu";
 import { ProjectQuickStatus } from "@/components/projects/ProjectQuickStatus";
 import { ProjectOverviewTab } from "@/components/projects/ProjectOverviewTab";
+import { ProjectWorkOrders } from "@/components/projects/ProjectWorkOrders";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
 import { exportProjectToZip } from "@/lib/zipExport";
@@ -419,10 +420,11 @@ export default function ProjectDetail() {
                 className="w-full"
               >
                 <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-                  <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-7">
+                  <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-8">
                     <TabsTrigger value="overview">Översikt</TabsTrigger>
                     <TabsTrigger value="info">Information</TabsTrigger>
                     <TabsTrigger value="economy">Ekonomi</TabsTrigger>
+                    <TabsTrigger value="work-orders">Arbetsordrar</TabsTrigger>
                     <TabsTrigger value="simulation">Simulering</TabsTrigger>
                     <TabsTrigger value="documents">Dokument</TabsTrigger>
                     <TabsTrigger value="checklist">Checklista</TabsTrigger>
@@ -540,6 +542,20 @@ export default function ProjectDetail() {
                       <ProjectCostManagement
                         projectId={project.id}
                         onCostUpdate={fetchProject}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="work-orders">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Arbetsordrar</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ProjectWorkOrders
+                        projectId={project.id}
+                        propertyId={project.property_id}
                       />
                     </CardContent>
                   </Card>

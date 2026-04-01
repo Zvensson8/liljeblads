@@ -32,6 +32,7 @@ import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { WorkOrderDialog } from "./WorkOrderDialog";
 import { DocumentPreviewDialog } from "./documents/DocumentPreviewDialog";
+import { WorkOrderPreviewSheet } from "./WorkOrderPreviewSheet";
 import { exportWorkOrderToZip } from "@/lib/zipExport";
 
 interface WorkOrderDetailDialogProps {
@@ -55,7 +56,7 @@ export function WorkOrderDetailDialog({
   const [converting, setConverting] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<any>(null);
   const [exporting, setExporting] = useState(false);
-  const [sendingDraft, setSendingDraft] = useState(false);
+  const [previewSheetOpen, setPreviewSheetOpen] = useState(false);
 
   const { data: files, refetch: refetchFiles } = useQuery({
     queryKey: ["work-order-files", workOrder?.id],
@@ -242,33 +243,7 @@ export function WorkOrderDetailDialog({
     }
   };
 
-  const handleSendDraft = async () => {
-    if (!workOrder) return;
-    
-    setSendingDraft(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user?.email) {
-        throw new Error("Kunde inte hämta användarens e-post");
-      }
-      
-      const { error } = await supabase.functions.invoke('send-work-order-draft', {
-        body: { 
-          workOrderId: workOrder.id,
-          userEmail: user.email
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast.success("Beställningsutkast skickat till din e-post");
-    } catch (error: any) {
-      toast.error(error.message || "Kunde inte skicka beställningsutkast");
-    } finally {
-      setSendingDraft(false);
-    }
-  };
+  // Replaced by preview sheet
 
   if (!workOrder) return null;
 
@@ -283,11 +258,10 @@ export function WorkOrderDetailDialog({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleSendDraft}
-                  disabled={sendingDraft}
+                  onClick={() => setPreviewSheetOpen(true)}
                 >
                   <Mail className="h-4 w-4 mr-2" />
-                  {sendingDraft ? "Skickar..." : "Skicka beställningsutkast"}
+                  Beställningsutkast
                 </Button>
                 <Button
                   variant="outline"
@@ -495,6 +469,12 @@ export function WorkOrderDetailDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <WorkOrderPreviewSheet
+        open={previewSheetOpen}
+        onOpenChange={setPreviewSheetOpen}
+        workOrder={workOrder}
+      />
     </>
   );
 }

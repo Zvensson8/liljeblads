@@ -2931,6 +2931,7 @@ export type Database = {
           last_reminder_sent: string | null
           price: number | null
           priority: Database["public"]["Enums"]["work_order_priority"]
+          project_id: string | null
           property_id: string
           quarter: string | null
           reminder_enabled: boolean | null
@@ -2949,6 +2950,7 @@ export type Database = {
           last_reminder_sent?: string | null
           price?: number | null
           priority?: Database["public"]["Enums"]["work_order_priority"]
+          project_id?: string | null
           property_id: string
           quarter?: string | null
           reminder_enabled?: boolean | null
@@ -2967,6 +2969,7 @@ export type Database = {
           last_reminder_sent?: string | null
           price?: number | null
           priority?: Database["public"]["Enums"]["work_order_priority"]
+          project_id?: string | null
           property_id?: string
           quarter?: string | null
           reminder_enabled?: boolean | null
@@ -2976,6 +2979,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "work_orders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "work_orders_property_id_fkey"
             columns: ["property_id"]
