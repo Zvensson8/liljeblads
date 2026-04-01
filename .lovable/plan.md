@@ -1,298 +1,75 @@
 
 
-# Plan: Förbättra Projektmodulen
+# Plan: AI-beställningstext, E-postutskick & Projektkoppling
 
-## Sammanfattning
-En omfattande uppgradering av projektmodulen för att göra den mer effektiv och användarvänlig - både i projektlistan och inne i enskilda projekt.
+## Översikt
 
----
-
-## Nuvarande utmaningar
-
-### Projektlistan (`Projects.tsx`)
-- Dashboard visas inte - bara projektlista och filter
-- Mycket vertikal scrollning för att se alla projekt
-- Ingen snabb överblick av projektstatus
-
-### Projektdetalj (`ProjectDetail.tsx`)
-- 6 flikar som kräver mycket klickande
-- KPI-kort högst upp visar bara siffror utan kontext
-- Headern har för många knappar som gömmer sig på mobil
-- Checklistan har ingen prioritering eller gruppering
-- Ekonomifliken kräver två klick för att se kostnader
+Tre funktioner implementeras:
+1. **AI-genererad beställningstext + förhandsgranskning** — Ett preview-steg i arbetsorderdetaljvyn där AI genererar en beställningstext som kan redigeras innan skickning
+2. **E-postutskick till användaren** — Skickar den genererade/redigerade texten som e-post (till inloggad användares e-post, som idag)
+3. **Koppla arbetsordrar till projekt** — Möjlighet att skapa arbetsordrar inifrån ett projekt och se kopplade ordrar
 
 ---
 
-## Förbättringar
+## Steg 1: Databasändring — Lägg till `project_id` på `work_orders`
 
-### 1. Projektlista - Dashboard-vy
-
-**Vad ändras:**
-Lägg till en "Översikt"-flik som standard som visar `ProjectDashboard`-komponenten (som redan finns men inte används).
-
-**Resultat:**
-```text
-┌─ Projekt ─────────────────────────────────────────────────┐
-│ [Översikt] [Aktiva projekt] [Förslag] [Arkiverade]       │
-├───────────────────────────────────────────────────────────┤
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐     │
-│  │ 12       │ │ 4.2M kr  │ │ 3.8M kr  │ │ 2        │     │
-│  │ Projekt  │ │ Budget   │ │ Utfall   │ │ Varning  │     │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘     │
-│                                                           │
-│  ┌─────────────────────┐  ┌─────────────────────────────┐│
-│  │ Projekt per status  │  │ Projekt per typ             ││
-│  └─────────────────────┘  └─────────────────────────────┘│
-└───────────────────────────────────────────────────────────┘
+Ny migration:
+```sql
+ALTER TABLE work_orders ADD COLUMN project_id uuid REFERENCES projects(id) ON DELETE SET NULL;
+CREATE INDEX idx_work_orders_project_id ON work_orders(project_id);
 ```
 
 ---
 
-### 2. Projektdetalj - Ny startsida
+## Steg 2: Edge Function — `generate-order-text`
 
-**Vad ändras:**
-Ersätt "Information"-fliken med en kombinerad överblick som visar det viktigaste direkt.
+Ny edge function som tar emot `workOrderId`, hämtar arbetsorder + fastighets- och kontaktdata, och anropar Gemini (via Lovable AI gateway) för att generera en professionell beställningstext på svenska.
 
-**Ny layout:**
-```text
-┌─ Projektöversikt ─────────────────────────────────────────┐
-│                                                           │
-│  ┌─ Ekonomi ─────────┐  ┌─ Framsteg ─────────────────┐   │
-│  │ Budget: 500k      │  │ Checklista: ████████░░ 80% │   │
-│  │ Utfall: 380k      │  │ 8 av 10 punkter klara      │   │
-│  │ Prognos: 520k     │  │                            │   │
-│  │                   │  │ Nästa deadline:            │   │
-│  │ ███████░░░ 76%    │  │ "Beställ material" - 3 feb │   │
-│  └───────────────────┘  └────────────────────────────┘   │
-│                                                           │
-│  ┌─ Senaste aktivitet ───────────────────────────────┐   │
-│  │ • Kostnad tillagd: Konsulttimmar (15 000 kr)      │   │
-│  │ • Dokument uppladdad: Offert.pdf                  │   │
-│  │ • Checklistpunkt klar: "Granska ritningar"        │   │
-│  └───────────────────────────────────────────────────┘   │
-└───────────────────────────────────────────────────────────┘
-```
+Returnerar genererad text som JSON.
 
 ---
 
-### 3. Kompaktare header med Action Menu
+## Steg 3: Ny komponent — `WorkOrderPreviewSheet`
 
-**Vad ändras:**
-Samla alla sekundära åtgärder (Export, Rapport, Beställningsutkast, Arkivera) i en dropdown-meny.
-
-**Före:**
-```text
-[Redigera] [Beställningsutkast] [Exportera] [Rapport] [Arkivera]
-```
-
-**Efter:**
-```text
-[Redigera] [Åtgärder ▼]
-              ├─ Beställningsutkast
-              ├─ Exportera ZIP
-              ├─ Generera rapport
-              └─ Arkivera projekt
-```
+En sheet/dialog som öppnas från arbetsorderdetaljvyn:
+- Knappen "Skicka beställningsutkast" öppnar sheeten istället för att direkt skicka
+- Sheeten visar: "Generera med AI"-knapp → laddar AI-text → visar i redigerbar textarea
+- Användaren kan redigera texten fritt
+- Två knappar: "Skicka till min e-post" och "Avbryt"
 
 ---
 
-### 4. Förbättrad checklista
+## Steg 4: Uppdatera `send-work-order-draft` edge function
 
-**Vad ändras:**
-- Drag-and-drop för att ändra ordning
-- Gruppering efter kategori (Planering, Genomförande, Avslut)
-- Prioritetsnivåer (Hög, Normal, Låg)
-- Inline-redigering av titel
-
-**Ny layout:**
-```text
-┌─ Checklista ──────────────────────────────────────────────┐
-│ Framsteg: ████████░░░░ 65% (8 av 12 klara)               │
-├───────────────────────────────────────────────────────────┤
-│ ▼ Planering (3 av 3 klara)                               │
-│   ☑ Granska ritningar                                    │
-│   ☑ Inhämta offerter                                     │
-│   ☑ Godkänn budget                                       │
-│                                                           │
-│ ▼ Genomförande (4 av 7 klara)                            │
-│   ☑ Beställ material                                     │
-│   ☑ Starta byggnation                                    │
-│   ☐ Mellanbesiktning          [!] 5 feb  @Erik          │
-│   ☐ Slutbesiktning                   -   @Anna          │
-│   ...                                                     │
-│                                                           │
-│ ▼ Avslut (1 av 2 klara)                                  │
-│   ☐ Dokumentera                                          │
-│   ☑ Fakturering                                          │
-└───────────────────────────────────────────────────────────┘
-```
+Ändra befintliga edge functionen så den accepterar en valfri `customText`-parameter. Om `customText` skickas med, används den istället för den hårdkodade mallen. E-postens HTML wrappar texten med enkel formatering.
 
 ---
 
-### 5. Snabb-åtgärder från KPI-kort
+## Steg 5: Koppla arbetsordrar till projekt
 
-**Vad ändras:**
-Gör KPI-korten klickbara så att de leder direkt till relevant information.
+**WorkOrderDialog** — Lägg till valfritt `project_id`-fält (dropdown med projekt på samma fastighet). Skickas med vid insert/update.
 
-**Interaktivitet:**
-| Klick på | Åtgärd |
-|----------|--------|
-| Budget | Öppna Ekonomi-fliken |
-| Prognos | Öppna Simulering |
-| Utfall | Öppna Ekonomi-fliken med kostnader synliga |
-| Avvikelse | Visa varning och förslag |
+**ProjectDetail** — Ny tab eller sektion under "Översikt" som visar kopplade arbetsordrar med möjlighet att:
+- Se lista på kopplade arbetsordrar
+- Skapa ny arbetsorder direkt kopplad till projektet (öppnar WorkOrderDialog med `project_id` förifyllt)
 
----
-
-### 6. Mobilanpassning
-
-**Vad ändras:**
-- Tabs blir en swipebar horisontell lista
-- KPI-kort staplas 2x2 istället för 4 i rad
-- Action-knappen blir en floating button
-- Checklistan får swipe-gester
-
-**Mobil KPI-layout:**
-```text
-┌────────────┐ ┌────────────┐
-│ Budget     │ │ Prognos    │
-│ 500 000 kr │ │ 520 000 kr │
-└────────────┘ └────────────┘
-┌────────────┐ ┌────────────┐
-│ Utfall     │ │ Avvikelse  │
-│ 380 000 kr │ │ +4%        │
-└────────────┘ └────────────┘
-
-[+ Lägg till] (Floating action button)
-```
-
----
-
-### 7. Snabbstatus-ändring
-
-**Vad ändras:**
-Klick på status-badge öppnar en snabb dropdown för att byta status utan att gå via "Redigera".
-
-**Interaktion:**
-```text
-[Pågående ▼]
- ├─ Planerat
- ├─ Inväntar offert
- ├─ Offert finns
- ├─ ● Pågående (nuvarande)
- ├─ Pausat
- └─ Avslutat
-```
+Ny komponent `ProjectWorkOrders` som visar tabell med status, åtgärd, pris och länk till detalj.
 
 ---
 
 ## Tekniska detaljer
 
-### Filer som ändras
+**Filer som skapas:**
+- `supabase/functions/generate-order-text/index.ts` — AI-textgenerering via Lovable AI (Gemini)
+- `src/components/WorkOrderPreviewSheet.tsx` — Preview + redigering + skicka
+- `src/components/projects/ProjectWorkOrders.tsx` — Lista kopplade arbetsordrar
 
-| Fil | Ändring |
-|-----|---------|
-| `src/pages/Projects.tsx` | Lägg till "Översikt"-flik med ProjectDashboard |
-| `src/pages/ProjectDetail.tsx` | Ny startsida, kompakt header, klickbara KPI |
-| `src/components/projects/ProjectOverview.tsx` | **NY FIL** - Kombinerad översiktsvy |
-| `src/components/projects/ProjectQuickStatus.tsx` | **NY FIL** - Snabb statusändring |
-| `src/components/projects/ProjectActionsMenu.tsx` | **NY FIL** - Dropdown för åtgärder |
-| `src/components/projects/ProjectChecklistManagement.tsx` | Gruppering, prioritet, drag-and-drop |
+**Filer som ändras:**
+- `src/components/WorkOrderDetailDialog.tsx` — Byt ut direktskicka-knappen mot preview-sheet
+- `src/components/WorkOrderDialog.tsx` — Lägg till valfritt project_id-fält
+- `supabase/functions/send-work-order-draft/index.ts` — Stöd för customText
+- `src/pages/ProjectDetail.tsx` — Ny tab "Arbetsordrar"
 
-### Nya komponenter
-
-**ProjectOverview.tsx:**
-```tsx
-interface ProjectOverviewProps {
-  project: Project;
-  onNavigate: (tab: string) => void;
-}
-
-// Visar:
-// - Ekonomi-sammanfattning med progress bar
-// - Checklista-progress med nästa deadline
-// - Senaste 3 aktiviteter
-// - Klickbara kort som navigerar till rätt flik
-```
-
-**ProjectQuickStatus.tsx:**
-```tsx
-interface ProjectQuickStatusProps {
-  projectId: string;
-  currentStatus: ProjectStatus;
-  onStatusChange: () => void;
-}
-
-// Dropdown-komponent för snabb statusändring
-```
-
-**ProjectActionsMenu.tsx:**
-```tsx
-interface ProjectActionsMenuProps {
-  project: Project;
-  onExport: () => void;
-  onSendDraft: () => void;
-  onArchive: () => void;
-}
-
-// DropdownMenu med alla sekundära åtgärder
-```
-
-### Checklista-förbättringar
-
-```tsx
-// Nya fält i project_checklist_items
-interface ChecklistItem {
-  // ... befintliga fält
-  category: string | null;  // "planning" | "execution" | "closing"
-  priority: string | null;  // "high" | "normal" | "low"
-}
-
-// Gruppering i UI:
-const groupedItems = useMemo(() => {
-  return {
-    planning: items.filter(i => i.category === "planning"),
-    execution: items.filter(i => i.category === "execution"),
-    closing: items.filter(i => i.category === "closing"),
-    uncategorized: items.filter(i => !i.category),
-  };
-}, [items]);
-```
-
----
-
-## Databasändringar
-
-Lägg till nya kolumner för checklista-kategorier:
-
-```sql
-ALTER TABLE project_checklist_items 
-ADD COLUMN category TEXT DEFAULT NULL,
-ADD COLUMN priority TEXT DEFAULT 'normal';
-```
-
----
-
-## Prioritering
-
-| Steg | Funktion | Komplexitet |
-|------|----------|-------------|
-| 1 | Aktivera Dashboard i projektlistan | Låg |
-| 2 | Kompakt header med Action Menu | Låg |
-| 3 | Snabb statusändring | Låg |
-| 4 | Ny Projektöversikt-flik | Medel |
-| 5 | Mobilanpassning | Medel |
-| 6 | Klickbara KPI-kort | Låg |
-| 7 | Förbättrad checklista med kategorier | Medel-Hög |
-
----
-
-## Fördelar
-
-- **Dashboard**: Direkt överblick utan att klicka på varje projekt
-- **Ny översikt**: Viktigaste informationen synlig direkt
-- **Kompakt header**: Renare gränssnitt, bättre på mobil
-- **Snabb status**: Färre klick för vanliga åtgärder
-- **Kategoriserad checklista**: Bättre struktur för större projekt
-- **Mobilanpassning**: Fungerar lika bra på telefon som desktop
+**Databas:**
+- Migration: `project_id uuid` på `work_orders`
 
