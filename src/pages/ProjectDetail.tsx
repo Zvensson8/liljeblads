@@ -195,32 +195,8 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleSendOrderDraft = async () => {
-    if (!project) return;
-    
-    setSendingDraft(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user?.email) {
-        throw new Error("Kunde inte hämta användarens e-post");
-      }
-      
-      const { error } = await supabase.functions.invoke('send-project-order-draft', {
-        body: { 
-          projectId: project.id,
-          userEmail: user.email
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast.success("Beställningsutkast skickat till din e-post");
-    } catch (error: any) {
-      toast.error(error.message || "Kunde inte skicka beställningsutkast");
-    } finally {
-      setSendingDraft(false);
-    }
+  const handleOpenOrderPreview = () => {
+    setOrderPreviewOpen(true);
   };
 
   const getStatusBadge = (status: ProjectStatus) => {
