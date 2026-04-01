@@ -23,8 +23,6 @@ import {
   Download,
   Home,
   Building2,
-  Mail,
-  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -40,6 +38,7 @@ import { ProjectActionsMenu } from "@/components/projects/ProjectActionsMenu";
 import { ProjectQuickStatus } from "@/components/projects/ProjectQuickStatus";
 import { ProjectOverviewTab } from "@/components/projects/ProjectOverviewTab";
 import { ProjectWorkOrders } from "@/components/projects/ProjectWorkOrders";
+import { ProjectOrderPreviewSheet } from "@/components/projects/ProjectOrderPreviewSheet";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
 import { exportProjectToZip } from "@/lib/zipExport";
@@ -80,7 +79,7 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [sendingDraft, setSendingDraft] = useState(false);
+  const [orderPreviewOpen, setOrderPreviewOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const { addRecentItem } = useRecentlyVisited();
   const isMobile = useIsMobile();
@@ -194,32 +193,8 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleSendOrderDraft = async () => {
-    if (!project) return;
-    
-    setSendingDraft(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user?.email) {
-        throw new Error("Kunde inte hämta användarens e-post");
-      }
-      
-      const { error } = await supabase.functions.invoke('send-project-order-draft', {
-        body: { 
-          projectId: project.id,
-          userEmail: user.email
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast.success("Beställningsutkast skickat till din e-post");
-    } catch (error: any) {
-      toast.error(error.message || "Kunde inte skicka beställningsutkast");
-    } finally {
-      setSendingDraft(false);
-    }
+  const handleOpenOrderPreview = () => {
+    setOrderPreviewOpen(true);
   };
 
   const getStatusBadge = (status: ProjectStatus) => {
@@ -326,9 +301,9 @@ export default function ProjectDetail() {
               <ProjectActionsMenu
                 isArchived={project.is_archived}
                 exporting={exporting}
-                sendingDraft={sendingDraft}
+                sendingDraft={false}
                 onExport={handleExport}
-                onSendDraft={handleSendOrderDraft}
+                onSendDraft={handleOpenOrderPreview}
                 onArchive={handleArchive}
                 onReactivate={handleReactivate}
                 onGenerateReport={() => setReportDialogOpen(true)}
@@ -641,6 +616,12 @@ export default function ProjectDetail() {
         onOpenChange={setEditDialogOpen}
         onSuccess={fetchProject}
         editingProject={project}
+      />
+
+      <ProjectOrderPreviewSheet
+        open={orderPreviewOpen}
+        onOpenChange={setOrderPreviewOpen}
+        project={project}
       />
     </SidebarProvider>
   );

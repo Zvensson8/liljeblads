@@ -10,6 +10,7 @@ const corsHeaders = {
 interface ProjectOrderRequest {
   projectId: string;
   userEmail: string;
+  customText?: string;
 }
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
@@ -20,7 +21,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { projectId, userEmail }: ProjectOrderRequest = await req.json();
+    const { projectId, userEmail, customText }: ProjectOrderRequest = await req.json();
 
     if (!projectId || !userEmail) {
       throw new Error("Project ID och användarens e-post är obligatoriska");
@@ -111,35 +112,52 @@ const handler = async (req: Request): Promise<Response> => {
 
     const organization = project.property.organization || { name: "Er organisation", logo_url: null };
 
-    // Skapa HTML-mall med enkel vänsterjusterad layout
-    const htmlContent = `
+    let htmlContent: string;
+
+    if (customText) {
+      // Use custom/AI-generated text
+      const escapeHtml = (text: string): string => {
+        return text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      };
+      const formattedText = escapeHtml(customText).replace(/\n/g, '<br>');
+      htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      color: #000000;
-      max-width: 800px;
-      margin: 0;
-      padding: 20px;
-      background-color: #ffffff;
-    }
-    .content {
-      text-align: left;
-    }
-    p {
-      margin: 0 0 16px 0;
-    }
-    .section {
-      margin: 24px 0;
-    }
-    strong {
-      font-weight: bold;
-    }
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #000000; max-width: 800px; margin: 0; padding: 20px; background-color: #ffffff; }
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div>${formattedText}</div>
+  <div class="footer">
+    <p>Detta meddelande är skickat från ${escapeHtml(organization.name)}</p>
+    <p>Genererat ${escapeHtml(timestamp)}</p>
+  </div>
+</body>
+</html>`;
+    } else {
+      // Original template
+      htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #000000; max-width: 800px; margin: 0; padding: 20px; background-color: #ffffff; }
+    .content { text-align: left; }
+    p { margin: 0 0 16px 0; }
+    .section { margin: 24px 0; }
+    strong { font-weight: bold; }
   </style>
 </head>
 <body>
@@ -188,8 +206,8 @@ const handler = async (req: Request): Promise<Response> => {
     </div>
   </div>
 </body>
-</html>
-    `;
+</html>`;
+    }
 
     const emailResponse = await resend.emails.send({
       from: "Fastighetssystem <info@liljeblads.com>",

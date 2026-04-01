@@ -12,28 +12,28 @@ import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Mail, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 
-interface WorkOrderPreviewSheetProps {
+interface ProjectOrderPreviewSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workOrder: any;
+  project: any;
 }
 
-export function WorkOrderPreviewSheet({
+export function ProjectOrderPreviewSheet({
   open,
   onOpenChange,
-  workOrder,
-}: WorkOrderPreviewSheetProps) {
+  project,
+}: ProjectOrderPreviewSheetProps) {
   const [text, setText] = useState("");
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
 
   const handleGenerate = useCallback(async () => {
-    if (!workOrder?.id) return;
+    if (!project?.id) return;
     setGenerating(true);
     setText("");
     try {
-      const { data, error } = await supabase.functions.invoke("generate-order-text", {
-        body: { workOrderId: workOrder.id },
+      const { data, error } = await supabase.functions.invoke("generate-project-order-text", {
+        body: { projectId: project.id },
       });
 
       if (error) throw error;
@@ -45,11 +45,10 @@ export function WorkOrderPreviewSheet({
     } finally {
       setGenerating(false);
     }
-  }, [workOrder?.id]);
+  }, [project?.id]);
 
-  // Auto-generate when sheet opens
   useEffect(() => {
-    if (open && workOrder?.id) {
+    if (open && project?.id) {
       setText("");
       handleGenerate();
     }
@@ -71,9 +70,9 @@ export function WorkOrderPreviewSheet({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.email) throw new Error("Kunde inte hämta din e-post");
 
-      const { data, error } = await supabase.functions.invoke("send-work-order-draft", {
+      const { data, error } = await supabase.functions.invoke("send-project-order-draft", {
         body: {
-          workOrderId: workOrder.id,
+          projectId: project.id,
           userEmail: user.email,
           customText: text,
         },
@@ -99,10 +98,10 @@ export function WorkOrderPreviewSheet({
           {/* Header */}
           <div className="flex-none border-b px-6 py-5">
             <SheetTitle className="text-lg font-semibold text-foreground">
-              Förhandsgranskning av beställning
+              Förhandsgranskning av projektbeställning
             </SheetTitle>
             <SheetDescription className="mt-1 text-sm text-muted-foreground">
-              AI-genererad beställningstext. Redigera innan du skickar.
+              AI-genererad beställningstext för projektet. Redigera innan du skickar.
             </SheetDescription>
           </div>
 
@@ -110,19 +109,16 @@ export function WorkOrderPreviewSheet({
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
             {/* Summary badges */}
             <div className="flex flex-wrap gap-2">
-              {workOrder?.action && (
-                <Badge variant="outline">{workOrder.action}</Badge>
+              {project?.name && (
+                <Badge variant="outline">{project.name}</Badge>
               )}
-              {workOrder?.contractor && (
-                <Badge variant="secondary">{workOrder.contractor}</Badge>
+              {project?.project_number && (
+                <Badge variant="secondary">{project.project_number}</Badge>
               )}
-              {workOrder?.price && (
+              {project?.budget && (
                 <Badge variant="secondary">
-                  {parseInt(workOrder.price).toLocaleString("sv-SE")} SEK
+                  {parseInt(project.budget).toLocaleString("sv-SE")} SEK
                 </Badge>
-              )}
-              {workOrder?.quarter && (
-                <Badge variant="secondary">{workOrder.quarter}</Badge>
               )}
             </div>
 
