@@ -21,7 +21,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { workOrderId, userEmail }: WorkOrderRequest = await req.json();
+    const { workOrderId, userEmail, customText }: WorkOrderRequest = await req.json();
 
     if (!workOrderId || !userEmail) {
       throw new Error("Work Order ID och användarens e-post är obligatoriska");
