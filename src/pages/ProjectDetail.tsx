@@ -547,6 +547,20 @@ export default function ProjectDetail() {
                   </Card>
                 </TabsContent>
 
+                <TabsContent value="work-orders">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Arbetsordrar</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ProjectWorkOrders
+                        projectId={project.id}
+                        propertyId={project.property_id}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
                 <TabsContent value="simulation">
                   <Card>
                     <CardHeader>
