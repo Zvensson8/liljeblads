@@ -67,6 +67,7 @@ export function WorkOrderDialog({
   order,
   onSuccess,
   propertyId,
+  projectId,
 }: WorkOrderDialogProps) {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
