@@ -10,6 +10,7 @@ const corsHeaders = {
 interface ProjectOrderRequest {
   projectId: string;
   userEmail: string;
+  customText?: string;
 }
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
@@ -20,7 +21,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { projectId, userEmail }: ProjectOrderRequest = await req.json();
+    const { projectId, userEmail, customText }: ProjectOrderRequest = await req.json();
 
     if (!projectId || !userEmail) {
       throw new Error("Project ID och användarens e-post är obligatoriska");
