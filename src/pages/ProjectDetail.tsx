@@ -303,9 +303,9 @@ export default function ProjectDetail() {
               <ProjectActionsMenu
                 isArchived={project.is_archived}
                 exporting={exporting}
-                sendingDraft={sendingDraft}
+                sendingDraft={false}
                 onExport={handleExport}
-                onSendDraft={handleSendOrderDraft}
+                onSendDraft={handleOpenOrderPreview}
                 onArchive={handleArchive}
                 onReactivate={handleReactivate}
                 onGenerateReport={() => setReportDialogOpen(true)}
