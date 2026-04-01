@@ -40,6 +40,7 @@ import { ProjectActionsMenu } from "@/components/projects/ProjectActionsMenu";
 import { ProjectQuickStatus } from "@/components/projects/ProjectQuickStatus";
 import { ProjectOverviewTab } from "@/components/projects/ProjectOverviewTab";
 import { ProjectWorkOrders } from "@/components/projects/ProjectWorkOrders";
+import { ProjectOrderPreviewSheet } from "@/components/projects/ProjectOrderPreviewSheet";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
 import { exportProjectToZip } from "@/lib/zipExport";
