@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Sheet,
-  SheetContent,
-  SheetHeader,
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, Mail, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { RefreshCw, Mail, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 
 interface WorkOrderPreviewSheetProps {
@@ -27,8 +27,10 @@ export function WorkOrderPreviewSheet({
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
 
-  const handleGenerate = async () => {
+  const handleGenerate = useCallback(async () => {
+    if (!workOrder?.id) return;
     setGenerating(true);
+    setText("");
     try {
       const { data, error } = await supabase.functions.invoke("generate-order-text", {
         body: { workOrderId: workOrder.id },
@@ -38,12 +40,24 @@ export function WorkOrderPreviewSheet({
       if (data?.error) throw new Error(data.error);
 
       setText(data.text || "");
-      toast.success("Text genererad");
     } catch (err: any) {
-      toast.error(err.message || "Kunde inte generera text");
+      setText(`[Fel vid generering: ${err.message || "Okänt fel"}]\n\nDu kan skriva texten manuellt nedan.`);
     } finally {
       setGenerating(false);
     }
+  }, [workOrder?.id]);
+
+  // Auto-generate when sheet opens
+  useEffect(() => {
+    if (open && workOrder?.id) {
+      setText("");
+      handleGenerate();
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleClose = () => {
+    setText("");
+    onOpenChange(false);
   };
 
   const handleSend = async () => {
@@ -78,60 +92,108 @@ export function WorkOrderPreviewSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg flex flex-col">
-        <SheetHeader>
-          <SheetTitle>Beställningsutkast</SheetTitle>
-          <SheetDescription>
-            Generera en beställningstext med AI eller skriv din egen. Du kan redigera texten innan du skickar.
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="flex-1 flex flex-col gap-4 mt-4 min-h-0">
-          <Button
-            variant="outline"
-            onClick={handleGenerate}
-            disabled={generating}
-            className="w-full"
-          >
-            {generating ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
-            )}
-            {generating ? "Genererar..." : "Generera med AI"}
-          </Button>
-
-          <Textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Klicka 'Generera med AI' eller skriv din beställningstext här..."
-            className="flex-1 min-h-[300px] resize-none"
-          />
-
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="flex-1"
-            >
-              Avbryt
-            </Button>
-            <Button
-              onClick={handleSend}
-              disabled={sending || !text.trim()}
-              className="flex-1"
-            >
-              {sending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Mail className="h-4 w-4 mr-2" />
-              )}
-              {sending ? "Skickar..." : "Skicka till min e-post"}
-            </Button>
+    <Sheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) handleClose(); }}>
+      <SheetPrimitive.Portal>
+        <SheetPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <SheetPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex h-full w-full flex-col gap-0 border-l bg-background p-0 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-lg">
+          {/* Header */}
+          <div className="flex-none border-b px-6 py-5">
+            <SheetTitle className="text-lg font-semibold text-foreground">
+              Förhandsgranskning av beställning
+            </SheetTitle>
+            <SheetDescription className="mt-1 text-sm text-muted-foreground">
+              AI-genererad beställningstext. Redigera innan du skickar.
+            </SheetDescription>
           </div>
-        </div>
-      </SheetContent>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            {/* Summary badges */}
+            <div className="flex flex-wrap gap-2">
+              {workOrder?.action && (
+                <Badge variant="outline">{workOrder.action}</Badge>
+              )}
+              {workOrder?.contractor && (
+                <Badge variant="secondary">{workOrder.contractor}</Badge>
+              )}
+              {workOrder?.price && (
+                <Badge variant="secondary">
+                  {parseInt(workOrder.price).toLocaleString("sv-SE")} SEK
+                </Badge>
+              )}
+              {workOrder?.quarter && (
+                <Badge variant="secondary">{workOrder.quarter}</Badge>
+              )}
+            </div>
+
+            {/* Generated text */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-muted-foreground uppercase">
+                  Beställningstext
+                </label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  className="h-7 text-xs"
+                >
+                  <RefreshCw className={`mr-1 h-3 w-3 ${generating ? "animate-spin" : ""}`} />
+                  Regenerera
+                </Button>
+              </div>
+
+              {generating && !text && (
+                <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-sm">Genererar text...</span>
+                </div>
+              )}
+
+              <Textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={generating ? "Genererar..." : "Texten visas här..."}
+                rows={18}
+                className="text-sm leading-relaxed resize-none"
+              />
+            </div>
+
+            {/* Email info */}
+            <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+              <Mail className="h-4 w-4 text-primary" />
+              <span className="text-foreground">
+                Utkastet skickas till <strong>din e-postadress</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex-none border-t px-6 py-4">
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={handleClose}>
+                Tillbaka
+              </Button>
+              <Button
+                onClick={handleSend}
+                disabled={sending || generating || !text.trim()}
+              >
+                {sending ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-1.5 h-4 w-4" />
+                )}
+                {sending ? "Skickar..." : "Skicka till min e-post"}
+              </Button>
+            </div>
+          </div>
+
+          <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+            <span className="sr-only">Stäng</span>
+          </SheetPrimitive.Close>
+        </SheetPrimitive.Content>
+      </SheetPrimitive.Portal>
     </Sheet>
   );
 }
