@@ -58,6 +58,7 @@ interface WorkOrderDialogProps {
   order?: any;
   onSuccess: () => void;
   propertyId?: string;
+  projectId?: string;
 }
 
 export function WorkOrderDialog({
