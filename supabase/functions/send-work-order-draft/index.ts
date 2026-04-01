@@ -10,6 +10,7 @@ const corsHeaders = {
 interface WorkOrderRequest {
   workOrderId: string;
   userEmail: string;
+  customText?: string;
 }
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
