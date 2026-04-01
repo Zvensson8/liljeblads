@@ -81,7 +81,7 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [sendingDraft, setSendingDraft] = useState(false);
+  const [orderPreviewOpen, setOrderPreviewOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const { addRecentItem } = useRecentlyVisited();
   const isMobile = useIsMobile();
