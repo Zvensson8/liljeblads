@@ -32,6 +32,7 @@ import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { WorkOrderDialog } from "./WorkOrderDialog";
 import { DocumentPreviewDialog } from "./documents/DocumentPreviewDialog";
+import { WorkOrderPreviewSheet } from "./WorkOrderPreviewSheet";
 import { exportWorkOrderToZip } from "@/lib/zipExport";
 
 interface WorkOrderDetailDialogProps {
