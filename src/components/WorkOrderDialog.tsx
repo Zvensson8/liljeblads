@@ -174,7 +174,7 @@ export function WorkOrderDialog({
       if (order) {
         const { error } = await supabase
           .from("work_orders")
-          .update({ ...payload, updated_at: new Date().toISOString() })
+          .update({ ...payload, project_id: projectId || order.project_id || null, updated_at: new Date().toISOString() })
           .eq("id", order.id);
 
         if (error) {
@@ -183,7 +183,7 @@ export function WorkOrderDialog({
         }
         toast.success("Arbetsorder uppdaterad");
       } else {
-        const { error } = await supabase.from("work_orders").insert([payload]);
+        const { error } = await supabase.from("work_orders").insert([{ ...payload, project_id: projectId || null }]);
 
         if (error) {
           handleDbError("Skapande", error);

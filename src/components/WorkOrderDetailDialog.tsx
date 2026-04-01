@@ -258,11 +258,10 @@ export function WorkOrderDetailDialog({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleSendDraft}
-                  disabled={sendingDraft}
+                  onClick={() => setPreviewSheetOpen(true)}
                 >
                   <Mail className="h-4 w-4 mr-2" />
-                  {sendingDraft ? "Skickar..." : "Skicka beställningsutkast"}
+                  Beställningsutkast
                 </Button>
                 <Button
                   variant="outline"
