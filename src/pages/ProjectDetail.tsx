@@ -23,8 +23,6 @@ import {
   Download,
   Home,
   Building2,
-  Mail,
-  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
