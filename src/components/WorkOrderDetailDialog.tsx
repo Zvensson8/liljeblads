@@ -56,7 +56,7 @@ export function WorkOrderDetailDialog({
   const [converting, setConverting] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<any>(null);
   const [exporting, setExporting] = useState(false);
-  const [sendingDraft, setSendingDraft] = useState(false);
+  const [previewSheetOpen, setPreviewSheetOpen] = useState(false);
 
   const { data: files, refetch: refetchFiles } = useQuery({
     queryKey: ["work-order-files", workOrder?.id],
