@@ -619,6 +619,12 @@ export default function ProjectDetail() {
         onSuccess={fetchProject}
         editingProject={project}
       />
+
+      <ProjectOrderPreviewSheet
+        open={orderPreviewOpen}
+        onOpenChange={setOrderPreviewOpen}
+        project={project}
+      />
     </SidebarProvider>
   );
 }
