@@ -83,6 +83,37 @@ export function FounderKnowledgeBase() {
     fetchSources();
   }, [fetchSources]);
 
+  const callAuthedFunction = useCallback(async (functionName: string, payload: Record<string, unknown>) => {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      throw new Error("Din session har gått ut. Logga in igen och försök på nytt.");
+    }
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(result?.error || `Edge Function misslyckades (${response.status})`);
+    }
+
+    return result;
+  }, []);
+
   const handleIngestText = async () => {
     if (!sourceKey.trim() || !sourceTitle.trim() || !content.trim()) {
       toast.error("Fyll i alla fält");
@@ -91,15 +122,12 @@ export function FounderKnowledgeBase() {
 
     setIngesting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ingest-knowledge-base", {
-        body: {
-          sourceKey: sourceKey.trim(),
-          sourceTitle: sourceTitle.trim(),
-          content: content.trim(),
-        },
+      const data = await callAuthedFunction("ingest-knowledge-base", {
+        sourceKey: sourceKey.trim(),
+        sourceTitle: sourceTitle.trim(),
+        content: content.trim(),
       });
 
-      if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
       toast.success(`Ingestat ${data.chunksCreated || 0} chunks från "${sourceTitle}"`);
@@ -203,11 +231,11 @@ export function FounderKnowledgeBase() {
         if (!urlData?.signedUrl) throw new Error("Kunde inte skapa signerad URL");
 
         // Parse the document - call multiple times with increasing page ranges for large docs
-        const { data: parseData, error: parseError } = await supabase.functions.invoke("parse-document", {
-          body: { url: urlData.signedUrl, maxPages: 100 },
+        const parseData = await callAuthedFunction("parse-document", {
+          url: urlData.signedUrl,
+          maxPages: 100,
         });
 
-        if (parseError) throw parseError;
         if (parseData?.error && !parseData?.text) throw new Error(parseData.error);
 
         extractedText = parseData?.text || "";
@@ -224,15 +252,12 @@ export function FounderKnowledgeBase() {
       setUploadProgress(`Ingestar ${extractedText.length.toLocaleString("sv-SE")} tecken i kunskapsbasen...`);
 
       // Ingest the extracted text
-      const { data, error } = await supabase.functions.invoke("ingest-knowledge-base", {
-        body: {
-          sourceKey: fileSourceKey.trim(),
-          sourceTitle: fileSourceTitle.trim(),
-          content: extractedText,
-        },
+      const data = await callAuthedFunction("ingest-knowledge-base", {
+        sourceKey: fileSourceKey.trim(),
+        sourceTitle: fileSourceTitle.trim(),
+        content: extractedText,
       });
 
-      if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
       setUploadStep(4);
@@ -360,7 +385,7 @@ export function FounderKnowledgeBase() {
                     {uploadStep < 4 ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Check className="h-4 w-4 text-green-500" />
+                      <Check className="h-4 w-4 text-primary" />
                     )}
                     {uploadProgress}
                   </div>
