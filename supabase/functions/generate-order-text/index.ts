@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { searchKnowledgeBase } from "../_shared/knowledgeBaseSearch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,6 +51,10 @@ serve(async (req) => {
 
     const contact = contacts?.[0] || null;
 
+    // Search knowledge base for relevant ABT06/industry context
+    const searchQuery = `beställning entreprenad ${workOrder.action || ""} ${workOrder.comments || ""}`;
+    const knowledgeContext = await searchKnowledgeBase(searchQuery, 4);
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
@@ -64,6 +69,10 @@ serve(async (req) => {
       ? `Kontaktperson: ${contact.name}${contact.role ? ` (${contact.role})` : ""}${contact.phone ? `, tel: ${contact.phone}` : ""}${contact.email ? `, e-post: ${contact.email}` : ""}`
       : "";
 
+    const knowledgeSection = knowledgeContext
+      ? `\n\nRelevant branschkunskap (ABT06 m.m.) att referera till vid behov:\n${knowledgeContext}`
+      : "";
+
     const prompt = `Du är en professionell fastighetsförvaltare som skriver beställningar till entreprenörer. Skriv en tydlig och professionell beställningstext på svenska baserat på följande information:
 
 Organisation: ${orgName}
@@ -75,16 +84,17 @@ ${workOrder.price ? `Estimerat pris: ${workOrder.price} kr` : ""}
 ${workOrder.contractor ? `Entreprenör: ${workOrder.contractor}` : ""}
 Fastighetsnummer: ${propertyNumber}
 Fakturaadress: ${invoiceAddress}
-${contactInfo}
+${contactInfo}${knowledgeSection}
 
 Skriv texten som ett e-postmeddelande. Inkludera:
 1. Hälsningsfras
 2. Tydlig beskrivning av arbetet som beställs
-3. Tidsplan om angivet
-4. Faktureringsuppgifter (fakturaadressen, märkning med fastighetsnummer + kontonummer, faktura skickas till scanning@retta.se)
-5. Kontaktuppgifter för praktiska frågor (om kontaktperson finns)
-6. Be om bekräftelse och preliminärt startdatum
-7. Avslut
+3. Om relevant, referera till tillämpliga bestämmelser (t.ex. ABT06) för att förtydliga ansvar och garantier
+4. Tidsplan om angivet
+5. Faktureringsuppgifter (fakturaadressen, märkning med fastighetsnummer + kontonummer, faktura skickas till scanning@retta.se)
+6. Kontaktuppgifter för praktiska frågor (om kontaktperson finns)
+7. Be om bekräftelse och preliminärt startdatum
+8. Avslut
 
 Skriv ENBART beställningstexten, inget annat. Använd ren text utan markdown-formatering.`;
 
@@ -97,7 +107,7 @@ Skriv ENBART beställningstexten, inget annat. Använd ren text utan markdown-fo
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: "Du skriver professionella beställningstexter för fastighetsförvaltning på svenska." },
+          { role: "system", content: "Du skriver professionella beställningstexter för fastighetsförvaltning på svenska. Du har kunskap om ABT06 och andra branschstandarder och refererar till dessa vid behov." },
           { role: "user", content: prompt },
         ],
       }),

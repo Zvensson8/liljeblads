@@ -11,6 +11,7 @@ import { FounderOrganizations } from "@/components/founder/FounderOrganizations"
 import { FounderOrganizationMembers } from "@/components/founder/FounderOrganizationMembers";
 import { FounderUsers } from "@/components/founder/FounderUsers";
 import { FounderStats } from "@/components/founder/FounderStats";
+import { FounderKnowledgeBase } from "@/components/founder/FounderKnowledgeBase";
 
 export default function FounderAdmin() {
   const { user } = useAuth();
@@ -94,11 +95,12 @@ export default function FounderAdmin() {
 
             {/* Tabs */}
             <Tabs defaultValue="stats" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="stats">Översikt</TabsTrigger>
                 <TabsTrigger value="organizations">Organisationer</TabsTrigger>
                 <TabsTrigger value="members">Medlemmar</TabsTrigger>
                 <TabsTrigger value="users">Användare</TabsTrigger>
+                <TabsTrigger value="knowledge">Kunskapsbas</TabsTrigger>
               </TabsList>
 
               <TabsContent value="stats">
@@ -115,6 +117,10 @@ export default function FounderAdmin() {
 
               <TabsContent value="users">
                 <FounderUsers />
+              </TabsContent>
+
+              <TabsContent value="knowledge">
+                <FounderKnowledgeBase />
               </TabsContent>
             </Tabs>
           </div>
