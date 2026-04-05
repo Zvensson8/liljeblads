@@ -81,8 +81,10 @@ export default function AIChat() {
   });
 
   useEffect(() => {
-    setMessages(conversationMessages);
-  }, [conversationMessages]);
+    if (!isLoading) {
+      setMessages(conversationMessages);
+    }
+  }, [conversationMessages, isLoading]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
