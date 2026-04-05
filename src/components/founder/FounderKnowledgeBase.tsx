@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { BookOpen, Upload, Trash2, Loader2, FileText, Search } from "lucide-react";
+import { BookOpen, Upload, Trash2, Loader2, FileText, FileUp, Check } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
 
 interface KBSource {
   source_key: string;
@@ -33,10 +35,18 @@ export function FounderKnowledgeBase() {
   const [deleteKey, setDeleteKey] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Form state
+  // Text form state
   const [sourceKey, setSourceKey] = useState("");
   const [sourceTitle, setSourceTitle] = useState("");
   const [content, setContent] = useState("");
+
+  // File upload state
+  const [fileSourceKey, setFileSourceKey] = useState("");
+  const [fileSourceTitle, setFileSourceTitle] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string>("");
+  const [uploadStep, setUploadStep] = useState(0); // 0=idle, 1=uploading, 2=parsing, 3=ingesting, 4=done
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSources = useCallback(async () => {
     try {
@@ -46,7 +56,6 @@ export function FounderKnowledgeBase() {
 
       if (error) throw error;
 
-      // Group by source_key
       const grouped: Record<string, KBSource> = {};
       (data || []).forEach((row: any) => {
         if (!grouped[row.source_key]) {
@@ -74,7 +83,7 @@ export function FounderKnowledgeBase() {
     fetchSources();
   }, [fetchSources]);
 
-  const handleIngest = async () => {
+  const handleIngestText = async () => {
     if (!sourceKey.trim() || !sourceTitle.trim() || !content.trim()) {
       toast.error("Fyll i alla fält");
       return;
@@ -105,6 +114,151 @@ export function FounderKnowledgeBase() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = [
+      "application/pdf",
+      "text/plain",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    const allowedExts = [".pdf", ".txt", ".docx", ".md"];
+    const ext = "." + file.name.split(".").pop()?.toLowerCase();
+
+    if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
+      toast.error("Stöder PDF, DOCX, TXT och MD-filer");
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("Max filstorlek: 20 MB");
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Auto-fill title from filename
+    if (!fileSourceTitle) {
+      const name = file.name.replace(/\.[^/.]+$/, "");
+      setFileSourceTitle(name);
+    }
+    if (!fileSourceKey) {
+      const key = file.name
+        .replace(/\.[^/.]+$/, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9åäö]+/g, "-")
+        .replace(/^-|-$/g, "");
+      setFileSourceKey(key);
+    }
+  };
+
+  const readFileAsText = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile || !fileSourceKey.trim() || !fileSourceTitle.trim()) {
+      toast.error("Välj en fil och fyll i nyckel och titel");
+      return;
+    }
+
+    setIngesting(true);
+    setUploadStep(1);
+    setUploadProgress("Läser fil...");
+
+    try {
+      let extractedText = "";
+      const ext = "." + selectedFile.name.split(".").pop()?.toLowerCase();
+
+      if (ext === ".txt" || ext === ".md") {
+        // Plain text - read directly
+        extractedText = await readFileAsText(selectedFile);
+        setUploadStep(2);
+        setUploadProgress("Text extraherad");
+      } else {
+        // PDF/DOCX - upload to storage, then parse
+        setUploadProgress("Laddar upp fil...");
+
+        const filePath = `knowledge-base/${Date.now()}-${selectedFile.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("property-documents")
+          .upload(filePath, selectedFile);
+
+        if (uploadError) throw new Error("Uppladdning misslyckades: " + uploadError.message);
+
+        setUploadStep(2);
+        setUploadProgress("Extraherar text från dokument...");
+
+        // Get signed URL for the uploaded file
+        const { data: urlData } = await supabase.storage
+          .from("property-documents")
+          .createSignedUrl(filePath, 300);
+
+        if (!urlData?.signedUrl) throw new Error("Kunde inte skapa signerad URL");
+
+        // Parse the document - call multiple times with increasing page ranges for large docs
+        const { data: parseData, error: parseError } = await supabase.functions.invoke("parse-document", {
+          body: { url: urlData.signedUrl, maxPages: 100 },
+        });
+
+        if (parseError) throw parseError;
+        if (parseData?.error && !parseData?.text) throw new Error(parseData.error);
+
+        extractedText = parseData?.text || "";
+
+        // Clean up the temp file
+        await supabase.storage.from("property-documents").remove([filePath]);
+
+        if (!extractedText.trim()) {
+          throw new Error("Kunde inte extrahera text från dokumentet. Försök med en textfil istället.");
+        }
+      }
+
+      setUploadStep(3);
+      setUploadProgress(`Ingestar ${extractedText.length.toLocaleString("sv-SE")} tecken i kunskapsbasen...`);
+
+      // Ingest the extracted text
+      const { data, error } = await supabase.functions.invoke("ingest-knowledge-base", {
+        body: {
+          sourceKey: fileSourceKey.trim(),
+          sourceTitle: fileSourceTitle.trim(),
+          content: extractedText,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setUploadStep(4);
+      setUploadProgress(`Klart! ${data.chunksCreated || 0} chunks skapade.`);
+      toast.success(`Ingestat ${data.chunksCreated || 0} chunks från "${fileSourceTitle}"`);
+
+      // Reset after delay
+      setTimeout(() => {
+        setSelectedFile(null);
+        setFileSourceKey("");
+        setFileSourceTitle("");
+        setUploadStep(0);
+        setUploadProgress("");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }, 2000);
+
+      fetchSources();
+    } catch (err: any) {
+      toast.error(err.message || "Kunde inte bearbeta dokumentet");
+      setUploadStep(0);
+      setUploadProgress("");
+    } finally {
+      setIngesting(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteKey) return;
     setDeleting(true);
@@ -125,63 +279,164 @@ export function FounderKnowledgeBase() {
     }
   };
 
+  const stepProgress = uploadStep === 0 ? 0 : uploadStep === 1 ? 20 : uploadStep === 2 ? 50 : uploadStep === 3 ? 80 : 100;
+
   return (
     <div className="space-y-6">
-      {/* Ingest form */}
+      {/* Upload card with tabs */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Ladda upp kunskapsbastext
+            Ladda upp till kunskapsbasen
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Käll-nyckel</label>
-              <Input
-                placeholder="t.ex. abt06"
-                value={sourceKey}
-                onChange={(e) => setSourceKey(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Titel</label>
-              <Input
-                placeholder="t.ex. ABT 06 – Allmänna bestämmelser"
-                value={sourceTitle}
-                onChange={(e) => setSourceTitle(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Innehåll</label>
-            <Textarea
-              placeholder="Klistra in texten här..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={12}
-              className="text-sm"
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">
-              {content.length > 0 ? `${content.length.toLocaleString("sv-SE")} tecken` : ""}
-            </span>
-            <Button onClick={handleIngest} disabled={ingesting}>
-              {ingesting ? (
-                <>
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                  Bearbetar...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-1.5 h-4 w-4" />
-                  Ingesta dokument
-                </>
+        <CardContent>
+          <Tabs defaultValue="file" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="file">
+                <FileUp className="h-4 w-4 mr-1.5" />
+                Ladda upp fil
+              </TabsTrigger>
+              <TabsTrigger value="text">
+                <FileText className="h-4 w-4 mr-1.5" />
+                Klistra in text
+              </TabsTrigger>
+            </TabsList>
+
+            {/* File upload tab */}
+            <TabsContent value="file" className="space-y-4">
+              <div
+                className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.txt,.md,.docx"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                {selectedFile ? (
+                  <div className="space-y-2">
+                    <FileText className="h-10 w-10 mx-auto text-primary" />
+                    <p className="font-medium">{selectedFile.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(selectedFile.size / 1024).toFixed(0)} KB · Klicka för att byta fil
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <FileUp className="h-10 w-10 mx-auto text-muted-foreground" />
+                    <p className="font-medium">Klicka för att välja fil</p>
+                    <p className="text-xs text-muted-foreground">PDF, DOCX, TXT eller MD (max 20 MB)</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Käll-nyckel</label>
+                  <Input
+                    placeholder="t.ex. abt06"
+                    value={fileSourceKey}
+                    onChange={(e) => setFileSourceKey(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Titel</label>
+                  <Input
+                    placeholder="t.ex. ABT 06 – Allmänna bestämmelser"
+                    value={fileSourceTitle}
+                    onChange={(e) => setFileSourceTitle(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {uploadStep > 0 && (
+                <div className="space-y-2">
+                  <Progress value={stepProgress} className="h-2" />
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    {uploadStep < 4 ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4 text-green-500" />
+                    )}
+                    {uploadProgress}
+                  </div>
+                </div>
               )}
-            </Button>
-          </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleFileUpload}
+                  disabled={ingesting || !selectedFile}
+                >
+                  {ingesting ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      Bearbetar...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-1.5 h-4 w-4" />
+                      Ladda upp & ingesta
+                    </>
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+
+            {/* Text paste tab */}
+            <TabsContent value="text" className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Käll-nyckel</label>
+                  <Input
+                    placeholder="t.ex. abt06"
+                    value={sourceKey}
+                    onChange={(e) => setSourceKey(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Titel</label>
+                  <Input
+                    placeholder="t.ex. ABT 06 – Allmänna bestämmelser"
+                    value={sourceTitle}
+                    onChange={(e) => setSourceTitle(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Innehåll</label>
+                <Textarea
+                  placeholder="Klistra in texten här..."
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  rows={12}
+                  className="text-sm"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {content.length > 0 ? `${content.length.toLocaleString("sv-SE")} tecken` : ""}
+                </span>
+                <Button onClick={handleIngestText} disabled={ingesting}>
+                  {ingesting ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      Bearbetar...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-1.5 h-4 w-4" />
+                      Ingesta text
+                    </>
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
