@@ -113,25 +113,28 @@ Deno.serve(async (req) => {
     const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
     if (!GOOGLE_AI_API_KEY) throw new Error("GOOGLE_AI_API_KEY is not configured");
 
+    // Read body first (can only be read once)
+    const body = await req.json();
+
     // Auth check
     const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
-    if (userError || !user) throw new Error("Unauthorized");
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) throw new Error("Unauthorized");
+    const userId = claimsData.claims.sub;
 
     // Check founder role
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("role", "founder")
       .maybeSingle();
 
     if (!roleData) throw new Error("Only founders can manage the knowledge base");
-
-    const body = await req.json();
 
     // Handle delete
     if (body.action === "delete") {
@@ -174,10 +177,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Ingest
-    const { source_key, source_title, content } = body;
+    // Ingest - accept both camelCase and snake_case
+    const source_key = body.sourceKey || body.source_key;
+    const source_title = body.sourceTitle || body.source_title;
+    const content = body.content;
     if (!source_key || !source_title || !content) {
-      throw new Error("Missing required fields: source_key, source_title, content");
+      throw new Error("Missing required fields: sourceKey, sourceTitle, content");
     }
 
     console.log(`Ingesting knowledge base: ${source_key} (${content.length} chars)`);
@@ -217,7 +222,7 @@ Deno.serve(async (req) => {
         success: true,
         source_key,
         source_title,
-        chunks_count: chunks.length,
+        chunksCreated: chunks.length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
