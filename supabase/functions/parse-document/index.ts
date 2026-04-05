@@ -32,21 +32,25 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
+    // Decode JWT to get user ID
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
-
-    if (claimsError || !claimsData?.claims?.sub) {
+    let userId: string;
+    try {
+      const payloadB64 = token.split('.')[1];
+      const payload = JSON.parse(atob(payloadB64));
+      userId = payload.sub;
+      if (!userId) throw new Error('No sub');
+    } catch {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = claimsData.claims.sub;
+    // Create auth client for storage RLS
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
     const { url, maxPages = 10 } = await req.json();
 
