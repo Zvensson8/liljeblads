@@ -320,7 +320,7 @@ export default function AIChat() {
     return { mainContent: suggestions.length > 0 ? mainContent : content, suggestions };
   };
 
-  const ConversationList = () => (
+  const conversationListContent = (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b">
         <Button onClick={handleNewConversation} className="w-full" variant="outline">
@@ -328,7 +328,7 @@ export default function AIChat() {
           Ny konversation
         </Button>
       </div>
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="p-2 space-y-1">
           {conversationsLoading ? (
             <div className="flex justify-center py-4">
@@ -360,7 +360,7 @@ export default function AIChat() {
                   variant="ghost"
                   size="icon"
                   className={cn(
-                    "h-7 w-7 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity",
+                    "h-7 w-7 flex-shrink-0 opacity-100 transition-opacity",
                     selectedConversationId === conv.id ? "text-primary-foreground hover:bg-primary-foreground/20" : "hover:bg-destructive/10 hover:text-destructive"
                   )}
                   onClick={(e) => {
@@ -376,7 +376,7 @@ export default function AIChat() {
             ))
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 
