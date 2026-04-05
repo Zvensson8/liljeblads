@@ -58,6 +58,17 @@ function parseTimeFilter(message: string): { quarter?: number; year?: number } {
   return f;
 }
 
+function normalizeProjectReference(value: string): string {
+  return value.trim().toUpperCase().replace(/\s+/g, '');
+}
+
+function extractProjectReferences(message: string): string[] {
+  const matches = message.match(/\b\d{4,6}(?:[-+][A-Z0-9]+)?\b/gi) || [];
+  return [...new Set(matches
+    .map(normalizeProjectReference)
+    .filter(ref => !/^20[2-3]\d$/.test(ref)))];
+}
+
 // ── Embedding helper ─────────────────────────────────────────
 async function getEmbedding(text: string, apiKey: string): Promise<number[]> {
   const resp = await fetch(
@@ -87,6 +98,7 @@ async function buildContext(
 ): Promise<string> {
   const searchTerms = extractSearchTerms(userMessage);
   const timeFilter = parseTimeFilter(userMessage);
+  const projectRefs = extractProjectReferences(userMessage);
   const parts: string[] = [];
 
   // 1. Org overview with properties & components
@@ -99,6 +111,42 @@ async function buildContext(
   
   const propIds = props?.map(p => p.id) || [];
   const propMap = new Map(props?.map(p => [p.id, p.name]) || []);
+  let explicitlyMatchedProjects: any[] = [];
+
+  if (projectRefs.length > 0 && propIds.length > 0) {
+    const { data: projectCandidates, error: projectCandidatesError } = await supabase
+      .from('projects')
+      .select('id, name, project_number, status, budget, actual_cost, description, type, year, start_quarter, property_id, property:properties(name, address)')
+      .in('property_id', propIds)
+      .limit(200);
+
+    if (projectCandidatesError) {
+      console.error('Project candidate query error:', projectCandidatesError.message);
+    } else {
+      explicitlyMatchedProjects = (projectCandidates || []).filter((project: any) =>
+        projectRefs.includes(normalizeProjectReference(project.project_number || ''))
+      );
+
+      if (explicitlyMatchedProjects.length > 0) {
+        let info = `🎯 EXAKT PROJEKTMATCHNING FÖR DENNA FRÅGA:`;
+        for (const project of explicitlyMatchedProjects) {
+          info += `\n  - ${project.name}`;
+          if (project.project_number) info += ` [Projektnr: ${project.project_number}]`;
+          info += ` (${project.property?.name || '?'})`;
+          if (project.status) info += ` — ${project.status}`;
+          if (project.type) info += `, typ: ${project.type}`;
+          if (project.year) info += `, år: ${project.year}`;
+          if (project.start_quarter) info += `, startkvartal: Q${project.start_quarter}`;
+          if (project.budget) info += `\n    Budget: ${project.budget.toLocaleString('sv-SE')} kr`;
+          if (project.actual_cost) info += `, Utfall: ${project.actual_cost.toLocaleString('sv-SE')} kr`;
+          if (project.description) info += `\n    Beskrivning: ${project.description}`;
+        }
+        parts.push(info);
+      } else {
+        parts.push(`⚠️ Ingen exakt projektmatchning hittades för projektnummer: ${projectRefs.join(', ')}`);
+      }
+    }
+  }
 
   let comps: any[] = [];
   if (propIds.length > 0) {
@@ -238,10 +286,16 @@ async function buildContext(
 
   // 4. Projects by time
   if ((timeFilter.quarter || timeFilter.year)) {
-    let q = supabase.from('projects').select('*, property:properties(name, address)').in('property_id', propIds);
-    if (timeFilter.quarter) q = q.eq('start_quarter', timeFilter.quarter);
-    if (timeFilter.year) q = q.eq('year', timeFilter.year);
-    const { data: projects } = await q.limit(30);
+    let projects = explicitlyMatchedProjects;
+
+    if (projects.length === 0) {
+      let q = supabase.from('projects').select('*, property:properties(name, address)').in('property_id', propIds);
+      if (timeFilter.quarter) q = q.eq('start_quarter', timeFilter.quarter);
+      if (timeFilter.year) q = q.eq('year', timeFilter.year);
+      const { data } = await q.limit(30);
+      projects = data || [];
+    }
+
     if (projects && projects.length > 0) {
       for (const pr of projects) {
         let info = `📋 PROJEKT: ${pr.name}`;
@@ -356,8 +410,11 @@ async function buildContext(
       }
       parts.push(info);
     }
-    const { data: activeProj } = await supabase.from('projects').select('id, name, project_number, status, budget, actual_cost, description, property:properties(name)')
-      .in('property_id', propIds).in('status', ['pagaende', 'planerat']).limit(10);
+    const activeProj = explicitlyMatchedProjects.length > 0
+      ? explicitlyMatchedProjects.filter((project: any) => ['pagaende', 'planerat'].includes(project.status))
+      : (await supabase.from('projects').select('id, name, project_number, status, budget, actual_cost, description, property:properties(name)')
+        .in('property_id', propIds).in('status', ['pagaende', 'planerat']).limit(10)).data;
+
     if (activeProj && activeProj.length > 0) {
       let info = `🚧 AKTIVA/PLANERADE PROJEKT:`;
       for (const p of activeProj) {
@@ -496,6 +553,7 @@ VIKTIGA REGLER:
 6. Om information saknas, säg EXAKT vilken data som saknas
 7. Ge alltid siffror (antal, kronor, procent) vid översikter
 8. Använd verktygen för att föreslå åtgärder (confidence >= 0.7)
+9. Om senaste användarmeddelandet innehåller ett projektnummer ska du behandla det som den exakta projektreferensen och ignorera andra projekt med liknande nummer, om inte användaren uttryckligen ber om en jämförelse
 
 KUNSKAPSBAS & KÄLLHÄNVISNING:
 - Om kunskapsbas-kontext (ABT 06, lagtexter, branschstandarder) tillhandahålls, referera ALLTID till källa: "Enligt kapitel X i ABT 06...", "Enligt X kap. Y § [lagnamn]..."
