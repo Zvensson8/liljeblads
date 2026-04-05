@@ -58,6 +58,27 @@ function parseTimeFilter(message: string): { quarter?: number; year?: number } {
   return f;
 }
 
+// ── Embedding helper ─────────────────────────────────────────
+async function getEmbedding(text: string, apiKey: string): Promise<number[]> {
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: { parts: [{ text }] },
+        outputDimensionality: 768,
+      }),
+    }
+  );
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Embedding API error ${resp.status}: ${errText}`);
+  }
+  const data = await resp.json();
+  return data.embedding?.values || [];
+}
+
 // ── Context builder ──────────────────────────────────────────
 async function buildContext(
   supabase: ReturnType<typeof createClient>,
@@ -75,7 +96,6 @@ async function buildContext(
     .eq('organization_id', orgId);
   
   if (propsError) console.error('Properties query error:', propsError.message);
-  console.log(`Properties found: ${props?.length || 0} for org ${orgId}`);
   
   const propIds = props?.map(p => p.id) || [];
   const propMap = new Map(props?.map(p => [p.id, p.name]) || []);
@@ -124,7 +144,6 @@ async function buildContext(
     }
     const { data: mhRecords } = await mq.limit(50);
     if (mhRecords && mhRecords.length > 0) {
-      // Fetch document embeddings for protocol content
       const docIds = mhRecords.flatMap(m => (m.documents || []).map((d: any) => d.id)).filter(Boolean);
       let docEmbeddings: any[] = [];
       if (docIds.length > 0) {
@@ -351,6 +370,50 @@ async function buildContext(
   return `\n\n--- RELEVANT DATA FRÅN SYSTEMET ---\n${parts.join('\n\n')}\n--- SLUT PÅ DATA ---`;
 }
 
+// ── Knowledge base RAG search ────────────────────────────────
+async function searchKnowledgeBase(
+  supabase: ReturnType<typeof createClient>,
+  userMessage: string,
+  googleApiKey: string,
+): Promise<string> {
+  try {
+    if (userMessage.length < 3) return '';
+    
+    const queryEmbedding = await getEmbedding(userMessage, googleApiKey);
+    
+    const { data: kbChunks, error } = await supabase.rpc("match_knowledge_base_chunks", {
+      _embedding: JSON.stringify(queryEmbedding),
+      _match_count: 8,
+      _match_threshold: 0.35,
+    });
+
+    if (error || !kbChunks?.length) return '';
+
+    const kbBySource = new Map<string, { title: string; chunks: string[] }>();
+    for (const chunk of kbChunks) {
+      if (!kbBySource.has(chunk.source_key)) {
+        kbBySource.set(chunk.source_key, { title: chunk.source_title, chunks: [] });
+      }
+      kbBySource.get(chunk.source_key)!.chunks.push(chunk.content);
+    }
+
+    const parts: string[] = [];
+    for (const [_key, info] of kbBySource) {
+      parts.push(`## ${info.title}\n\n${info.chunks.join("\n\n---\n\n")}`);
+    }
+
+    let kbContext = parts.join("\n\n===\n\n");
+    if (kbContext.length > 40000) {
+      kbContext = kbContext.substring(0, 40000) + "\n\n[...trunkerad]";
+    }
+
+    return `\n\n--- KUNSKAPSBAS (BRANSCHSTANDARDER & LAGSTIFTNING) ---\n${kbContext}\n--- SLUT PÅ KUNSKAPSBAS ---`;
+  } catch (e) {
+    console.error("Knowledge base search error:", e);
+    return '';
+  }
+}
+
 // ── Action tools definition ──────────────────────────────────
 const actionTools = [
   {
@@ -411,7 +474,7 @@ const actionTools = [
   }
 ];
 
-const systemPromptBase = `Du är en expert AI-assistent för fastighetsförvaltning. Du har tillgång till organisationens alla data.
+const systemPromptBase = `Du är en expert AI-assistent för fastighetsförvaltning med djup kunskap om svensk fastighetsrätt, entreprenadjuridik (inklusive ABT 06), och branschstandarder.
 
 VIKTIGA REGLER:
 1. Svara ALLTID på svenska
@@ -423,10 +486,19 @@ VIKTIGA REGLER:
 7. Ge alltid siffror (antal, kronor, procent) vid översikter
 8. Använd verktygen för att föreslå åtgärder (confidence >= 0.7)
 
+KUNSKAPSBAS & KÄLLHÄNVISNING:
+- Om kunskapsbas-kontext (ABT 06, lagtexter, branschstandarder) tillhandahålls, referera ALLTID till källa: "Enligt kapitel X i ABT 06...", "Enligt X kap. Y § [lagnamn]..."
+- Prioritera organisationens egna data framför generella kunskapsbasregler
+- Vid entreprenad- och beställningsfrågor, var extra noggrann med att skilja på beställarens och entreprenörens ansvar enligt ABT 06
+- Varna alltid för formkrav (t.ex. att ändringar och tillägg måste vara skriftliga enligt ABT 06)
+
 SVARSFORMAT:
 📊 SAMMANFATTNING — Översikt
-🔍 MÄTVÄRDEN — Specifika mätvärden
-⚠️ AVVIKELSER & REKOMMENDATIONER — Problem och förslag`;
+🔍 DETALJER — Specifika mätvärden och fakta
+⚠️ AVVIKELSER & REKOMMENDATIONER — Problem och förslag
+
+FÖLJDFRÅGOR:
+Avsluta ALLTID ditt svar med 2-3 föreslagna följdfrågor under "---" med varje förslag på en egen rad: "👉 [fråga här]".`;
 
 // ── Main handler ─────────────────────────────────────────────
 serve(async (req) => {
@@ -439,6 +511,7 @@ serve(async (req) => {
 
     const { messages, stream: streamRequested, conversationId } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -478,21 +551,37 @@ serve(async (req) => {
     }
     const orgId = profile.organization_id;
 
-    // ── Build context ──
+    // ── Build context & knowledge base search in parallel ──
     const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop();
     let contextInfo = '';
+    let knowledgeBaseContext = '';
+
     if (lastUserMsg?.content) {
       try {
         console.log(`Building context for org: ${orgId}, msg: "${lastUserMsg.content.substring(0, 50)}"`);
-        contextInfo = await buildContext(supabase, orgId, lastUserMsg.content);
-        console.log(`Context built (${contextInfo.length} chars)`);
+        
+        const contextPromises: Promise<string>[] = [
+          buildContext(supabase, orgId, lastUserMsg.content),
+        ];
+
+        // Search knowledge base if GOOGLE_AI_API_KEY is available
+        if (GOOGLE_AI_API_KEY) {
+          contextPromises.push(
+            searchKnowledgeBase(supabase, lastUserMsg.content, GOOGLE_AI_API_KEY)
+          );
+        }
+
+        const results = await Promise.all(contextPromises);
+        contextInfo = results[0] || '';
+        knowledgeBaseContext = results[1] || '';
+        
+        console.log(`Context built (${contextInfo.length} chars), KB context (${knowledgeBaseContext.length} chars)`);
       } catch (e) {
         console.error('Context build error:', e instanceof Error ? e.message : e);
-        console.error('Context build stack:', e instanceof Error ? e.stack : '');
       }
     }
 
-    const systemPrompt = systemPromptBase + contextInfo;
+    const systemPrompt = systemPromptBase + contextInfo + knowledgeBaseContext;
     const useTools = !streamRequested;
 
     // ── AI request ──

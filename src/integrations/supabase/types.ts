@@ -1126,6 +1126,45 @@ export type Database = {
           },
         ]
       }
+      knowledge_base_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string
+          embedding: string | null
+          id: string
+          metadata: Json | null
+          source_key: string
+          source_title: string
+          token_count: number | null
+          updated_at: string
+        }
+        Insert: {
+          chunk_index?: number
+          content: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          source_key: string
+          source_title: string
+          token_count?: number | null
+          updated_at?: string
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          source_key?: string
+          source_title?: string
+          token_count?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       maintenance_history: {
         Row: {
           action_type: string
@@ -3074,6 +3113,21 @@ export type Database = {
       is_organization_member: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
+      }
+      match_knowledge_base_chunks: {
+        Args: {
+          _embedding: string
+          _match_count?: number
+          _match_threshold?: number
+        }
+        Returns: {
+          chunk_index: number
+          content: string
+          id: string
+          similarity: number
+          source_key: string
+          source_title: string
+        }[]
       }
       seed_default_property_info_categories: {
         Args: { org_id: string }
