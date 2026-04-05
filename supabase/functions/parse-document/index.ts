@@ -37,14 +37,16 @@ serve(async (req) => {
     });
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: userData, error: userError } = await authClient.auth.getUser(token);
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
 
-    if (userError || !userData?.user?.id) {
+    if (claimsError || !claimsData?.claims?.sub) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const userId = claimsData.claims.sub;
 
     const { url, maxPages = 10 } = await req.json();
 
@@ -55,7 +57,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`User ${userData.user.id} parsing PDF from URL: ${url}`);
+    console.log(`User ${userId} parsing PDF from URL: ${url}`);
 
     let data: Uint8Array;
 
