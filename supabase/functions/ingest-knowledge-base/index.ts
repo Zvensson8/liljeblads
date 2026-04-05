@@ -105,10 +105,9 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("Missing authorization header");
+    if (!authHeader?.startsWith("Bearer ")) throw new Error("Missing authorization header");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
     if (!GOOGLE_AI_API_KEY) throw new Error("GOOGLE_AI_API_KEY is not configured");
@@ -116,14 +115,17 @@ Deno.serve(async (req) => {
     // Read body first (can only be read once)
     const body = await req.json();
 
-    // Auth check
-    const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    // Decode JWT to get user ID (no API call needed - just base64 decode the payload)
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) throw new Error("Unauthorized");
-    const userId = claimsData.claims.sub;
+    let userId: string;
+    try {
+      const payloadB64 = token.split(".")[1];
+      const payload = JSON.parse(atob(payloadB64));
+      userId = payload.sub;
+      if (!userId) throw new Error("No sub in token");
+    } catch {
+      throw new Error("Invalid token");
+    }
 
     // Check founder role
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
