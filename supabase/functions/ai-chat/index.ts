@@ -379,7 +379,9 @@ async function searchKnowledgeBase(
   try {
     if (userMessage.length < 3) return '';
     
+    console.log('KB search: generating embedding...');
     const queryEmbedding = await getEmbedding(userMessage, googleApiKey);
+    console.log(`KB search: embedding generated (${queryEmbedding.length} dims)`);
     
     const { data: kbChunks, error } = await supabase.rpc("match_knowledge_base_chunks", {
       _embedding: JSON.stringify(queryEmbedding),
@@ -387,7 +389,12 @@ async function searchKnowledgeBase(
       _match_threshold: 0.35,
     });
 
-    if (error || !kbChunks?.length) return '';
+    if (error) {
+      console.error('KB search RPC error:', error);
+      return '';
+    }
+    console.log(`KB search: found ${kbChunks?.length || 0} chunks`);
+    if (!kbChunks?.length) return '';
 
     const kbBySource = new Map<string, { title: string; chunks: string[] }>();
     for (const chunk of kbChunks) {
