@@ -394,9 +394,9 @@ export default function AIChat() {
                   <SheetTrigger asChild>
                     <Button variant="ghost" size="icon"><Menu className="h-5 w-5" /></Button>
                   </SheetTrigger>
-                  <SheetContent side="left" className="w-72 p-0">
-                    <ConversationList />
-                  </SheetContent>
+                    <SheetContent side="left" className="w-72 p-0">
+                      {conversationListContent}
+                    </SheetContent>
                 </Sheet>
               )}
               <div className="flex items-center gap-2">
@@ -415,7 +415,7 @@ export default function AIChat() {
             {/* Desktop conversation sidebar */}
             {!isMobile && (
               <aside className="w-72 border-r flex-shrink-0 bg-muted/30 min-h-0 overflow-hidden">
-                <ConversationList />
+                {conversationListContent}
               </aside>
             )}
 
