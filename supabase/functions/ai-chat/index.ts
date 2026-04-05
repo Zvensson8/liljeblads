@@ -238,13 +238,15 @@ async function buildContext(
 
   // 4. Projects by time
   if ((timeFilter.quarter || timeFilter.year)) {
-    let q = supabase.from('projects').select('*, property:properties(name)').in('property_id', propIds);
+    let q = supabase.from('projects').select('*, property:properties(name, address)').in('property_id', propIds);
     if (timeFilter.quarter) q = q.eq('start_quarter', timeFilter.quarter);
     if (timeFilter.year) q = q.eq('year', timeFilter.year);
     const { data: projects } = await q.limit(30);
     if (projects && projects.length > 0) {
       for (const pr of projects) {
-        let info = `📋 PROJEKT: ${pr.name} (${pr.property?.name || '?'})`;
+        let info = `📋 PROJEKT: ${pr.name}`;
+        if (pr.project_number) info += ` [Projektnr: ${pr.project_number}]`;
+        info += ` (${pr.property?.name || '?'})`;
         info += `\n    Status: ${pr.status || '?'}, Typ: ${pr.type || '?'}`;
         if (pr.budget) info += `\n    Budget: ${pr.budget.toLocaleString('sv-SE')} kr`;
         if (pr.actual_cost) info += `, Utfall: ${pr.actual_cost.toLocaleString('sv-SE')} kr`;
@@ -354,12 +356,14 @@ async function buildContext(
       }
       parts.push(info);
     }
-    const { data: activeProj } = await supabase.from('projects').select('id, name, status, budget, actual_cost, property:properties(name)')
+    const { data: activeProj } = await supabase.from('projects').select('id, name, project_number, status, budget, actual_cost, description, property:properties(name)')
       .in('property_id', propIds).in('status', ['pagaende', 'planerat']).limit(10);
     if (activeProj && activeProj.length > 0) {
       let info = `🚧 AKTIVA/PLANERADE PROJEKT:`;
       for (const p of activeProj) {
-        info += `\n  - ${p.name} (${p.property?.name || '?'}) — ${p.status}`;
+        info += `\n  - ${p.name}`;
+        if (p.project_number) info += ` [Projektnr: ${p.project_number}]`;
+        info += ` (${p.property?.name || '?'}) — ${p.status}`;
         if (p.budget) info += `, budget: ${p.budget.toLocaleString('sv-SE')} kr`;
       }
       parts.push(info);
