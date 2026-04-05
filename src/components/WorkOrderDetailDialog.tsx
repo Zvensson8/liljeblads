@@ -4,12 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import * as SheetPrimitive from "@radix-ui/react-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, Trash2, Download, Edit2, FolderKanban, Eye, FileArchive, Mail } from "lucide-react";
+import { Upload, FileText, Trash2, Download, Edit2, FolderKanban, Eye, FileArchive, Mail, X } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -168,7 +167,6 @@ export function WorkOrderDetailDialog({
     
     setConverting(true);
     try {
-      // Skapa nytt projekt baserat på arbetsorderns data
       const { data: newProject, error: projectError } = await supabase
         .from("projects")
         .insert([{
@@ -184,16 +182,9 @@ export function WorkOrderDetailDialog({
         .select()
         .single();
 
-      if (projectError) {
-        console.error("Project creation error:", projectError);
-        throw projectError;
-      }
+      if (projectError) throw projectError;
+      if (!newProject) throw new Error("Projektet kunde inte skapas");
 
-      if (!newProject) {
-        throw new Error("Projektet kunde inte skapas");
-      }
-
-      // Uppdatera arbetsorderns status till slutförd och lägg till kommentar om konvertering
       const conversionNote = `Konverterad till projekt ${newProject.project_number} - ${newProject.name}`;
       const updatedComments = workOrder.comments 
         ? `${workOrder.comments}\n\n${conversionNote}` 
@@ -207,17 +198,13 @@ export function WorkOrderDetailDialog({
         })
         .eq("id", workOrder.id);
 
-      if (updateError) {
-        console.error("Work order update error:", updateError);
-        throw updateError;
-      }
+      if (updateError) throw updateError;
 
       toast.success("Arbetsorder konverterad till projekt!");
       onUpdate();
       setConvertDialogOpen(false);
       setConverting(false);
       
-      // Använd setTimeout för att säkerställa att state uppdateringar är klara
       setTimeout(() => {
         onOpenChange(false);
         navigate(`/projects/${newProject.id}`);
@@ -243,18 +230,34 @@ export function WorkOrderDetailDialog({
     }
   };
 
-  // Replaced by preview sheet
+  const handleClose = () => {
+    onOpenChange(false);
+  };
 
   if (!workOrder) return null;
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby="work-order-detail-description">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-2xl">Arbetsorder Detaljer</DialogTitle>
-              <div className="flex gap-2">
+      <Sheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) handleClose(); }}>
+        <SheetPrimitive.Portal>
+          <SheetPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+          <SheetPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex h-full w-full flex-col gap-0 border-l bg-background p-0 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-2xl">
+            {/* Header */}
+            <div className="flex-none border-b px-6 py-5">
+              <div className="flex items-center justify-between">
+                <SheetTitle className="text-xl font-semibold text-foreground">
+                  Arbetsorder Detaljer
+                </SheetTitle>
+                <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8">
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Stäng</span>
+                </Button>
+              </div>
+              <SheetDescription className="mt-1 text-sm text-muted-foreground sr-only">
+                Detaljerad vy av arbetsorder med information och filer
+              </SheetDescription>
+              {/* Action buttons */}
+              <div className="flex flex-wrap gap-2 mt-3">
                 <Button
                   variant="outline"
                   size="sm"
@@ -290,147 +293,145 @@ export function WorkOrderDetailDialog({
                 </Button>
               </div>
             </div>
-            <DialogDescription id="work-order-detail-description" className="sr-only">
-              Detaljerad vy av arbetsorder med information och filer
-            </DialogDescription>
-          </DialogHeader>
 
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-muted-foreground">Åtgärd</Label>
-                    <p className="font-medium">{workOrder.action}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Fastighet</Label>
-                    <p className="font-medium">{workOrder.properties?.name}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Status</Label>
-                    <div className="mt-1">
-                      <Badge variant="outline">{getStatusLabel(workOrder.status)}</Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Prioritet</Label>
-                    <div className="mt-1">{getPriorityBadge(workOrder.priority)}</div>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Entreprenör</Label>
-                    <p className="font-medium">{workOrder.contractor || "-"}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Pris</Label>
-                    <p className="font-medium text-green-500">
-                      {workOrder.price ? `${Number(workOrder.price).toLocaleString("sv-SE")} kr` : "-"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Datum</Label>
-                    <p className="font-medium">
-                      {workOrder.due_date
-                        ? format(new Date(workOrder.due_date), "yyyy-MM-dd", { locale: sv })
-                        : "-"}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Kvartal</Label>
-                    <p className="font-medium">{workOrder.quarter || "-"}</p>
-                  </div>
-                </div>
-                {workOrder.comments && (
-                  <>
-                    <Separator />
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-muted-foreground">Kommentar</Label>
-                      <p className="mt-1 text-sm">{workOrder.comments}</p>
+                      <Label className="text-muted-foreground">Åtgärd</Label>
+                      <p className="font-medium">{workOrder.action}</p>
                     </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                    <div>
+                      <Label className="text-muted-foreground">Fastighet</Label>
+                      <p className="font-medium">{workOrder.properties?.name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Status</Label>
+                      <div className="mt-1">
+                        <Badge variant="outline">{getStatusLabel(workOrder.status)}</Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Prioritet</Label>
+                      <div className="mt-1">{getPriorityBadge(workOrder.priority)}</div>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Entreprenör</Label>
+                      <p className="font-medium">{workOrder.contractor || "-"}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Pris</Label>
+                      <p className="font-medium text-green-500">
+                        {workOrder.price ? `${Number(workOrder.price).toLocaleString("sv-SE")} kr` : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Datum</Label>
+                      <p className="font-medium">
+                        {workOrder.due_date
+                          ? format(new Date(workOrder.due_date), "yyyy-MM-dd", { locale: sv })
+                          : "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Kvartal</Label>
+                      <p className="font-medium">{workOrder.quarter || "-"}</p>
+                    </div>
+                  </div>
+                  {workOrder.comments && (
+                    <>
+                      <Separator />
+                      <div>
+                        <Label className="text-muted-foreground">Kommentar</Label>
+                        <p className="mt-1 text-sm">{workOrder.comments}</p>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Filer
-                  <Label htmlFor="file-upload" className="cursor-pointer">
-                    <Button size="sm" disabled={uploading} asChild>
-                      <span>
-                        <Upload className="h-4 w-4 mr-2" />
-                        {uploading ? "Laddar upp..." : "Ladda upp fil"}
-                      </span>
-                    </Button>
-                  </Label>
-                  <Input
-                    id="file-upload"
-                    type="file"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                    disabled={uploading}
-                  />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {files && files.length > 0 ? (
-                  <div className="space-y-2">
-                    {files.map((file) => (
-                      <div
-                        key={file.id}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium">{file.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {file.file_size ? `${(file.file_size / 1024).toFixed(1)} KB` : ""}
-                              {" · "}
-                              {format(new Date(file.created_at), "yyyy-MM-dd HH:mm", { locale: sv })}
-                            </p>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    Filer
+                    <Label htmlFor="file-upload" className="cursor-pointer">
+                      <Button size="sm" disabled={uploading} asChild>
+                        <span>
+                          <Upload className="h-4 w-4 mr-2" />
+                          {uploading ? "Laddar upp..." : "Ladda upp fil"}
+                        </span>
+                      </Button>
+                    </Label>
+                    <Input
+                      id="file-upload"
+                      type="file"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                    />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {files && files.length > 0 ? (
+                    <div className="space-y-2">
+                      {files.map((file) => (
+                        <div
+                          key={file.id}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium">{file.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {file.file_size ? `${(file.file_size / 1024).toFixed(1)} KB` : ""}
+                                {" · "}
+                                {format(new Date(file.created_at), "yyyy-MM-dd HH:mm", { locale: sv })}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setPreviewDocument(file)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => window.open(file.file_url, "_blank")}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteFile(file.id, file.file_url)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setPreviewDocument(file)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => window.open(file.file_url, "_blank")}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteFile(file.id, file.file_url)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
-                    Inga filer uppladdade än
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </DialogContent>
-      </Dialog>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+                      Inga filer uppladdade än
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </SheetPrimitive.Content>
+        </SheetPrimitive.Portal>
+      </Sheet>
 
       <WorkOrderDialog
         open={editDialogOpen}
