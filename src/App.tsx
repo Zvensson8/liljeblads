@@ -3,8 +3,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/hooks/useAuth";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { NotificationsProvider } from "@/hooks/useNotifications";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { useGlobalShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -46,6 +46,14 @@ const PageLoader = () => (
   </div>
 );
 
+// Protected route wrapper — redirects to /auth if not authenticated
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  if (!user) return <Navigate to="/auth" replace />;
+  return <>{children}</>;
+};
+
 const AppContent = () => {
   const [searchOpen, setSearchOpen] = React.useState(false);
   const isMobile = useIsMobile();
@@ -57,25 +65,25 @@ const AppContent = () => {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/properties" element={<Properties />} />
-          <Route path="/property/:id" element={<PropertyDetail />} />
-          <Route path="/components" element={<Components />} />
-          <Route path="/components/:id" element={<ComponentDetail />} />
-          <Route path="/work-orders" element={<WorkOrders />} />
-          <Route path="/operations" element={<Operations />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/projects/:id" element={<ProjectDetail />} />
-          <Route path="/cost-overview" element={<CostOverview />} />
-          <Route path="/recurring-costs" element={<RecurringCosts />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/security" element={<SecurityDashboard />} />
-          <Route path="/ai-chat" element={<AIChat />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="/user/settings" element={<UserSettings />} />
-          <Route path="/organization/settings" element={<OrganizationSettings />} />
-          <Route path="/founder/admin" element={<FounderAdmin />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/properties" element={<ProtectedRoute><Properties /></ProtectedRoute>} />
+          <Route path="/property/:id" element={<ProtectedRoute><PropertyDetail /></ProtectedRoute>} />
+          <Route path="/components" element={<ProtectedRoute><Components /></ProtectedRoute>} />
+          <Route path="/components/:id" element={<ProtectedRoute><ComponentDetail /></ProtectedRoute>} />
+          <Route path="/work-orders" element={<ProtectedRoute><WorkOrders /></ProtectedRoute>} />
+          <Route path="/operations" element={<ProtectedRoute><Operations /></ProtectedRoute>} />
+          <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+          <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
+          <Route path="/cost-overview" element={<ProtectedRoute><CostOverview /></ProtectedRoute>} />
+          <Route path="/recurring-costs" element={<ProtectedRoute><RecurringCosts /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+          <Route path="/security" element={<ProtectedRoute><SecurityDashboard /></ProtectedRoute>} />
+          <Route path="/ai-chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+          <Route path="/user/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
+          <Route path="/organization/settings" element={<ProtectedRoute><OrganizationSettings /></ProtectedRoute>} />
+          <Route path="/founder/admin" element={<ProtectedRoute><FounderAdmin /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
