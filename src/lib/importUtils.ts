@@ -160,14 +160,16 @@ const componentSchema = z.object({
   refrigerant_type: z.string().optional(),
 });
 
-interface ValidationResult {
-  status: 'valid' | 'warning' | 'error';
+export interface ValidationResult {
+  status: 'valid' | 'warning' | 'error' | 'duplicate';
   message: string;
   data: any;
   floorId?: string;
   propertyId?: string;
   floorName: string;
   propertyName?: string;
+  duplicateOf?: { name: string; serial_number?: string; registration_number?: string };
+  approved?: boolean;
 }
 
 export const validateAndMatchComponents = async (
@@ -201,7 +203,7 @@ export const validateAndMatchComponents = async (
   // Fetch existing components to check for duplicates
   const { data: existingComponents } = await supabase
     .from('components')
-    .select('name, floor_id, property_id');
+    .select('name, floor_id, property_id, serial_number, registration_number');
 
   const existingNamesByFloor = new Set(
     existingComponents?.filter(c => c.floor_id).map((c) => `${c.name.toLowerCase()}-${c.floor_id}`) || []
@@ -209,6 +211,18 @@ export const validateAndMatchComponents = async (
   const existingNamesByProperty = new Set(
     existingComponents?.map((c) => `${c.name.toLowerCase()}-${c.property_id}`) || []
   );
+
+  // Build sets for serial_number and registration_number duplicate detection
+  const existingSerials = new Map<string, { name: string; serial_number: string }>();
+  const existingRegNrs = new Map<string, { name: string; registration_number: string }>();
+  for (const c of existingComponents || []) {
+    if (c.serial_number) {
+      existingSerials.set(c.serial_number.toLowerCase(), { name: c.name, serial_number: c.serial_number });
+    }
+    if (c.registration_number) {
+      existingRegNrs.set(c.registration_number.toLowerCase(), { name: c.name, registration_number: c.registration_number });
+    }
+  }
 
   const results: ValidationResult[] = [];
 
@@ -267,18 +281,41 @@ export const validateAndMatchComponents = async (
         }
       }
 
-      // Check for duplicates
-      if (floorId) {
-        const duplicateKey = `${mappedData.name.toLowerCase()}-${floorId}`;
-        if (existingNamesByFloor.has(duplicateKey)) {
-          result.status = 'warning';
-          result.message = 'Komponent med samma beteckning finns redan på denna våning';
+      // Check for duplicates by serial_number or registration_number first
+      let isDuplicate = false;
+      if (mappedData.serial_number) {
+        const existing = existingSerials.get(mappedData.serial_number.toLowerCase());
+        if (existing) {
+          result.status = 'duplicate';
+          result.message = `Serie-ID "${mappedData.serial_number}" finns redan (${existing.name})`;
+          result.duplicateOf = existing;
+          isDuplicate = true;
         }
-      } else {
-        const duplicateKey = `${mappedData.name.toLowerCase()}-${propId}`;
-        if (existingNamesByProperty.has(duplicateKey)) {
-          result.status = 'warning';
-          result.message = 'Komponent med samma beteckning finns redan i denna fastighet';
+      }
+      if (!isDuplicate && mappedData.registration_number) {
+        const existing = existingRegNrs.get(mappedData.registration_number.toLowerCase());
+        if (existing) {
+          result.status = 'duplicate';
+          result.message = `Reg.nr "${mappedData.registration_number}" finns redan (${existing.name})`;
+          result.duplicateOf = existing;
+          isDuplicate = true;
+        }
+      }
+
+      // Check for name duplicates (warning only)
+      if (!isDuplicate) {
+        if (floorId) {
+          const duplicateKey = `${mappedData.name.toLowerCase()}-${floorId}`;
+          if (existingNamesByFloor.has(duplicateKey)) {
+            result.status = 'warning';
+            result.message = 'Komponent med samma beteckning finns redan på denna våning';
+          }
+        } else {
+          const duplicateKey = `${mappedData.name.toLowerCase()}-${propId}`;
+          if (existingNamesByProperty.has(duplicateKey)) {
+            result.status = 'warning';
+            result.message = 'Komponent med samma beteckning finns redan i denna fastighet';
+          }
         }
       }
 
@@ -311,7 +348,12 @@ export const importComponents = async (
   let failed = 0;
 
   for (const component of validatedComponents) {
+    // Skip errors and unapproved duplicates
     if (component.status === 'error' || !component.propertyId) {
+      failed++;
+      continue;
+    }
+    if (component.status === 'duplicate' && !component.approved) {
       failed++;
       continue;
     }

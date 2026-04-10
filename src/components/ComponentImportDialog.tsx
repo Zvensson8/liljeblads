@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Download, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { Upload, Download, CheckCircle, AlertCircle, XCircle, Copy, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { parseImportFile, validateAndMatchComponents, importComponents } from '@/lib/importUtils';
+import { parseImportFile, validateAndMatchComponents, importComponents, type ValidationResult } from '@/lib/importUtils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ComponentImportDialogProps {
@@ -24,7 +24,7 @@ export const ComponentImportDialog = ({
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<any[]>([]);
-  const [validationResults, setValidationResults] = useState<any[]>([]);
+  const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [importing, setImporting] = useState(false);
   const [stage, setStage] = useState<'upload' | 'preview'>('upload');
   const { toast } = useToast();
@@ -65,8 +65,10 @@ export const ComponentImportDialog = ({
     setImporting(true);
 
     try {
-      const validComponents = validationResults.filter((r) => r.status === 'valid');
-      const result = await importComponents(validComponents);
+      const importable = validationResults.filter(
+        (r) => r.status === 'valid' || r.status === 'warning' || (r.status === 'duplicate' && r.approved)
+      );
+      const result = await importComponents(importable);
 
       toast({
         title: 'Import slutförd!',
@@ -182,12 +184,28 @@ export const ComponentImportDialog = ({
     });
   };
 
-  const getStatusIcon = (status: string) => {
+  const handleApproveDuplicate = (index: number) => {
+    setValidationResults(prev => prev.map((r, i) => 
+      i === index ? { ...r, approved: true } : r
+    ));
+  };
+
+  const handleRejectDuplicate = (index: number) => {
+    setValidationResults(prev => prev.map((r, i) => 
+      i === index ? { ...r, approved: false } : r
+    ));
+  };
+
+  const getStatusIcon = (status: string, approved?: boolean) => {
     switch (status) {
       case 'valid':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'warning':
         return <AlertCircle className="h-4 w-4 text-yellow-600" />;
+      case 'duplicate':
+        if (approved === true) return <CheckCircle className="h-4 w-4 text-green-600" />;
+        if (approved === false) return <XCircle className="h-4 w-4 text-red-600" />;
+        return <Copy className="h-4 w-4 text-orange-600" />;
       case 'error':
         return <XCircle className="h-4 w-4 text-red-600" />;
       default:
@@ -195,12 +213,16 @@ export const ComponentImportDialog = ({
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, approved?: boolean) => {
     switch (status) {
       case 'valid':
         return <Badge variant="default" className="bg-green-600">OK</Badge>;
       case 'warning':
         return <Badge variant="default" className="bg-yellow-600">Varning</Badge>;
+      case 'duplicate':
+        if (approved === true) return <Badge variant="default" className="bg-green-600">Godkänd</Badge>;
+        if (approved === false) return <Badge variant="destructive">Nekad</Badge>;
+        return <Badge variant="default" className="bg-orange-600">Dubblett</Badge>;
       case 'error':
         return <Badge variant="destructive">Fel</Badge>;
       default:
@@ -208,9 +230,11 @@ export const ComponentImportDialog = ({
     }
   };
 
-  const validCount = validationResults.filter((r) => r.status === 'valid').length;
-  const warningCount = validationResults.filter((r) => r.status === 'warning').length;
+  const validCount = validationResults.filter((r) => r.status === 'valid' || r.status === 'warning').length;
+  const duplicateCount = validationResults.filter((r) => r.status === 'duplicate').length;
+  const approvedDuplicates = validationResults.filter((r) => r.status === 'duplicate' && r.approved).length;
   const errorCount = validationResults.filter((r) => r.status === 'error').length;
+  const importableCount = validCount + approvedDuplicates;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -270,15 +294,17 @@ export const ComponentImportDialog = ({
 
         {stage === 'preview' && (
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex gap-4 mb-4">
+            <div className="flex flex-wrap gap-4 mb-4">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <span className="text-sm">{validCount} giltig(a)</span>
               </div>
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-yellow-600" />
-                <span className="text-sm">{warningCount} varning(ar)</span>
-              </div>
+              {duplicateCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <Copy className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm">{duplicateCount} dubblett(er) ({approvedDuplicates} godkänd(a))</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <XCircle className="h-4 w-4 text-red-600" />
                 <span className="text-sm">{errorCount} fel</span>
@@ -295,23 +321,48 @@ export const ComponentImportDialog = ({
                     {!propertyId && <TableHead>Fastighet</TableHead>}
                     <TableHead>Våning</TableHead>
                     <TableHead>Meddelande</TableHead>
+                    <TableHead className="w-24">Åtgärd</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {validationResults.map((result, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{getStatusIcon(result.status)}</TableCell>
+                    <TableRow key={index} className={result.status === 'duplicate' && result.approved === false ? 'opacity-50' : ''}>
+                      <TableCell>{getStatusIcon(result.status, result.approved)}</TableCell>
                       <TableCell className="font-medium">{result.data.name}</TableCell>
                       <TableCell>{result.data.type}</TableCell>
                       {!propertyId && <TableCell>{result.propertyName}</TableCell>}
                       <TableCell>{result.floorName}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {getStatusBadge(result.status)}
+                          {getStatusBadge(result.status, result.approved)}
                           <span className="text-sm text-muted-foreground">
                             {result.message}
                           </span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {result.status === 'duplicate' && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant={result.approved === true ? 'default' : 'outline'}
+                              className="h-7 w-7"
+                              onClick={() => handleApproveDuplicate(index)}
+                              title="Godkänn import"
+                            >
+                              <ThumbsUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant={result.approved === false ? 'destructive' : 'outline'}
+                              className="h-7 w-7"
+                              onClick={() => handleRejectDuplicate(index)}
+                              title="Neka import"
+                            >
+                              <ThumbsDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -325,9 +376,9 @@ export const ComponentImportDialog = ({
               </Button>
               <Button
                 onClick={handleImport}
-                disabled={importing || validCount === 0}
+                disabled={importing || importableCount === 0 || validationResults.some(r => r.status === 'duplicate' && r.approved === undefined)}
               >
-                {importing ? 'Importerar...' : `Importera ${validCount} komponenter`}
+                {importing ? 'Importerar...' : `Importera ${importableCount} komponenter`}
               </Button>
             </div>
           </div>
