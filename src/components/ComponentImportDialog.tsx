@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Upload, Download, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { parseCSV, validateAndMatchComponents, importComponents } from '@/lib/importUtils';
+import { parseImportFile, validateAndMatchComponents, importComponents } from '@/lib/importUtils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ComponentImportDialogProps {
@@ -33,10 +33,11 @@ export const ComponentImportDialog = ({
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    if (!selectedFile.name.endsWith('.csv')) {
+    const validExtensions = ['.csv', '.xlsx', '.xls'];
+    if (!validExtensions.some(ext => selectedFile.name.toLowerCase().endsWith(ext))) {
       toast({
         title: 'Fel filtyp',
-        description: 'Vänligen välj en CSV-fil',
+        description: 'Vänligen välj en CSV- eller Excel-fil (.xlsx/.xls)',
         variant: 'destructive',
       });
       return;
@@ -45,7 +46,7 @@ export const ComponentImportDialog = ({
     setFile(selectedFile);
 
     try {
-      const parsed = await parseCSV(selectedFile);
+      const parsed = await parseImportFile(selectedFile);
       setParsedData(parsed);
 
       const validated = await validateAndMatchComponents(parsed, propertyId || null);
@@ -216,28 +217,28 @@ export const ComponentImportDialog = ({
       <DialogTrigger asChild>
         <Button variant="outline">
           <Upload className="h-4 w-4 mr-2" />
-          Importera från CSV
+          Importera
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col" aria-describedby="import-dialog-description">
         <DialogHeader>
           <DialogTitle>
-            Importera komponenter från CSV
+            Importera komponenter
             {propertyName && ` - ${propertyName}`}
           </DialogTitle>
           <DialogDescription id="import-dialog-description" className="sr-only">
-            Importera komponenter från en CSV-fil
+            Importera komponenter från en CSV- eller Excel-fil
           </DialogDescription>
         </DialogHeader>
 
         {stage === 'upload' && (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="csv-file">Välj CSV-fil</Label>
+              <Label htmlFor="csv-file">Välj CSV- eller Excel-fil</Label>
               <Input
                 id="csv-file"
                 type="file"
-                accept=".csv"
+                accept=".csv,.xlsx,.xls"
                 onChange={handleFileChange}
               />
             </div>
