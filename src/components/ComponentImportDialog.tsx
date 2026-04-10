@@ -294,15 +294,17 @@ export const ComponentImportDialog = ({
 
         {stage === 'preview' && (
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex gap-4 mb-4">
+            <div className="flex flex-wrap gap-4 mb-4">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <span className="text-sm">{validCount} giltig(a)</span>
               </div>
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-yellow-600" />
-                <span className="text-sm">{warningCount} varning(ar)</span>
-              </div>
+              {duplicateCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <Copy className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm">{duplicateCount} dubblett(er) ({approvedDuplicates} godkänd(a))</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <XCircle className="h-4 w-4 text-red-600" />
                 <span className="text-sm">{errorCount} fel</span>
@@ -319,23 +321,48 @@ export const ComponentImportDialog = ({
                     {!propertyId && <TableHead>Fastighet</TableHead>}
                     <TableHead>Våning</TableHead>
                     <TableHead>Meddelande</TableHead>
+                    <TableHead className="w-24">Åtgärd</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {validationResults.map((result, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{getStatusIcon(result.status)}</TableCell>
+                    <TableRow key={index} className={result.status === 'duplicate' && result.approved === false ? 'opacity-50' : ''}>
+                      <TableCell>{getStatusIcon(result.status, result.approved)}</TableCell>
                       <TableCell className="font-medium">{result.data.name}</TableCell>
                       <TableCell>{result.data.type}</TableCell>
                       {!propertyId && <TableCell>{result.propertyName}</TableCell>}
                       <TableCell>{result.floorName}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {getStatusBadge(result.status)}
+                          {getStatusBadge(result.status, result.approved)}
                           <span className="text-sm text-muted-foreground">
                             {result.message}
                           </span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {result.status === 'duplicate' && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant={result.approved === true ? 'default' : 'outline'}
+                              className="h-7 w-7"
+                              onClick={() => handleApproveDuplicate(index)}
+                              title="Godkänn import"
+                            >
+                              <ThumbsUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant={result.approved === false ? 'destructive' : 'outline'}
+                              className="h-7 w-7"
+                              onClick={() => handleRejectDuplicate(index)}
+                              title="Neka import"
+                            >
+                              <ThumbsDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -349,9 +376,9 @@ export const ComponentImportDialog = ({
               </Button>
               <Button
                 onClick={handleImport}
-                disabled={importing || validCount === 0}
+                disabled={importing || importableCount === 0 || validationResults.some(r => r.status === 'duplicate' && r.approved === undefined)}
               >
-                {importing ? 'Importerar...' : `Importera ${validCount} komponenter`}
+                {importing ? 'Importerar...' : `Importera ${importableCount} komponenter`}
               </Button>
             </div>
           </div>
