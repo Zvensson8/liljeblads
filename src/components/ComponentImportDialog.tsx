@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Download, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { Upload, Download, CheckCircle, AlertCircle, XCircle, Copy, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { parseImportFile, validateAndMatchComponents, importComponents } from '@/lib/importUtils';
+import { parseImportFile, validateAndMatchComponents, importComponents, type ValidationResult } from '@/lib/importUtils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ComponentImportDialogProps {
@@ -24,7 +24,7 @@ export const ComponentImportDialog = ({
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<any[]>([]);
-  const [validationResults, setValidationResults] = useState<any[]>([]);
+  const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [importing, setImporting] = useState(false);
   const [stage, setStage] = useState<'upload' | 'preview'>('upload');
   const { toast } = useToast();
@@ -65,8 +65,10 @@ export const ComponentImportDialog = ({
     setImporting(true);
 
     try {
-      const validComponents = validationResults.filter((r) => r.status === 'valid');
-      const result = await importComponents(validComponents);
+      const importable = validationResults.filter(
+        (r) => r.status === 'valid' || r.status === 'warning' || (r.status === 'duplicate' && r.approved)
+      );
+      const result = await importComponents(importable);
 
       toast({
         title: 'Import slutförd!',
@@ -182,12 +184,28 @@ export const ComponentImportDialog = ({
     });
   };
 
-  const getStatusIcon = (status: string) => {
+  const handleApproveDuplicate = (index: number) => {
+    setValidationResults(prev => prev.map((r, i) => 
+      i === index ? { ...r, approved: true } : r
+    ));
+  };
+
+  const handleRejectDuplicate = (index: number) => {
+    setValidationResults(prev => prev.map((r, i) => 
+      i === index ? { ...r, approved: false } : r
+    ));
+  };
+
+  const getStatusIcon = (status: string, approved?: boolean) => {
     switch (status) {
       case 'valid':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'warning':
         return <AlertCircle className="h-4 w-4 text-yellow-600" />;
+      case 'duplicate':
+        if (approved === true) return <CheckCircle className="h-4 w-4 text-green-600" />;
+        if (approved === false) return <XCircle className="h-4 w-4 text-red-600" />;
+        return <Copy className="h-4 w-4 text-orange-600" />;
       case 'error':
         return <XCircle className="h-4 w-4 text-red-600" />;
       default:
@@ -195,12 +213,16 @@ export const ComponentImportDialog = ({
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, approved?: boolean) => {
     switch (status) {
       case 'valid':
         return <Badge variant="default" className="bg-green-600">OK</Badge>;
       case 'warning':
         return <Badge variant="default" className="bg-yellow-600">Varning</Badge>;
+      case 'duplicate':
+        if (approved === true) return <Badge variant="default" className="bg-green-600">Godkänd</Badge>;
+        if (approved === false) return <Badge variant="destructive">Nekad</Badge>;
+        return <Badge variant="default" className="bg-orange-600">Dubblett</Badge>;
       case 'error':
         return <Badge variant="destructive">Fel</Badge>;
       default:
@@ -208,9 +230,11 @@ export const ComponentImportDialog = ({
     }
   };
 
-  const validCount = validationResults.filter((r) => r.status === 'valid').length;
-  const warningCount = validationResults.filter((r) => r.status === 'warning').length;
+  const validCount = validationResults.filter((r) => r.status === 'valid' || r.status === 'warning').length;
+  const duplicateCount = validationResults.filter((r) => r.status === 'duplicate').length;
+  const approvedDuplicates = validationResults.filter((r) => r.status === 'duplicate' && r.approved).length;
   const errorCount = validationResults.filter((r) => r.status === 'error').length;
+  const importableCount = validCount + approvedDuplicates;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
