@@ -293,7 +293,7 @@ export const ComponentImportDialog = ({
         )}
 
         {stage === 'preview' && (
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex flex-col overflow-hidden min-h-0">
             <div className="flex flex-wrap gap-4 mb-4">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
@@ -311,7 +311,7 @@ export const ComponentImportDialog = ({
               </div>
             </div>
 
-            <ScrollArea className="max-h-[50vh] border rounded-lg">
+            <div className="h-[50vh] overflow-auto border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -368,7 +368,7 @@ export const ComponentImportDialog = ({
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
 
             <div className="flex justify-end gap-2 mt-4">
               <Button variant="outline" onClick={handleClose}>
