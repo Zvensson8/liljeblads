@@ -78,56 +78,36 @@ export const parseCSV = (file: File): Promise<any[]> => {
   });
 };
 
-// Component type mapping
-const componentTypeMap: Record<string, string> = {
-  'SC1': 'SC1',
-  'SC2': 'SC2',
-  'SC3': 'SC3',
-  'SC4.1.1.1': 'SC4.1.1.1',
-  'SC4.1.1.2': 'SC4.1.1.2',
-  'SC4.1.1.3': 'SC4.1.1.3',
-  'SC4.1.2.1': 'SC4.1.2.1',
-  'SC4.1.2.2': 'SC4.1.2.2',
-  'SC4.1.2.3': 'SC4.1.2.3',
-  'SC4.2.1.1': 'SC4.2.1.1',
-  'SC4.2.1.2': 'SC4.2.1.2',
-  'SC4.2.1.3': 'SC4.2.1.3',
-  'SC4.2.2.1': 'SC4.2.2.1',
-  'SC4.2.2.2': 'SC4.2.2.2',
-  'SC4.2.2.3': 'SC4.2.2.3',
-  'SC4.3.1.1': 'SC4.3.1.1',
-  'SC4.3.1.2': 'SC4.3.1.2',
-  'SC4.3.1.3': 'SC4.3.1.3',
-  'SC4.3.2.1': 'SC4.3.2.1',
-  'SC4.3.2.2': 'SC4.3.2.2',
-  'SC4.3.2.3': 'SC4.3.2.3',
-  'SC4.4.1.1': 'SC4.4.1.1',
-  'SC4.4.1.2': 'SC4.4.1.2',
-  'SC4.4.1.3': 'SC4.4.1.3',
-  'SC4.4.2.1': 'SC4.4.2.1',
-  'SC4.4.2.2': 'SC4.4.2.2',
-  'SC4.4.2.3': 'SC4.4.2.3',
-  'SC4.5.1.1': 'SC4.5.1.1',
-  'SC4.5.1.2': 'SC4.5.1.2',
-  'SC4.5.1.3': 'SC4.5.1.3',
-  'SC4.5.2.1': 'SC4.5.2.1',
-  'SC4.5.2.2': 'SC4.5.2.2',
-  'SC4.5.2.3': 'SC4.5.2.3',
-  'SC4.6.1.1': 'SC4.6.1.1',
-  'SC4.6.1.2': 'SC4.6.1.2',
-  'SC4.6.1.3': 'SC4.6.1.3',
-  'SC4.6.2.1': 'SC4.6.2.1',
-  'SC4.6.2.2': 'SC4.6.2.2',
-  'SC4.6.2.3': 'SC4.6.2.3',
-  'SC4.6.2.4': 'SC4.6.2.4',
-  'SC4.6.2.5': 'SC4.6.2.5',
-  'SC4.6.2.6': 'SC4.6.2.6',
-  'SC4.6.2.7': 'SC4.6.2.7',
-  'SC4.6.2.8': 'SC4.6.2.8',
-  'SC4.6.2.9': 'SC4.6.2.9',
-  'SC5.1': 'SC5.1',
-  'SC5.2': 'SC5.2',
-  'SC5.3': 'SC5.3',
+// Valid component types from database enum
+const validComponentTypes = new Set([
+  'SC1', 'SC2.1.1', 'SC2.3', 'SC2.3.1', 'SC2.3.3', 'SC2.3.4', 'SC2.3.7',
+  'SC2.6.2', 'SC4.1.2.5.1', 'SC4.1.2.5.3', 'SC4.1.6.9', 'SC4.2.4.6',
+  'SC4.2.4.7', 'SC4.5.1', 'SC4.6.2.6', 'SC4.6.2.6.1', 'SC4.7', 'SC5.5',
+  'SC7.1', 'SC7.2',
+]);
+
+// Extract SC code from a string like "SC2.3 Entréer, Portar mm" -> "SC2.3"
+const extractComponentType = (raw: string): { code: string; valid: boolean } => {
+  const trimmed = raw.trim();
+  // Try to match SC code pattern (most specific first)
+  const match = trimmed.match(/^(SC[\d.]+)/);
+  const code = match ? match[1] : trimmed;
+  
+  // Try progressively shorter codes if exact match fails
+  // e.g. "SC2.3.4.5" -> try "SC2.3.4.5", "SC2.3.4", "SC2.3", "SC2"
+  if (validComponentTypes.has(code)) {
+    return { code, valid: true };
+  }
+  
+  const parts = code.split('.');
+  for (let i = parts.length - 1; i >= 1; i--) {
+    const shorter = parts.slice(0, i).join('.');
+    if (validComponentTypes.has(shorter)) {
+      return { code: shorter, valid: true };
+    }
+  }
+  
+  return { code, valid: false };
 };
 
 const statusMap: Record<string, string> = {
