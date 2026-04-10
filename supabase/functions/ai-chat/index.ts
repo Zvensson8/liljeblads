@@ -614,11 +614,25 @@ serve(async (req) => {
 
     // ── Profile & org ──
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Try profile first, then fall back to organization_members
     const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', userId).single();
-    if (!profile?.organization_id) {
-      return jsonResponse({ error: 'User profile not found' }, 403);
+    let orgId = profile?.organization_id;
+    
+    if (!orgId) {
+      // Fallback: look up organization via organization_members table
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      orgId = membership?.organization_id;
     }
-    const orgId = profile.organization_id;
+    
+    if (!orgId) {
+      return jsonResponse({ error: 'Ingen organisation hittades för din användare. Kontakta administratören.' }, 403);
+    }
 
     // ── Build context & knowledge base search in parallel ──
     const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop();
