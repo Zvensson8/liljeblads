@@ -228,8 +228,7 @@ export const validateAndMatchComponents = async (
     try {
       // Extract component type code from full description (e.g. "SC2.3 Entréer, Portar mm" -> "SC2.3")
       const rawType = col('Komponenttyp', 'Typ', 'Type');
-      const typeCodeMatch = rawType.match(/^(SC[\d.]+)/);
-      const typeCode = typeCodeMatch ? typeCodeMatch[1] : rawType;
+      const { code: typeCode, valid: typeValid } = extractComponentType(rawType);
 
       // Parse installation year from various formats
       const rawYear = col('Installationsår', 'Inst.år', 'Installation year');
@@ -246,7 +245,7 @@ export const validateAndMatchComponents = async (
 
       const mappedData = {
         name: col('Beteckning', 'Name'),
-        type: componentTypeMap[typeCode] || typeCode || rawType,
+        type: typeCode,
         floorName: col('Våning', 'Våningsplan', 'Floor') || undefined,
         propertyName: col('Fastighet', 'Property') || undefined,
         registration_number: col('Reg.nr', 'Regnr', 'Registration number') || null,
@@ -327,11 +326,9 @@ export const validateAndMatchComponents = async (
         }
       }
 
-      if (!componentTypeMap[row['Komponenttyp']]) {
-        if (result.status === 'valid') {
-          result.status = 'warning';
-          result.message = `Okänd komponenttyp: ${row['Komponenttyp']}`;
-        }
+      if (!typeValid) {
+        result.status = 'error';
+        result.message = `Okänd komponenttyp: "${rawType}" (extraherad kod: ${typeCode})`;
       }
 
       result.data = mappedData;
