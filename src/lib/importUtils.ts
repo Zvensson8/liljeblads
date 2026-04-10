@@ -17,10 +17,10 @@ const parseXLSX = (file: File): Promise<any[]> => {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array', raw: false });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
         if (rows.length === 0) {
           reject(new Error('Filen innehåller inga datarader'));
           return;
