@@ -281,18 +281,41 @@ export const validateAndMatchComponents = async (
         }
       }
 
-      // Check for duplicates
-      if (floorId) {
-        const duplicateKey = `${mappedData.name.toLowerCase()}-${floorId}`;
-        if (existingNamesByFloor.has(duplicateKey)) {
-          result.status = 'warning';
-          result.message = 'Komponent med samma beteckning finns redan på denna våning';
+      // Check for duplicates by serial_number or registration_number first
+      let isDuplicate = false;
+      if (mappedData.serial_number) {
+        const existing = existingSerials.get(mappedData.serial_number.toLowerCase());
+        if (existing) {
+          result.status = 'duplicate';
+          result.message = `Serie-ID "${mappedData.serial_number}" finns redan (${existing.name})`;
+          result.duplicateOf = existing;
+          isDuplicate = true;
         }
-      } else {
-        const duplicateKey = `${mappedData.name.toLowerCase()}-${propId}`;
-        if (existingNamesByProperty.has(duplicateKey)) {
-          result.status = 'warning';
-          result.message = 'Komponent med samma beteckning finns redan i denna fastighet';
+      }
+      if (!isDuplicate && mappedData.registration_number) {
+        const existing = existingRegNrs.get(mappedData.registration_number.toLowerCase());
+        if (existing) {
+          result.status = 'duplicate';
+          result.message = `Reg.nr "${mappedData.registration_number}" finns redan (${existing.name})`;
+          result.duplicateOf = existing;
+          isDuplicate = true;
+        }
+      }
+
+      // Check for name duplicates (warning only)
+      if (!isDuplicate) {
+        if (floorId) {
+          const duplicateKey = `${mappedData.name.toLowerCase()}-${floorId}`;
+          if (existingNamesByFloor.has(duplicateKey)) {
+            result.status = 'warning';
+            result.message = 'Komponent med samma beteckning finns redan på denna våning';
+          }
+        } else {
+          const duplicateKey = `${mappedData.name.toLowerCase()}-${propId}`;
+          if (existingNamesByProperty.has(duplicateKey)) {
+            result.status = 'warning';
+            result.message = 'Komponent med samma beteckning finns redan i denna fastighet';
+          }
         }
       }
 
