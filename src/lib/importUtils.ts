@@ -140,60 +140,40 @@ export const validateAndMatchComponents = async (
   csvData: any[],
   propertyId: string | null
 ): Promise<ValidationResult[]> => {
-  let floors: any[] = [];
-  let properties: any[] = [];
-  let floorMap: Map<string, string>;
-  let propertyMap: Map<string, string> | undefined;
+  // Always fetch all properties for name matching
+  const { data: propertiesData, error: propertiesError } = await supabase
+    .from('properties')
+    .select('id, name');
 
-  if (propertyId) {
-    // Single property mode - fetch floors for specific property
-    const { data: floorsData, error: floorsError } = await supabase
-      .from('floors')
-      .select('id, name')
-      .eq('property_id', propertyId);
-
-    if (floorsError || !floorsData) {
-      throw new Error('Kunde inte hämta våningar för fastigheten');
-    }
-
-    floors = floorsData;
-    floorMap = new Map(floors.map((f) => [f.name.toLowerCase(), f.id]));
-  } else {
-    // Multi-property mode - fetch all properties and floors
-    const { data: propertiesData, error: propertiesError } = await supabase
-      .from('properties')
-      .select('id, name');
-
-    if (propertiesError || !propertiesData) {
-      throw new Error('Kunde inte hämta fastigheter');
-    }
-
-    properties = propertiesData;
-    propertyMap = new Map(properties.map((p) => [p.name.toLowerCase(), p.id]));
-
-    const { data: floorsData, error: floorsError } = await supabase
-      .from('floors')
-      .select('id, name, property_id');
-
-    if (floorsError || !floorsData) {
-      throw new Error('Kunde inte hämta våningar');
-    }
-
-    floors = floorsData;
-    // Create compound key: "propertyId-floorName" -> floorId
-    floorMap = new Map(
-      floors.map((f) => [`${f.property_id}-${f.name.toLowerCase()}`, f.id])
-    );
+  if (propertiesError || !propertiesData) {
+    throw new Error('Kunde inte hämta fastigheter');
   }
+
+  const propertyMap = new Map(propertiesData.map((p) => [p.name.toLowerCase(), p.id]));
+
+  // Fetch all floors
+  const { data: floorsData, error: floorsError } = await supabase
+    .from('floors')
+    .select('id, name, property_id');
+
+  if (floorsError || !floorsData) {
+    throw new Error('Kunde inte hämta våningar');
+  }
+
+  const floorMap = new Map(
+    floorsData.map((f) => [`${f.property_id}-${f.name.toLowerCase()}`, f.id])
+  );
 
   // Fetch existing components to check for duplicates
   const { data: existingComponents } = await supabase
     .from('components')
-    .select('name, floor_id')
-    .in('floor_id', floors.map((f) => f.id));
+    .select('name, floor_id, property_id');
 
-  const existingNames = new Set(
-    existingComponents?.map((c) => `${c.name.toLowerCase()}-${c.floor_id}`) || []
+  const existingNamesByFloor = new Set(
+    existingComponents?.filter(c => c.floor_id).map((c) => `${c.name.toLowerCase()}-${c.floor_id}`) || []
+  );
+  const existingNamesByProperty = new Set(
+    existingComponents?.map((c) => `${c.name.toLowerCase()}-${c.property_id}`) || []
   );
 
   const results: ValidationResult[] = [];
@@ -208,18 +188,17 @@ export const validateAndMatchComponents = async (
     };
 
     try {
-      // Map CSV columns to database fields
       const mappedData = {
         name: row['Beteckning'],
         type: componentTypeMap[row['Komponenttyp']] || row['Komponenttyp'],
-        floorName: row['Våning'],
+        floorName: row['Våning'] || undefined,
         propertyName: row['Fastighet'] || undefined,
         registration_number: row['Reg.nr'] || null,
         installation_year: row['Installationsår'] ? parseInt(row['Installationsår']) : null,
         manufacturer: row['Tillverkare'] || null,
         model: row['Modell'] || null,
         serial_number: row['Serie-ID'] || null,
-        room_zone: row['Placering'] || null,
+        room_zone: row['Placering'],
         status: statusMap[row['Status']?.toLowerCase()] || 'active',
         notes: row['Anteckningar'] || null,
         refrigerant_code: row['Kod'] || null,
@@ -227,34 +206,14 @@ export const validateAndMatchComponents = async (
         refrigerant_type: row['Köldmedietyp'] || null,
       };
 
-      // Validate with Zod
       componentSchema.parse(mappedData);
 
-      let floorId: string | undefined;
+      // Resolve property
       let propId: string | undefined;
-
       if (propertyId) {
-        // Single property mode
         propId = propertyId;
-        floorId = floorMap.get(mappedData.floorName.toLowerCase());
-        if (!floorId) {
-          result.status = 'error';
-          result.message = `Våning "${mappedData.floorName}" finns inte`;
-          result.data = mappedData;
-          results.push(result);
-          continue;
-        }
       } else {
-        // Multi-property mode
-        if (!mappedData.propertyName) {
-          result.status = 'error';
-          result.message = 'Fastighet saknas';
-          result.data = mappedData;
-          results.push(result);
-          continue;
-        }
-
-        propId = propertyMap!.get(mappedData.propertyName.toLowerCase());
+        propId = propertyMap.get(mappedData.propertyName!.toLowerCase());
         if (!propId) {
           result.status = 'error';
           result.message = `Fastighet "${mappedData.propertyName}" finns inte`;
@@ -262,28 +221,38 @@ export const validateAndMatchComponents = async (
           results.push(result);
           continue;
         }
+      }
 
+      // Resolve floor (optional)
+      let floorId: string | undefined;
+      if (mappedData.floorName) {
         floorId = floorMap.get(`${propId}-${mappedData.floorName.toLowerCase()}`);
         if (!floorId) {
-          result.status = 'error';
-          result.message = `Våning "${mappedData.floorName}" finns inte i fastigheten "${mappedData.propertyName}"`;
-          result.data = mappedData;
-          results.push(result);
-          continue;
+          result.status = 'warning';
+          result.message = `Våning "${mappedData.floorName}" finns inte – komponenten importeras utan våning`;
         }
       }
 
       // Check for duplicates
-      const duplicateKey = `${mappedData.name.toLowerCase()}-${floorId}`;
-      if (existingNames.has(duplicateKey)) {
-        result.status = 'warning';
-        result.message = 'Komponent med samma beteckning finns redan på denna våning';
+      if (floorId) {
+        const duplicateKey = `${mappedData.name.toLowerCase()}-${floorId}`;
+        if (existingNamesByFloor.has(duplicateKey)) {
+          result.status = 'warning';
+          result.message = 'Komponent med samma beteckning finns redan på denna våning';
+        }
+      } else {
+        const duplicateKey = `${mappedData.name.toLowerCase()}-${propId}`;
+        if (existingNamesByProperty.has(duplicateKey)) {
+          result.status = 'warning';
+          result.message = 'Komponent med samma beteckning finns redan i denna fastighet';
+        }
       }
 
-      // Check if component type is valid
       if (!componentTypeMap[row['Komponenttyp']]) {
-        result.status = 'warning';
-        result.message = `Okänd komponenttyp: ${row['Komponenttyp']}`;
+        if (result.status === 'valid') {
+          result.status = 'warning';
+          result.message = `Okänd komponenttyp: ${row['Komponenttyp']}`;
+        }
       }
 
       result.data = mappedData;
@@ -308,7 +277,7 @@ export const importComponents = async (
   let failed = 0;
 
   for (const component of validatedComponents) {
-    if (component.status !== 'valid' || !component.floorId || !component.propertyId) {
+    if (component.status === 'error' || !component.propertyId) {
       failed++;
       continue;
     }
@@ -318,7 +287,7 @@ export const importComponents = async (
     const { error } = await supabase.from('components').insert({
       name: data.name,
       type: data.type,
-      floor_id: floorId,
+      floor_id: floorId || null,
       property_id: propertyId,
       registration_number: data.registration_number,
       installation_year: data.installation_year,
