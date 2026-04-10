@@ -1,5 +1,39 @@
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
+import * as XLSX from 'xlsx';
+
+// Parse CSV or XLSX file into array of objects
+export const parseImportFile = (file: File): Promise<any[]> => {
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (ext === 'xlsx' || ext === 'xls') {
+    return parseXLSX(file);
+  }
+  return parseCSV(file);
+};
+
+const parseXLSX = (file: File): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        if (rows.length === 0) {
+          reject(new Error('Filen innehåller inga datarader'));
+          return;
+        }
+        resolve(rows);
+      } catch (error: any) {
+        reject(new Error(`Fel vid parsing av Excel-fil: ${error.message}`));
+      }
+    };
+    reader.onerror = () => reject(new Error('Kunde inte läsa filen'));
+    reader.readAsArrayBuffer(file);
+  });
+};
 
 // CSV parsing function
 export const parseCSV = (file: File): Promise<any[]> => {
