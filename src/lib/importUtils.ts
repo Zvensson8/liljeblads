@@ -348,7 +348,12 @@ export const importComponents = async (
   let failed = 0;
 
   for (const component of validatedComponents) {
+    // Skip errors and unapproved duplicates
     if (component.status === 'error' || !component.propertyId) {
+      failed++;
+      continue;
+    }
+    if (component.status === 'duplicate' && !component.approved) {
       failed++;
       continue;
     }
