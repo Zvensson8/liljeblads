@@ -203,7 +203,7 @@ export const validateAndMatchComponents = async (
   // Fetch existing components to check for duplicates
   const { data: existingComponents } = await supabase
     .from('components')
-    .select('name, floor_id, property_id');
+    .select('name, floor_id, property_id, serial_number, registration_number');
 
   const existingNamesByFloor = new Set(
     existingComponents?.filter(c => c.floor_id).map((c) => `${c.name.toLowerCase()}-${c.floor_id}`) || []
@@ -211,6 +211,18 @@ export const validateAndMatchComponents = async (
   const existingNamesByProperty = new Set(
     existingComponents?.map((c) => `${c.name.toLowerCase()}-${c.property_id}`) || []
   );
+
+  // Build sets for serial_number and registration_number duplicate detection
+  const existingSerials = new Map<string, { name: string; serial_number: string }>();
+  const existingRegNrs = new Map<string, { name: string; registration_number: string }>();
+  for (const c of existingComponents || []) {
+    if (c.serial_number) {
+      existingSerials.set(c.serial_number.toLowerCase(), { name: c.name, serial_number: c.serial_number });
+    }
+    if (c.registration_number) {
+      existingRegNrs.set(c.registration_number.toLowerCase(), { name: c.name, registration_number: c.registration_number });
+    }
+  }
 
   const results: ValidationResult[] = [];
 
