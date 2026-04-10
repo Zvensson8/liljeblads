@@ -269,6 +269,9 @@ export default function AIChat() {
         const title = words + (userMessage.content.split(' ').length > 4 ? '...' : '');
         updateTitleMutation.mutate({ id: conversationId, title });
       }
+
+      // Refetch messages from DB before unlocking state sync
+      await queryClient.invalidateQueries({ queryKey: ['ai-messages', conversationId] });
     } catch (error: any) {
       const status = error?.context?.status ?? error?.status;
       if (status === 401) {
