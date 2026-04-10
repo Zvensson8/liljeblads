@@ -17,10 +17,10 @@ const parseXLSX = (file: File): Promise<any[]> => {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array', raw: false });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
         if (rows.length === 0) {
           reject(new Error('Filen innehåller inga datarader'));
           return;
@@ -227,31 +227,59 @@ export const validateAndMatchComponents = async (
   const results: ValidationResult[] = [];
 
   for (const row of csvData) {
+    // Flexible column name resolver
+    const col = (primary: string, ...alts: string[]): string => {
+      const val = row[primary];
+      if (val !== undefined && val !== null) return String(val);
+      for (const alt of alts) {
+        if (row[alt] !== undefined && row[alt] !== null) return String(row[alt]);
+      }
+      return '';
+    };
+
     const result: ValidationResult = {
       status: 'valid',
       message: 'Redo för import',
       data: {},
-      floorName: row['Våning'] || '',
-      propertyName: row['Fastighet'] || undefined,
+      floorName: col('Våning', 'Våningsplan', 'Floor'),
+      propertyName: col('Fastighet', 'Property') || undefined,
     };
 
     try {
+      // Extract component type code from full description (e.g. "SC2.3 Entréer, Portar mm" -> "SC2.3")
+      const rawType = col('Komponenttyp', 'Typ', 'Type');
+      const typeCodeMatch = rawType.match(/^(SC[\d.]+)/);
+      const typeCode = typeCodeMatch ? typeCodeMatch[1] : rawType;
+
+      // Parse installation year from various formats
+      const rawYear = col('Installationsår', 'Inst.år', 'Installation year');
+      let installYear: number | null = null;
+      if (rawYear) {
+        const yearMatch = rawYear.match(/(\d{4})/);
+        if (yearMatch) {
+          installYear = parseInt(yearMatch[1]);
+        } else {
+          const parsed = parseInt(rawYear);
+          if (!isNaN(parsed)) installYear = parsed;
+        }
+      }
+
       const mappedData = {
-        name: row['Beteckning'],
-        type: componentTypeMap[row['Komponenttyp']] || row['Komponenttyp'],
-        floorName: row['Våning'] || undefined,
-        propertyName: row['Fastighet'] || undefined,
-        registration_number: row['Reg.nr'] || null,
-        installation_year: row['Installationsår'] ? parseInt(row['Installationsår']) : null,
-        manufacturer: row['Tillverkare'] || null,
-        model: row['Modell'] || null,
-        serial_number: row['Serie-ID'] || null,
-        room_zone: row['Placering'],
-        status: statusMap[row['Status']?.toLowerCase()] || 'active',
-        notes: row['Anteckningar'] || null,
-        refrigerant_code: row['Kod'] || null,
-        refrigerant_amount_kg: row['Fyllnadsmängd (kg)'] ? parseFloat(row['Fyllnadsmängd (kg)']) : null,
-        refrigerant_type: row['Köldmedietyp'] || null,
+        name: col('Beteckning', 'Name'),
+        type: componentTypeMap[typeCode] || typeCode || rawType,
+        floorName: col('Våning', 'Våningsplan', 'Floor') || undefined,
+        propertyName: col('Fastighet', 'Property') || undefined,
+        registration_number: col('Reg.nr', 'Regnr', 'Registration number') || null,
+        installation_year: installYear,
+        manufacturer: col('Tillverkare', 'Manufacturer') || null,
+        model: col('Modell', 'Model') || null,
+        serial_number: col('Serie-ID', 'Serienummer', 'Serial number') || null,
+        room_zone: col('Placering', 'Placement', 'Location'),
+        status: statusMap[col('Status').toLowerCase()] || 'active',
+        notes: col('Anteckningar', 'Kommentar', 'Notes') || null,
+        refrigerant_code: col('Kod', 'Code') || null,
+        refrigerant_amount_kg: col('Fyllnadsmängd (kg)') ? parseFloat(col('Fyllnadsmängd (kg)')) : null,
+        refrigerant_type: col('Köldmedietyp') || null,
       };
 
       componentSchema.parse(mappedData);
