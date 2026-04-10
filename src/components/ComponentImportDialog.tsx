@@ -100,13 +100,13 @@ export const ComponentImportDialog = ({
       ? [
           'Beteckning',
           'Komponenttyp',
+          'Placering',
           'Våning',
           'Reg.nr',
           'Installationsår',
           'Tillverkare',
           'Modell',
           'Serie-ID',
-          'Placering',
           'Status',
           'Anteckningar',
           'Kod',
@@ -117,13 +117,13 @@ export const ComponentImportDialog = ({
           'Beteckning',
           'Komponenttyp',
           'Fastighet',
+          'Placering',
           'Våning',
           'Reg.nr',
           'Installationsår',
           'Tillverkare',
           'Modell',
           'Serie-ID',
-          'Placering',
           'Status',
           'Anteckningar',
           'Kod',
@@ -135,13 +135,13 @@ export const ComponentImportDialog = ({
       ? [
           'VP-01-Källare',
           'SC4.6.2.6',
+          'Pannrum',
           'Källare',
           'REG-123',
           '2020',
           'NIBE',
           'F2120',
           'SN-123456',
-          'Pannrum',
           'active',
           'Testkomponent',
           'R410A',
@@ -152,13 +152,13 @@ export const ComponentImportDialog = ({
           'VP-01-Källare',
           'SC4.6.2.6',
           'Centrumhuset',
+          'Pannrum',
           'Källare',
           'REG-123',
           '2020',
           'NIBE',
           'F2120',
           'SN-123456',
-          'Pannrum',
           'active',
           'Testkomponent',
           'R410A',
@@ -260,8 +260,8 @@ export const ComponentImportDialog = ({
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Beteckning</li>
                 <li>• Komponenttyp</li>
-                {!propertyId && <li>• Fastighet</li>}
-                <li>• Våning</li>
+                <li>• Fastighet</li>
+                <li>• Placering</li>
               </ul>
             </div>
           </div>
