@@ -160,14 +160,16 @@ const componentSchema = z.object({
   refrigerant_type: z.string().optional(),
 });
 
-interface ValidationResult {
-  status: 'valid' | 'warning' | 'error';
+export interface ValidationResult {
+  status: 'valid' | 'warning' | 'error' | 'duplicate';
   message: string;
   data: any;
   floorId?: string;
   propertyId?: string;
   floorName: string;
   propertyName?: string;
+  duplicateOf?: { name: string; serial_number?: string; registration_number?: string };
+  approved?: boolean;
 }
 
 export const validateAndMatchComponents = async (
