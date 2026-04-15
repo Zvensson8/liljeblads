@@ -526,7 +526,7 @@ export function WorkOrderDetailDialog({
                       <FormField control={form.control} name="property_id" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Fastighet *</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select onValueChange={(val) => { field.onChange(val); form.setValue("component_id", ""); }} value={field.value}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Välj fastighet" /></SelectTrigger></FormControl>
                             <SelectContent>
                               {properties?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
@@ -543,6 +543,24 @@ export function WorkOrderDetailDialog({
                         </FormItem>
                       )} />
                     </div>
+
+                    {watchedPropertyId && componentsForProperty && componentsForProperty.length > 0 && (
+                      <FormField control={form.control} name="component_id" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Komponent (valfritt)</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Välj komponent" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="">Ingen komponent</SelectItem>
+                              {componentsForProperty.map((comp) => (
+                                <SelectItem key={comp.id} value={comp.id}>{comp.name} ({comp.type})</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                       <FormField control={form.control} name="status" render={({ field }) => (
