@@ -513,6 +513,21 @@ const Components = () => {
                             Installerad: <span className="font-medium text-foreground">{component.installation_year}</span>
                           </div>
                         )}
+
+                        {(maintenanceStats[component.id] || workOrderStats[component.id]) && (
+                          <div className="border-t pt-2 mt-2 space-y-1">
+                            {maintenanceStats[component.id] && (
+                              <div className="text-sm text-muted-foreground">
+                                Underhållskostnad: <span className="font-semibold text-foreground">{maintenanceStats[component.id].totalCost.toLocaleString('sv-SE')} kr</span>
+                              </div>
+                            )}
+                            {workOrderStats[component.id] && (
+                              <div className="text-sm text-muted-foreground">
+                                Arbetsordrar: <span className="font-medium text-foreground">{workOrderStats[component.id].count} st</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </CardContent>
                       </Card>
                     ))}
