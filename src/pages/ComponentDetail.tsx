@@ -92,6 +92,7 @@ export default function ComponentDetail() {
   const [component, setComponent] = useState<Component | null>(null);
   const [floor, setFloor] = useState<Floor | null>(null);
   const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceRecord[]>([]);
+  const [componentWorkOrders, setComponentWorkOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
