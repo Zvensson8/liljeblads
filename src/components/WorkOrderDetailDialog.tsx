@@ -418,6 +418,13 @@ export function WorkOrderDetailDialog({
                           <Label className="text-muted-foreground">Fastighet</Label>
                           <p className="font-medium">{workOrder.properties?.name}</p>
                         </div>
+                        {workOrder.components && (
+                          <div>
+                            <Label className="text-muted-foreground">Komponent</Label>
+                            <p className="font-medium">{workOrder.components.name} ({workOrder.components.type})</p>
+                          </div>
+                        )}
+                        </div>
                         <div>
                           <Label className="text-muted-foreground">Status</Label>
                           <div className="mt-1"><Badge variant="outline">{getStatusLabel(workOrder.status)}</Badge></div>
