@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -85,6 +85,8 @@ const Components = () => {
   const [filterProperty, setFilterProperty] = useState<string>('all');
   const [filterManufacturer, setFilterManufacturer] = useState<string>('all');
   const [filterModel, setFilterModel] = useState<string>('all');
+  const [maintenanceStats, setMaintenanceStats] = useState<Record<string, { totalCost: number; count: number; lastDate: string | null }>>({});
+  const [workOrderStats, setWorkOrderStats] = useState<Record<string, { count: number; totalPrice: number }>>({});
 
   // Get unique values for filter dropdowns
   const uniqueTypes = [...new Set(components.map(c => c.type))].filter(Boolean).sort((a, b) => a.localeCompare(b, 'sv'));
@@ -115,8 +117,47 @@ const Components = () => {
       navigate('/auth');
     } else if (user) {
       fetchComponents();
+      fetchMaintenanceStats();
+      fetchWorkOrderStats();
     }
   }, [user, authLoading, navigate]);
+
+  const fetchMaintenanceStats = async () => {
+    const { data } = await supabase
+      .from('maintenance_history')
+      .select('component_id, cost, performed_date');
+    if (!data) return;
+    const stats: Record<string, { totalCost: number; count: number; lastDate: string | null }> = {};
+    data.forEach((row: any) => {
+      if (!stats[row.component_id]) {
+        stats[row.component_id] = { totalCost: 0, count: 0, lastDate: null };
+      }
+      stats[row.component_id].totalCost += row.cost || 0;
+      stats[row.component_id].count += 1;
+      if (!stats[row.component_id].lastDate || row.performed_date > stats[row.component_id].lastDate!) {
+        stats[row.component_id].lastDate = row.performed_date;
+      }
+    });
+    setMaintenanceStats(stats);
+  };
+
+  const fetchWorkOrderStats = async () => {
+    const { data } = await supabase
+      .from('work_orders')
+      .select('component_id, price')
+      .not('component_id', 'is', null);
+    if (!data) return;
+    const stats: Record<string, { count: number; totalPrice: number }> = {};
+    data.forEach((row: any) => {
+      if (!row.component_id) return;
+      if (!stats[row.component_id]) {
+        stats[row.component_id] = { count: 0, totalPrice: 0 };
+      }
+      stats[row.component_id].count += 1;
+      stats[row.component_id].totalPrice += row.price || 0;
+    });
+    setWorkOrderStats(stats);
+  };
 
   const fetchComponents = async () => {
     const { data, error } = await supabase
