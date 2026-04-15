@@ -172,6 +172,14 @@ export default function ComponentDetail() {
 
       if (maintenanceError) throw maintenanceError;
       setMaintenanceHistory(maintenanceData || []);
+
+      // Fetch work orders linked to this component
+      const { data: woData } = await supabase
+        .from("work_orders")
+        .select("*, properties(id, name)")
+        .eq("component_id", id)
+        .order("created_at", { ascending: false });
+      setComponentWorkOrders(woData || []);
     } catch (error: any) {
       toast.error("Kunde inte hämta komponentdata");
       navigate("/components");
