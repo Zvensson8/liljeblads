@@ -585,6 +585,11 @@ const Components = () => {
                                 <td className="py-2 px-4 hidden sm:table-cell" onClick={(e) => e.stopPropagation()}>
                                   <LastServiceBadge componentId={component.id} />
                                 </td>
+                                <td className="py-3 px-4 text-sm hidden lg:table-cell">
+                                  {(maintenanceStats[component.id]?.totalCost || 0 + (workOrderStats[component.id]?.totalPrice || 0)) > 0
+                                    ? `${((maintenanceStats[component.id]?.totalCost || 0) + (workOrderStats[component.id]?.totalPrice || 0)).toLocaleString('sv-SE')} kr`
+                                    : '-'}
+                                </td>
                                 <td className="py-3 px-4">
                                   <Badge className={getStatusColor(component.status)}>
                                     {getStatusText(component.status)}
