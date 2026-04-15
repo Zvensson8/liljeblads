@@ -223,6 +223,8 @@ export default function ComponentDetail() {
   };
 
   const totalMaintenanceCost = maintenanceHistory.reduce((sum, record) => sum + (record.cost || 0), 0);
+  const totalWorkOrderCost = componentWorkOrders.reduce((sum, wo) => sum + (wo.price || 0), 0);
+  const totalCombinedCost = totalMaintenanceCost + totalWorkOrderCost;
   const averageMaintenanceCost = maintenanceHistory.length > 0 
     ? totalMaintenanceCost / maintenanceHistory.length 
     : 0;
@@ -319,8 +321,13 @@ export default function ComponentDetail() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-2xl font-bold">
-                      {totalMaintenanceCost.toLocaleString("sv-SE")} kr
+                      {totalCombinedCost.toLocaleString("sv-SE")} kr
                     </p>
+                    {totalWorkOrderCost > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Underhåll: {totalMaintenanceCost.toLocaleString("sv-SE")} kr · Arbetsordrar: {totalWorkOrderCost.toLocaleString("sv-SE")} kr
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 
