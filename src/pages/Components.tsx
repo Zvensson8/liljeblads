@@ -545,6 +545,7 @@ const Components = () => {
                               <th className="text-left py-3 px-4 font-medium">Fastighet</th>
                               <th className="text-left py-3 px-4 font-medium">Våning</th>
                               <th className="text-left py-3 px-4 font-medium hidden sm:table-cell">Senaste service</th>
+                              <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Kostnad</th>
                               <th className="text-left py-3 px-4 font-medium">Status</th>
                               <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
                             </tr>
