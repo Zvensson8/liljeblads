@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -85,6 +85,8 @@ const Components = () => {
   const [filterProperty, setFilterProperty] = useState<string>('all');
   const [filterManufacturer, setFilterManufacturer] = useState<string>('all');
   const [filterModel, setFilterModel] = useState<string>('all');
+  const [maintenanceStats, setMaintenanceStats] = useState<Record<string, { totalCost: number; count: number; lastDate: string | null }>>({});
+  const [workOrderStats, setWorkOrderStats] = useState<Record<string, { count: number; totalPrice: number }>>({});
 
   // Get unique values for filter dropdowns
   const uniqueTypes = [...new Set(components.map(c => c.type))].filter(Boolean).sort((a, b) => a.localeCompare(b, 'sv'));
@@ -115,8 +117,47 @@ const Components = () => {
       navigate('/auth');
     } else if (user) {
       fetchComponents();
+      fetchMaintenanceStats();
+      fetchWorkOrderStats();
     }
   }, [user, authLoading, navigate]);
+
+  const fetchMaintenanceStats = async () => {
+    const { data } = await supabase
+      .from('maintenance_history')
+      .select('component_id, cost, performed_date');
+    if (!data) return;
+    const stats: Record<string, { totalCost: number; count: number; lastDate: string | null }> = {};
+    data.forEach((row: any) => {
+      if (!stats[row.component_id]) {
+        stats[row.component_id] = { totalCost: 0, count: 0, lastDate: null };
+      }
+      stats[row.component_id].totalCost += row.cost || 0;
+      stats[row.component_id].count += 1;
+      if (!stats[row.component_id].lastDate || row.performed_date > stats[row.component_id].lastDate!) {
+        stats[row.component_id].lastDate = row.performed_date;
+      }
+    });
+    setMaintenanceStats(stats);
+  };
+
+  const fetchWorkOrderStats = async () => {
+    const { data } = await supabase
+      .from('work_orders')
+      .select('component_id, price')
+      .not('component_id', 'is', null);
+    if (!data) return;
+    const stats: Record<string, { count: number; totalPrice: number }> = {};
+    data.forEach((row: any) => {
+      if (!row.component_id) return;
+      if (!stats[row.component_id]) {
+        stats[row.component_id] = { count: 0, totalPrice: 0 };
+      }
+      stats[row.component_id].count += 1;
+      stats[row.component_id].totalPrice += row.price || 0;
+    });
+    setWorkOrderStats(stats);
+  };
 
   const fetchComponents = async () => {
     const { data, error } = await supabase
@@ -472,6 +513,21 @@ const Components = () => {
                             Installerad: <span className="font-medium text-foreground">{component.installation_year}</span>
                           </div>
                         )}
+
+                        {(maintenanceStats[component.id] || workOrderStats[component.id]) && (
+                          <div className="border-t pt-2 mt-2 space-y-1">
+                            {maintenanceStats[component.id] && (
+                              <div className="text-sm text-muted-foreground">
+                                Underhållskostnad: <span className="font-semibold text-foreground">{maintenanceStats[component.id].totalCost.toLocaleString('sv-SE')} kr</span>
+                              </div>
+                            )}
+                            {workOrderStats[component.id] && (
+                              <div className="text-sm text-muted-foreground">
+                                Arbetsordrar: <span className="font-medium text-foreground">{workOrderStats[component.id].count} st</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </CardContent>
                       </Card>
                     ))}
@@ -489,6 +545,7 @@ const Components = () => {
                               <th className="text-left py-3 px-4 font-medium">Fastighet</th>
                               <th className="text-left py-3 px-4 font-medium">Våning</th>
                               <th className="text-left py-3 px-4 font-medium hidden sm:table-cell">Senaste service</th>
+                              <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Kostnad</th>
                               <th className="text-left py-3 px-4 font-medium">Status</th>
                               <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
                             </tr>
@@ -527,6 +584,11 @@ const Components = () => {
                                 </td>
                                 <td className="py-2 px-4 hidden sm:table-cell" onClick={(e) => e.stopPropagation()}>
                                   <LastServiceBadge componentId={component.id} />
+                                </td>
+                                <td className="py-3 px-4 text-sm hidden lg:table-cell">
+                                  {(maintenanceStats[component.id]?.totalCost || 0 + (workOrderStats[component.id]?.totalPrice || 0)) > 0
+                                    ? `${((maintenanceStats[component.id]?.totalCost || 0) + (workOrderStats[component.id]?.totalPrice || 0)).toLocaleString('sv-SE')} kr`
+                                    : '-'}
                                 </td>
                                 <td className="py-3 px-4">
                                   <Badge className={getStatusColor(component.status)}>
@@ -569,14 +631,37 @@ const Components = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-12">
-                      <p className="text-muted-foreground mb-4">
-                        Kostnadsöversikt över alla komponenter kommer snart
-                      </p>
-                      <Button variant="outline" onClick={() => navigate('/cost-overview')}>
-                        Öppna fullständig kostnadsöversikt
-                      </Button>
-                    </div>
+                    {components.length === 0 ? (
+                      <p className="text-center py-8 text-muted-foreground">Inga komponenter att visa</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {[...components]
+                          .map(c => ({
+                            ...c,
+                            totalCost: (maintenanceStats[c.id]?.totalCost || 0) + (workOrderStats[c.id]?.totalPrice || 0),
+                            serviceCount: (maintenanceStats[c.id]?.count || 0),
+                            woCount: (workOrderStats[c.id]?.count || 0),
+                          }))
+                          .filter(c => c.totalCost > 0)
+                          .sort((a, b) => b.totalCost - a.totalCost)
+                          .map(c => (
+                            <div
+                              key={c.id}
+                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                              onClick={() => navigate(`/components/${c.id}`)}
+                            >
+                              <div>
+                                <p className="font-medium">{c.name}</p>
+                                <p className="text-sm text-muted-foreground">{c.property_name} · {c.serviceCount} åtgärder · {c.woCount} arbetsordrar</p>
+                              </div>
+                              <p className="font-semibold">{c.totalCost.toLocaleString('sv-SE')} kr</p>
+                            </div>
+                          ))}
+                        {components.every(c => ((maintenanceStats[c.id]?.totalCost || 0) + (workOrderStats[c.id]?.totalPrice || 0)) === 0) && (
+                          <p className="text-center py-8 text-muted-foreground">Ingen kostnadsdata registrerad ännu</p>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

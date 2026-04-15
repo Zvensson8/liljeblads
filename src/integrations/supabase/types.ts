@@ -2963,6 +2963,7 @@ export type Database = {
         Row: {
           action: string
           comments: string | null
+          component_id: string | null
           contractor: string | null
           created_at: string
           due_date: string | null
@@ -2982,6 +2983,7 @@ export type Database = {
         Insert: {
           action: string
           comments?: string | null
+          component_id?: string | null
           contractor?: string | null
           created_at?: string
           due_date?: string | null
@@ -3001,6 +3003,7 @@ export type Database = {
         Update: {
           action?: string
           comments?: string | null
+          component_id?: string | null
           contractor?: string | null
           created_at?: string
           due_date?: string | null
@@ -3018,6 +3021,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "work_orders_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "work_orders_project_id_fkey"
             columns: ["project_id"]

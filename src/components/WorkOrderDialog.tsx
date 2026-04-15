@@ -38,6 +38,7 @@ import { useAuth } from "@/hooks/useAuth";
 const workOrderSchema = z.object({
   action: z.string().min(1, "Åtgärd krävs").max(200, "Max 200 tecken"),
   property_id: z.string().min(1, "Fastighet krävs"),
+  component_id: z.string().optional(),
   due_date: z.string().optional(),
   status: z.enum(["not_started", "awaiting_quote", "ordered", "completed", "archived"]),
   priority: z.enum(["low", "medium", "high"]),
@@ -77,6 +78,7 @@ export function WorkOrderDialog({
     defaultValues: {
       action: "",
       property_id: propertyId || "",
+      component_id: "",
       status: "not_started",
       priority: "medium",
       price: "",
@@ -88,6 +90,22 @@ export function WorkOrderDialog({
       reminder_frequency: "weekly",
       reminder_recipient_email: user?.email || "",
     },
+  });
+
+  const watchedPropertyId = form.watch("property_id");
+
+  const { data: componentsForProperty } = useQuery({
+    queryKey: ["components-for-property", watchedPropertyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("components")
+        .select("id, name, type")
+        .eq("property_id", watchedPropertyId)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!watchedPropertyId,
   });
 
   const { data: properties } = useQuery({
@@ -109,6 +127,7 @@ export function WorkOrderDialog({
       form.reset({
         action: order.action || "",
         property_id: order.property_id || "",
+        component_id: order.component_id || "",
         status: order.status || "not_started",
         priority: order.priority || "medium",
         price: order.price?.toString() || "",
@@ -124,6 +143,7 @@ export function WorkOrderDialog({
       form.reset({
         action: "",
         property_id: propertyId,
+        component_id: "",
         status: "not_started",
         priority: "medium",
         price: "",
@@ -149,6 +169,7 @@ export function WorkOrderDialog({
       const payload = {
         action: data.action,
         property_id: data.property_id,
+        component_id: data.component_id || null,
         status: data.status,
         priority: data.priority,
         price: data.price ? parseFloat(data.price) : null,
@@ -239,7 +260,10 @@ export function WorkOrderDialog({
                   <FormItem>
                     <FormLabel>Fastighet *</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        form.setValue("component_id", "");
+                      }}
                       value={field.value}
                     >
                       <FormControl>
@@ -274,6 +298,37 @@ export function WorkOrderDialog({
                 )}
               />
             </div>
+
+            {watchedPropertyId && componentsForProperty && componentsForProperty.length > 0 && (
+              <FormField
+                control={form.control}
+                name="component_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Komponent (valfritt)</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Välj komponent" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">Ingen komponent</SelectItem>
+                        {componentsForProperty.map((comp) => (
+                          <SelectItem key={comp.id} value={comp.id}>
+                            {comp.name} ({comp.type})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField

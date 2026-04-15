@@ -27,6 +27,7 @@ import {
   Home,
   Building2,
   Wrench,
+  ClipboardList,
 } from "lucide-react";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
@@ -90,6 +91,7 @@ export default function ComponentDetail() {
   const [component, setComponent] = useState<Component | null>(null);
   const [floor, setFloor] = useState<Floor | null>(null);
   const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceRecord[]>([]);
+  const [componentWorkOrders, setComponentWorkOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
@@ -169,6 +171,14 @@ export default function ComponentDetail() {
 
       if (maintenanceError) throw maintenanceError;
       setMaintenanceHistory(maintenanceData || []);
+
+      // Fetch work orders linked to this component
+      const { data: woData } = await supabase
+        .from("work_orders")
+        .select("*, properties(id, name)")
+        .eq("component_id", id)
+        .order("created_at", { ascending: false });
+      setComponentWorkOrders(woData || []);
     } catch (error: any) {
       toast.error("Kunde inte hämta komponentdata");
       navigate("/components");
@@ -212,6 +222,8 @@ export default function ComponentDetail() {
   };
 
   const totalMaintenanceCost = maintenanceHistory.reduce((sum, record) => sum + (record.cost || 0), 0);
+  const totalWorkOrderCost = componentWorkOrders.reduce((sum, wo) => sum + (wo.price || 0), 0);
+  const totalCombinedCost = totalMaintenanceCost + totalWorkOrderCost;
   const averageMaintenanceCost = maintenanceHistory.length > 0 
     ? totalMaintenanceCost / maintenanceHistory.length 
     : 0;
@@ -308,8 +320,13 @@ export default function ComponentDetail() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-2xl font-bold">
-                      {totalMaintenanceCost.toLocaleString("sv-SE")} kr
+                      {totalCombinedCost.toLocaleString("sv-SE")} kr
                     </p>
+                    {totalWorkOrderCost > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Underhåll: {totalMaintenanceCost.toLocaleString("sv-SE")} kr · Arbetsordrar: {totalWorkOrderCost.toLocaleString("sv-SE")} kr
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -361,9 +378,12 @@ export default function ComponentDetail() {
 
               {/* Main Content Tabs */}
               <Tabs defaultValue="info" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
                   <TabsTrigger value="info">Info</TabsTrigger>
                   <TabsTrigger value="maintenance">Underhåll</TabsTrigger>
+                  <TabsTrigger value="work-orders">
+                    Arbetsordrar{componentWorkOrders.length > 0 && ` (${componentWorkOrders.length})`}
+                  </TabsTrigger>
                   <TabsTrigger value="costs">Kostnader</TabsTrigger>
                   <TabsTrigger value="location">Plats</TabsTrigger>
                   <TabsTrigger value="documents">Dokument</TabsTrigger>
@@ -459,6 +479,55 @@ export default function ComponentDetail() {
                               onDelete={fetchComponentData}
                             />
                           ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="work-orders">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ClipboardList className="h-5 w-5" />
+                        Arbetsordrar kopplade till komponenten
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {componentWorkOrders.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <ClipboardList className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>Inga arbetsordrar kopplade till denna komponent</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {componentWorkOrders.map((wo) => (
+                            <div
+                              key={wo.id}
+                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                              onClick={() => navigate(`/work-orders`)}
+                            >
+                              <div>
+                                <p className="font-medium">{wo.action}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {wo.status === 'not_started' ? 'Ej påbörjad' : wo.status === 'awaiting_quote' ? 'Inväntar offert' : wo.status === 'ordered' ? 'Beställt' : wo.status === 'completed' ? 'Slutförd' : 'Arkiverad'}
+                                  {wo.contractor && ` · ${wo.contractor}`}
+                                  {wo.due_date && ` · ${wo.due_date}`}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                {wo.price ? (
+                                  <p className="font-semibold">{Number(wo.price).toLocaleString('sv-SE')} kr</p>
+                                ) : (
+                                  <p className="text-muted-foreground">-</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-2 border-t flex justify-between text-sm font-semibold">
+                            <span>Total kostnad arbetsordrar</span>
+                            <span>{totalWorkOrderCost.toLocaleString('sv-SE')} kr</span>
+                          </div>
                         </div>
                       )}
                     </CardContent>
