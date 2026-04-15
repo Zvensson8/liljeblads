@@ -46,6 +46,7 @@ interface MaintenanceRecord {
   cost: number | null;
   notes: string | null;
   category: string | null;
+  work_order_id?: string | null;
 }
 
 interface ServiceRecordCardProps {
