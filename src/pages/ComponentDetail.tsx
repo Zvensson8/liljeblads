@@ -486,6 +486,55 @@ export default function ComponentDetail() {
                   </Card>
                 </TabsContent>
 
+                <TabsContent value="work-orders">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ClipboardList className="h-5 w-5" />
+                        Arbetsordrar kopplade till komponenten
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {componentWorkOrders.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <ClipboardList className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>Inga arbetsordrar kopplade till denna komponent</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {componentWorkOrders.map((wo) => (
+                            <div
+                              key={wo.id}
+                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                              onClick={() => navigate(`/work-orders`)}
+                            >
+                              <div>
+                                <p className="font-medium">{wo.action}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {wo.status === 'not_started' ? 'Ej påbörjad' : wo.status === 'awaiting_quote' ? 'Inväntar offert' : wo.status === 'ordered' ? 'Beställt' : wo.status === 'completed' ? 'Slutförd' : 'Arkiverad'}
+                                  {wo.contractor && ` · ${wo.contractor}`}
+                                  {wo.due_date && ` · ${wo.due_date}`}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                {wo.price ? (
+                                  <p className="font-semibold">{Number(wo.price).toLocaleString('sv-SE')} kr</p>
+                                ) : (
+                                  <p className="text-muted-foreground">-</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-2 border-t flex justify-between text-sm font-semibold">
+                            <span>Total kostnad arbetsordrar</span>
+                            <span>{totalWorkOrderCost.toLocaleString('sv-SE')} kr</span>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
                 <TabsContent value="costs">
                   <Card>
                     <CardHeader>
