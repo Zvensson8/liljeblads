@@ -61,6 +61,7 @@ type ViewMode = "detail" | "edit" | "preview";
 const workOrderSchema = z.object({
   action: z.string().min(1, "Åtgärd krävs").max(200, "Max 200 tecken"),
   property_id: z.string().min(1, "Fastighet krävs"),
+  component_id: z.string().optional(),
   due_date: z.string().optional(),
   status: z.enum(["not_started", "awaiting_quote", "ordered", "completed", "archived"]),
   priority: z.enum(["low", "medium", "high"]),
@@ -106,10 +107,26 @@ export function WorkOrderDetailDialog({
   const form = useForm<WorkOrderFormData>({
     resolver: zodResolver(workOrderSchema),
     defaultValues: {
-      action: "", property_id: "", status: "not_started", priority: "medium",
+      action: "", property_id: "", component_id: "", status: "not_started", priority: "medium",
       price: "", contractor: "", quarter: "", comments: "", due_date: "",
       reminder_enabled: false, reminder_frequency: "weekly", reminder_recipient_email: "",
     },
+  });
+
+  const watchedPropertyId = form.watch("property_id");
+
+  const { data: componentsForProperty } = useQuery({
+    queryKey: ["components-for-property-detail", watchedPropertyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("components")
+        .select("id, name, type")
+        .eq("property_id", watchedPropertyId)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!watchedPropertyId,
   });
 
   const { data: properties } = useQuery({
@@ -148,6 +165,7 @@ export function WorkOrderDetailDialog({
       form.reset({
         action: workOrder.action || "",
         property_id: workOrder.property_id || "",
+        component_id: workOrder.component_id || "",
         status: workOrder.status || "not_started",
         priority: workOrder.priority || "medium",
         price: workOrder.price?.toString() || "",
@@ -237,7 +255,8 @@ export function WorkOrderDetailDialog({
     setSubmitting(true);
     try {
       const payload = {
-        action: data.action, property_id: data.property_id, status: data.status, priority: data.priority,
+        action: data.action, property_id: data.property_id, component_id: data.component_id || null,
+        status: data.status, priority: data.priority,
         price: data.price ? parseFloat(data.price) : null, contractor: data.contractor || null,
         quarter: data.quarter || null, comments: data.comments || null, due_date: data.due_date || null,
         reminder_enabled: data.reminder_enabled, reminder_frequency: data.reminder_frequency,
