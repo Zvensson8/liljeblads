@@ -548,10 +548,10 @@ export function WorkOrderDetailDialog({
                       <FormField control={form.control} name="component_id" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Komponent (valfritt)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)} value={field.value || "__none__"}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Välj komponent" /></SelectTrigger></FormControl>
                             <SelectContent>
-                              <SelectItem value="">Ingen komponent</SelectItem>
+                              <SelectItem value="__none__">Ingen komponent</SelectItem>
                               {componentsForProperty.map((comp) => (
                                 <SelectItem key={comp.id} value={comp.id}>{comp.name} ({comp.type})</SelectItem>
                               ))}
