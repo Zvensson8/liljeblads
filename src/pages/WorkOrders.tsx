@@ -48,6 +48,11 @@ const WorkOrders = () => {
           properties (
             id,
             name
+          ),
+          components (
+            id,
+            name,
+            type
           )
         `)
         .in("status", showArchived ? ["completed", "archived"] : ["not_started", "awaiting_quote", "ordered"])
