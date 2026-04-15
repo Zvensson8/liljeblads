@@ -802,6 +802,33 @@ export function WorkOrderDetailDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={completionDialogOpen} onOpenChange={setCompletionDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slutför arbetsorder</AlertDialogTitle>
+            <AlertDialogDescription>
+              Arbetsorderdern kommer att markeras som slutförd och en underhållspost skapas automatiskt för den kopplade komponenten. Vill du registrera en kostnad?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="completion-cost">Kostnad (valfritt)</Label>
+            <Input
+              id="completion-cost"
+              type="number"
+              placeholder="Ange kostnad i kr"
+              value={completionCost}
+              onChange={(e) => setCompletionCost(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCompletionSkip}>Hoppa över</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCompletionConfirm}>
+              Spara &amp; slutför
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
