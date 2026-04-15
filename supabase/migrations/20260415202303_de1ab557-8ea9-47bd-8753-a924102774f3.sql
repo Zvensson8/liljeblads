@@ -1,0 +1,1 @@
+ALTER TABLE public.work_orders ADD COLUMN component_id uuid REFERENCES public.components(id) ON DELETE SET NULL;
