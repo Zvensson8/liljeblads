@@ -631,14 +631,37 @@ const Components = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-12">
-                      <p className="text-muted-foreground mb-4">
-                        Kostnadsöversikt över alla komponenter kommer snart
-                      </p>
-                      <Button variant="outline" onClick={() => navigate('/cost-overview')}>
-                        Öppna fullständig kostnadsöversikt
-                      </Button>
-                    </div>
+                    {components.length === 0 ? (
+                      <p className="text-center py-8 text-muted-foreground">Inga komponenter att visa</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {[...components]
+                          .map(c => ({
+                            ...c,
+                            totalCost: (maintenanceStats[c.id]?.totalCost || 0) + (workOrderStats[c.id]?.totalPrice || 0),
+                            serviceCount: (maintenanceStats[c.id]?.count || 0),
+                            woCount: (workOrderStats[c.id]?.count || 0),
+                          }))
+                          .filter(c => c.totalCost > 0)
+                          .sort((a, b) => b.totalCost - a.totalCost)
+                          .map(c => (
+                            <div
+                              key={c.id}
+                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                              onClick={() => navigate(`/components/${c.id}`)}
+                            >
+                              <div>
+                                <p className="font-medium">{c.name}</p>
+                                <p className="text-sm text-muted-foreground">{c.property_name} · {c.serviceCount} åtgärder · {c.woCount} arbetsordrar</p>
+                              </div>
+                              <p className="font-semibold">{c.totalCost.toLocaleString('sv-SE')} kr</p>
+                            </div>
+                          ))}
+                        {components.every(c => ((maintenanceStats[c.id]?.totalCost || 0) + (workOrderStats[c.id]?.totalPrice || 0)) === 0) && (
+                          <p className="text-center py-8 text-muted-foreground">Ingen kostnadsdata registrerad ännu</p>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
