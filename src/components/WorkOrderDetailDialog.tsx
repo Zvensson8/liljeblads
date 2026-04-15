@@ -98,6 +98,9 @@ export function WorkOrderDetailDialog({
   const [previewDocument, setPreviewDocument] = useState<any>(null);
   const [exporting, setExporting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
+  const [completionCost, setCompletionCost] = useState("");
+  const [pendingSubmitData, setPendingSubmitData] = useState<WorkOrderFormData | null>(null);
 
   // Preview state
   const [previewText, setPreviewText] = useState("");
@@ -252,6 +255,22 @@ export function WorkOrderDetailDialog({
   // ---- Edit submit ----
   const onSubmit = async (data: WorkOrderFormData) => {
     if (!user || !workOrder) return;
+
+    // If changing to completed and a component is linked, show cost dialog
+    const isCompletingNow = data.status === "completed" && workOrder.status !== "completed";
+    const componentId = data.component_id || workOrder.component_id;
+    if (isCompletingNow && componentId) {
+      setPendingSubmitData(data);
+      setCompletionCost(data.price || workOrder.price?.toString() || "");
+      setCompletionDialogOpen(true);
+      return;
+    }
+
+    await saveWorkOrder(data);
+  };
+
+  const saveWorkOrder = async (data: WorkOrderFormData, maintenanceCost?: number | null) => {
+    if (!user || !workOrder) return;
     setSubmitting(true);
     try {
       const payload = {
@@ -265,6 +284,23 @@ export function WorkOrderDetailDialog({
       };
       const { error } = await supabase.from("work_orders").update(payload).eq("id", workOrder.id);
       if (error) throw error;
+
+      // Auto-create maintenance_history if completing with a component
+      const componentId = data.component_id || workOrder.component_id;
+      if (data.status === "completed" && componentId) {
+        const { error: mhError } = await supabase.from("maintenance_history").insert({
+          component_id: componentId,
+          action_type: data.action || workOrder.action,
+          performed_date: new Date().toISOString().split("T")[0],
+          supplier: data.contractor || workOrder.contractor || null,
+          cost: maintenanceCost !== undefined ? maintenanceCost : (data.price ? parseFloat(data.price) : null),
+          notes: data.comments || workOrder.comments || null,
+          category: "planned",
+          work_order_id: workOrder.id,
+        });
+        if (mhError) console.error("Kunde inte skapa underhållspost:", mhError);
+      }
+
       toast.success("Arbetsorder uppdaterad");
       onUpdate();
       setViewMode("detail");
@@ -273,6 +309,21 @@ export function WorkOrderDetailDialog({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleCompletionConfirm = async () => {
+    if (!pendingSubmitData) return;
+    const cost = completionCost ? parseFloat(completionCost) : null;
+    setCompletionDialogOpen(false);
+    await saveWorkOrder(pendingSubmitData, cost);
+    setPendingSubmitData(null);
+  };
+
+  const handleCompletionSkip = async () => {
+    if (!pendingSubmitData) return;
+    setCompletionDialogOpen(false);
+    await saveWorkOrder(pendingSubmitData, null);
+    setPendingSubmitData(null);
   };
 
   // ---- Send preview email ----
@@ -747,6 +798,33 @@ export function WorkOrderDetailDialog({
             <AlertDialogCancel disabled={converting}>Avbryt</AlertDialogCancel>
             <AlertDialogAction onClick={handleConvertToProject} disabled={converting}>
               {converting ? "Konverterar..." : "Konvertera till projekt"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={completionDialogOpen} onOpenChange={setCompletionDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slutför arbetsorder</AlertDialogTitle>
+            <AlertDialogDescription>
+              Arbetsorderdern kommer att markeras som slutförd och en underhållspost skapas automatiskt för den kopplade komponenten. Vill du registrera en kostnad?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="completion-cost">Kostnad (valfritt)</Label>
+            <Input
+              id="completion-cost"
+              type="number"
+              placeholder="Ange kostnad i kr"
+              value={completionCost}
+              onChange={(e) => setCompletionCost(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCompletionSkip}>Hoppa över</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCompletionConfirm}>
+              Spara &amp; slutför
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

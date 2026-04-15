@@ -82,6 +82,7 @@ interface MaintenanceRecord {
   notes: string | null;
   is_warranty: boolean;
   category: string | null;
+  work_order_id: string | null;
 }
 
 export default function ComponentDetail() {

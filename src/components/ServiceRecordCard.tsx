@@ -46,6 +46,7 @@ interface MaintenanceRecord {
   cost: number | null;
   notes: string | null;
   category: string | null;
+  work_order_id?: string | null;
 }
 
 interface ServiceRecordCardProps {
@@ -286,6 +287,11 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
             <div className="flex-1 space-y-2">
               <div className="flex items-center gap-3 flex-wrap">
                 <h4 className="font-semibold">{record.action_type}</h4>
+                {record.work_order_id && (
+                  <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+                    Från arbetsorder
+                  </Badge>
+                )}
                 {record.category && (
                   <Badge variant="secondary" className="text-xs">
                     {record.category}

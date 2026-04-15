@@ -1180,6 +1180,7 @@ export type Database = {
           performed_date: string
           supplier: string | null
           updated_at: string
+          work_order_id: string | null
         }
         Insert: {
           action_type: string
@@ -1195,6 +1196,7 @@ export type Database = {
           performed_date: string
           supplier?: string | null
           updated_at?: string
+          work_order_id?: string | null
         }
         Update: {
           action_type?: string
@@ -1210,6 +1212,7 @@ export type Database = {
           performed_date?: string
           supplier?: string | null
           updated_at?: string
+          work_order_id?: string | null
         }
         Relationships: [
           {
@@ -1224,6 +1227,13 @@ export type Database = {
             columns: ["drift_task_id"]
             isOneToOne: false
             referencedRelation: "drift_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_history_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
         ]
