@@ -50,12 +50,10 @@ export const MaintenanceHistoryDialog = ({
   const { toast } = useToast();
 
   const categories = [
-    'Drift',
-    'Renovering',
-    'Förebyggande underhåll',
-    'Akut reparation',
-    'Inspektion',
-    'Annat'
+    { value: 'planned', label: 'Planerat underhåll' },
+    { value: 'preventive', label: 'Förebyggande underhåll' },
+    { value: 'acute', label: 'Akut reparation' },
+    { value: 'warranty', label: 'Garanti' },
   ];
 
   useEffect(() => {
