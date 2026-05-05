@@ -50,12 +50,10 @@ export const MaintenanceHistoryDialog = ({
   const { toast } = useToast();
 
   const categories = [
-    'Drift',
-    'Renovering',
-    'Förebyggande underhåll',
-    'Akut reparation',
-    'Inspektion',
-    'Annat'
+    { value: 'planned', label: 'Planerat underhåll' },
+    { value: 'preventive', label: 'Förebyggande underhåll' },
+    { value: 'acute', label: 'Akut reparation' },
+    { value: 'warranty', label: 'Garanti' },
   ];
 
   useEffect(() => {
@@ -196,7 +194,7 @@ export const MaintenanceHistoryDialog = ({
                     >
                       <option value="">Välj kategori</option>
                       {categories.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
                       ))}
                     </select>
                   </div>
