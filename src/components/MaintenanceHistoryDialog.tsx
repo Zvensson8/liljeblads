@@ -194,7 +194,7 @@ export const MaintenanceHistoryDialog = ({
                     >
                       <option value="">Välj kategori</option>
                       {categories.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
                       ))}
                     </select>
                   </div>
