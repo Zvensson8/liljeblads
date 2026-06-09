@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCreateMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
+import { useCreateMaintenanceDocument } from '@/hooks/useMaintenanceDocuments';
 import { useDriftTasks } from '@/hooks/useDriftTasks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
