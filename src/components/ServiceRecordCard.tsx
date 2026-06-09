@@ -249,7 +249,7 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
     try {
       // Delete from storage (only if we can parse the path)
       if (filePath) {
-        await supabase.storage.from('maintenance-documents').remove([filePath]);
+        await storageService.remove('maintenance-documents', [filePath]);
       }
 
       // Delete from database

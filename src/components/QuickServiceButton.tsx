@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { storageService } from '@/services/supabase';
 import { useCreateMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 import { useCreateMaintenanceDocument } from '@/hooks/useMaintenanceDocuments';
 import { useDriftTasks } from '@/hooks/useDriftTasks';
@@ -139,31 +139,26 @@ export const QuickServiceButton = ({
         const fileExt = selectedFile.name.split('.').pop();
         const fileName = `${maintenanceRecord.id}/${crypto.randomUUID()}.${fileExt}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('maintenance-documents')
-          .upload(fileName, selectedFile);
-
-        if (uploadError) {
+        try {
+          await storageService.upload('maintenance-documents', fileName, selectedFile);
+        } catch (uploadError: any) {
           console.error('Upload error:', uploadError);
           toast.error('Service registrerad men dokumentet kunde inte laddas upp', {
-            description: uploadError.message
+            description: uploadError.message,
           });
-        } else {
-          const { data: urlData } = supabase.storage
-            .from('maintenance-documents')
-            .getPublicUrl(fileName);
+        }
 
-          try {
-            await createMaintenanceDoc.mutateAsync({
-              maintenance_history_id: maintenanceRecord.id,
-              file_url: urlData.publicUrl,
-              file_name: selectedFile.name,
-              file_size: selectedFile.size,
-              mime_type: selectedFile.type,
-            } as any);
-          } catch (docError: any) {
-            console.error('Doc record error:', docError);
-          }
+        try {
+          const publicUrl = storageService.getPublicUrl('maintenance-documents', fileName);
+          await createMaintenanceDoc.mutateAsync({
+            maintenance_history_id: maintenanceRecord.id,
+            file_url: publicUrl,
+            file_name: selectedFile.name,
+            file_size: selectedFile.size,
+            mime_type: selectedFile.type,
+          } as any);
+        } catch (docError: any) {
+          console.error('Doc record error:', docError);
         }
       }
 
