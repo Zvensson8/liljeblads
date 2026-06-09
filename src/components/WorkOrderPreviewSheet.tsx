@@ -67,18 +67,13 @@ export function WorkOrderPreviewSheet({
 
     setSending(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user?.email) throw new Error("Kunde inte hämta din e-post");
 
-      const { data, error } = await supabase.functions.invoke("send-work-order-draft", {
-        body: {
-          workOrderId: workOrder.id,
-          userEmail: user.email,
-          customText: text,
-        },
-      });
-
-      if (error) throw error;
+      const data = await sendWorkOrderDraft.mutateAsync({
+        workOrderId: workOrder.id,
+        userEmail: user.email,
+        customText: text,
+      }) as { error?: string };
       if (data?.error) throw new Error(data.error);
 
       toast.success("Beställningsutkast skickat till din e-post");
