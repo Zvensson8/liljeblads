@@ -94,12 +94,9 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
   const handleDeleteDocument = async (docId: string, fileUrl: string) => {
     try {
       const filePath = fileUrl.split("/").slice(-3).join("/");
-      
-      const { error: storageError } = await supabase.storage
-        .from("property-documents")
-        .remove([filePath]);
 
-      if (storageError) throw storageError;
+      await storageService.remove("property-documents", [filePath]);
+
 
       const { error: dbError } = await supabase
         .from("property_documents")

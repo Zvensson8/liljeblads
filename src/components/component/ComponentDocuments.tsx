@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { storageService } from "@/services/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -66,11 +67,8 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
       const fileExt = file.name.split(".").pop();
       const filePath = `${session.user.id}/${componentId}/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("component-documents")
-        .upload(filePath, file);
+      await storageService.upload("component-documents", filePath, file);
 
-      if (uploadError) throw uploadError;
 
       // Store the file path (not public URL) since bucket is now private
       // We'll generate signed URLs when accessing the file
