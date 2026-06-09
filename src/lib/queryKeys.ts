@@ -9,85 +9,86 @@
  *
  * Inspired by https://tkdodo.eu/blog/effective-react-query-keys
  */
+
+/**
+ * Factory for the standard 4-shape key set (all / lists / list /
+ * details / detail). Keeps the registry below from repeating the same
+ * boilerplate for every entity.
+ */
+function makeEntityKeys<TName extends string>(name: TName) {
+  const all = [name] as const;
+  const lists = () => [...all, 'list'] as const;
+  const details = () => [...all, 'detail'] as const;
+  return {
+    all,
+    lists,
+    list: (filters?: Record<string, unknown>) =>
+      [...lists(), filters ?? {}] as const,
+    details,
+    detail: (id: string) => [...details(), id] as const,
+  };
+}
+
 export const queryKeys = {
   properties: {
-    all: ['properties'] as const,
-    lists: () => [...queryKeys.properties.all, 'list'] as const,
-    list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.properties.lists(), filters ?? {}] as const,
-    details: () => [...queryKeys.properties.all, 'detail'] as const,
-    detail: (id: string) => [...queryKeys.properties.details(), id] as const,
+    ...makeEntityKeys('properties'),
   },
   workOrders: {
-    all: ['work-orders'] as const,
-    lists: () => [...queryKeys.workOrders.all, 'list'] as const,
-    list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.workOrders.lists(), filters ?? {}] as const,
-    details: () => [...queryKeys.workOrders.all, 'detail'] as const,
-    detail: (id: string) => [...queryKeys.workOrders.details(), id] as const,
+    ...makeEntityKeys('work-orders'),
     byProject: (projectId: string) =>
-      [...queryKeys.workOrders.all, 'project', projectId] as const,
+      ['work-orders', 'project', projectId] as const,
     byProperty: (propertyId: string) =>
-      [...queryKeys.workOrders.all, 'property', propertyId] as const,
+      ['work-orders', 'property', propertyId] as const,
   },
   components: {
-    all: ['components'] as const,
-    lists: () => [...queryKeys.components.all, 'list'] as const,
-    list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.components.lists(), filters ?? {}] as const,
-    details: () => [...queryKeys.components.all, 'detail'] as const,
-    detail: (id: string) => [...queryKeys.components.details(), id] as const,
+    ...makeEntityKeys('components'),
     byProperty: (propertyId: string) =>
-      [...queryKeys.components.all, 'property', propertyId] as const,
+      ['components', 'property', propertyId] as const,
   },
   maintenanceHistory: {
-    all: ['maintenance-history'] as const,
-    lists: () => [...queryKeys.maintenanceHistory.all, 'list'] as const,
-    list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.maintenanceHistory.lists(), filters ?? {}] as const,
-    details: () => [...queryKeys.maintenanceHistory.all, 'detail'] as const,
-    detail: (id: string) =>
-      [...queryKeys.maintenanceHistory.details(), id] as const,
+    ...makeEntityKeys('maintenance-history'),
     byComponent: (componentId: string) =>
-      [...queryKeys.maintenanceHistory.all, 'component', componentId] as const,
+      ['maintenance-history', 'component', componentId] as const,
   },
-
-  dashboardStats: {
-    all: ['dashboard-stats'] as const,
-    lists: () => [...queryKeys.dashboardStats.all, 'list'] as const,
-    list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.dashboardStats.lists(), filters ?? {}] as const,
-  },
+  dashboardStats: makeEntityKeys('dashboard-stats'),
   projects: {
-    all: ['projects'] as const,
-    lists: () => [...queryKeys.projects.all, 'list'] as const,
-    list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.projects.lists(), filters ?? {}] as const,
-    details: () => [...queryKeys.projects.all, 'detail'] as const,
-    detail: (id: string) => [...queryKeys.projects.details(), id] as const,
+    ...makeEntityKeys('projects'),
     byProperty: (propertyId: string) =>
-      [...queryKeys.projects.all, 'property', propertyId] as const,
+      ['projects', 'property', propertyId] as const,
   },
   todos: {
-    all: ['todos'] as const,
-    lists: () => [...queryKeys.todos.all, 'list'] as const,
-    list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.todos.lists(), filters ?? {}] as const,
-    details: () => [...queryKeys.todos.all, 'detail'] as const,
-    detail: (id: string) => [...queryKeys.todos.details(), id] as const,
+    ...makeEntityKeys('todos'),
     byProperty: (propertyId: string) =>
-      [...queryKeys.todos.all, 'property', propertyId] as const,
+      ['todos', 'property', propertyId] as const,
   },
   driftTasks: {
-    all: ['drift-tasks'] as const,
-    lists: () => [...queryKeys.driftTasks.all, 'list'] as const,
-    list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.driftTasks.lists(), filters ?? {}] as const,
-    details: () => [...queryKeys.driftTasks.all, 'detail'] as const,
-    detail: (id: string) => [...queryKeys.driftTasks.details(), id] as const,
+    ...makeEntityKeys('drift-tasks'),
     byProperty: (propertyId: string) =>
-      [...queryKeys.driftTasks.all, 'property', propertyId] as const,
+      ['drift-tasks', 'property', propertyId] as const,
   },
+
+  // — Newly consolidated entities —
+  floors: makeEntityKeys('floors'),
+  driftCategories: makeEntityKeys('drift-categories'),
+  recurringCosts: makeEntityKeys('recurring-costs'),
+  recurringCostHistory: makeEntityKeys('recurring-cost-history'),
+  propertyDocuments: makeEntityKeys('property-documents'),
+  propertyContacts: makeEntityKeys('property-contacts'),
+  propertyNotes: makeEntityKeys('property-notes'),
+  componentDocuments: makeEntityKeys('component-documents'),
+  projectDocuments: makeEntityKeys('project-documents'),
+  workOrderFiles: makeEntityKeys('work-order-files'),
+  maintenanceDocuments: makeEntityKeys('maintenance-history-documents'),
+  scheduledReports: makeEntityKeys('scheduled-reports'),
+  userConsents: makeEntityKeys('user-consents'),
+  aiSuggestedActions: makeEntityKeys('ai-suggested-actions'),
+  aiConversations: makeEntityKeys('ai-conversations'),
+  aiMessages: {
+    ...makeEntityKeys('ai-messages'),
+    byConversation: (conversationId: string) =>
+      ['ai-messages', 'conversation', conversationId] as const,
+  },
+  profiles: makeEntityKeys('profiles'),
 } as const;
 
 export type QueryKeys = typeof queryKeys;
