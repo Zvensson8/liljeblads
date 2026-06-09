@@ -535,13 +535,10 @@ export default function ProjectDetail() {
                         currentActualCost={project.actual_cost}
                         onApply={async (newForecast) => {
                           try {
-                            const { error } = await supabase
-                              .from("projects")
-                              .update({ forecast: newForecast })
-                              .eq("id", project.id);
-
-                            if (error) throw error;
-
+                            await updateProject.mutateAsync({
+                              id: project.id,
+                              patch: { forecast: newForecast },
+                            });
                             toast.success("Prognos uppdaterad från simulering");
                             fetchProject();
                           } catch (error: any) {
