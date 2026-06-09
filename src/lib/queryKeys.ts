@@ -121,6 +121,8 @@ export const queryKeys = {
     byOrganization: (organizationId: string) =>
       ['organization-members', 'organization', organizationId] as const,
   },
+  organizations: makeEntityKeys('organizations'),
+  founderStats: makeEntityKeys('founder-stats'),
 } as const;
 
 export type QueryKeys = typeof queryKeys;
