@@ -230,9 +230,8 @@ export function WorkOrderDetailDialog({
     try {
       const fileExt = file.name.split(".").pop();
       const filePath = `${session.user.id}/${workOrder.id}/${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from("property-documents").upload(filePath, file);
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from("property-documents").getPublicUrl(filePath);
+      await storageService.upload("property-documents", filePath, file);
+      const publicUrl = storageService.getPublicUrl("property-documents", filePath);
       await createWorkOrderFile.mutateAsync({
         work_order_id: workOrder.id,
         name: file.name,
@@ -251,7 +250,7 @@ export function WorkOrderDetailDialog({
   const handleDeleteFile = async (fileId: string, fileUrl: string) => {
     try {
       const filePath = fileUrl.split("/").slice(-3).join("/");
-      await supabase.storage.from("property-documents").remove([filePath]);
+      await storageService.remove("property-documents", [filePath]);
       await deleteWorkOrderFile.mutateAsync(fileId);
       refetchFiles();
     } catch {
