@@ -39,25 +39,14 @@ import { Pencil, Trash2, Search, Building } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TIER_CONFIGS, SUBSCRIPTION_TIERS } from "@/lib/subscriptionTiers";
 
-interface Organization {
-  id: string;
-  name: string;
-  subscription_tier: string;
-  max_properties: number;
-  max_users: number;
-  max_components: number;
-  max_work_orders: number;
-  max_projects: number;
-  max_documents: number;
-  max_storage_mb: number;
-  notes: string | null;
-  created_at: string;
-}
+// Organization type imported from useOrganizations hook
 
 export function FounderOrganizations() {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [filteredOrgs, setFilteredOrgs] = useState<Organization[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: organizations = [], isLoading: loading } = useOrganizations();
+  const createOrg = useCreateOrganization();
+  const updateOrg = useUpdateOrganization();
+  const deleteOrg = useDeleteOrganization();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -74,35 +63,13 @@ export function FounderOrganizations() {
     subscription_tier: "small",
   });
 
-  useEffect(() => {
-    fetchOrganizations();
-  }, []);
-
-  useEffect(() => {
-    const filtered = organizations.filter((org) =>
-      org.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredOrgs(filtered);
-  }, [searchTerm, organizations]);
-
-  const fetchOrganizations = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("organizations")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setOrganizations(data || []);
-      setFilteredOrgs(data || []);
-    } catch (error: any) {
-      console.error("Error fetching organizations:", error);
-      toast.error("Kunde inte hämta organisationer");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filteredOrgs = useMemo(
+    () =>
+      organizations.filter((org) =>
+        org.name.toLowerCase().includes(searchTerm.toLowerCase()),
+      ),
+    [organizations, searchTerm],
+  );
 
   const handleEdit = (org: Organization) => {
     setSelectedOrg(org);
@@ -118,80 +85,60 @@ export function FounderOrganizations() {
 
   const handleSaveEdit = async () => {
     if (!selectedOrg) return;
-
     try {
-      const { error } = await supabase
-        .from("organizations")
-        .update({
+      await updateOrg.mutateAsync({
+        id: selectedOrg.id,
+        patch: {
           name: editForm.name,
           subscription_tier: editForm.subscription_tier,
           max_properties: editForm.max_properties,
           max_users: editForm.max_users,
           notes: editForm.notes || null,
-        })
-        .eq("id", selectedOrg.id);
-
-      if (error) throw error;
-
-      toast.success("Organisation uppdaterad");
+        },
+      });
       setEditDialogOpen(false);
-      fetchOrganizations();
-    } catch (error: any) {
-      console.error("Error updating organization:", error);
-      toast.error("Kunde inte uppdatera organisation");
+    } catch {
+      /* toast handled in hook */
     }
   };
 
   const handleCreate = async () => {
     try {
-      const tierConfig = TIER_CONFIGS[createForm.subscription_tier as keyof typeof TIER_CONFIGS];
-      
-      const { error } = await supabase
-        .from("organizations")
-        .insert({
-          name: createForm.name,
-          subscription_tier: createForm.subscription_tier,
-          max_properties: tierConfig.limits.properties,
-          max_users: tierConfig.limits.users,
-          max_components: tierConfig.limits.components,
-          max_work_orders: tierConfig.limits.workOrders,
-          max_projects: tierConfig.limits.projects,
-          max_documents: tierConfig.limits.documents,
-          max_storage_mb: tierConfig.limits.storageMb,
-        });
-
-      if (error) throw error;
-
-      toast.success("Organisation skapad");
-      setCreateDialogOpen(false);
-      setCreateForm({
-        name: "",
-        subscription_tier: "small",
+      const tierConfig =
+        TIER_CONFIGS[createForm.subscription_tier as keyof typeof TIER_CONFIGS];
+      await createOrg.mutateAsync({
+        name: createForm.name,
+        subscription_tier: createForm.subscription_tier,
+        max_properties: tierConfig.limits.properties,
+        max_users: tierConfig.limits.users,
+        max_components: tierConfig.limits.components,
+        max_work_orders: tierConfig.limits.workOrders,
+        max_projects: tierConfig.limits.projects,
+        max_documents: tierConfig.limits.documents,
+        max_storage_mb: tierConfig.limits.storageMb,
       });
-      fetchOrganizations();
-    } catch (error: any) {
-      console.error("Error creating organization:", error);
-      toast.error("Kunde inte skapa organisation");
+      setCreateDialogOpen(false);
+      setCreateForm({ name: "", subscription_tier: "small" });
+    } catch {
+      /* toast handled in hook */
     }
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Är du säker på att du vill radera organisationen "${name}"? Detta kommer radera alla relaterade data.`)) {
+    if (
+      !confirm(
+        `Är du säker på att du vill radera organisationen "${name}"? Detta kommer radera alla relaterade data.`,
+      )
+    ) {
       return;
     }
-
     try {
-      const { error } = await supabase.from("organizations").delete().eq("id", id);
-
-      if (error) throw error;
-
-      toast.success("Organisation raderad");
-      fetchOrganizations();
-    } catch (error: any) {
-      console.error("Error deleting organization:", error);
-      toast.error("Kunde inte radera organisation");
+      await deleteOrg.mutateAsync(id);
+    } catch {
+      /* toast handled in hook */
     }
   };
+
 
   const handleTierChange = (tier: string) => {
     const config = TIER_CONFIGS[tier as keyof typeof TIER_CONFIGS];
