@@ -244,30 +244,17 @@ const Components = () => {
     setDialogOpen(true);
   };
 
-  const handleDeleteComponent = async (componentId: string, componentName: string) => {
+  const handleDeleteComponent = (componentId: string, componentName: string) => {
     if (!confirm(`Är du säker på att du vill ta bort ${componentName}?`)) {
       return;
     }
-
-    const { error } = await supabase
-      .from('components')
-      .delete()
-      .eq('id', componentId);
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Komponent borttagen',
-        description: `${componentName} har tagits bort.`,
-      });
-      fetchComponents();
-    }
+    deleteComponent.mutate(componentId);
   };
+
+  const refreshComponents = () => {
+    // react-query realtime + mutation invalidations handle refetch automatically.
+  };
+
 
   if (authLoading || loading) {
     return (
