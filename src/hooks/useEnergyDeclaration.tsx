@@ -39,7 +39,7 @@ export function useEnergyDeclaration(
 
   const updateEnergy = useMutation({
     mutationFn: async (
-      data: EnergyData & { fieldIds: Record<string, string | undefined> },
+      data: EnergyData & { fieldIds: EnergyFieldIds },
     ) => {
       await energyDeclarationService.upsertDeclaration({
         propertyId,
