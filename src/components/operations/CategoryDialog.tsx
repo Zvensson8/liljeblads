@@ -35,30 +35,12 @@ export function CategoryDialog({
   onOpenChange,
   propertyId,
 }: CategoryDialogProps) {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories2, _set] = useState<Category[]>([]); void categories2; void _set;
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (open && propertyId) {
-      fetchCategories();
-    }
-  }, [open, propertyId]);
-
-  const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from("drift_categories")
-      .select("*")
-      .eq("property_id", propertyId)
-      .order("name");
-
-    if (error) {
-      toast.error("Kunde inte hämta kategorier");
-      return;
-    }
-
-    setCategories(data || []);
-  };
+  const { data: categories = [] } = useDriftCategories({ propertyId, parentId: null as any });
+  const createCategory = useCreateDriftCategory();
+  const deleteCategory = useDeleteDriftCategory();
+  const loading = createCategory.isPending;
 
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,41 +50,28 @@ export function CategoryDialog({
       return;
     }
 
-    setLoading(true);
-
-    const { error } = await supabase.from("drift_categories").insert({
-      property_id: propertyId,
-      name: newCategoryName.trim(),
-    });
-
-    setLoading(false);
-
-    if (error) {
+    try {
+      await createCategory.mutateAsync({
+        property_id: propertyId,
+        name: newCategoryName.trim(),
+      } as any);
+      toast.success("Kategori skapad");
+      setNewCategoryName("");
+    } catch {
       toast.error("Kunde inte skapa kategori");
-      return;
     }
-
-    toast.success("Kategori skapad");
-    setNewCategoryName("");
-    fetchCategories();
   };
 
   const handleDeleteCategory = async (categoryId: string) => {
-    const { error } = await supabase
-      .from("drift_categories")
-      .delete()
-      .eq("id", categoryId);
-
-    if (error) {
+    try {
+      await deleteCategory.mutateAsync(categoryId);
+      toast.success("Kategori borttagen");
+    } catch {
       toast.error("Kunde inte ta bort kategori");
-      return;
     }
-
-    toast.success("Kategori borttagen");
-    fetchCategories();
   };
 
-  const parentCategories = categories.filter((c) => !c.parent_id);
+  const parentCategories = (categories as Category[]).filter((c) => !c.parent_id);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
