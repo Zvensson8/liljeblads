@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { storageService } from "@/services/supabase";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +31,7 @@ interface KBSource {
 }
 
 export function FounderKnowledgeBase() {
+  const { session } = useAuth();
   const [sources, setSources] = useState<KBSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [ingesting, setIngesting] = useState(false);
@@ -84,10 +87,7 @@ export function FounderKnowledgeBase() {
   }, [fetchSources]);
 
   const callAuthedFunction = useCallback(async (functionName: string, payload: Record<string, unknown>) => {
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) throw sessionError;
-
-    const accessToken = sessionData.session?.access_token;
+    const accessToken = session?.access_token;
     if (!accessToken) {
       throw new Error("Din session har gått ut. Logga in igen och försök på nytt.");
     }
