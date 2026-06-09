@@ -40,6 +40,18 @@ export const queryKeys = {
     byProperty: (propertyId: string) =>
       [...queryKeys.components.all, 'property', propertyId] as const,
   },
+  maintenanceHistory: {
+    all: ['maintenance-history'] as const,
+    lists: () => [...queryKeys.maintenanceHistory.all, 'list'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [...queryKeys.maintenanceHistory.lists(), filters ?? {}] as const,
+    details: () => [...queryKeys.maintenanceHistory.all, 'detail'] as const,
+    detail: (id: string) =>
+      [...queryKeys.maintenanceHistory.details(), id] as const,
+    byComponent: (componentId: string) =>
+      [...queryKeys.maintenanceHistory.all, 'component', componentId] as const,
+  },
+
 } as const;
 
 export type QueryKeys = typeof queryKeys;
