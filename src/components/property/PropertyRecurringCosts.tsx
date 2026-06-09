@@ -35,17 +35,18 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
   });
 
   const { data: property } = useProperty(propertyId);
+  const orgId = (property as any)?.organization_id as string | undefined;
   const { data: rawCosts, isLoading } = useRecurringCosts({ propertyId });
 
   // Account codes — no domain service yet; fetched here scoped to the org.
   const { data: accountCodes = [] } = useQuery({
-    queryKey: ["account-codes", property?.organization_id],
-    enabled: !!property?.organization_id,
+    queryKey: ["account-codes", orgId],
+    enabled: !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('account_codes')
         .select('*')
-        .eq('organization_id', property!.organization_id!)
+        .eq('organization_id', orgId!)
         .order('code');
       if (error) throw error;
       return data ?? [];
