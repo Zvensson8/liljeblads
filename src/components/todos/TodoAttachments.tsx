@@ -70,12 +70,7 @@ export function TodoAttachments({ todoId, onUpdate }: TodoAttachmentsProps) {
 
   const handleDownload = async (attachment: any) => {
     try {
-      const { data, error } = await supabase.storage
-        .from('todo-attachments')
-        .download(attachment.file_url);
-
-      if (error) throw error;
-
+      const data = await storageService.download('todo-attachments', attachment.file_url);
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
@@ -89,11 +84,7 @@ export function TodoAttachments({ todoId, onUpdate }: TodoAttachmentsProps) {
 
   const handleDelete = async (attachment: any) => {
     try {
-      const { error: storageError } = await supabase.storage
-        .from('todo-attachments')
-        .remove([attachment.file_url]);
-
-      if (storageError) throw storageError;
+      await storageService.remove('todo-attachments', [attachment.file_url]);
 
       const { error: dbError } = await supabase
         .from('todo_attachments' as any)
