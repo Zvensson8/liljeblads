@@ -52,6 +52,12 @@ export const queryKeys = {
       [...queryKeys.maintenanceHistory.all, 'component', componentId] as const,
   },
 
+  dashboardStats: {
+    all: ['dashboard-stats'] as const,
+    lists: () => [...queryKeys.dashboardStats.all, 'list'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [...queryKeys.dashboardStats.lists(), filters ?? {}] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;
