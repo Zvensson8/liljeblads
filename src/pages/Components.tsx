@@ -20,6 +20,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { FloorSelector } from '@/components/FloorSelector';
 import { QuickServiceButton } from '@/components/QuickServiceButton';
 import { LastServiceBadge } from '@/components/LastServiceBadge';
+import { useComponents, useDeleteComponent } from '@/hooks/useComponents';
+import { useMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
+import { useWorkOrders } from '@/hooks/useWorkOrders';
 // Type display name mapping
 const getTypeDisplayName = (typeCode: string): string => {
   const typeMap: Record<string, string> = {
