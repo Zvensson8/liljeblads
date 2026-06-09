@@ -62,11 +62,9 @@ export const driftTaskComponentService = createCrudService<
 });
 
 /** Bulk-delete a set of drift_tasks by id. Used by bulk actions. */
-export async function deleteDriftTasksByIds(
-  client: typeof import('@/integrations/supabase/client').supabase,
-  ids: string[],
-) {
+export async function deleteDriftTasksByIds(ids: string[]) {
   if (ids.length === 0) return;
-  const { error } = await client.from('drift_tasks').delete().in('id', ids);
+  const { supabase } = await import('@/integrations/supabase/client');
+  const { error } = await supabase.from('drift_tasks').delete().in('id', ids);
   if (error) throw error;
 }
