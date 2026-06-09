@@ -7,6 +7,8 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useProperties } from '@/hooks/useProperties';
+import { useCreateComponent, useUpdateComponent } from '@/hooks/useComponents';
 import { ComponentTemplate } from '@/hooks/useComponentLibrary';
 import { z } from 'zod';
 import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
@@ -49,7 +51,9 @@ export const ComponentFormDialog = ({
   onSuccess 
 }: ComponentFormDialogProps) => {
   const { toast } = useToast();
-  const [properties, setProperties] = useState<any[]>([]);
+  const { data: properties = [] } = useProperties();
+  const createComponent = useCreateComponent();
+  const updateComponent = useUpdateComponent();
   const [loading, setLoading] = useState(false);
   const [newComponentId, setNewComponentId] = useState<string | null>(null);
   const [showServicePlan, setShowServicePlan] = useState(false);
@@ -71,7 +75,7 @@ export const ComponentFormDialog = ({
 
   useEffect(() => {
     if (open) {
-      fetchProperties();
+      // properties fetched via useProperties hook
       setNewComponentId(null);
       setShowServicePlan(false);
       
@@ -102,16 +106,6 @@ export const ComponentFormDialog = ({
     }
   }, [propertyId]);
 
-  const fetchProperties = async () => {
-    const { data } = await supabase
-      .from('properties')
-      .select('id, name')
-      .order('name');
-    
-    if (data) {
-      setProperties(data);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,12 +151,10 @@ export const ComponentFormDialog = ({
 
       if (editingComponent) {
         // Update existing component
-        const { error } = await supabase
-          .from('components')
-          .update(componentData)
-          .eq('id', editingComponent.id);
-
-        if (error) throw error;
+        await updateComponent.mutateAsync({
+          id: editingComponent.id,
+          patch: componentData as any,
+        });
 
         toast({
           title: 'Komponent uppdaterad!',
@@ -170,15 +162,9 @@ export const ComponentFormDialog = ({
         });
       } else {
         // Create new component
-        const { data: newComponent, error } = await supabase
-          .from('components')
-          .insert([componentData])
-          .select()
-          .single();
+        const newComponent = await createComponent.mutateAsync(componentData as any);
 
-        if (error) throw error;
-
-        // Save canvas position if provided
+        // Save canvas position if provided (no domain service yet for geometry)
         if (newComponent && canvasPosition) {
           const { error: geometryError } = await supabase
             .from('component_geometry')
