@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -18,10 +16,16 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  useWorkOrders,
+  useUpdateWorkOrder,
+  useDeleteWorkOrder,
+} from "@/hooks/useWorkOrders";
+import { queryKeys } from "@/lib/queryKeys";
 
 const WorkOrders = () => {
-  const { session } = useAuth();
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -32,64 +36,37 @@ const WorkOrders = () => {
   const [selectedProperty, setSelectedProperty] = useState<string>("all");
   const [selectedContractor, setSelectedContractor] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  
+
   // Inline editing state
   const [editingCell, setEditingCell] = useState<{ orderId: string; field: string } | null>(null);
   const [tempValue, setTempValue] = useState<any>(null);
-  const [updating, setUpdating] = useState(false);
 
-  const { data: workOrders, refetch } = useQuery({
-    queryKey: ["work-orders", showArchived],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("work_orders")
-        .select(`
-          *,
-          properties (
-            id,
-            name
-          ),
-          components (
-            id,
-            name,
-            type
-          )
-        `)
-        .in("status", showArchived ? ["completed", "archived"] : ["not_started", "awaiting_quote", "ordered"])
-        .order("created_at", { ascending: false });
+  const { data: workOrders } = useWorkOrders({ showArchived });
+  const updateMutation = useUpdateWorkOrder();
+  const deleteMutation = useDeleteWorkOrder();
+  const updating = updateMutation.isPending;
 
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!session,
-  });
+  const refetch = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase
-      .from("work_orders")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      toast.error("Kunde inte ta bort arbetsorder");
-    } else {
-      toast.success("Arbetsorder borttagen");
-      refetch();
+    try {
+      await deleteMutation.mutateAsync(id);
+    } catch {
+      // hook surfaces error toast
     }
   };
 
   const activeCount = (workOrders?.filter((wo) => wo.status !== "archived") || []).length;
-  
+
   // Group orders by status
   const notStarted = workOrders?.filter((wo) => wo.status === "not_started") || [];
   const awaitingQuote = workOrders?.filter((wo) => wo.status === "awaiting_quote") || [];
   const ordered = workOrders?.filter((wo) => wo.status === "ordered") || [];
-  const orderedTotal = ordered.reduce((sum, wo) => sum + (Number(wo.price) || 0), 0);
+  const orderedTotal = ordered.reduce((sum, wo: any) => sum + (Number(wo.price) || 0), 0);
 
   const filteredOrders = (orders: any[]) => {
     let filtered = orders;
-    
-    // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter(
         (wo) =>
@@ -98,63 +75,47 @@ const WorkOrders = () => {
           wo.contractor?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    
-    // Filter by property
     if (selectedProperty !== "all") {
       filtered = filtered.filter((wo) => wo.property_id === selectedProperty);
     }
-    
-    // Filter by contractor
     if (selectedContractor !== "all") {
       filtered = filtered.filter((wo) => wo.contractor === selectedContractor);
     }
-    
-    // Filter by status
     if (selectedStatus !== "all") {
       filtered = filtered.filter((wo) => wo.status === selectedStatus);
     }
-    
     return filtered;
   };
 
-  // Get unique values for filters
   const uniqueProperties = Array.from(
-    new Set(workOrders?.map((wo) => wo.properties?.name).filter(Boolean))
+    new Set(workOrders?.map((wo: any) => wo.properties?.name).filter(Boolean))
   );
   const uniqueContractors = Array.from(
-    new Set(workOrders?.map((wo) => wo.contractor).filter(Boolean))
+    new Set(workOrders?.map((wo: any) => wo.contractor).filter(Boolean))
   );
-  
-  const activeFilterCount = 
+
+  const activeFilterCount =
     (selectedProperty !== "all" ? 1 : 0) +
     (selectedContractor !== "all" ? 1 : 0) +
     (selectedStatus !== "all" ? 1 : 0);
-  
+
   const clearAllFilters = () => {
     setSelectedProperty("all");
     setSelectedContractor("all");
     setSelectedStatus("all");
   };
 
-  // Inline editing functions
+  // Inline editing — delegated to the optimistic useUpdateWorkOrder hook.
   const updateWorkOrder = async (orderId: string, field: string, value: any) => {
-    setUpdating(true);
     try {
-      const updateData: any = { [field]: value, updated_at: new Date().toISOString() };
-      
-      const { error } = await supabase
-        .from("work_orders")
-        .update(updateData)
-        .eq("id", orderId);
-      
-      if (error) throw error;
-      
+      await updateMutation.mutateAsync({
+        id: orderId,
+        patch: { [field]: value } as any,
+      });
       toast.success("Arbetsorder uppdaterad");
-      refetch();
-    } catch (error) {
-      toast.error("Kunde inte uppdatera arbetsorder");
+    } catch {
+      // hook surfaces error toast
     } finally {
-      setUpdating(false);
       setEditingCell(null);
       setTempValue(null);
     }
@@ -196,7 +157,7 @@ const WorkOrders = () => {
 
   const renderOrdersTable = (orders: any[], title: string, icon: string, total?: number) => {
     const tableOrders = filteredOrders(orders);
-    
+
     return (
       <Card className="border-border">
         <CardHeader className="pb-2">
@@ -230,8 +191,8 @@ const WorkOrders = () => {
                 </thead>
                 <tbody>
                   {tableOrders.map((order) => (
-                    <tr 
-                      key={order.id} 
+                    <tr
+                      key={order.id}
                       className={`border-b border-l-4 ${getPriorityBorderColor(order.priority)} hover:bg-muted/50 cursor-pointer transition-colors`}
                       onClick={() => {
                         setDetailOrder(order);
@@ -245,7 +206,7 @@ const WorkOrders = () => {
                           <span>{order.properties?.name}</span>
                         </div>
                       </td>
-                      <td 
+                      <td
                         className="py-3 px-3"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -273,15 +234,15 @@ const WorkOrders = () => {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <Badge 
-                            variant="outline" 
+                          <Badge
+                            variant="outline"
                             className="hover:bg-muted cursor-pointer transition-colors"
                           >
                             {getStatusLabel(order.status)}
                           </Badge>
                         )}
                       </td>
-                      <td 
+                      <td
                         className="py-3 px-3"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -340,7 +301,6 @@ const WorkOrders = () => {
 
           <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              {/* Top bar with search and actions */}
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="relative w-full md:w-72">
@@ -352,8 +312,7 @@ const WorkOrders = () => {
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
-                  
-                  {/* Filter Popover */}
+
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="default" className="h-10">
@@ -376,7 +335,7 @@ const WorkOrders = () => {
                             </Button>
                           )}
                         </div>
-                        
+
                         <div className="space-y-3">
                           <div>
                             <label className="text-sm text-muted-foreground mb-1.5 block">Fastighet</label>
@@ -387,14 +346,14 @@ const WorkOrders = () => {
                               <SelectContent>
                                 <SelectItem value="all">Alla fastigheter</SelectItem>
                                 {uniqueProperties.map((property) => (
-                                  <SelectItem key={property} value={workOrders?.find(wo => wo.properties?.name === property)?.property_id || property}>
+                                  <SelectItem key={property} value={workOrders?.find((wo: any) => wo.properties?.name === property)?.property_id || property}>
                                     {property}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           </div>
-                          
+
                           <div>
                             <label className="text-sm text-muted-foreground mb-1.5 block">Entreprenör</label>
                             <Select value={selectedContractor} onValueChange={setSelectedContractor}>
@@ -411,7 +370,7 @@ const WorkOrders = () => {
                               </SelectContent>
                             </Select>
                           </div>
-                          
+
                           <div>
                             <label className="text-sm text-muted-foreground mb-1.5 block">Status</label>
                             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
@@ -478,12 +437,10 @@ const WorkOrders = () => {
                 </div>
               </div>
 
-              {/* Active count summary */}
               <div className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">{activeCount} aktiva arbetsordrar</span>
               </div>
 
-              {/* Content based on view mode */}
               {viewMode === "kanban" ? (
                 <WorkOrderKanban
                   workOrders={filteredOrders(workOrders || [])}
