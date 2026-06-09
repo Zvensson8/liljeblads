@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useRealtimeInvalidation } from '@/hooks/internal/useRealtimeInvalidation';
 import { queryKeys } from '@/lib/queryKeys';
+import { maintenanceHistoryService } from '@/services/supabase';
 import type {
   CreateMaintenanceHistoryInput,
   MaintenanceHistory,
@@ -19,62 +19,24 @@ export type {
   UpdateMaintenanceHistoryInput,
 } from '@/types/domain/maintenanceHistory';
 
-async function fetchMaintenanceHistory(
-  filters: MaintenanceHistoryListFilters
-): Promise<MaintenanceHistory[]> {
-  let query = supabase
-    .from('maintenance_history')
-    .select('*')
-    .order('performed_date', { ascending: false });
-
-  if (filters.componentId) query = query.eq('component_id', filters.componentId);
-  if (filters.category) query = query.eq('category', filters.category);
-  if (filters.fromDate) query = query.gte('performed_date', filters.fromDate);
-  if (filters.toDate) query = query.lte('performed_date', filters.toDate);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as MaintenanceHistory[];
-}
-
 /**
  * Hook: fetch maintenance history records with optional filters.
  * Subscribes to realtime changes on the `maintenance_history` table.
  */
 export function useMaintenanceHistory(
-  filters: MaintenanceHistoryListFilters = {}
+  filters: MaintenanceHistoryListFilters = {},
 ) {
-  const queryClient = useQueryClient();
   const { session } = useAuth();
 
-  const query = useQuery({
+  useRealtimeInvalidation('maintenance_history', queryKeys.maintenanceHistory.all);
+
+  return useQuery({
     queryKey: queryKeys.maintenanceHistory.list({ ...filters }),
-    queryFn: () => fetchMaintenanceHistory(filters),
+    queryFn: () => maintenanceHistoryService.list(filters),
     enabled: !!session,
     staleTime: 1000 * 60 * 2,
     gcTime: 1000 * 60 * 30,
   });
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('maintenance-history-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'maintenance_history' },
-        () => {
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.maintenanceHistory.all,
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-  return query;
 }
 
 export function useCreateMaintenanceHistory() {
@@ -82,15 +44,8 @@ export function useCreateMaintenanceHistory() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (input: CreateMaintenanceHistoryInput) => {
-      const { data, error } = await supabase
-        .from('maintenance_history')
-        .insert(input)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (input: CreateMaintenanceHistoryInput) =>
+      maintenanceHistoryService.create(input),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.maintenanceHistory.all,
@@ -112,32 +67,44 @@ export function useUpdateMaintenanceHistory() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       id,
       patch,
     }: {
       id: string;
       patch: UpdateMaintenanceHistoryInput;
-    }) => {
-      const { data, error } = await supabase
-        .from('maintenance_history')
-        .update(patch)
-        .eq('id', id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
+    }) => maintenanceHistoryService.update(id, patch),
+    onMutate: async ({ id, patch }) => {
+      await queryClient.cancelQueries({
         queryKey: queryKeys.maintenanceHistory.all,
       });
+      const snapshots = queryClient.getQueriesData<MaintenanceHistory[]>({
+        queryKey: queryKeys.maintenanceHistory.all,
+      });
+      snapshots.forEach(([key, list]) => {
+        if (!list) return;
+        queryClient.setQueryData<MaintenanceHistory[]>(
+          key,
+          list.map((m) =>
+            m.id === id ? ({ ...m, ...patch } as MaintenanceHistory) : m,
+          ),
+        );
+      });
+      return { snapshots };
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, ctx) => {
+      ctx?.snapshots.forEach(([key, list]) => {
+        queryClient.setQueryData(key, list);
+      });
       toast({
         title: 'Kunde inte uppdatera underhåll',
         description: error.message,
         variant: 'destructive',
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.maintenanceHistory.all,
       });
     },
   });
@@ -148,13 +115,7 @@ export function useDeleteMaintenanceHistory() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('maintenance_history')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => maintenanceHistoryService.remove(id),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.maintenanceHistory.all,
