@@ -15,7 +15,7 @@ import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { Toggle } from "@/components/ui/toggle";
 import { Badge } from "@/components/ui/badge";
 
-interface SearchResult {
+interface GlobalSearchResult {
   id: string;
   type: "property" | "component" | "work_order" | "project" | "todo" | "drift_task" | "maintenance";
   title: string;
