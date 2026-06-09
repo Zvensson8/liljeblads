@@ -1,19 +1,20 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowRight } from "lucide-react";
-import { format } from "date-fns";
-import { sv } from "date-fns/locale";
+import { useNavigate } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { format } from 'date-fns';
+import { sv } from 'date-fns/locale';
+import { useWorkOrders } from '@/hooks/useWorkOrders';
+import { useTodos } from '@/hooks/useTodos';
 
 interface AttentionItem {
   id: string;
-  type: "work_order" | "todo" | "component";
+  type: 'work_order' | 'todo' | 'component';
   title: string;
   subtitle: string;
-  severity: "high" | "medium";
+  severity: 'high' | 'medium';
   path: string;
 }
 
@@ -23,97 +24,57 @@ interface AttentionRequiredSectionProps {
 
 export function AttentionRequiredSection({ propertyId }: AttentionRequiredSectionProps) {
   const navigate = useNavigate();
-  const [items, setItems] = useState<AttentionItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: workOrders = [], isLoading: loadingWO } = useWorkOrders(
+    propertyId ? { propertyId } : {},
+  );
+  const { data: todos = [], isLoading: loadingTodos } = useTodos(
+    propertyId ? { propertyId, completed: false } : { completed: false },
+  );
 
-  useEffect(() => {
-    fetchAttentionItems();
-  }, [propertyId]);
+  const loading = loadingWO || loadingTodos;
 
-  const fetchAttentionItems = async () => {
-    setLoading(true);
-    const attentionItems: AttentionItem[] = [];
+  const items = useMemo<AttentionItem[]>(() => {
+    const attention: AttentionItem[] = [];
 
-    try {
-      // Fetch high priority work orders
-      let workOrderQuery = supabase
-        .from("work_orders")
-        .select("id, action, priority, due_date, properties(name)")
-        .eq("priority", "high")
-        .neq("status", "completed")
-        .neq("status", "archived");
+    workOrders
+      .filter((wo: any) => wo.priority === 'high')
+      .slice(0, 5)
+      .forEach((wo: any) =>
+        attention.push({
+          id: wo.id,
+          type: 'work_order',
+          title: wo.action,
+          subtitle: `${wo.properties?.name || ''} - Brådskande`,
+          severity: 'high',
+          path: `/work-orders?id=${wo.id}`,
+        }),
+      );
 
-      if (propertyId) {
-        workOrderQuery = workOrderQuery.eq("property_id", propertyId);
-      }
+    const now = Date.now();
+    todos
+      .filter((t: any) => t.due_date && new Date(t.due_date).getTime() < now)
+      .slice(0, 5)
+      .forEach((t: any) =>
+        attention.push({
+          id: t.id,
+          type: 'todo',
+          title: t.title,
+          subtitle: `${t.properties?.name || ''} - Förfallen ${format(new Date(t.due_date), 'PPP', { locale: sv })}`,
+          severity: 'medium',
+          path: `/properties/${propertyId || t.property_id}?tab=todos`,
+        }),
+      );
 
-      const { data: workOrders } = await workOrderQuery.limit(5);
+    attention.sort((a, b) => {
+      if (a.severity === 'high' && b.severity !== 'high') return -1;
+      if (a.severity !== 'high' && b.severity === 'high') return 1;
+      return 0;
+    });
 
-      if (workOrders) {
-        attentionItems.push(
-          ...workOrders.map((wo: any) => ({
-            id: wo.id,
-            type: "work_order" as const,
-            title: wo.action,
-            subtitle: `${wo.properties?.name || ""} - Brådskande`,
-            severity: "high" as const,
-            path: `/work-orders?id=${wo.id}`,
-          }))
-        );
-      }
+    return attention.slice(0, 8);
+  }, [workOrders, todos, propertyId]);
 
-      // Fetch overdue todos
-      let todoQuery = supabase
-        .from("property_todos")
-        .select("id, title, due_date, properties(name)")
-        .eq("completed", false)
-        .lt("due_date", new Date().toISOString());
-
-      if (propertyId) {
-        todoQuery = todoQuery.eq("property_id", propertyId);
-      }
-
-      const { data: todos } = await todoQuery.limit(5);
-
-      if (todos) {
-        attentionItems.push(
-          ...todos.map((todo: any) => ({
-            id: todo.id,
-            type: "todo" as const,
-            title: todo.title,
-            subtitle: `${todo.properties?.name || ""} - Förfallen ${format(
-              new Date(todo.due_date),
-              "PPP",
-              { locale: sv }
-            )}`,
-            severity: "medium" as const,
-            path: `/properties/${propertyId || todo.property_id}?tab=todos`,
-          }))
-        );
-      }
-
-      // Sort by severity
-      attentionItems.sort((a, b) => {
-        if (a.severity === "high" && b.severity !== "high") return -1;
-        if (a.severity !== "high" && b.severity === "high") return 1;
-        return 0;
-      });
-
-      setItems(attentionItems.slice(0, 8));
-    } catch (error) {
-      console.error("Error fetching attention items:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return null;
-  }
-
-  if (items.length === 0) {
-    return null;
-  }
+  if (loading || items.length === 0) return null;
 
   return (
     <Card className="border-orange-500/20 bg-orange-500/5 hover:shadow-[var(--shadow-elegant)] transition-all">
@@ -133,16 +94,13 @@ export function AttentionRequiredSection({ propertyId }: AttentionRequiredSectio
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  {item.severity === "high" && (
+                  {item.severity === 'high' && (
                     <Badge variant="destructive" className="h-5 text-xs">
                       Brådskande
                     </Badge>
                   )}
-                  {item.severity === "medium" && (
-                    <Badge
-                      variant="outline"
-                      className="h-5 text-xs border-orange-500 text-orange-500"
-                    >
+                  {item.severity === 'medium' && (
+                    <Badge variant="outline" className="h-5 text-xs border-orange-500 text-orange-500">
                       Förfallen
                     </Badge>
                   )}

@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { format, formatDistanceToNow } from "date-fns";
-import { sv } from "date-fns/locale";
-import { FileText, CheckSquare, Wrench, Phone, File as FileIcon } from "lucide-react";
+import { useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatDistanceToNow } from 'date-fns';
+import { sv } from 'date-fns/locale';
+import { useTodos } from '@/hooks/useTodos';
+import { useWorkOrders } from '@/hooks/useWorkOrders';
+import { usePropertyNotes } from '@/hooks/usePropertyNotes';
+import { usePropertyContacts } from '@/hooks/usePropertyContacts';
+import { usePropertyDocuments } from '@/hooks/usePropertyDocuments';
 
 interface ActivityTimelineProps {
   propertyId: string;
@@ -19,123 +21,72 @@ interface Activity {
 }
 
 export const ActivityTimeline = ({ propertyId }: ActivityTimelineProps) => {
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: notes = [], isLoading: l1 } = usePropertyNotes({ propertyId });
+  const { data: todos = [], isLoading: l2 } = useTodos({ propertyId });
+  const { data: workOrders = [], isLoading: l3 } = useWorkOrders({ propertyId });
+  const { data: contacts = [], isLoading: l4 } = usePropertyContacts({ propertyId });
+  const { data: documents = [], isLoading: l5 } = usePropertyDocuments({ propertyId });
 
-  useEffect(() => {
-    fetchActivities();
-  }, [propertyId]);
+  const loading = l1 || l2 || l3 || l4 || l5;
 
-  const fetchActivities = async () => {
-    setLoading(true);
-    const allActivities: Activity[] = [];
+  const activities = useMemo<Activity[]>(() => {
+    const all: Activity[] = [];
 
-    // Fetch notes
-    const { data: notes } = await supabase
-      .from("property_notes")
-      .select("*")
-      .eq("property_id", propertyId)
-      .order("created_at", { ascending: false })
-      .limit(5);
+    (notes as any[]).slice(0, 5).forEach((n) =>
+      all.push({
+        id: n.id,
+        type: 'note',
+        description: `Anteckning skapad: ${n.content.substring(0, 50)}${n.content.length > 50 ? '...' : ''}`,
+        timestamp: n.created_at,
+        icon: '📝',
+      }),
+    );
 
-    if (notes) {
-      allActivities.push(
-        ...notes.map((note) => ({
-          id: note.id,
-          type: "note",
-          description: `Anteckning skapad: ${note.content.substring(0, 50)}${note.content.length > 50 ? "..." : ""}`,
-          timestamp: note.created_at,
-          icon: "📝",
-        }))
-      );
-    }
+    (todos as any[]).slice(0, 5).forEach((t) =>
+      all.push({
+        id: t.id,
+        type: 'todo',
+        description: `Att-göra ${t.completed ? 'slutförd' : 'skapad'}: ${t.title}`,
+        timestamp: t.updated_at,
+        icon: t.completed ? '✅' : '☑️',
+      }),
+    );
 
-    // Fetch todos
-    const { data: todos } = await supabase
-      .from("property_todos")
-      .select("*")
-      .eq("property_id", propertyId)
-      .order("created_at", { ascending: false })
-      .limit(5);
+    (workOrders as any[]).slice(0, 5).forEach((wo) =>
+      all.push({
+        id: wo.id,
+        type: 'work_order',
+        description: `Arbetsorder: ${wo.action}`,
+        timestamp: wo.created_at,
+        icon: '🔧',
+      }),
+    );
 
-    if (todos) {
-      allActivities.push(
-        ...todos.map((todo) => ({
-          id: todo.id,
-          type: "todo",
-          description: `Att-göra ${todo.completed ? "slutförd" : "skapad"}: ${todo.title}`,
-          timestamp: todo.updated_at,
-          icon: todo.completed ? "✅" : "☑️",
-        }))
-      );
-    }
+    (contacts as any[]).slice(0, 5).forEach((c) =>
+      all.push({
+        id: c.id,
+        type: 'contact',
+        description: `Kontakt tillagd: ${c.name}`,
+        timestamp: c.created_at,
+        icon: '👤',
+      }),
+    );
 
-    // Fetch work orders
-    const { data: workOrders } = await supabase
-      .from("work_orders")
-      .select("*")
-      .eq("property_id", propertyId)
-      .order("created_at", { ascending: false })
-      .limit(5);
+    (documents as any[]).slice(0, 5).forEach((d) =>
+      all.push({
+        id: d.id,
+        type: 'document',
+        description: `Dokument uppladdat: ${d.name}`,
+        timestamp: d.created_at,
+        icon: '📄',
+      }),
+    );
 
-    if (workOrders) {
-      allActivities.push(
-        ...workOrders.map((wo) => ({
-          id: wo.id,
-          type: "work_order",
-          description: `Arbetsorder: ${wo.action}`,
-          timestamp: wo.created_at,
-          icon: "🔧",
-        }))
-      );
-    }
-
-    // Fetch contacts
-    const { data: contacts } = await supabase
-      .from("property_contacts")
-      .select("*")
-      .eq("property_id", propertyId)
-      .order("created_at", { ascending: false })
-      .limit(5);
-
-    if (contacts) {
-      allActivities.push(
-        ...contacts.map((contact) => ({
-          id: contact.id,
-          type: "contact",
-          description: `Kontakt tillagd: ${contact.name}`,
-          timestamp: contact.created_at,
-          icon: "👤",
-        }))
-      );
-    }
-
-    // Fetch documents
-    const { data: documents } = await supabase
-      .from("property_documents")
-      .select("*")
-      .eq("property_id", propertyId)
-      .order("created_at", { ascending: false })
-      .limit(5);
-
-    if (documents) {
-      allActivities.push(
-        ...documents.map((doc) => ({
-          id: doc.id,
-          type: "document",
-          description: `Dokument uppladdat: ${doc.name}`,
-          timestamp: doc.created_at,
-          icon: "📄",
-        }))
-      );
-    }
-
-    // Sort all activities by timestamp
-    allActivities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-    setActivities(allActivities.slice(0, 10));
-    setLoading(false);
-  };
+    all.sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
+    return all.slice(0, 10);
+  }, [notes, todos, workOrders, contacts, documents]);
 
   if (loading) {
     return (
@@ -171,7 +122,7 @@ export const ActivityTimeline = ({ propertyId }: ActivityTimelineProps) => {
           <div className="space-y-4">
             {activities.map((activity, index) => (
               <div
-                key={activity.id}
+                key={`${activity.type}-${activity.id}`}
                 className="flex gap-3 animate-slide-in-up"
                 style={{ animationDelay: `${index * 50}ms` }}
               >

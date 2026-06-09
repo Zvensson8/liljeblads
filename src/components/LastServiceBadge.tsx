@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { sv } from 'date-fns/locale';
+import { useMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 
 interface LastServiceBadgeProps {
   componentId: string;
@@ -11,31 +11,17 @@ interface LastServiceBadgeProps {
 }
 
 export const LastServiceBadge = ({ componentId, className }: LastServiceBadgeProps) => {
-  const [lastService, setLastService] = useState<{ date: string; actionType: string } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: history = [], isLoading } = useMaintenanceHistory({ componentId });
+  const lastService = useMemo(() => {
+    if (!history.length) return null;
+    const sorted = [...history].sort(
+      (a: any, b: any) =>
+        new Date(b.performed_date).getTime() - new Date(a.performed_date).getTime(),
+    );
+    return { date: sorted[0].performed_date as string, actionType: sorted[0].action_type as string };
+  }, [history]);
 
-  useEffect(() => {
-    fetchLastService();
-  }, [componentId]);
-
-  const fetchLastService = async () => {
-    const { data, error } = await supabase
-      .from('maintenance_history')
-      .select('performed_date, action_type')
-      .eq('component_id', componentId)
-      .order('performed_date', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!error && data) {
-      setLastService({ date: data.performed_date, actionType: data.action_type });
-    }
-    setLoading(false);
-  };
-
-  if (loading) {
-    return null;
-  }
+  if (isLoading) return null;
 
   if (!lastService) {
     return (
@@ -50,8 +36,8 @@ export const LastServiceBadge = ({ componentId, className }: LastServiceBadgePro
   const isRecent = daysSince <= 90;
 
   return (
-    <Badge 
-      variant="outline" 
+    <Badge
+      variant="outline"
       className={`text-xs gap-1 ${isRecent ? 'border-green-500/50 text-green-600' : 'border-yellow-500/50 text-yellow-600'} ${className}`}
     >
       {isRecent ? (
