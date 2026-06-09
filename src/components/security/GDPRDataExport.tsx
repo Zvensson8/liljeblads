@@ -94,12 +94,17 @@ const exportAsPdf = (data: Awaited<ReturnType<typeof fetchUserData>>) => {
 };
 
 export const GDPRDataExport = () => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState<ExportFormat | null>(null);
 
   const handleExport = async (fmt: ExportFormat) => {
+    if (!user) {
+      toast.error('Du måste vara inloggad');
+      return;
+    }
     setLoading(fmt);
     try {
-      const data = await fetchUserData();
+      const data = await fetchUserData(user.id);
       if (fmt === 'xlsx') {
         await exportAsXlsx(data);
       } else {
@@ -113,6 +118,7 @@ export const GDPRDataExport = () => {
       setLoading(null);
     }
   };
+
 
   return (
     <Card>
