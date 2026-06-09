@@ -25,6 +25,21 @@ export function useProperties() {
   });
 }
 
+/**
+ * Hook: fetch a single property by id.
+ */
+export function useProperty(id: string | undefined) {
+  useRealtimeInvalidation('properties', queryKeys.properties.all);
+
+  return useQuery({
+    queryKey: queryKeys.properties.detail(id ?? ''),
+    queryFn: () => propertyService.getById(id as string),
+    enabled: !!id,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
+  });
+}
+
 export function useCreateProperty() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

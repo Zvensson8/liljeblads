@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { useProject, useUpdateProject } from "@/hooks/useProjects";
+import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 import { Database } from "@/integrations/supabase/types";
 import {
   SidebarProvider,
@@ -75,24 +76,39 @@ export default function ProjectDetail() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [orderPreviewOpen, setOrderPreviewOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const { addRecentItem } = useRecentlyVisited();
   const isMobile = useIsMobile();
-  
+
   const activeTab = searchParams.get("tab") || "overview";
+
+  const {
+    data: projectData,
+    isLoading: projectLoading,
+    error: projectError,
+    refetch: refetchProject,
+  } = useProject(id);
+  const project = projectData as Project | null;
+  const loading = projectLoading;
+
+  const updateProject = useUpdateProject();
+  const logActivity = useLogProjectActivity();
 
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
-    } else if (user && id) {
-      fetchProject();
     }
-  }, [user, authLoading, id, navigate]);
+  }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (projectError) {
+      toast.error("Kunde inte hämta projekt");
+      navigate("/projects");
+    }
+  }, [projectError, navigate]);
 
   useEffect(() => {
     if (project) {
@@ -105,48 +121,23 @@ export default function ProjectDetail() {
     }
   }, [project]);
 
-  const fetchProject = async () => {
-    if (!id) return;
-    
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("projects")
-        .select(`
-          *,
-          property:properties(name)
-        `)
-        .eq("id", id)
-        .single();
-
-      if (error) throw error;
-      setProject(data as any);
-    } catch (error: any) {
-      toast.error("Kunde inte hämta projekt");
-      navigate("/projects");
-    } finally {
-      setLoading(false);
-    }
+  const fetchProject = () => {
+    refetchProject();
   };
 
   const handleArchive = async () => {
     if (!project) return;
 
     try {
-      const { error } = await supabase
-        .from("projects")
-        .update({ is_archived: true, status: "avslutat" })
-        .eq("id", project.id);
-
-      if (error) throw error;
-
-      // Log activity
-      await supabase.from("project_activity_log").insert({
+      await updateProject.mutateAsync({
+        id: project.id,
+        patch: { is_archived: true, status: "avslutat" },
+      });
+      await logActivity.mutateAsync({
         project_id: project.id,
         activity_type: "status_change",
         description: "Projekt arkiverat",
       });
-
       toast.success("Projekt arkiverat");
       navigate("/projects");
     } catch (error: any) {
@@ -158,20 +149,15 @@ export default function ProjectDetail() {
     if (!project) return;
 
     try {
-      const { error } = await supabase
-        .from("projects")
-        .update({ is_archived: false })
-        .eq("id", project.id);
-
-      if (error) throw error;
-
-      // Log activity
-      await supabase.from("project_activity_log").insert({
+      await updateProject.mutateAsync({
+        id: project.id,
+        patch: { is_archived: false },
+      });
+      await logActivity.mutateAsync({
         project_id: project.id,
         activity_type: "status_change",
         description: "Projekt återaktiverat",
       });
-
       toast.success("Projekt återaktiverat");
       fetchProject();
     } catch (error: any) {
@@ -549,13 +535,10 @@ export default function ProjectDetail() {
                         currentActualCost={project.actual_cost}
                         onApply={async (newForecast) => {
                           try {
-                            const { error } = await supabase
-                              .from("projects")
-                              .update({ forecast: newForecast })
-                              .eq("id", project.id);
-
-                            if (error) throw error;
-
+                            await updateProject.mutateAsync({
+                              id: project.id,
+                              patch: { forecast: newForecast },
+                            });
                             toast.success("Prognos uppdaterad från simulering");
                             fetchProject();
                           } catch (error: any) {
