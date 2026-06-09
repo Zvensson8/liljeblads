@@ -1,21 +1,17 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { Database } from "@/integrations/supabase/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
-import { Wrench, ExternalLink, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Wrench, ExternalLink, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { useDriftTasks } from "@/hooks/useDriftTasks";
+import { useComponents } from "@/hooks/useComponents";
 
 interface DriftTask {
   id: string;
@@ -37,45 +33,60 @@ export function ComponentServicePlanSection({
   propertyId,
 }: ComponentServicePlanSectionProps) {
   const navigate = useNavigate();
-  const [driftTasks, setDriftTasks] = useState<DriftTask[]>([]);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const currentYear = new Date().getFullYear();
 
+  const { data: tasksRaw = [] } = useDriftTasks({ propertyId });
+  const { data: components = [] } = useComponents({ propertyId });
+  const component = useMemo(
+    () => components.find((c: any) => c.id === componentId),
+    [components, componentId],
+  );
+
+  // Counts and existing links remain on the link table (no domain service yet).
+  const { data: taskComponents = [], refetch: refetchLinks } = useQuery({
+    queryKey: ["drift-task-components-for-property", propertyId, componentId],
+    queryFn: async () => {
+      const taskIds = tasksRaw.map((t: any) => t.id);
+      if (taskIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("drift_task_components")
+        .select("task_id, component_id")
+        .in("task_id", taskIds);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: tasksRaw.length > 0,
+  });
+
   useEffect(() => {
-    if (componentId && propertyId) {
-      fetchDriftTasks();
-      fetchExistingLinks();
-    }
-  }, [componentId, propertyId]);
+    setSelectedTaskIds(
+      taskComponents
+        .filter((tc: any) => tc.component_id === componentId)
+        .map((tc: any) => tc.task_id),
+    );
+  }, [taskComponents, componentId]);
 
-  const fetchDriftTasks = async () => {
-    const { data } = await supabase
-      .from("drift_tasks")
-      .select("id, name, year, quarter, planned_count, reported_count")
-      .eq("property_id", propertyId)
-      .gte("year", currentYear - 1)
-      .order("year", { ascending: true })
-      .order("quarter", { ascending: true });
-
-    if (data) {
-      // Fetch object count for each task
-      const tasksWithCounts = await Promise.all(
-        data.map(async (task) => {
-          const { count } = await supabase
-            .from("drift_task_components")
-            .select("*", { count: "exact", head: true })
-            .eq("task_id", task.id);
-          
-          return {
-            ...task,
-            objectCount: count || 0,
-          };
-        })
-      );
-      setDriftTasks(tasksWithCounts);
-    }
-  };
+  const driftTasks: DriftTask[] = useMemo(() => {
+    const counts: Record<string, number> = {};
+    taskComponents.forEach((tc: any) => {
+      counts[tc.task_id] = (counts[tc.task_id] || 0) + 1;
+    });
+    return tasksRaw
+      .filter((t: any) => t.year >= currentYear - 1)
+      .slice()
+      .sort((a: any, b: any) => a.year - b.year || String(a.quarter).localeCompare(String(b.quarter)))
+      .map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        year: t.year,
+        quarter: t.quarter,
+        planned_count: t.planned_count,
+        reported_count: t.reported_count,
+        objectCount: counts[t.id] || 0,
+      }));
+  }, [tasksRaw, taskComponents, currentYear]);
 
   const getTaskStatus = (task: DriftTask) => {
     if (task.reported_count === 0) return "missing";
@@ -83,50 +94,23 @@ export function ComponentServicePlanSection({
     return "remaining";
   };
 
-  const fetchExistingLinks = async () => {
-    const { data } = await supabase
-      .from("drift_task_components")
-      .select("task_id")
-      .eq("component_id", componentId);
-
-    if (data) {
-      setSelectedTaskIds(data.map((d) => d.task_id));
-    }
-  };
-
   const handleToggleTask = async (taskId: string, checked: boolean) => {
     setLoading(true);
 
     if (checked) {
-      // Check if component is already added
-      const { data: existing } = await supabase
-        .from("drift_task_components")
-        .select("id")
-        .eq("task_id", taskId)
-        .eq("component_id", componentId)
-        .maybeSingle();
-
-      if (existing) {
+      if (selectedTaskIds.includes(taskId)) {
         toast.error("Komponenten finns redan i denna driftuppgift");
         setLoading(false);
         return;
       }
 
-      // Fetch component data for series_id and registration_number
-      const { data: component } = await supabase
-        .from("components")
-        .select("serial_number, registration_number")
-        .eq("id", componentId)
-        .single();
-
-      // Add link
       const { error } = await supabase.from("drift_task_components").insert({
         task_id: taskId,
         component_id: componentId,
         object_name: null,
         is_reported: false,
-        series_id: component?.serial_number || null,
-        registration_number: component?.registration_number || null,
+        series_id: (component as any)?.serial_number || null,
+        registration_number: (component as any)?.registration_number || null,
       });
 
       if (error) {
@@ -135,11 +119,9 @@ export function ComponentServicePlanSection({
         return;
       }
 
-      setSelectedTaskIds([...selectedTaskIds, taskId]);
       toast.success("Komponent tillagd i driftuppgift");
-      fetchDriftTasks(); // Refresh to update counts
+      await refetchLinks();
     } else {
-      // Remove link
       const { error } = await supabase
         .from("drift_task_components")
         .delete()
@@ -152,9 +134,8 @@ export function ComponentServicePlanSection({
         return;
       }
 
-      setSelectedTaskIds(selectedTaskIds.filter((id) => id !== taskId));
       toast.success("Komponent borttagen från driftuppgift");
-      fetchDriftTasks(); // Refresh to update counts
+      await refetchLinks();
     }
 
     setLoading(false);
