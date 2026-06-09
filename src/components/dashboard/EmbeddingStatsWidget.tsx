@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
+import { useGenerateEmbeddings, useBackfillEmbeddings } from '@/hooks/useEdgeFunctions';
 import { Database, RefreshCw, CheckCircle2, Clock, AlertCircle, Loader2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,6 +20,8 @@ export function EmbeddingStatsWidget() {
   const [stats, setStats] = useState<EmbeddingStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const generateEmbeddings = useGenerateEmbeddings();
+  const backfillEmbeddings = useBackfillEmbeddings();
 
   useEffect(() => {
     fetchStats();
@@ -67,13 +70,9 @@ export function EmbeddingStatsWidget() {
   const handleProcess = async () => {
     setProcessing(true);
     try {
-      const response = await supabase.functions.invoke('generate-embeddings');
-      
-      if (response.error) throw response.error;
-      
-      const data = response.data;
-      const embedded = data.results?.filter((r: any) => r.status === 'embedded').length || 0;
-      const unchanged = data.results?.filter((r: any) => r.status === 'unchanged').length || 0;
+      const data = await generateEmbeddings.mutateAsync() as { results?: Array<{ status: string }> };
+      const embedded = data.results?.filter((r) => r.status === 'embedded').length || 0;
+      const unchanged = data.results?.filter((r) => r.status === 'unchanged').length || 0;
       
       if (embedded > 0) {
         toast.success(`${embedded} nya embeddings skapade`);
@@ -113,11 +112,7 @@ export function EmbeddingStatsWidget() {
   const handleBackfill = async () => {
     setProcessing(true);
     try {
-      const response = await supabase.functions.invoke('backfill-embeddings');
-      
-      if (response.error) throw response.error;
-      
-      const data = response.data;
+      const data = await backfillEmbeddings.mutateAsync() as { totalQueued: number };
       toast.success(`${data.totalQueued} poster köade för embedding`);
       
       // Refresh stats
