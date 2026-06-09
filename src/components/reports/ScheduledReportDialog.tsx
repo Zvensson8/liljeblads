@@ -4,15 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-
-interface Property {
-  id: string;
-  name: string;
-}
+import { useAuth } from '@/hooks/useAuth';
+import { useOrganization } from '@/hooks/useOrganization';
+import { useProperties } from '@/hooks/useProperties';
+import { useCreateScheduledReport } from '@/hooks/useScheduledReports';
 
 interface ScheduledReportDialogProps {
   open: boolean;
@@ -20,8 +17,11 @@ interface ScheduledReportDialogProps {
 }
 
 export const ScheduledReportDialog = ({ open, onOpenChange }: ScheduledReportDialogProps) => {
-  const queryClient = useQueryClient();
-  const [properties, setProperties] = useState<Property[]>([]);
+  const { user } = useAuth();
+  const { organization } = useOrganization();
+  const { data: properties = [] } = useProperties();
+  const createReport = useCreateScheduledReport();
+
   const [name, setName] = useState('');
   const [reportType, setReportType] = useState('maintenance-overview');
   const [selectedProperty, setSelectedProperty] = useState('');
@@ -29,65 +29,39 @@ export const ScheduledReportDialog = ({ open, onOpenChange }: ScheduledReportDia
   const [recipients, setRecipients] = useState('');
 
   useEffect(() => {
-    if (open) {
-      fetchProperties();
+    if (open && properties.length > 0 && !selectedProperty) {
+      setSelectedProperty(properties[0].id);
     }
-  }, [open]);
+  }, [open, properties, selectedProperty]);
 
-  const fetchProperties = async () => {
-    const { data } = await supabase
-      .from('properties')
-      .select('id, name')
-      .order('name');
-
-    if (data) {
-      setProperties(data);
-      if (data.length > 0) {
-        setSelectedProperty(data[0].id);
-      }
+  const handleCreate = async () => {
+    if (!user || !organization) {
+      toast.error('Du måste vara inloggad');
+      return;
     }
-  };
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+    const cronSchedule =
+      schedule === 'daily' ? '0 8 * * *' : schedule === 'weekly' ? '0 8 * * 1' : '0 8 1 * *';
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('organization_id')
-        .eq('id', user.id)
-        .single();
-
-      const cronSchedule = schedule === 'daily' ? '0 8 * * *' 
-        : schedule === 'weekly' ? '0 8 * * 1'
-        : '0 8 1 * *'; // monthly
-
-      const { error } = await supabase.from('scheduled_reports').insert({
+    try {
+      await createReport.mutateAsync({
         name,
         report_type: reportType,
         config: { property_id: selectedProperty },
         schedule: cronSchedule,
-        recipients: recipients.split(',').map(e => e.trim()),
-        organization_id: profile?.organization_id,
+        recipients: recipients.split(',').map((e) => e.trim()),
+        organization_id: organization.id,
         created_by: user.id,
         next_run: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scheduled-reports'] });
+      } as never);
       toast.success('Schemalagd rapport skapad!');
       onOpenChange(false);
-      // Reset form
       setName('');
       setRecipients('');
-    },
-    onError: () => {
+    } catch {
       toast.error('Kunde inte skapa rapporten');
-    },
-  });
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,10 +148,10 @@ export const ScheduledReportDialog = ({ open, onOpenChange }: ScheduledReportDia
             Avbryt
           </Button>
           <Button
-            onClick={() => createMutation.mutate()}
-            disabled={createMutation.isPending || !name || !recipients}
+            onClick={handleCreate}
+            disabled={createReport.isPending || !name || !recipients}
           >
-            {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {createReport.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Skapa rapport
           </Button>
         </DialogFooter>
