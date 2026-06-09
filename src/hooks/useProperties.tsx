@@ -74,6 +74,27 @@ export function useCreateProperty() {
   });
 }
 
+export function useUpdateProperty() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<Property> }) =>
+      propertyService.update(id, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.properties.all });
+      toast({ title: 'Fastighet uppdaterad' });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Kunde inte uppdatera fastighet',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 export function useDeleteProperty() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
