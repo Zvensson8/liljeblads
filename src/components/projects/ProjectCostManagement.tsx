@@ -102,7 +102,7 @@ export function ProjectCostManagement({
         if (error) throw error;
 
         // Log activity
-        await supabase.from("project_activity_log").insert({
+        await logActivity.mutateAsync({
           project_id: projectId,
           activity_type: "cost_updated",
           description: `Kostnad uppdaterad: "${formData.description}" (${parseFloat(formData.amount).toLocaleString("sv-SE")} kr)`,
