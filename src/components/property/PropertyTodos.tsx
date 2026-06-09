@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  useTodos,
+  useCreateTodo,
+  useUpdateTodo,
+  useDeleteTodo,
+} from "@/hooks/useTodos";
 
 interface PropertyTodosProps {
   propertyId: string;
@@ -28,6 +35,7 @@ interface PropertyTodosProps {
 }
 
 export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProps) {
+  const { user } = useAuth();
   const [newTodo, setNewTodo] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
   const [newPriority, setNewPriority] = useState("medium");
@@ -39,155 +47,103 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
   const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
 
-  const { data: todos, refetch } = useQuery({
-    queryKey: ["property-todos", propertyId, categoryFilter, priorityFilter, showCompleted],
-    queryFn: async () => {
-      let query: any = supabase
-        .from("property_todos")
-        .select("*")
-        .eq("property_id", propertyId)
-        .is("parent_todo_id", null);
+  // Single fetch of all todos for this property; derive top-level/subtasks client-side.
+  const { data: allTodos, refetch } = useTodos({ propertyId });
 
-      if (!showCompleted) {
-        query = query.eq("completed", false);
-      }
+  const createTodo = useCreateTodo();
+  const updateTodo = useUpdateTodo();
+  const deleteTodo = useDeleteTodo();
 
-      if (categoryFilter) {
-        query = query.eq("category", categoryFilter);
-      }
-      if (priorityFilter) {
-        query = query.eq("priority", priorityFilter);
-      }
-
-      query = query
-        .order("completed")
-        .order("due_date");
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as any[];
-    },
-  });
-
-  const { data: subtasks } = useQuery({
-    queryKey: ["subtasks-list", propertyId, Array.from(expandedTodos)],
-    enabled: expandedTodos.size > 0,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("property_todos")
-        .select("*")
-        .in("parent_todo_id", Array.from(expandedTodos))
-        .order("order")
-        .order("created_at");
-
-      if (error) throw error;
-      return data as any[];
-    },
-  });
-
-  const { data: subtaskCounts } = useQuery({
-    queryKey: ["subtask-counts", todos?.map(t => (t as any).id)],
-    enabled: !!todos && todos.length > 0,
-    queryFn: async () => {
-      if (!todos || todos.length === 0) return {};
-
-      const todoIds = todos.map(t => (t as any).id);
-      const { data, error } = await (supabase as any)
-        .from("property_todos")
-        .select("parent_todo_id")
-        .in("parent_todo_id", todoIds);
-
-      if (error) throw error;
-
-      const counts: Record<string, number> = {};
-      data?.forEach((item: any) => {
-        counts[item.parent_todo_id] = (counts[item.parent_todo_id] || 0) + 1;
+  const topLevel = useMemo(() => {
+    const list = (allTodos ?? []).filter((t: any) => !t.parent_todo_id);
+    return list
+      .filter((t: any) => (showCompleted ? true : !t.completed))
+      .filter((t: any) => (categoryFilter ? t.category === categoryFilter : true))
+      .filter((t: any) => (priorityFilter ? t.priority === priorityFilter : true))
+      .sort((a: any, b: any) => {
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        const ad = a.due_date ?? "";
+        const bd = b.due_date ?? "";
+        return ad.localeCompare(bd);
       });
+  }, [allTodos, categoryFilter, priorityFilter, showCompleted]);
 
-      return counts;
-    },
-  });
+  const subtasksByParent = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    (allTodos ?? []).forEach((t: any) => {
+      if (t.parent_todo_id) {
+        (map[t.parent_todo_id] ||= []).push(t);
+      }
+    });
+    return map;
+  }, [allTodos]);
+
+  const subtaskCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    Object.entries(subtasksByParent).forEach(([k, v]) => (counts[k] = v.length));
+    return counts;
+  }, [subtasksByParent]);
 
   const { data: attachmentCounts } = useQuery({
-    queryKey: ["attachment-counts", todos?.map(t => (t as any).id)],
-    enabled: !!todos && todos.length > 0,
+    queryKey: ["attachment-counts", (allTodos ?? []).map((t: any) => t.id)],
+    enabled: !!allTodos && allTodos.length > 0,
     queryFn: async () => {
-      if (!todos || todos.length === 0) return {};
-
-      const todoIds = todos.map(t => (t as any).id);
+      const todoIds = (allTodos ?? []).map((t: any) => t.id);
       const { data, error } = await (supabase as any)
         .from("todo_attachments")
         .select("todo_id")
         .in("todo_id", todoIds);
 
       if (error) throw error;
-
       const counts: Record<string, number> = {};
       data?.forEach((item: any) => {
         counts[item.todo_id] = (counts[item.todo_id] || 0) + 1;
       });
-
       return counts;
     },
   });
 
   const handleAddTodo = async () => {
     if (!newTodo.trim()) return;
-
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error("Du måste vara inloggad");
       return;
     }
 
-    const { error } = await supabase
-      .from("property_todos")
-      .insert([{
+    try {
+      await createTodo.mutateAsync({
         property_id: propertyId,
         title: newTodo,
         due_date: newDueDate || null,
         priority: newPriority,
         category: newCategory === "none" ? null : newCategory || null,
         user_id: user.id,
-      }]);
-
-    if (error) {
-      toast.error("Kunde inte lägga till uppgift");
-    } else {
+      } as any);
       toast.success("Uppgift tillagd");
       setNewTodo("");
       setNewDueDate("");
       setNewPriority("medium");
       setNewCategory("none");
-      refetch();
+    } catch {
+      // toast handled in hook
     }
   };
 
   const handleToggleTodo = async (id: string, completed: boolean) => {
-    const { error } = await supabase
-      .from("property_todos")
-      .update({ completed: !completed })
-      .eq("id", id);
-
-    if (error) {
-      toast.error("Kunde inte uppdatera uppgift");
-    } else {
+    try {
+      await updateTodo.mutateAsync({ id, patch: { completed: !completed } as any });
       toast.success(completed ? "Uppgift återaktiverad" : "Uppgift slutförd");
-      refetch();
+    } catch {
+      // toast handled in hook
     }
   };
 
   const handleDeleteTodo = async (id: string) => {
-    const { error } = await supabase
-      .from("property_todos")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      toast.error("Kunde inte ta bort uppgift");
-    } else {
+    try {
+      await deleteTodo.mutateAsync(id);
       toast.success("Uppgift borttagen");
-      refetch();
+    } catch {
+      // toast handled in hook
     }
   };
 
@@ -208,7 +164,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
     setDetailDialogOpen(true);
   };
 
-  const displayTodos = compact ? (todos?.slice(0, 3) || []) : (todos || []);
+  const displayTodos = compact ? topLevel.slice(0, 3) : topLevel;
 
   return (
     <div className="space-y-4">
@@ -317,7 +273,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
           displayTodos.map((todo: any) => {
             const hasSubtasks = (subtaskCounts?.[todo.id] || 0) > 0;
             const isExpanded = expandedTodos.has(todo.id);
-            const todoSubtasks = subtasks?.filter((s: any) => s.parent_todo_id === todo.id) || [];
+            const todoSubtasks = subtasksByParent[todo.id] || [];
             const completedSubtasks = todoSubtasks.filter((s: any) => s.completed).length;
             const hasAttachments = (attachmentCounts?.[todo.id] || 0) > 0;
 

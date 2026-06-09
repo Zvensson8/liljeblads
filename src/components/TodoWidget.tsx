@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +12,17 @@ import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { TodoPriorityBadge } from "@/components/todos/TodoPriorityBadge";
-import { TodoCategoryBadge } from "@/components/todos/TodoCategoryBadge";
 import { TodoProgressBar } from "@/components/todos/TodoProgressBar";
 import { TodoDetailDialog } from "@/components/todos/TodoDetailDialog";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { useProperties } from "@/hooks/useProperties";
+import {
+  useTodos,
+  useCreateTodo,
+  useUpdateTodo,
+  useDeleteTodo,
+} from "@/hooks/useTodos";
 
 interface Todo {
   id: string;
@@ -29,10 +36,7 @@ interface Todo {
   priority?: string;
   category?: string | null;
   parent_todo_id?: string | null;
-  properties: {
-    id: string;
-    name: string;
-  };
+  properties?: { id: string; name: string } | null;
   subtasks?: any[];
   attachments?: any[];
 }
@@ -42,6 +46,7 @@ interface TodoWidgetProps {
 }
 
 export function TodoWidget({ propertyId }: TodoWidgetProps) {
+  const { user } = useAuth();
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [newTodo, setNewTodo] = useState("");
@@ -51,126 +56,69 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
   const [newDueDate, setNewDueDate] = useState("");
   const [showCompleted, setShowCompleted] = useState(false);
 
-  const { data: properties } = useQuery({
-    queryKey: ["properties-for-todos"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("properties")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: properties } = useProperties();
+  const { data: allTodos, isLoading, refetch } = useTodos(propertyId ? { propertyId } : {});
 
-  const { data: todos, isLoading, refetch } = useQuery({
-    queryKey: ["todos-widget", propertyId, showCompleted],
-    queryFn: async () => {
-      let query = supabase
-        .from("property_todos")
-        .select("*, properties(id, name)")
-        .is("parent_todo_id", null)
-        .order("due_date", { ascending: true });
+  const createTodo = useCreateTodo();
+  const updateTodo = useUpdateTodo();
+  const deleteTodo = useDeleteTodo();
 
-      if (!showCompleted) {
-        query = query.eq("completed", false);
-      }
+  const propertyMap = useMemo(() => {
+    const m: Record<string, { id: string; name: string }> = {};
+    (properties ?? []).forEach((p: any) => (m[p.id] = { id: p.id, name: p.name }));
+    return m;
+  }, [properties]);
 
-      if (propertyId) {
-        query = query.eq("property_id", propertyId);
-      }
+  const todos = useMemo(() => {
+    return (allTodos ?? [])
+      .filter((t: any) => !t.parent_todo_id)
+      .filter((t: any) => (showCompleted ? true : !t.completed))
+      .map((t: any) => ({
+        ...t,
+        properties: t.property_id ? propertyMap[t.property_id] ?? null : null,
+      }))
+      .sort((a: any, b: any) => (a.due_date ?? "").localeCompare(b.due_date ?? ""));
+  }, [allTodos, showCompleted, propertyMap]);
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data || []) as any[];
-    },
-  });
+  const subtasksData = useMemo(() => {
+    const grouped: Record<string, any[]> = {};
+    (allTodos ?? []).forEach((t: any) => {
+      if (t.parent_todo_id) (grouped[t.parent_todo_id] ||= []).push(t);
+    });
+    return grouped;
+  }, [allTodos]);
 
-  const { data: subtasksData } = useQuery({
-    queryKey: ["subtasks-widget", todos?.map(t => (t as any).id)],
-    enabled: !!todos && todos.length > 0,
-    queryFn: async () => {
-      if (!todos || todos.length === 0) return {};
-
-      const todoIds = todos.map(t => (t as any).id);
-      const { data, error } = await (supabase as any)
-        .from("property_todos")
-        .select("*")
-        .in("parent_todo_id", todoIds);
-
-      if (error) throw error;
-
-      const grouped: Record<string, any[]> = {};
-      data?.forEach((subtask: any) => {
-        if (!grouped[subtask.parent_todo_id]) {
-          grouped[subtask.parent_todo_id] = [];
-        }
-        grouped[subtask.parent_todo_id].push(subtask);
-      });
-
-      return grouped;
-    },
-  });
-
-  const { data: subtaskCounts } = useQuery({
-    queryKey: ["subtask-counts-widget", todos?.map(t => (t as any).id)],
-    enabled: !!todos && todos.length > 0,
-    queryFn: async () => {
-      if (!todos || todos.length === 0) return {};
-
-      const todoIds = todos.map(t => (t as any).id);
-      const { data, error } = await (supabase as any)
-        .from("property_todos")
-        .select("parent_todo_id")
-        .in("parent_todo_id", todoIds);
-
-      if (error) throw error;
-
-      const counts: Record<string, number> = {};
-      data?.forEach((item: any) => {
-        counts[item.parent_todo_id] = (counts[item.parent_todo_id] || 0) + 1;
-      });
-
-      return counts;
-    },
-  });
+  const subtaskCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    Object.entries(subtasksData).forEach(([k, v]) => (counts[k] = v.length));
+    return counts;
+  }, [subtasksData]);
 
   const { data: attachmentCounts } = useQuery({
-    queryKey: ["attachment-counts-widget", todos?.map(t => (t as any).id)],
-    enabled: !!todos && todos.length > 0,
+    queryKey: ["attachment-counts-widget", todos.map(t => t.id)],
+    enabled: todos.length > 0,
     queryFn: async () => {
-      if (!todos || todos.length === 0) return {};
-
-      const todoIds = todos.map(t => (t as any).id);
+      const todoIds = todos.map(t => t.id);
       const { data, error } = await (supabase as any)
         .from("todo_attachments")
         .select("todo_id")
         .in("todo_id", todoIds);
 
       if (error) throw error;
-
       const counts: Record<string, number> = {};
       data?.forEach((item: any) => {
         counts[item.todo_id] = (counts[item.todo_id] || 0) + 1;
       });
-
       return counts;
     },
   });
 
   const handleToggleComplete = async (id: string, completed: boolean) => {
     try {
-      const { error } = await supabase
-        .from("property_todos")
-        .update({ completed: !completed })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      refetch();
+      await updateTodo.mutateAsync({ id, patch: { completed: !completed } as any });
       toast.success(completed ? "Uppgift återaktiverad" : "Uppgift slutförd");
-    } catch (error: any) {
-      toast.error("Kunde inte uppdatera uppgift");
+    } catch {
+      // toast handled in hook
     }
   };
 
@@ -181,67 +129,43 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
 
   const handleAddTodo = async () => {
     if (!newTodo.trim()) return;
-
-    console.log("Adding todo with data:", {
-      property_id: newPropertyId === "none" ? null : newPropertyId || null,
-      title: newTodo,
-      due_date: newDueDate || null,
-      priority: newPriority,
-      category: newCategory === "none" ? null : newCategory || null,
-    });
-
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error("Du måste vara inloggad");
       return;
     }
 
-    const { data, error } = await (supabase as any)
-      .from("property_todos")
-      .insert([{
+    try {
+      await createTodo.mutateAsync({
         property_id: newPropertyId === "none" ? null : newPropertyId || null,
         title: newTodo,
         due_date: newDueDate || null,
         priority: newPriority,
         category: newCategory === "none" ? null : newCategory || null,
         user_id: user.id,
-      }])
-      .select();
-
-    if (error) {
-      console.error("Error adding todo:", error);
-      toast.error(`Kunde inte lägga till uppgift: ${error.message}`);
-    } else {
-      console.log("Todo added successfully:", data);
+      } as any);
       toast.success("Uppgift tillagd");
       setNewTodo("");
       setNewPropertyId("none");
       setNewPriority("medium");
       setNewCategory("none");
       setNewDueDate("");
-      refetch();
+    } catch {
+      // toast handled in hook
     }
   };
 
   const handleDeleteTodo = async (id: string) => {
-    const { error } = await (supabase as any)
-      .from("property_todos")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      toast.error("Kunde inte ta bort uppgift");
-    } else {
+    try {
+      await deleteTodo.mutateAsync(id);
       toast.success("Uppgift borttagen");
-      refetch();
+    } catch {
+      // toast handled in hook
     }
   };
 
-  const groupedByCategory = (todos || []).reduce((acc: Record<string, any[]>, todo: any) => {
+  const groupedByCategory = todos.reduce((acc: Record<string, any[]>, todo: any) => {
     const category = todo.category || "Okategoriserad";
-    if (!acc[category]) {
-      acc[category] = [];
-    }
+    if (!acc[category]) acc[category] = [];
     acc[category].push(todo);
     return acc;
   }, {} as Record<string, any[]>);
@@ -306,7 +230,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Ingen fastighet</SelectItem>
-                    {properties?.map((property) => (
+                    {properties?.map((property: any) => (
                       <SelectItem key={property.id} value={property.id}>
                         {property.name}
                       </SelectItem>
