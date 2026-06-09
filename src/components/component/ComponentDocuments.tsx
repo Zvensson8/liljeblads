@@ -122,15 +122,12 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
       }
     }
     
-    const { data, error } = await supabase.storage
-      .from("component-documents")
-      .createSignedUrl(storagePath, 3600); // 1 hour expiry
-    
-    if (error) {
+    try {
+      return await storageService.createSignedUrl("component-documents", storagePath, 3600);
+    } catch (error) {
       console.error("Error creating signed URL:", error);
       return null;
     }
-    return data.signedUrl;
   };
 
   const handleDownload = async (doc: any) => {
@@ -153,11 +150,8 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
         }
       }
       
-      const { error: storageError } = await supabase.storage
-        .from("component-documents")
-        .remove([filePath]);
+      await storageService.remove("component-documents", [filePath]);
 
-      if (storageError) throw storageError;
 
       const { error: dbError } = await supabase
         .from("component_documents")
