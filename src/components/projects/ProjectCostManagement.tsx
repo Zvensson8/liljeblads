@@ -45,6 +45,7 @@ export function ProjectCostManagement({
 }: ProjectCostManagementProps) {
   const [costs, setCosts] = useState<CostItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const logActivity = useLogProjectActivity();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCost, setEditingCost] = useState<CostItem | null>(null);
   const [formData, setFormData] = useState({
