@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useComponents } from "@/hooks/useComponents";
+import { useProperties } from "@/hooks/useProperties";
+import { useCreateWorkOrder, useUpdateWorkOrder } from "@/hooks/useWorkOrders";
 import {
   Dialog,
   DialogContent,
@@ -94,32 +95,11 @@ export function WorkOrderDialog({
 
   const watchedPropertyId = form.watch("property_id");
 
-  const { data: componentsForProperty } = useQuery({
-    queryKey: ["components-for-property", watchedPropertyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("components")
-        .select("id, name, type")
-        .eq("property_id", watchedPropertyId)
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!watchedPropertyId,
-  });
+  const { data: componentsForProperty } = useComponents({ propertyId: watchedPropertyId });
+  const { data: properties } = useProperties();
 
-  const { data: properties } = useQuery({
-    queryKey: ["properties-for-work-orders"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("properties")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const createWorkOrder = useCreateWorkOrder();
+  const updateWorkOrder = useUpdateWorkOrder();
 
 
   useEffect(() => {
@@ -192,25 +172,18 @@ export function WorkOrderDialog({
         toast.error(`${actionLabel} misslyckades: ${msg || "Okänt fel"}`);
       };
 
-      if (order) {
-        const { error } = await supabase
-          .from("work_orders")
-          .update({ ...payload, project_id: projectId || order.project_id || null, updated_at: new Date().toISOString() })
-          .eq("id", order.id);
-
-        if (error) {
-          handleDbError("Uppdatering", error);
-          return;
+      try {
+        if (order) {
+          await updateWorkOrder.mutateAsync({
+            id: order.id,
+            patch: { ...payload, project_id: projectId || order.project_id || null } as any,
+          });
+        } else {
+          await createWorkOrder.mutateAsync({ ...payload, project_id: projectId || null } as any);
         }
-        toast.success("Arbetsorder uppdaterad");
-      } else {
-        const { error } = await supabase.from("work_orders").insert([{ ...payload, project_id: projectId || null }]);
-
-        if (error) {
-          handleDbError("Skapande", error);
-          return;
-        }
-        toast.success("Arbetsorder skapad");
+      } catch (err: any) {
+        handleDbError(order ? "Uppdatering" : "Skapande", err);
+        return;
       }
 
       form.reset();
