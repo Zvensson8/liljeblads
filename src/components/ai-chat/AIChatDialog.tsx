@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { useAIChat } from '@/hooks/useEdgeFunctions';
 
 interface Message {
   id: string;
@@ -23,6 +23,7 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const aiChat = useAIChat();
 
   useEffect(() => {
     if (open && inputRef.current) {
@@ -42,63 +43,51 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input.trim()
+      content: input.trim(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
     try {
-      const invoke = async () => {
-        const { data, error } = await supabase.functions.invoke('ai-chat', {
-          body: {
-            messages: [...messages, userMessage].map(m => ({
-              role: m.role,
-              content: m.content
-            }))
-          }
-        });
-        return { data, error };
-      };
-
-      let { data, error } = await invoke();
-
-      // If auth session in backend is missing, refresh and retry once
-      const status = (error as any)?.context?.status ?? (error as any)?.status;
-      if (error && status === 401) {
-        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-        if (!refreshError && refreshed?.session) {
-          ({ data, error } = await invoke());
-        }
-      }
-
-      if (error) throw error;
+      const data = (await aiChat.mutateAsync({
+        messages: [...messages, userMessage].map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      })) as { message?: string } | null;
 
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: data.message || 'Jag kunde inte generera ett svar just nu.'
+        content: data?.message || 'Jag kunde inte generera ett svar just nu.',
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error: any) {
       const status = error?.context?.status ?? error?.status;
       if (status === 401) {
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: 'Din session har gått ut. Logga in igen och försök på nytt.'
-        }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: 'Din session har gått ut. Logga in igen och försök på nytt.',
+          },
+        ]);
         return;
       }
 
       console.error('AI chat error:', error);
-      setMessages(prev => [...prev, {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: 'Ett fel uppstod. Försök igen.'
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: 'Ett fel uppstod. Försök igen.',
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -150,28 +139,32 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
               <div
                 key={message.id}
                 className={cn(
-                  "flex gap-3",
-                  message.role === 'user' && "flex-row-reverse"
+                  'flex gap-3',
+                  message.role === 'user' && 'flex-row-reverse',
                 )}
               >
-                <div className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                  message.role === 'user' 
-                    ? "bg-primary text-primary-foreground" 
-                    : "bg-muted"
-                )}>
+                <div
+                  className={cn(
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+                    message.role === 'user'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted',
+                  )}
+                >
                   {message.role === 'user' ? (
                     <User className="h-4 w-4" />
                   ) : (
                     <Bot className="h-4 w-4" />
                   )}
                 </div>
-                <div className={cn(
-                  "rounded-lg px-3 py-2 text-sm max-w-[75%]",
-                  message.role === 'user'
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                )}>
+                <div
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-sm max-w-[75%]',
+                    message.role === 'user'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted',
+                  )}
+                >
                   {message.content}
                 </div>
               </div>
