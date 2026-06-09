@@ -161,7 +161,7 @@ const uploadFile = async (file: File) => {
       if (dbError) throw dbError;
 
       // Log activity
-      await supabase.from("project_activity_log").insert({
+      await logActivity.mutateAsync({
         project_id: projectId,
         activity_type: "document_upload",
         description: `Dokument uppladdad: "${file.name}" i mappen "${selectedFolder}"${nextVersion > 1 ? ` (version ${nextVersion})` : ""}`,
