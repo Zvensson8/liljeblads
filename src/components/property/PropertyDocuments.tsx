@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { storageService } from "@/services/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -63,15 +64,9 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
       const fileExt = file.name.split(".").pop();
       const filePath = `${session.user.id}/${propertyId}/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("property-documents")
-        .upload(filePath, file);
+      await storageService.upload("property-documents", filePath, file);
 
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("property-documents")
-        .getPublicUrl(filePath);
+      const publicUrl = storageService.getPublicUrl("property-documents", filePath);
 
       const { error: dbError } = await supabase
         .from("property_documents")
