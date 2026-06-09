@@ -1,5 +1,10 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import {
+  useProjectActivityLog,
+  useLogProjectActivity,
+  useUpdateProjectActivity,
+  useDeleteProjectActivity,
+} from "@/hooks/useProjectActivityLog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -89,8 +94,11 @@ const activityColors = {
 };
 
 export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
-  const [activities, setActivities] = useState<ActivityLogEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { data: activities = [], isLoading: loading } = useProjectActivityLog(projectId);
+  const logActivity = useLogProjectActivity();
+  const updateActivity = useUpdateProjectActivity();
+  const deleteActivity = useDeleteProjectActivity();
+
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newActivityType, setNewActivityType] = useState("manual_entry");
   const [newActivityDescription, setNewActivityDescription] = useState("");
@@ -100,29 +108,6 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchActivities();
-  }, [projectId]);
-
-  const fetchActivities = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("project_activity_log")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-      setActivities(data || []);
-    } catch (error: any) {
-      toast.error("Kunde inte hämta aktivitetslogg");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAddActivity = async () => {
     if (!newActivityDescription.trim()) {
       toast.error("Beskrivning krävs");
@@ -131,19 +116,16 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.from("project_activity_log").insert({
+      await logActivity.mutateAsync({
         project_id: projectId,
         activity_type: newActivityType,
         description: newActivityDescription,
       });
 
-      if (error) throw error;
-
       toast.success("Aktivitet tillagd");
       setAddDialogOpen(false);
       setNewActivityDescription("");
       setNewActivityType("manual_entry");
-      fetchActivities();
     } catch (error: any) {
       toast.error("Kunde inte lägga till aktivitet");
     } finally {
@@ -159,20 +141,15 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
 
     setSubmitting(true);
     try {
-      const { error } = await supabase
-        .from("project_activity_log")
-        .update({
-          activity_type: editingActivity.activity_type,
-          description: editingActivity.description,
-        })
-        .eq("id", editingActivity.id);
-
-      if (error) throw error;
+      await updateActivity.mutateAsync({
+        id: editingActivity.id,
+        activity_type: editingActivity.activity_type,
+        description: editingActivity.description,
+      });
 
       toast.success("Aktivitet uppdaterad");
       setEditDialogOpen(false);
       setEditingActivity(null);
-      fetchActivities();
     } catch (error: any) {
       toast.error("Kunde inte uppdatera aktivitet");
     } finally {
@@ -184,17 +161,10 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
     if (!activityToDelete) return;
 
     try {
-      const { error } = await supabase
-        .from("project_activity_log")
-        .delete()
-        .eq("id", activityToDelete);
-
-      if (error) throw error;
-
+      await deleteActivity.mutateAsync(activityToDelete);
       toast.success("Aktivitet raderad");
       setDeleteDialogOpen(false);
       setActivityToDelete(null);
-      fetchActivities();
     } catch (error: any) {
       toast.error("Kunde inte radera aktivitet");
     }
