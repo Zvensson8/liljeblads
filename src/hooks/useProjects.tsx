@@ -39,6 +39,22 @@ export function useProjects(filters: ProjectListFilters = {}) {
   });
 }
 
+/**
+ * Hook: fetch a single project (with property relation) by id.
+ */
+export function useProject(id: string | undefined) {
+  const { session } = useAuth();
+
+  useRealtimeInvalidation('projects', queryKeys.projects.all);
+
+  return useQuery({
+    queryKey: queryKeys.projects.detail(id ?? ''),
+    queryFn: () => projectService.getById(id as string),
+    enabled: !!session && !!id,
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 30,
+  });
+
 export function useCreateProject() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
