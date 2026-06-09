@@ -74,7 +74,7 @@ export function ProjectFormDialog({
   onSuccess,
   editingProject,
 }: ProjectFormDialogProps) {
-  const [loading2, _setLoading2] = useState(false); void _setLoading2; void loading2;
+  
   const [loading, setLoading] = useState(false);
   const [showOrderDraftOption, setShowOrderDraftOption] = useState(false);
   const [sendingDraft, setSendingDraft] = useState(false);
