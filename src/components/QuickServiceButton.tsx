@@ -59,64 +59,45 @@ export const QuickServiceButton = ({
     new Date().toISOString().split('T')[0]
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [driftTasks, setDriftTasks] = useState<DriftTask[]>([]);
   const [selectedDriftTaskId, setSelectedDriftTaskId] = useState<string>('');
-  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [propertyId, setPropertyId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { quarter, year } = getQuarterFromDate(performedDate);
+
+  const { data: driftTasksData = [], isLoading: loadingTasks } = useDriftTasks(
+    open && propertyId ? { propertyId, quarter, year } : ({} as any),
+  );
+  const driftTasks = (open && propertyId ? (driftTasksData as DriftTask[]) : []).slice().sort(
+    (a, b) => a.name.localeCompare(b.name),
+  );
+
+  const createMaintenance = useCreateMaintenanceHistory();
 
   const resetForm = () => {
     setActionType('Service');
     setPerformedDate(new Date().toISOString().split('T')[0]);
     setSelectedFile(null);
     setSelectedDriftTaskId('');
-    setDriftTasks([]);
   };
 
-  // Fetch drift tasks when date changes
+  // Resolve component's property_id (single lookup, no list hook needed)
   useEffect(() => {
-    if (!open || !performedDate) return;
-
-    const fetchDriftTasks = async () => {
-      setLoadingTasks(true);
-      try {
-        // Get component's property_id
-        const { data: component, error: compError } = await supabase
-          .from('components')
-          .select('property_id')
-          .eq('id', componentId)
-          .single();
-
-        if (compError || !component) {
-          console.error('Error fetching component:', compError);
-          return;
-        }
-
-        const { quarter, year } = getQuarterFromDate(performedDate);
-
-        // Fetch drift tasks for this property, quarter, and year
-        const { data: tasks, error: tasksError } = await supabase
-          .from('drift_tasks')
-          .select('id, name, planned_count, reported_count')
-          .eq('property_id', component.property_id)
-          .eq('quarter', quarter)
-          .eq('year', year)
-          .order('name');
-
-        if (tasksError) {
-          console.error('Error fetching drift tasks:', tasksError);
-          return;
-        }
-
-        setDriftTasks(tasks || []);
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoadingTasks(false);
-      }
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('components')
+        .select('property_id')
+        .eq('id', componentId)
+        .single();
+      if (!cancelled && !error && data) setPropertyId((data as any).property_id);
+    })();
+    return () => {
+      cancelled = true;
     };
+  }, [open, componentId]);
 
-    fetchDriftTasks();
-  }, [open, performedDate, componentId]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
