@@ -40,6 +40,11 @@ import { sv } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useProjectTemplates } from "@/hooks/useProjectTemplates";
 import { useOrganization } from "@/hooks/useOrganization";
+import { useProperties } from "@/hooks/useProperties";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfiles";
+import { useCreateProject, useUpdateProject } from "@/hooks/useProjects";
+import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 
 const projectSchema = z.object({
   property_id: z.string().min(1, "Fastighet krävs"),
