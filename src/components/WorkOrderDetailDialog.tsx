@@ -98,6 +98,8 @@ export function WorkOrderDetailDialog({
   onUpdate,
 }: WorkOrderDetailDialogProps) {
   const { session, user } = useAuth();
+  const generateOrderText = useGenerateOrderText();
+  const sendWorkOrderDraft = useSendWorkOrderDraft();
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("detail");
   const [uploading, setUploading] = useState(false);
@@ -196,12 +198,9 @@ export function WorkOrderDetailDialog({
     setGenerating(true);
     setPreviewText("");
     try {
-      const { data, error } = await supabase.functions.invoke("generate-order-text", {
-        body: { workOrderId: workOrder.id },
-      });
-      if (error) throw error;
+      const data = await generateOrderText.mutateAsync({ workOrderId: workOrder.id }) as { text?: string; error?: string };
       if (data?.error) throw new Error(data.error);
-      setPreviewText(data.text || "");
+      setPreviewText(data?.text || "");
     } catch (err: any) {
       setPreviewText(`[Fel vid generering: ${err.message || "Okänt fel"}]\n\nDu kan skriva texten manuellt nedan.`);
     } finally {
