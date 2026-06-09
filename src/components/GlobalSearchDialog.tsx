@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import {
   CommandDialog,
   CommandEmpty,
@@ -12,17 +11,9 @@ import {
 import { Building2, Package, Wrench, Briefcase, Search, Sparkles, CheckSquare, Calendar, ClipboardList } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAISearch, AISearchResult } from "@/hooks/useAISearch";
+import { useGlobalSearch, SearchResult } from "@/hooks/useGlobalSearch";
 import { Toggle } from "@/components/ui/toggle";
 import { Badge } from "@/components/ui/badge";
-
-interface SearchResult {
-  id: string;
-  type: "property" | "component" | "work_order" | "project" | "todo" | "drift_task" | "maintenance";
-  title: string;
-  subtitle: string;
-  path: string;
-  similarity?: number;
-}
 
 interface GlobalSearchDialogProps {
   open: boolean;
