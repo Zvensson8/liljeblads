@@ -54,6 +54,9 @@ export function useProject(id: string | undefined) {
     staleTime: 1000 * 60 * 2,
     gcTime: 1000 * 60 * 30,
   });
+}
+
+
 
 export function useCreateProject() {
   const queryClient = useQueryClient();
