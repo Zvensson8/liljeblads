@@ -30,15 +30,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 
-interface CostItem {
-  id: string;
-  description: string;
-  amount: number;
-  cost_date: string;
-  actor: string | null;
-  category: string | null;
-  created_at: string;
-}
+type CostItem = ProjectCostItem;
 
 interface ProjectCostManagementProps {
   projectId: string;
@@ -49,8 +41,10 @@ export function ProjectCostManagement({
   projectId,
   onCostUpdate,
 }: ProjectCostManagementProps) {
-  const [costs, setCosts] = useState<CostItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { data: costs = [], isLoading: loading } = useProjectCostItems(projectId);
+  const createCost = useCreateProjectCostItem();
+  const updateCost = useUpdateProjectCostItem();
+  const deleteCost = useDeleteProjectCostItem();
   const logActivity = useLogProjectActivity();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCost, setEditingCost] = useState<CostItem | null>(null);
@@ -61,28 +55,6 @@ export function ProjectCostManagement({
     actor: "",
     category: "",
   });
-
-  useEffect(() => {
-    fetchCosts();
-  }, [projectId]);
-
-  const fetchCosts = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("project_cost_items")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("cost_date", { ascending: false });
-
-      if (error) throw error;
-      setCosts(data || []);
-    } catch (error: any) {
-      toast.error("Kunde inte hämta kostnader");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
