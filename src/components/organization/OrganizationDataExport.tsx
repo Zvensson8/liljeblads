@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useExportOrganizationData } from "@/hooks/useEdgeFunctions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -139,6 +141,8 @@ function exportRawAsPdf(rawData: any, filename: string, orgName: string) {
 }
 
 export function OrganizationDataExport({ organizationId }: OrganizationDataExportProps) {
+  const { session } = useAuth();
+  const exportData = useExportOrganizationData();
   const [loading, setLoading] = useState(false);
   const [exportType, setExportType] = useState<"all" | "user" | "properties">("all");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("zip");
@@ -217,22 +221,17 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
 
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast.error("Du måste vara inloggad för att exportera data");
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("export-organization-data", {
-        body: {
-          organizationId,
-          exportType,
-          userId: exportType === "user" ? selectedUserId : null,
-          propertyIds: exportType === "properties" ? selectedPropertyIds : null,
-        },
-      });
-
-      if (error) throw error;
+      const data = await exportData.mutateAsync({
+        organizationId,
+        exportType,
+        userId: exportType === "user" ? selectedUserId : null,
+        propertyIds: exportType === "properties" ? selectedPropertyIds : null,
+      }) as any;
 
       const baseFilename = data.filename;
       const orgName = data.rawData?.organization?.name || "Organisation";

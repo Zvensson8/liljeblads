@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { useSendProjectOrderDraft } from "@/hooks/useEdgeFunctions";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -94,6 +95,7 @@ export function ProjectFormDialog({
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
   const logActivity = useLogProjectActivity();
+  const sendProjectOrderDraft = useSendProjectOrderDraft();
 
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -273,15 +275,11 @@ export function ProjectFormDialog({
         throw new Error("Kunde inte hämta användarens e-post");
       }
 
-      const { error } = await supabase.functions.invoke('send-project-order-draft', {
-        body: {
-          projectId: createdProjectId,
-          userEmail: user.email
-        }
+      await sendProjectOrderDraft.mutateAsync({
+        projectId: createdProjectId,
+        userEmail: user.email,
       });
 
-      if (error) throw error;
-      
       toast.success("Beställningsutkast skickat till din e-post");
       setShowOrderDraftOption(false);
       setCreatedProjectId(null);

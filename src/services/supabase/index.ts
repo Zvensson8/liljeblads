@@ -10,6 +10,12 @@ export { createCrudService } from './createCrudService';
 export type { CrudService, CrudServiceConfig } from './createCrudService';
 export { subscribeToTable } from './realtimeRegistry';
 
+// — Cross-cutting infrastructure —
+export { storageService } from './storageService';
+export type { StorageBucket, UploadOptions } from './storageService';
+export { invokeEdgeFunction, invokeEdgeFunctionRaw } from './edgeFunctionService';
+export type { InvokeOptions } from './edgeFunctionService';
+
 // — Core domain entities —
 export { propertyService } from './propertyService';
 export { workOrderService } from './workOrderService';

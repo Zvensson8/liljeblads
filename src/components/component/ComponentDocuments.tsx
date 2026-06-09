@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { storageService } from "@/services/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -66,11 +67,8 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
       const fileExt = file.name.split(".").pop();
       const filePath = `${session.user.id}/${componentId}/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("component-documents")
-        .upload(filePath, file);
+      await storageService.upload("component-documents", filePath, file);
 
-      if (uploadError) throw uploadError;
 
       // Store the file path (not public URL) since bucket is now private
       // We'll generate signed URLs when accessing the file
@@ -124,15 +122,12 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
       }
     }
     
-    const { data, error } = await supabase.storage
-      .from("component-documents")
-      .createSignedUrl(storagePath, 3600); // 1 hour expiry
-    
-    if (error) {
+    try {
+      return await storageService.createSignedUrl("component-documents", storagePath, 3600);
+    } catch (error) {
       console.error("Error creating signed URL:", error);
       return null;
     }
-    return data.signedUrl;
   };
 
   const handleDownload = async (doc: any) => {
@@ -155,11 +150,8 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
         }
       }
       
-      const { error: storageError } = await supabase.storage
-        .from("component-documents")
-        .remove([filePath]);
+      await storageService.remove("component-documents", [filePath]);
 
-      if (storageError) throw storageError;
 
       const { error: dbError } = await supabase
         .from("component_documents")

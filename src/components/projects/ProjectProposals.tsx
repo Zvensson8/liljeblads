@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrganization } from '@/hooks/useOrganization';
+import { useExecuteAIAction } from '@/hooks/useEdgeFunctions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,7 @@ export function ProjectProposals() {
   const { organization } = useOrganization();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const executeAction = useExecuteAIAction();
   const [selectedProposals, setSelectedProposals] = useState<Set<string>>(new Set());
   const [processing, setProcessing] = useState(false);
   const [showManualDialog, setShowManualDialog] = useState(false);
@@ -91,16 +93,12 @@ export function ProjectProposals() {
         })
         .eq('id', proposalId);
 
-      const { data, error } = await supabase.functions.invoke('execute-ai-action', {
-        body: { actionId: proposalId }
-      });
-
-      if (error) throw error;
+      const data = await executeAction.mutateAsync({ actionId: proposalId }) as { result?: { project_id?: string } };
 
       toast.success('Projekt skapat!');
       queryClient.invalidateQueries({ queryKey: ['project-proposals'] });
       queryClient.invalidateQueries({ queryKey: ['pending-ai-actions'] });
-      
+
       // Navigate to the new project
       if (data?.result?.project_id) {
         navigate(`/projects/${data.result.project_id}`);
@@ -148,9 +146,7 @@ export function ProjectProposals() {
           })
           .eq('id', id);
 
-        await supabase.functions.invoke('execute-ai-action', {
-          body: { actionId: id }
-        });
+        await executeAction.mutateAsync({ actionId: id });
 
         successCount++;
       } catch (error) {

@@ -12,6 +12,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshSession: () => Promise<Session | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +30,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     navigate('/auth');
   }, [navigate]);
+
+  const refreshSession = useCallback(async () => {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error) throw error;
+    setSession(data.session);
+    setUser(data.session?.user ?? null);
+    return data.session;
+  }, []);
 
   // Inactivity timeout logic
   useEffect(() => {
@@ -102,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signOut, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

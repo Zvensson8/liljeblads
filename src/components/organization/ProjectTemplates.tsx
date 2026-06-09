@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 interface ProjectTemplatesProps {
@@ -18,6 +19,7 @@ interface ProjectTemplatesProps {
 }
 
 export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
+  const { user } = useAuth();
   const { templates, loading, refetch } = useProjectTemplates(organizationId);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -86,10 +88,9 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
         if (error) throw error;
         toast.success("Mall uppdaterad");
       } else {
-        const { data: user } = await supabase.auth.getUser();
         const { error } = await supabase
           .from("project_templates")
-          .insert({ ...templateData, created_by: user.user?.id });
+          .insert({ ...templateData, created_by: user?.id });
         if (error) throw error;
         toast.success("Mall skapad");
       }
@@ -119,7 +120,6 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
 
   const handleDuplicate = async (template: any) => {
     try {
-      const { data: user } = await supabase.auth.getUser();
       const { error } = await supabase
         .from("project_templates")
         .insert({
@@ -130,7 +130,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
           estimated_duration_quarters: template.estimated_duration_quarters,
           checklist_items: template.checklist_items,
           budget_categories: template.budget_categories,
-          created_by: user.user?.id,
+          created_by: user?.id,
         });
       if (error) throw error;
       toast.success("Mall duplicerad");

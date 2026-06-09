@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Building2, MapPin, FileText, AlertCircle, Mail, Settings, Wrench, Clock } from 'lucide-react';
 import { PropertyTodos } from './PropertyTodos';
 import { ActivityTimeline } from '../ActivityTimeline';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useSendPropertyInfo } from '@/hooks/useEdgeFunctions';
 import { EnergyDeclarationCard } from './EnergyDeclarationCard';
 import { usePropertyContacts } from '@/hooks/usePropertyContacts';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
@@ -32,6 +32,7 @@ export function PropertyOverview({
   const { user } = useAuth();
   const { data: contacts = [] } = usePropertyContacts({ propertyId: property.id });
   const { preferences } = useNotificationPreferences();
+  const sendPropertyInfo = useSendPropertyInfo();
 
   const handleSendContactInfo = async () => {
     if (!user?.email) {
@@ -49,18 +50,14 @@ export function PropertyOverview({
 
       const recipientEmail = preferences?.notification_email || user.email;
 
-      const { error } = await supabase.functions.invoke('send-property-info', {
-        body: {
-          property_name: property.name,
-          property_number: property.property_number,
-          property_address: property.address,
-          invoice_address: property.invoice_address,
-          main_contact: mainContact,
-          recipient_email: recipientEmail,
-        },
+      await sendPropertyInfo.mutateAsync({
+        property_name: property.name,
+        property_number: property.property_number,
+        property_address: property.address,
+        invoice_address: property.invoice_address,
+        main_contact: mainContact,
+        recipient_email: recipientEmail,
       });
-
-      if (error) throw error;
 
       toast.success('Kontaktinformation skickad till din e-post!');
     } catch (error: any) {

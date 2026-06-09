@@ -5,6 +5,7 @@ import { Loader2, Sparkles, Check, X, FileText, Wrench, CheckSquare, FolderKanba
 import { AIActionCard, type AIAction } from '@/components/ai-chat/AIActionCard';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useAnalyzeProtocol, useExecuteAIAction } from '@/hooks/useEdgeFunctions';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,6 +30,8 @@ export function ProtocolAnalysisDialog({
 }: ProtocolAnalysisDialogProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const analyzeProtocol = useAnalyzeProtocol();
+  const executeAction = useExecuteAIAction();
   const [state, setState] = useState<AnalysisState>('idle');
   const [suggestions, setSuggestions] = useState<AIAction[]>([]);
   const [summary, setSummary] = useState<{ work_orders: number; todos: number; project_proposals: number } | null>(null);
@@ -43,15 +46,11 @@ export function ProtocolAnalysisDialog({
     setSummary(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('analyze-protocol', {
-        body: {
-          documentId,
-          documentType: 'component_documents',
-          componentId
-        }
-      });
-
-      if (fnError) throw fnError;
+      const data = await analyzeProtocol.mutateAsync({
+        documentId,
+        documentType: 'component_documents',
+        componentId,
+      }) as { error?: string; suggestions?: AIAction[]; summary?: typeof summary };
 
       if (data.error) {
         throw new Error(data.error);
@@ -111,9 +110,7 @@ export function ProtocolAnalysisDialog({
           })
           .eq('id', actionId);
 
-        await supabase.functions.invoke('execute-ai-action', {
-          body: { actionId }
-        });
+        await executeAction.mutateAsync({ actionId });
 
         successCount++;
       } catch (error) {
@@ -170,9 +167,7 @@ export function ProtocolAnalysisDialog({
         })
         .eq('id', actionId);
 
-      await supabase.functions.invoke('execute-ai-action', {
-        body: { actionId }
-      });
+      await executeAction.mutateAsync({ actionId });
 
       toast.success('Åtgärd utförd!');
       setSuggestions(prev => prev.map(s => 

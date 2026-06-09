@@ -2,9 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, AlertTriangle, CheckCircle2, Activity } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export const SecurityMetrics = () => {
+  const { user } = useAuth();
+
   const { data: auditCount } = useQuery({
     queryKey: ['audit-logs-count'],
     queryFn: async () => {
@@ -17,26 +20,14 @@ export const SecurityMetrics = () => {
     },
   });
 
-  const { data: userInfo } = useQuery({
-    queryKey: ['user-security-info'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      return {
+  const userInfo = user
+    ? {
         email: user.email,
         lastSignIn: user.last_sign_in_at,
         createdAt: user.created_at,
         emailVerified: user.email_confirmed_at !== null,
-      };
-    },
-  });
+      }
+    : null;
 
   const securityMetrics = [
     {

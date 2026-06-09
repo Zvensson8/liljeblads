@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,6 +17,7 @@ export const DeleteAccountDialog = ({ open, onOpenChange }: DeleteAccountDialogP
   const [confirmation, setConfirmation] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const handleDelete = async () => {
     if (confirmation !== 'RADERA') {
@@ -26,13 +27,12 @@ export const DeleteAccountDialog = ({ open, onOpenChange }: DeleteAccountDialogP
 
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       // This would trigger CASCADE deletes on all related data
       // In production, you'd want to implement this via an edge function
       // that handles the deletion more carefully
-      
+
       toast.info('Kontakta support för att radera ditt konto');
       onOpenChange(false);
     } catch (error) {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { storageService } from '@/services/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -159,7 +160,7 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
       docs.map(async (doc) => {
         const filePath = getMaintenanceDocPathFromUrl(doc.file_url);
         if (!filePath) return;
-        await supabase.storage.from('maintenance-documents').remove([filePath]);
+        await storageService.remove('maintenance-documents', [filePath]);
       })
     );
 
@@ -214,23 +215,17 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
       const fileName = `${record.id}/${crypto.randomUUID()}.${fileExt}`;
 
       // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from('maintenance-documents')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
+      await storageService.upload('maintenance-documents', fileName, file);
 
       // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('maintenance-documents')
-        .getPublicUrl(fileName);
+      const publicUrl = storageService.getPublicUrl('maintenance-documents', fileName);
 
       // Save to database
       const { error: dbError } = await supabase
         .from('maintenance_history_documents')
         .insert({
           maintenance_history_id: record.id,
-          file_url: urlData.publicUrl,
+          file_url: publicUrl,
           file_name: file.name,
           file_size: file.size,
           mime_type: file.type
@@ -254,7 +249,7 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
     try {
       // Delete from storage (only if we can parse the path)
       if (filePath) {
-        await supabase.storage.from('maintenance-documents').remove([filePath]);
+        await storageService.remove('maintenance-documents', [filePath]);
       }
 
       // Delete from database

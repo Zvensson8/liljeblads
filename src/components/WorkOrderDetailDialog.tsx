@@ -4,6 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { storageService } from "@/services/supabase";
+import { useGenerateOrderText, useSendWorkOrderDraft } from "@/hooks/useEdgeFunctions";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useProperties } from "@/hooks/useProperties";
@@ -96,6 +98,8 @@ export function WorkOrderDetailDialog({
   onUpdate,
 }: WorkOrderDetailDialogProps) {
   const { session, user } = useAuth();
+  const generateOrderText = useGenerateOrderText();
+  const sendWorkOrderDraft = useSendWorkOrderDraft();
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("detail");
   const [uploading, setUploading] = useState(false);
@@ -194,12 +198,9 @@ export function WorkOrderDetailDialog({
     setGenerating(true);
     setPreviewText("");
     try {
-      const { data, error } = await supabase.functions.invoke("generate-order-text", {
-        body: { workOrderId: workOrder.id },
-      });
-      if (error) throw error;
+      const data = await generateOrderText.mutateAsync({ workOrderId: workOrder.id }) as { text?: string; error?: string };
       if (data?.error) throw new Error(data.error);
-      setPreviewText(data.text || "");
+      setPreviewText(data?.text || "");
     } catch (err: any) {
       setPreviewText(`[Fel vid generering: ${err.message || "Okänt fel"}]\n\nDu kan skriva texten manuellt nedan.`);
     } finally {
@@ -229,9 +230,8 @@ export function WorkOrderDetailDialog({
     try {
       const fileExt = file.name.split(".").pop();
       const filePath = `${session.user.id}/${workOrder.id}/${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from("property-documents").upload(filePath, file);
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from("property-documents").getPublicUrl(filePath);
+      await storageService.upload("property-documents", filePath, file);
+      const publicUrl = storageService.getPublicUrl("property-documents", filePath);
       await createWorkOrderFile.mutateAsync({
         work_order_id: workOrder.id,
         name: file.name,
@@ -250,7 +250,7 @@ export function WorkOrderDetailDialog({
   const handleDeleteFile = async (fileId: string, fileUrl: string) => {
     try {
       const filePath = fileUrl.split("/").slice(-3).join("/");
-      await supabase.storage.from("property-documents").remove([filePath]);
+      await storageService.remove("property-documents", [filePath]);
       await deleteWorkOrderFile.mutateAsync(fileId);
       refetchFiles();
     } catch {
@@ -338,12 +338,12 @@ export function WorkOrderDetailDialog({
     if (!previewText.trim()) { toast.error("Skriv eller generera en text först"); return; }
     setSending(true);
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser?.email) throw new Error("Kunde inte hämta din e-post");
-      const { data, error } = await supabase.functions.invoke("send-work-order-draft", {
-        body: { workOrderId: workOrder.id, userEmail: authUser.email, customText: previewText },
-      });
-      if (error) throw error;
+      if (!user?.email) throw new Error("Kunde inte hämta din e-post");
+      const data = await sendWorkOrderDraft.mutateAsync({
+        workOrderId: workOrder.id,
+        userEmail: user.email,
+        customText: previewText,
+      }) as { error?: string };
       if (data?.error) throw new Error(data.error);
       toast.success("Beställningsutkast skickat till din e-post");
       setViewMode("detail");
