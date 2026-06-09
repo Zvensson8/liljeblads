@@ -76,14 +76,24 @@ export function ProjectFormDialog({
 }: ProjectFormDialogProps) {
   const [properties, setProperties] = useState<{ id: string; name: string; property_number: string }[]>([]);
   const [loading, setLoading] = useState(false);
-  const [userName, setUserName] = useState<string>("");
   const [showOrderDraftOption, setShowOrderDraftOption] = useState(false);
   const [sendingDraft, setSendingDraft] = useState(false);
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
-  
+
   const { organization } = useOrganization();
   const { templates } = useProjectTemplates(organization?.id);
+  const { user } = useAuth();
+  const { data: profile } = useProfile(user?.id);
+  const userName = profile?.full_name ?? "";
+  const { data: propertiesData = [] } = useProperties();
+  const properties = (propertiesData as any[])
+    .map((p) => ({ id: p.id, name: p.name, property_number: p.property_number }))
+    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "sv"));
+
+  const createProject = useCreateProject();
+  const updateProject = useUpdateProject();
+  const logActivity = useLogProjectActivity();
 
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -103,8 +113,6 @@ export function ProjectFormDialog({
 
   useEffect(() => {
     if (open) {
-      fetchProperties();
-      fetchUserName();
       if (editingProject) {
         form.reset({
           property_id: editingProject.property_id,
@@ -119,37 +127,13 @@ export function ProjectFormDialog({
           budget: editingProject.budget,
         });
       } else {
-        // Set project manager to current user's name for new projects
         form.setValue("project_manager", userName);
       }
     }
   }, [open, editingProject, userName]);
 
-  const fetchProperties = async () => {
-    const { data } = await supabase
-      .from("properties")
-      .select("id, name, property_number")
-      .order("name");
-    setProperties(data || []);
-  };
-
-  const fetchUserName = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", user.id)
-        .single();
-      
-      if (profile?.full_name) {
-        setUserName(profile.full_name);
-      }
-    }
-  };
-
   const setPropertyNumber = (propertyId: string) => {
-    const property = properties.find(p => p.id === propertyId);
+    const property = properties.find((p) => p.id === propertyId);
     if (property?.property_number) {
       form.setValue("project_number", property.property_number);
     }
