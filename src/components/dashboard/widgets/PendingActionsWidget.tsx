@@ -106,7 +106,7 @@ export function PendingActionsWidget() {
             reviewed_at: new Date().toISOString(),
           },
         });
-        await supabase.functions.invoke('execute-ai-action', { body: { actionId } });
+        await executeAction.mutateAsync({ actionId });
         successCount++;
       } catch (error) {
         console.error('Error executing action:', actionId, error);
