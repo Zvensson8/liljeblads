@@ -112,7 +112,7 @@ export function EmbeddingStatsWidget() {
   const handleBackfill = async () => {
     setProcessing(true);
     try {
-      const data = await backfillEmbeddings.mutateAsync() as { totalQueued: number };
+      const data = await backfillEmbeddings.mutateAsync(undefined) as { totalQueued: number };
       toast.success(`${data.totalQueued} poster köade för embedding`);
       
       // Refresh stats
@@ -128,16 +128,10 @@ export function EmbeddingStatsWidget() {
   const handleForceDocumentBackfill = async () => {
     setProcessing(true);
     try {
-      const response = await supabase.functions.invoke('backfill-embeddings', {
-        body: { 
-          tables: ['maintenance_history_documents'], 
-          force: true 
-        }
-      });
-      
-      if (response.error) throw response.error;
-      
-      const data = response.data;
+      const data = await backfillEmbeddings.mutateAsync({
+        tables: ['maintenance_history_documents'],
+        force: true,
+      }) as { totalQueued: number };
       toast.success(`${data.totalQueued} dokument köade för omprocessning med PDF-parsing`);
       
       // Refresh stats
