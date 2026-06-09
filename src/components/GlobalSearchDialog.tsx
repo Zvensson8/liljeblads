@@ -11,9 +11,18 @@ import {
 import { Building2, Package, Wrench, Briefcase, Search, Sparkles, CheckSquare, Calendar, ClipboardList } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAISearch, AISearchResult } from "@/hooks/useAISearch";
-import { useGlobalSearch, SearchResult } from "@/hooks/useGlobalSearch";
+import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { Toggle } from "@/components/ui/toggle";
 import { Badge } from "@/components/ui/badge";
+
+interface SearchResult {
+  id: string;
+  type: "property" | "component" | "work_order" | "project" | "todo" | "drift_task" | "maintenance";
+  title: string;
+  subtitle: string;
+  path: string;
+  similarity?: number;
+}
 
 interface GlobalSearchDialogProps {
   open: boolean;
@@ -22,18 +31,18 @@ interface GlobalSearchDialogProps {
 
 export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
   const [useAI, setUseAI] = useState(false);
   
   const { search: aiSearch, isSearching: aiSearching, results: aiResults, error: aiError, clearResults } = useAISearch();
+  const { data: standardResults = [], isLoading: standardLoading } = useGlobalSearch({
+    query: searchQuery,
+    enabled: !useAI && open,
+  });
 
   useEffect(() => {
     if (!open) {
       setSearchQuery("");
-      setResults([]);
       clearResults();
     }
   }, [open, clearResults]);
@@ -115,143 +124,12 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
     return () => clearTimeout(debounce);
   }, [searchQuery, useAI, aiSearch]);
 
-  // Update results when AI results change
-  useEffect(() => {
-    if (useAI && aiResults) {
-      setResults(convertAIResults(aiResults));
-    }
-  }, [aiResults, useAI, convertAIResults]);
+  const aiResultsMemo = useMemo(() => {
+    if (!useAI || !aiResults) return [];
+    return convertAIResults(aiResults);
+  }, [useAI, aiResults, convertAIResults]);
 
-  // Standard search effect
-  useEffect(() => {
-    if (useAI) return;
-    
-    const searchData = async () => {
-      if (!searchQuery || searchQuery.length < 2 || !user) {
-        setResults([]);
-        return;
-      }
-
-      setLoading(true);
-      const allResults: SearchResult[] = [];
-
-      try {
-        // Search properties
-        const propertiesPromises = [
-          supabase.from("properties").select("id, name, address, property_number").ilike("name", `%${searchQuery}%`).limit(5),
-          supabase.from("properties").select("id, name, address, property_number").ilike("address", `%${searchQuery}%`).limit(5),
-          supabase.from("properties").select("id, name, address, property_number").ilike("property_number", `%${searchQuery}%`).limit(5)
-        ];
-        
-        const propertiesResults = await Promise.all(propertiesPromises);
-        const uniqueProperties = new Map();
-        propertiesResults.forEach(result => {
-          result.data?.forEach(p => uniqueProperties.set(p.id, p));
-        });
-        const properties = Array.from(uniqueProperties.values()).slice(0, 5);
-
-        if (properties.length > 0) {
-          allResults.push(
-            ...properties.map((p: any) => ({
-              id: p.id,
-              type: "property" as const,
-              title: p.name,
-              subtitle: p.address || `#${p.property_number || p.id.substring(0, 5)}`,
-              path: `/properties/${p.id}`,
-            }))
-          );
-        }
-
-        // Search components (both floor-linked and property-linked)
-        const { data: components } = await supabase
-          .from("components")
-          .select(`
-            id, 
-            name, 
-            type,
-            floors:floor_id(
-              property_id,
-              properties(name)
-            ),
-            direct_property:property_id(
-              id,
-              name
-            )
-          `)
-          .ilike("name", `%${searchQuery}%`)
-          .limit(5);
-
-        if (components) {
-          allResults.push(
-            ...components.map((c: any) => {
-              const propertyName = c.floors?.properties?.name || c.direct_property?.name || "";
-              return {
-                id: c.id,
-                type: "component" as const,
-                title: c.name,
-                subtitle: `${c.type}${propertyName ? ` - ${propertyName}` : ""}`,
-                path: `/components/${c.id}`,
-              };
-            })
-          );
-        }
-
-        // Search work orders
-        const { data: workOrders } = await supabase
-          .from("work_orders")
-          .select("id, action, properties(name)")
-          .ilike("action", `%${searchQuery}%`)
-          .neq("status", "archived")
-          .limit(5);
-
-        if (workOrders) {
-          allResults.push(
-            ...workOrders.map((w: any) => ({
-              id: w.id,
-              type: "work_order" as const,
-              title: w.action,
-              subtitle: w.properties?.name || "",
-              path: `/work-orders?id=${w.id}`,
-            }))
-          );
-        }
-
-        // Search projects
-        const projectsPromises = [
-          supabase.from("projects").select("id, name, project_number, properties(name)").ilike("name", `%${searchQuery}%`).eq("is_archived", false).limit(5),
-          supabase.from("projects").select("id, name, project_number, properties(name)").ilike("project_number", `%${searchQuery}%`).eq("is_archived", false).limit(5)
-        ];
-        
-        const projectsResults = await Promise.all(projectsPromises);
-        const uniqueProjects = new Map();
-        projectsResults.forEach(result => {
-          result.data?.forEach(p => uniqueProjects.set(p.id, p));
-        });
-        const projects = Array.from(uniqueProjects.values()).slice(0, 5);
-
-        if (projects.length > 0) {
-          allResults.push(
-            ...projects.map((p: any) => ({
-              id: p.id,
-              type: "project" as const,
-              title: p.name,
-              subtitle: `${p.project_number} - ${p.properties?.name || ""}`,
-              path: `/projects/${p.id}`,
-            }))
-          );
-        }
-
-        setResults(allResults);
-      } catch (error) {
-        console.error("Search error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const debounce = setTimeout(searchData, 300);
-    return () => clearTimeout(debounce);
-  }, [searchQuery, user, useAI]);
+  const results = useAI ? aiResultsMemo : standardResults;
 
   const handleSelect = (path: string) => {
     navigate(path);
