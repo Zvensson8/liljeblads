@@ -1,42 +1,24 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FolderKanban } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
-
-interface Project {
-  id: string;
-  name: string;
-  status: string;
-  properties: { name: string };
-}
+import { useProjects } from '@/hooks/useProjects';
 
 export const RecentProjectsWidget = () => {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: allProjects = [], isLoading } = useProjects();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  const fetchProjects = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, name, status, properties(name)')
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const projects = useMemo(
+    () =>
+      [...allProjects]
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )
+        .slice(0, 3),
+    [allProjects],
+  );
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -57,7 +39,7 @@ export const RecentProjectsWidget = () => {
         </div>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <p className="text-sm text-muted-foreground">Laddar...</p>
         ) : projects.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
@@ -65,7 +47,7 @@ export const RecentProjectsWidget = () => {
           </p>
         ) : (
           <div className="space-y-2">
-            {projects.map((project) => (
+            {projects.map((project: any) => (
               <div
                 key={project.id}
                 className="p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
