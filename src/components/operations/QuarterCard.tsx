@@ -393,9 +393,6 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
 
 
 
-    toast.success("Uppgift markerad som klar");
-  };
-
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = 
       task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
