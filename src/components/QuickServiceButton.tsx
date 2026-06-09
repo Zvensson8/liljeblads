@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { storageService } from '@/services/supabase';
 import { useCreateMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 import { useCreateMaintenanceDocument } from '@/hooks/useMaintenanceDocuments';
