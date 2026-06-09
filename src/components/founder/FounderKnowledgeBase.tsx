@@ -112,7 +112,7 @@ export function FounderKnowledgeBase() {
     }
 
     return result;
-  }, []);
+  }, [session?.access_token]);
 
   const handleIngestText = async () => {
     if (!sourceKey.trim() || !sourceTitle.trim() || !content.trim()) {
