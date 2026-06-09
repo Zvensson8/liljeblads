@@ -124,18 +124,13 @@ export const QuickServiceButton = ({
 
     try {
       // 1. Create the maintenance history record with optional drift_task_id
-      const { data: maintenanceRecord, error: maintenanceError } = await supabase
-        .from('maintenance_history')
-        .insert({
-          component_id: componentId,
-          action_type: actionType,
-          performed_date: performedDate,
-          drift_task_id: selectedDriftTaskId || null,
-        })
-        .select('id')
-        .single();
+      const maintenanceRecord = await createMaintenance.mutateAsync({
+        component_id: componentId,
+        action_type: actionType,
+        performed_date: performedDate,
+        drift_task_id: selectedDriftTaskId || null,
+      } as any);
 
-      if (maintenanceError) throw maintenanceError;
 
       // 2. If a file was selected, upload it
       if (selectedFile && maintenanceRecord) {
