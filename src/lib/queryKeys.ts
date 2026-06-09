@@ -18,6 +18,18 @@ export const queryKeys = {
     details: () => [...queryKeys.properties.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.properties.details(), id] as const,
   },
+  workOrders: {
+    all: ['work-orders'] as const,
+    lists: () => [...queryKeys.workOrders.all, 'list'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [...queryKeys.workOrders.lists(), filters ?? {}] as const,
+    details: () => [...queryKeys.workOrders.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.workOrders.details(), id] as const,
+    byProject: (projectId: string) =>
+      [...queryKeys.workOrders.all, 'project', projectId] as const,
+    byProperty: (propertyId: string) =>
+      [...queryKeys.workOrders.all, 'property', propertyId] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;
