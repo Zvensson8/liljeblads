@@ -78,6 +78,16 @@ export const queryKeys = {
     byProperty: (propertyId: string) =>
       [...queryKeys.todos.all, 'property', propertyId] as const,
   },
+  driftTasks: {
+    all: ['drift-tasks'] as const,
+    lists: () => [...queryKeys.driftTasks.all, 'list'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [...queryKeys.driftTasks.lists(), filters ?? {}] as const,
+    details: () => [...queryKeys.driftTasks.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.driftTasks.details(), id] as const,
+    byProperty: (propertyId: string) =>
+      [...queryKeys.driftTasks.all, 'property', propertyId] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;
