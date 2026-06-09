@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { storageService } from "@/services/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,23 +55,13 @@ export function OrganizationBranding({ organization, onUpdate }: OrganizationBra
 
       console.log("Uploading to:", filePath);
 
-      const { error: uploadError } = await supabase.storage
-        .from("organization-logos")
-        .upload(filePath, file, { upsert: true });
+      await storageService.upload("organization-logos", filePath, file, { upsert: true });
 
-      if (uploadError) {
-        console.error("Upload error:", uploadError);
-        throw uploadError;
-      }
-
-      console.log("Upload successful, getting public URL...");
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("organization-logos")
-        .getPublicUrl(filePath);
+      const publicUrl = storageService.getPublicUrl("organization-logos", filePath);
 
       console.log("Public URL:", publicUrl);
       console.log("Updating organization record...");
+
 
       const { error: updateError } = await supabase
         .from("organizations")

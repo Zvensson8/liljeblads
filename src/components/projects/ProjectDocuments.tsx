@@ -132,18 +132,14 @@ const uploadFile = async (file: File) => {
       const existingDocs = await getDocumentVersions(file.name);
       const nextVersion = existingDocs.length > 0 ? Math.max(...existingDocs.map(d => d.version || 1)) + 1 : 1;
 
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const fileExt = file.name.split(".").pop();
       // Use path structure: userId/projectId/timestamp.ext for RLS to work
       const filePath = `${user.id}/${projectId}/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("project-documents")
-        .upload(filePath, file);
+      await storageService.upload("project-documents", filePath, file);
 
-      if (uploadError) throw uploadError;
 
       // Store the file path (not public URL) since bucket is now private
       // We'll generate signed URLs when accessing the file
