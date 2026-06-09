@@ -6,7 +6,9 @@ export type StorageBucket =
   | 'component-documents'
   | 'project-documents'
   | 'floor-drawings'
-  | 'organization-logos';
+  | 'organization-logos'
+  | 'todo-attachments'
+  | (string & {});
 
 export interface UploadOptions {
   cacheControl?: string;
