@@ -48,7 +48,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
   }, [open, clearResults]);
 
   // Convert AI results to standard format
-  const convertAIResults = useCallback((aiData: typeof aiResults): SearchResult[] => {
+  const convertAIResults = useCallback((aiData: typeof aiResults): GlobalSearchResult[] => {
     if (!aiData) return [];
     
     return aiData.results.map((r: AISearchResult) => {
