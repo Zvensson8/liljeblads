@@ -66,7 +66,8 @@ export function TaskFormDialog({
   onSuccess,
 }: TaskFormDialogProps) {
   const [templateLibraryOpen, setTemplateLibraryOpen] = useState(false);
-  
+  const createDriftTask = useCreateDriftTask();
+
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
@@ -77,25 +78,24 @@ export function TaskFormDialog({
   });
 
   const onSubmit = async (values: TaskFormValues) => {
-    const { error } = await supabase.from("drift_tasks").insert({
-      property_id: propertyId,
-      year,
-      quarter,
-      name: values.name,
-      description: values.description || null,
-      planned_count: values.planned_count,
-      reported_count: 0,
-    });
+    try {
+      await createDriftTask.mutateAsync({
+        property_id: propertyId,
+        year,
+        quarter,
+        name: values.name,
+        description: values.description || null,
+        planned_count: values.planned_count,
+        reported_count: 0,
+      } as any);
 
-    if (error) {
+      toast.success("Uppgift skapad");
+      form.reset();
+      onOpenChange(false);
+      onSuccess();
+    } catch {
       toast.error("Kunde inte skapa uppgift");
-      return;
     }
-
-    toast.success("Uppgift skapad");
-    form.reset();
-    onOpenChange(false);
-    onSuccess();
   };
 
   return (
