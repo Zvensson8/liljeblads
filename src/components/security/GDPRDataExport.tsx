@@ -2,38 +2,37 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Download, FileText, Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { createWorkbook, addJsonSheet, downloadWorkbook } from '@/lib/excelUtils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  profileService,
+  propertyService,
+  componentService,
+  workOrderService,
+  projectService,
+  todoService,
+} from '@/services/supabase';
 
 type ExportFormat = 'xlsx' | 'pdf';
 
-const fetchUserData = async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-
-  const [
-    { data: profile },
-    { data: properties },
-    { data: components },
-    { data: workOrders },
-    { data: projects },
-    { data: todos },
-  ] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase.from('properties').select('*').eq('owner_id', user.id),
-    supabase.from('components').select('*').eq('property_id', user.id),
-    supabase.from('work_orders').select('*'),
-    supabase.from('projects').select('*'),
-    supabase.from('property_todos').select('*'),
+const fetchUserData = async (userId: string) => {
+  const [profile, properties, components, workOrders, projects, todos] = await Promise.all([
+    profileService.getById(userId),
+    propertyService.list({ ownerId: userId } as never).catch(() => []),
+    componentService.list().catch(() => []),
+    workOrderService.list().catch(() => []),
+    projectService.list().catch(() => []),
+    todoService.list().catch(() => []),
   ]);
 
   return { profile, properties, components, workOrders, projects, todos };
 };
+
 
 const exportAsXlsx = async (data: Awaited<ReturnType<typeof fetchUserData>>) => {
   const wb = createWorkbook();
@@ -95,12 +94,17 @@ const exportAsPdf = (data: Awaited<ReturnType<typeof fetchUserData>>) => {
 };
 
 export const GDPRDataExport = () => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState<ExportFormat | null>(null);
 
   const handleExport = async (fmt: ExportFormat) => {
+    if (!user) {
+      toast.error('Du måste vara inloggad');
+      return;
+    }
     setLoading(fmt);
     try {
-      const data = await fetchUserData();
+      const data = await fetchUserData(user.id);
       if (fmt === 'xlsx') {
         await exportAsXlsx(data);
       } else {
@@ -114,6 +118,7 @@ export const GDPRDataExport = () => {
       setLoading(null);
     }
   };
+
 
   return (
     <Card>
