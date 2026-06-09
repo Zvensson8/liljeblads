@@ -66,29 +66,24 @@ export function ProjectCostManagement({
 
     try {
       if (editingCost) {
-        const { error } = await supabase
-          .from("project_cost_items")
-          .update({
+        await updateCost.mutateAsync({
+          id: editingCost.id,
+          patch: {
             description: formData.description,
             amount: parseFloat(formData.amount),
             cost_date: formData.cost_date,
             actor: formData.actor || null,
             category: formData.category || null,
-          })
-          .eq("id", editingCost.id);
-
-        if (error) throw error;
-
-        // Log activity
+          },
+        });
         await logActivity.mutateAsync({
           project_id: projectId,
           activity_type: "cost_updated",
           description: `Kostnad uppdaterad: "${formData.description}" (${parseFloat(formData.amount).toLocaleString("sv-SE")} kr)`,
         });
-
         toast.success("Kostnad uppdaterad");
       } else {
-        const { error } = await supabase.from("project_cost_items").insert({
+        await createCost.mutateAsync({
           project_id: projectId,
           description: formData.description,
           amount: parseFloat(formData.amount),
@@ -96,16 +91,11 @@ export function ProjectCostManagement({
           actor: formData.actor || null,
           category: formData.category || null,
         });
-
-        if (error) throw error;
-
-        // Log activity
         await logActivity.mutateAsync({
           project_id: projectId,
           activity_type: "cost_added",
           description: `Kostnad tillagd: "${formData.description}" (${parseFloat(formData.amount).toLocaleString("sv-SE")} kr)`,
         });
-
         toast.success("Kostnad registrerad");
       }
 
@@ -118,7 +108,6 @@ export function ProjectCostManagement({
         actor: "",
         category: "",
       });
-      fetchCosts();
       onCostUpdate();
     } catch (error: any) {
       toast.error("Kunde inte spara kostnad");
