@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -52,6 +53,7 @@ export function ProjectChecklistManagement({
   projectId,
   propertyId,
 }: ProjectChecklistManagementProps) {
+  const { user } = useAuth();
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(false);
   const logActivity = useLogProjectActivity();
@@ -224,8 +226,9 @@ export function ProjectChecklistManagement({
 
   const handleAddToPropertyTodos = async (item: ChecklistItem) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+
+
 
       const { error } = await supabase
         .from("property_todos")
