@@ -30,6 +30,16 @@ export const queryKeys = {
     byProperty: (propertyId: string) =>
       [...queryKeys.workOrders.all, 'property', propertyId] as const,
   },
+  components: {
+    all: ['components'] as const,
+    lists: () => [...queryKeys.components.all, 'list'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [...queryKeys.components.lists(), filters ?? {}] as const,
+    details: () => [...queryKeys.components.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.components.details(), id] as const,
+    byProperty: (propertyId: string) =>
+      [...queryKeys.components.all, 'property', propertyId] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;
