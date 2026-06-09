@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -6,6 +6,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { useProperties } from "@/hooks/useProperties";
+import { useComponents } from "@/hooks/useComponents";
+import { useUpdateWorkOrder } from "@/hooks/useWorkOrders";
+import { useCreateMaintenanceHistory } from "@/hooks/useMaintenanceHistory";
+import { useCreateProject } from "@/hooks/useProjects";
+import { useCreateWorkOrderFile, useDeleteWorkOrderFile } from "@/hooks/useWorkOrderFiles";
 import {
   Sheet,
   SheetTitle,
@@ -118,29 +124,28 @@ export function WorkOrderDetailDialog({
 
   const watchedPropertyId = form.watch("property_id");
 
-  const { data: componentsForProperty } = useQuery({
-    queryKey: ["components-for-property-detail", watchedPropertyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("components")
-        .select("id, name, type")
-        .eq("property_id", watchedPropertyId)
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!watchedPropertyId,
-  });
+  const updateWorkOrder = useUpdateWorkOrder();
+  const createMaintenanceHistory = useCreateMaintenanceHistory();
+  const createProject = useCreateProject();
+  const createWorkOrderFile = useCreateWorkOrderFile();
+  const deleteWorkOrderFile = useDeleteWorkOrderFile();
 
-  const { data: properties } = useQuery({
-    queryKey: ["properties-for-work-orders"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("properties").select("id, name").order("name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: allComponents } = useComponents(
+    watchedPropertyId ? { propertyId: watchedPropertyId } : {},
+  );
+  const componentsForProperty = useMemo(
+    () =>
+      (allComponents ?? [])
+        .filter((c: any) => c.property_id === watchedPropertyId)
+        .map((c: any) => ({ id: c.id, name: c.name, type: c.type })),
+    [allComponents, watchedPropertyId],
+  );
+
+  const { data: propertiesData } = useProperties();
+  const properties = useMemo(
+    () => (propertiesData ?? []).map((p: any) => ({ id: p.id, name: p.name })),
+    [propertiesData],
+  );
 
   const { data: files, refetch: refetchFiles } = useQuery({
     queryKey: ["work-order-files", workOrder?.id],
@@ -227,11 +232,13 @@ export function WorkOrderDetailDialog({
       const { error: uploadError } = await supabase.storage.from("property-documents").upload(filePath, file);
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from("property-documents").getPublicUrl(filePath);
-      const { error: dbError } = await supabase.from("work_order_files").insert([{
-        work_order_id: workOrder.id, name: file.name, file_url: publicUrl, file_size: file.size, mime_type: file.type,
-      }]);
-      if (dbError) throw dbError;
-      toast.success("Fil uppladdad");
+      await createWorkOrderFile.mutateAsync({
+        work_order_id: workOrder.id,
+        name: file.name,
+        file_url: publicUrl,
+        file_size: file.size,
+        mime_type: file.type,
+      } as any);
       refetchFiles();
     } catch (error: any) {
       toast.error("Kunde inte ladda upp fil: " + error.message);
@@ -244,8 +251,7 @@ export function WorkOrderDetailDialog({
     try {
       const filePath = fileUrl.split("/").slice(-3).join("/");
       await supabase.storage.from("property-documents").remove([filePath]);
-      await supabase.from("work_order_files").delete().eq("id", fileId);
-      toast.success("Fil borttagen");
+      await deleteWorkOrderFile.mutateAsync(fileId);
       refetchFiles();
     } catch {
       toast.error("Kunde inte ta bort fil");
@@ -273,7 +279,7 @@ export function WorkOrderDetailDialog({
     if (!user || !workOrder) return;
     setSubmitting(true);
     try {
-      const payload = {
+      const patch = {
         action: data.action, property_id: data.property_id, component_id: data.component_id || null,
         status: data.status, priority: data.priority,
         price: data.price ? parseFloat(data.price) : null, contractor: data.contractor || null,
@@ -281,27 +287,28 @@ export function WorkOrderDetailDialog({
         reminder_enabled: data.reminder_enabled, reminder_frequency: data.reminder_frequency,
         reminder_recipient_email: data.reminder_recipient_email || null,
         project_id: workOrder.project_id || null, updated_at: new Date().toISOString(),
-      };
-      const { error } = await supabase.from("work_orders").update(payload).eq("id", workOrder.id);
-      if (error) throw error;
+      } as any;
+      await updateWorkOrder.mutateAsync({ id: workOrder.id, patch });
 
       // Auto-create maintenance_history if completing with a component
       const componentId = data.component_id || workOrder.component_id;
       if (data.status === "completed" && componentId) {
-        const { error: mhError } = await supabase.from("maintenance_history").insert({
-          component_id: componentId,
-          action_type: data.action || workOrder.action,
-          performed_date: new Date().toISOString().split("T")[0],
-          supplier: data.contractor || workOrder.contractor || null,
-          cost: maintenanceCost !== undefined ? maintenanceCost : (data.price ? parseFloat(data.price) : null),
-          notes: data.comments || workOrder.comments || null,
-          category: "planned",
-          work_order_id: workOrder.id,
-        });
-        if (mhError) console.error("Kunde inte skapa underhållspost:", mhError);
+        try {
+          await createMaintenanceHistory.mutateAsync({
+            component_id: componentId,
+            action_type: data.action || workOrder.action,
+            performed_date: new Date().toISOString().split("T")[0],
+            supplier: data.contractor || workOrder.contractor || null,
+            cost: maintenanceCost !== undefined ? maintenanceCost : (data.price ? parseFloat(data.price) : null),
+            notes: data.comments || workOrder.comments || null,
+            category: "planned",
+            work_order_id: workOrder.id,
+          } as any);
+        } catch (mhError) {
+          console.error("Kunde inte skapa underhållspost:", mhError);
+        }
       }
 
-      toast.success("Arbetsorder uppdaterad");
       onUpdate();
       setViewMode("detail");
     } catch (error: any) {
@@ -352,18 +359,23 @@ export function WorkOrderDetailDialog({
     if (!workOrder) return;
     setConverting(true);
     try {
-      const { data: newProject, error: projectError } = await supabase
-        .from("projects").insert([{
-          name: workOrder.action, property_id: workOrder.property_id,
-          description: workOrder.comments || `Konverterat från arbetsorder: ${workOrder.action}`,
-          status: "planerat", start_date: workOrder.due_date || new Date().toISOString().split('T')[0],
-          budget: workOrder.price || null, project_number: `WO-${workOrder.id.substring(0, 8)}`, type: "underhall",
-        }]).select().single();
-      if (projectError) throw projectError;
+      const newProject = await createProject.mutateAsync({
+        name: workOrder.action,
+        property_id: workOrder.property_id,
+        description: workOrder.comments || `Konverterat från arbetsorder: ${workOrder.action}`,
+        status: "planerat",
+        start_date: workOrder.due_date || new Date().toISOString().split('T')[0],
+        budget: workOrder.price || null,
+        project_number: `WO-${workOrder.id.substring(0, 8)}`,
+        type: "underhall",
+      } as any);
       if (!newProject) throw new Error("Projektet kunde inte skapas");
       const conversionNote = `Konverterad till projekt ${newProject.project_number} - ${newProject.name}`;
       const updatedComments = workOrder.comments ? `${workOrder.comments}\n\n${conversionNote}` : conversionNote;
-      await supabase.from("work_orders").update({ status: "completed", comments: updatedComments }).eq("id", workOrder.id);
+      await updateWorkOrder.mutateAsync({
+        id: workOrder.id,
+        patch: { status: "completed", comments: updatedComments } as any,
+      });
       toast.success("Arbetsorder konverterad till projekt!");
       onUpdate();
       setConvertDialogOpen(false);
