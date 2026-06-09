@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,6 +9,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Check, ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useUpdateProject } from "@/hooks/useProjects";
+import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 
 type ProjectStatus = Database["public"]["Enums"]["project_status"];
 
@@ -46,6 +47,8 @@ export function ProjectQuickStatus({
 }: ProjectQuickStatusProps) {
   const [updating, setUpdating] = useState(false);
   const [open, setOpen] = useState(false);
+  const updateProject = useUpdateProject();
+  const logActivity = useLogProjectActivity();
 
   const handleStatusChange = async (newStatus: ProjectStatus) => {
     if (newStatus === currentStatus) {
@@ -55,18 +58,12 @@ export function ProjectQuickStatus({
 
     setUpdating(true);
     try {
-      const { error } = await supabase
-        .from("projects")
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", projectId);
+      await updateProject.mutateAsync({
+        id: projectId,
+        patch: { status: newStatus } as any,
+      });
 
-      if (error) throw error;
-
-      // Log activity
-      await supabase.from("project_activity_log").insert({
+      await logActivity.mutateAsync({
         project_id: projectId,
         activity_type: "status_change",
         description: `Status ändrad från "${statusConfig[currentStatus].label}" till "${statusConfig[newStatus].label}"`,
