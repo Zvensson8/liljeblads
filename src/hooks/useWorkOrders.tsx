@@ -59,7 +59,7 @@ export function useWorkOrders(filters: WorkOrderListFilters = {}) {
   const { session } = useAuth();
 
   const query = useQuery({
-    queryKey: queryKeys.workOrders.list(filters),
+    queryKey: queryKeys.workOrders.list({ ...filters }),
     queryFn: () => fetchWorkOrders(filters),
     enabled: !!session,
     staleTime: 1000 * 60 * 2,
