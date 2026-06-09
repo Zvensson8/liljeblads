@@ -1,5 +1,10 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import {
+  useProjectActivityLog,
+  useLogProjectActivity,
+  useUpdateProjectActivity,
+  useDeleteProjectActivity,
+} from "@/hooks/useProjectActivityLog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
