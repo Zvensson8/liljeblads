@@ -1,55 +1,27 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart3, TrendingUp } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-
-interface QuickStats {
-  properties: number;
-  workOrders: number;
-  projects: number;
-  components: number;
-}
+import { BarChart3 } from 'lucide-react';
+import { useProperties } from '@/hooks/useProperties';
+import { useWorkOrders } from '@/hooks/useWorkOrders';
+import { useProjects } from '@/hooks/useProjects';
+import { useComponents } from '@/hooks/useComponents';
 
 export const QuickStatsWidget = () => {
-  const [stats, setStats] = useState<QuickStats>({
-    properties: 0,
-    workOrders: 0,
-    projects: 0,
-    components: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const properties = useProperties();
+  const workOrders = useWorkOrders();
+  const projects = useProjects();
+  const components = useComponents();
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    try {
-      const [properties, workOrders, projects, components] = await Promise.all([
-        supabase.from('properties').select('id', { count: 'exact', head: true }),
-        supabase.from('work_orders').select('id', { count: 'exact', head: true }),
-        supabase.from('projects').select('id', { count: 'exact', head: true }),
-        supabase.from('components').select('id', { count: 'exact', head: true }),
-      ]);
-
-      setStats({
-        properties: properties.count || 0,
-        workOrders: workOrders.count || 0,
-        projects: projects.count || 0,
-        components: components.count || 0,
-      });
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading =
+    properties.isLoading ||
+    workOrders.isLoading ||
+    projects.isLoading ||
+    components.isLoading;
 
   const statItems = [
-    { label: 'Fastigheter', value: stats.properties, color: 'text-blue-500' },
-    { label: 'Arbetsordrar', value: stats.workOrders, color: 'text-orange-500' },
-    { label: 'Projekt', value: stats.projects, color: 'text-purple-500' },
-    { label: 'Komponenter', value: stats.components, color: 'text-green-500' },
+    { label: 'Fastigheter', value: properties.data?.length ?? 0, color: 'text-blue-500' },
+    { label: 'Arbetsordrar', value: workOrders.data?.length ?? 0, color: 'text-orange-500' },
+    { label: 'Projekt', value: projects.data?.length ?? 0, color: 'text-purple-500' },
+    { label: 'Komponenter', value: components.data?.length ?? 0, color: 'text-green-500' },
   ];
 
   return (

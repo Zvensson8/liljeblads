@@ -1,61 +1,41 @@
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
-import { Skeleton } from "@/components/ui/skeleton";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { useWorkOrders } from '@/hooks/useWorkOrders';
+
+const statusLabels: Record<string, string> = {
+  not_started: 'Ej påbörjad',
+  awaiting_quote: 'Inväntar offert',
+  ordered: 'Beställt',
+  in_progress: 'Pågående',
+  completed: 'Slutförd',
+};
+
+const statusColors: Record<string, string> = {
+  not_started: 'hsl(var(--chart-1))',
+  awaiting_quote: 'hsl(var(--chart-2))',
+  ordered: 'hsl(var(--chart-3))',
+  in_progress: 'hsl(var(--chart-4))',
+  completed: 'hsl(var(--chart-5))',
+};
 
 export function WorkOrdersChart() {
-  const [loading, setLoading] = useState(true);
-  const [chartData, setChartData] = useState<any[]>([]);
+  const { data: workOrders = [], isLoading } = useWorkOrders();
 
-  useEffect(() => {
-    fetchWorkOrderStats();
-  }, []);
+  const chartData = useMemo(() => {
+    const counts = workOrders.reduce<Record<string, number>>((acc, wo: any) => {
+      acc[wo.status] = (acc[wo.status] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(counts).map(([status, count]) => ({
+      name: statusLabels[status] || status,
+      value: count,
+      color: statusColors[status] || 'hsl(var(--muted))',
+    }));
+  }, [workOrders]);
 
-  const fetchWorkOrderStats = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("work_orders")
-        .select("status");
-
-      if (error) throw error;
-
-      const statusCounts = data.reduce((acc: any, order) => {
-        acc[order.status] = (acc[order.status] || 0) + 1;
-        return acc;
-      }, {});
-
-      const statusLabels: Record<string, string> = {
-        not_started: "Ej påbörjad",
-        awaiting_quote: "Inväntar offert",
-        ordered: "Beställt",
-        in_progress: "Pågående",
-        completed: "Slutförd"
-      };
-
-      const colors: Record<string, string> = {
-        not_started: "hsl(var(--chart-1))",
-        awaiting_quote: "hsl(var(--chart-2))",
-        ordered: "hsl(var(--chart-3))",
-        in_progress: "hsl(var(--chart-4))",
-        completed: "hsl(var(--chart-5))"
-      };
-
-      const formatted = Object.entries(statusCounts).map(([status, count]) => ({
-        name: statusLabels[status] || status,
-        value: count as number,
-        color: colors[status] || "hsl(var(--muted))"
-      }));
-
-      setChartData(formatted);
-    } catch (error) {
-      console.error("Error fetching work order stats:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <Card className="border-border/50">
         <CardHeader>
@@ -75,9 +55,7 @@ export function WorkOrdersChart() {
     <Card className="border-border/50">
       <CardHeader>
         <CardTitle>Arbetsordrar</CardTitle>
-        <CardDescription>
-          Fördelning per status ({totalOrders} st)
-        </CardDescription>
+        <CardDescription>Fördelning per status ({totalOrders} st)</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>

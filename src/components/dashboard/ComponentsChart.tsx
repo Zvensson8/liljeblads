@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Legend } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { useComponents } from '@/hooks/useComponents';
 
 interface ComponentData {
   type: string;
@@ -12,46 +12,25 @@ interface ComponentData {
 }
 
 export function ComponentsChart() {
-  const [data, setData] = useState<ComponentData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: components = [], isLoading } = useComponents();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const { data: components } = await supabase
-        .from('components')
-        .select('type, status');
-
-      if (!components) return;
-
-      // Group by type and status
-      const grouped = components.reduce((acc, comp) => {
+  const data = useMemo<ComponentData[]>(() => {
+    const grouped = components.reduce<Record<string, { active: number; maintenance: number; inactive: number }>>(
+      (acc, comp: any) => {
         if (!acc[comp.type]) {
           acc[comp.type] = { active: 0, maintenance: 0, inactive: 0 };
         }
-        acc[comp.type][comp.status]++;
+        if (comp.status in acc[comp.type]) {
+          (acc[comp.type] as any)[comp.status]++;
+        }
         return acc;
-      }, {} as Record<string, { active: number; maintenance: number; inactive: number }>);
+      },
+      {},
+    );
+    return Object.entries(grouped).map(([type, counts]) => ({ type, ...counts }));
+  }, [components]);
 
-      const chartData = Object.entries(grouped).map(([type, counts]) => ({
-        type,
-        active: counts.active,
-        maintenance: counts.maintenance,
-        inactive: counts.inactive,
-      }));
-
-      setData(chartData);
-    } catch (error) {
-      console.error('Error fetching chart data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <Card className="border-border/50">
         <CardHeader>
@@ -68,18 +47,9 @@ export function ComponentsChart() {
   }
 
   const chartConfig = {
-    active: {
-      label: 'Aktiva',
-      color: 'hsl(var(--chart-1))',
-    },
-    maintenance: {
-      label: 'Underhåll',
-      color: 'hsl(var(--chart-2))',
-    },
-    inactive: {
-      label: 'Inaktiva',
-      color: 'hsl(var(--chart-3))',
-    },
+    active: { label: 'Aktiva', color: 'hsl(var(--chart-1))' },
+    maintenance: { label: 'Underhåll', color: 'hsl(var(--chart-2))' },
+    inactive: { label: 'Inaktiva', color: 'hsl(var(--chart-3))' },
   };
 
   return (
@@ -98,15 +68,8 @@ export function ComponentsChart() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis 
-                  dataKey="type" 
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                />
-                <YAxis 
-                  className="text-xs"
-                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                />
+                <XAxis dataKey="type" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Legend />
                 <Bar dataKey="active" fill="var(--color-active)" name="Aktiva" radius={[4, 4, 0, 0]} />

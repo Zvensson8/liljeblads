@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +9,11 @@ import { AIActionCard, type AIAction } from '@/components/ai-chat/AIActionCard';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  useAISuggestedActions,
+  useUpdateAISuggestedAction,
+} from '@/hooks/useAISuggestedActions';
+import { queryKeys } from '@/lib/queryKeys';
 
 export function PendingActionsWidget() {
   const { user } = useAuth();
@@ -17,42 +22,33 @@ export function PendingActionsWidget() {
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
-  const { data: pendingActions = [], isLoading } = useQuery({
-    queryKey: ['pending-ai-actions'],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('ai_suggested_actions')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
-      if (error) throw error;
-      return (data || []) as AIAction[];
-    },
-    enabled: !!user,
-  });
+  const { data: actions = [], isLoading } = useAISuggestedActions({ status: 'pending' });
+  const pendingActions = useMemo(() => actions.slice(0, 10) as AIAction[], [actions]);
+  const updateAction = useUpdateAISuggestedAction();
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.aiSuggestedActions.all });
+    queryClient.invalidateQueries({ queryKey: ['ai-actions'] });
+  };
 
   const handleApprove = async (actionId: string) => {
     try {
-      await (supabase as any)
-        .from('ai_suggested_actions')
-        .update({ 
-          status: 'approved', 
+      await updateAction.mutateAsync({
+        id: actionId,
+        patch: {
+          status: 'approved',
           reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString()
-        })
-        .eq('id', actionId);
-
-      const { data, error } = await supabase.functions.invoke('execute-ai-action', {
-        body: { actionId }
+          reviewed_at: new Date().toISOString(),
+        },
       });
 
+      const { error } = await supabase.functions.invoke('execute-ai-action', {
+        body: { actionId },
+      });
       if (error) throw error;
 
       toast.success('Åtgärd utförd!');
-      queryClient.invalidateQueries({ queryKey: ['pending-ai-actions'] });
-      queryClient.invalidateQueries({ queryKey: ['ai-actions'] });
+      invalidate();
     } catch (error) {
       console.error('Error executing action:', error);
       toast.error('Kunde inte utföra åtgärden');
@@ -61,19 +57,17 @@ export function PendingActionsWidget() {
 
   const handleReject = async (actionId: string, reason?: string) => {
     try {
-      await (supabase as any)
-        .from('ai_suggested_actions')
-        .update({ 
+      await updateAction.mutateAsync({
+        id: actionId,
+        patch: {
           status: 'rejected',
           reviewed_by: user?.id,
           reviewed_at: new Date().toISOString(),
-          rejection_reason: reason || null
-        })
-        .eq('id', actionId);
-
+          rejection_reason: reason || null,
+        },
+      });
       toast.success('Förslag avvisat');
-      queryClient.invalidateQueries({ queryKey: ['pending-ai-actions'] });
-      queryClient.invalidateQueries({ queryKey: ['ai-actions'] });
+      invalidate();
     } catch (error) {
       console.error('Error rejecting action:', error);
       toast.error('Kunde inte avvisa förslaget');
@@ -81,13 +75,10 @@ export function PendingActionsWidget() {
   };
 
   const handleSelectChange = (actionId: string, selected: boolean) => {
-    setSelectedActions(prev => {
+    setSelectedActions((prev) => {
       const next = new Set(prev);
-      if (selected) {
-        next.add(actionId);
-      } else {
-        next.delete(actionId);
-      }
+      if (selected) next.add(actionId);
+      else next.delete(actionId);
       return next;
     });
   };
@@ -96,13 +87,12 @@ export function PendingActionsWidget() {
     if (selectedActions.size === pendingActions.length) {
       setSelectedActions(new Set());
     } else {
-      setSelectedActions(new Set(pendingActions.map(a => a.id)));
+      setSelectedActions(new Set(pendingActions.map((a) => a.id)));
     }
   };
 
   const handleBatchApprove = async () => {
     if (selectedActions.size === 0) return;
-    
     setIsBatchProcessing(true);
     const actionIds = Array.from(selectedActions);
     let successCount = 0;
@@ -110,19 +100,15 @@ export function PendingActionsWidget() {
 
     for (const actionId of actionIds) {
       try {
-        await (supabase as any)
-          .from('ai_suggested_actions')
-          .update({ 
-            status: 'approved', 
+        await updateAction.mutateAsync({
+          id: actionId,
+          patch: {
+            status: 'approved',
             reviewed_by: user?.id,
-            reviewed_at: new Date().toISOString()
-          })
-          .eq('id', actionId);
-
-        await supabase.functions.invoke('execute-ai-action', {
-          body: { actionId }
+            reviewed_at: new Date().toISOString(),
+          },
         });
-
+        await supabase.functions.invoke('execute-ai-action', { body: { actionId } });
         successCount++;
       } catch (error) {
         console.error('Error executing action:', actionId, error);
@@ -140,28 +126,28 @@ export function PendingActionsWidget() {
     if (errorCount > 0) {
       toast.error(`${errorCount} åtgärd${errorCount > 1 ? 'er' : ''} misslyckades`);
     }
-
-    queryClient.invalidateQueries({ queryKey: ['pending-ai-actions'] });
-    queryClient.invalidateQueries({ queryKey: ['ai-actions'] });
+    invalidate();
   };
 
   const handleBatchReject = async () => {
     if (selectedActions.size === 0) return;
-    
     setIsBatchProcessing(true);
     const actionIds = Array.from(selectedActions);
 
     try {
-      await (supabase as any)
-        .from('ai_suggested_actions')
-        .update({ 
-          status: 'rejected',
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString(),
-          rejection_reason: 'Batch-avvisad'
-        })
-        .in('id', actionIds);
-
+      await Promise.all(
+        actionIds.map((id) =>
+          updateAction.mutateAsync({
+            id,
+            patch: {
+              status: 'rejected',
+              reviewed_by: user?.id,
+              reviewed_at: new Date().toISOString(),
+              rejection_reason: 'Batch-avvisad',
+            },
+          }),
+        ),
+      );
       toast.success(`${actionIds.length} förslag avvisade`);
     } catch (error) {
       console.error('Error batch rejecting:', error);
@@ -171,8 +157,7 @@ export function PendingActionsWidget() {
     setIsBatchProcessing(false);
     setSelectedActions(new Set());
     setIsBatchMode(false);
-    queryClient.invalidateQueries({ queryKey: ['pending-ai-actions'] });
-    queryClient.invalidateQueries({ queryKey: ['ai-actions'] });
+    invalidate();
   };
 
   const allSelected = pendingActions.length > 0 && selectedActions.size === pendingActions.length;
@@ -193,14 +178,12 @@ export function PendingActionsWidget() {
           </CardTitle>
           <div className="flex items-center gap-1">
             {pendingActions.length > 1 && (
-              <Button 
-                variant={isBatchMode ? "secondary" : "ghost"} 
+              <Button
+                variant={isBatchMode ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => {
                   setIsBatchMode(!isBatchMode);
-                  if (isBatchMode) {
-                    setSelectedActions(new Set());
-                  }
+                  if (isBatchMode) setSelectedActions(new Set());
                 }}
               >
                 <ListChecks className="h-3 w-3 mr-1" />
@@ -243,11 +226,7 @@ export function PendingActionsWidget() {
                 </div>
                 {someSelected && (
                   <div className="flex gap-1">
-                    <Button 
-                      size="sm" 
-                      onClick={handleBatchApprove}
-                      disabled={isBatchProcessing}
-                    >
+                    <Button size="sm" onClick={handleBatchApprove} disabled={isBatchProcessing}>
                       {isBatchProcessing ? (
                         <Loader2 className="h-3 w-3 animate-spin mr-1" />
                       ) : (
@@ -255,8 +234,8 @@ export function PendingActionsWidget() {
                       )}
                       Godkänn ({selectedActions.size})
                     </Button>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={handleBatchReject}
                       disabled={isBatchProcessing}

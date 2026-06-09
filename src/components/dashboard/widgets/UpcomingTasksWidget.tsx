@@ -1,43 +1,21 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckSquare, Calendar } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
-
-interface Task {
-  id: string;
-  title: string;
-  due_date: string;
-  properties: { name: string };
-}
+import { useTodos } from '@/hooks/useTodos';
 
 export const UpcomingTasksWidget = () => {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: todos = [], isLoading } = useTodos();
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  const fetchTasks = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('property_todos')
-        .select('id, title, due_date, properties(name)')
-        .eq('completed', false)
-        .not('due_date', 'is', null)
-        .order('due_date', { ascending: true })
-        .limit(5);
-
-      if (error) throw error;
-      setTasks(data || []);
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const tasks = useMemo(
+    () =>
+      todos
+        .filter((t: any) => !t.completed && t.due_date)
+        .sort((a: any, b: any) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+        .slice(0, 5),
+    [todos],
+  );
 
   return (
     <Card className="h-full border-border/50">
@@ -48,7 +26,7 @@ export const UpcomingTasksWidget = () => {
         </div>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <p className="text-sm text-muted-foreground">Laddar...</p>
         ) : tasks.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
@@ -56,7 +34,7 @@ export const UpcomingTasksWidget = () => {
           </p>
         ) : (
           <div className="space-y-2">
-            {tasks.map((task) => (
+            {tasks.map((task: any) => (
               <div
                 key={task.id}
                 className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
