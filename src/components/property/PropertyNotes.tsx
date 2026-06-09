@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +6,12 @@ import { Plus, Trash2, Edit2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
+import {
+  usePropertyNotes,
+  useCreatePropertyNote,
+  useUpdatePropertyNote,
+  useDeletePropertyNote,
+} from "@/hooks/usePropertyNotes";
 
 interface PropertyNotesProps {
   propertyId: string;
@@ -18,62 +22,42 @@ export function PropertyNotes({ propertyId }: PropertyNotesProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
 
-  const { data: notes, refetch } = useQuery({
-    queryKey: ["property-notes", propertyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("property_notes")
-        .select("*")
-        .eq("property_id", propertyId)
-        .order("created_at", { ascending: false });
+  const { data: notesRaw } = usePropertyNotes({ propertyId });
+  const notes = (notesRaw ?? []).slice().sort(
+    (a: any, b: any) => (b.created_at ?? "").localeCompare(a.created_at ?? "")
+  );
 
-      if (error) throw error;
-      return data;
-    },
-  });
+  const createNote = useCreatePropertyNote();
+  const updateNote = useUpdatePropertyNote();
+  const deleteNote = useDeletePropertyNote();
 
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
-
-    const { error } = await supabase
-      .from("property_notes")
-      .insert([{ property_id: propertyId, content: newNote }]);
-
-    if (error) {
-      toast.error("Kunde inte lägga till anteckning");
-    } else {
+    try {
+      await createNote.mutateAsync({ property_id: propertyId, content: newNote } as any);
       toast.success("Anteckning tillagd");
       setNewNote("");
-      refetch();
+    } catch {
+      toast.error("Kunde inte lägga till anteckning");
     }
   };
 
   const handleUpdateNote = async (id: string) => {
-    const { error } = await supabase
-      .from("property_notes")
-      .update({ content: editContent, updated_at: new Date().toISOString() })
-      .eq("id", id);
-
-    if (error) {
-      toast.error("Kunde inte uppdatera anteckning");
-    } else {
+    try {
+      await updateNote.mutateAsync({ id, patch: { content: editContent } as any });
       toast.success("Anteckning uppdaterad");
       setEditingId(null);
-      refetch();
+    } catch {
+      toast.error("Kunde inte uppdatera anteckning");
     }
   };
 
   const handleDeleteNote = async (id: string) => {
-    const { error } = await supabase
-      .from("property_notes")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      toast.error("Kunde inte ta bort anteckning");
-    } else {
+    try {
+      await deleteNote.mutateAsync(id);
       toast.success("Anteckning borttagen");
-      refetch();
+    } catch {
+      toast.error("Kunde inte ta bort anteckning");
     }
   };
 
@@ -94,7 +78,7 @@ export function PropertyNotes({ propertyId }: PropertyNotesProps) {
 
       <div className="space-y-2">
         {notes && notes.length > 0 ? (
-          notes.map((note) => (
+          notes.map((note: any) => (
             <Card key={note.id}>
               <CardContent className="pt-4">
                 {editingId === note.id ? (
