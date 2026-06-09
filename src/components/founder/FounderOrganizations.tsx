@@ -34,7 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
+
 import { Pencil, Trash2, Search, Building } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TIER_CONFIGS, SUBSCRIPTION_TIERS } from "@/lib/subscriptionTiers";
