@@ -214,25 +214,22 @@ export function FounderKnowledgeBase() {
         setUploadProgress("Laddar upp fil...");
 
         const filePath = `knowledge-base/${Date.now()}-${selectedFile.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from("property-documents")
-          .upload(filePath, selectedFile);
-
-        if (uploadError) throw new Error("Uppladdning misslyckades: " + uploadError.message);
+        try {
+          await storageService.upload("property-documents", filePath, selectedFile);
+        } catch (uploadError: any) {
+          throw new Error("Uppladdning misslyckades: " + uploadError.message);
+        }
 
         setUploadStep(2);
         setUploadProgress("Extraherar text från dokument...");
 
         // Get signed URL for the uploaded file
-        const { data: urlData } = await supabase.storage
-          .from("property-documents")
-          .createSignedUrl(filePath, 300);
-
-        if (!urlData?.signedUrl) throw new Error("Kunde inte skapa signerad URL");
+        const signedUrl = await storageService.createSignedUrl("property-documents", filePath, 300);
+        if (!signedUrl) throw new Error("Kunde inte skapa signerad URL");
 
         // Parse the document - call multiple times with increasing page ranges for large docs
         const parseData = await callAuthedFunction("parse-document", {
-          url: urlData.signedUrl,
+          url: signedUrl,
           maxPages: 100,
         });
 
@@ -241,7 +238,7 @@ export function FounderKnowledgeBase() {
         extractedText = parseData?.text || "";
 
         // Clean up the temp file
-        await supabase.storage.from("property-documents").remove([filePath]);
+        await storageService.remove("property-documents", [filePath]);
 
         if (!extractedText.trim()) {
           throw new Error("Kunde inte extrahera text från dokumentet. Försök med en textfil istället.");
