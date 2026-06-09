@@ -148,12 +148,7 @@ export function ProjectFormDialog({
       };
 
       if (editingProject) {
-        const { error } = await supabase
-          .from("projects")
-          .update(projectData)
-          .eq("id", editingProject.id);
-
-        if (error) throw error;
+        await updateProject.mutateAsync({ id: editingProject.id, patch: projectData });
 
         // Log the update with detailed changes
         const changes: string[] = [];
@@ -161,8 +156,6 @@ export function ProjectFormDialog({
           changes.push(`Namn ändrat från "${editingProject.name}" till "${values.name}"`);
         }
         if (values.description !== editingProject.description) {
-          const oldDesc = editingProject.description || '(ingen beskrivning)';
-          const newDesc = values.description || '(tom beskrivning)';
           if (!editingProject.description && values.description) {
             changes.push(`Beskrivning tillagd: "${values.description.substring(0, 50)}${values.description.length > 50 ? '...' : ''}"`);
           } else if (editingProject.description && !values.description) {
@@ -211,7 +204,7 @@ export function ProjectFormDialog({
         }
 
         if (changes.length > 0) {
-          await supabase.from("project_activity_log").insert({
+          await logActivity.mutateAsync({
             project_id: editingProject.id,
             activity_type: "status_change",
             description: `Projekt uppdaterat: ${changes.join(", ")}`,
@@ -220,17 +213,11 @@ export function ProjectFormDialog({
 
         toast.success("Projekt uppdaterat");
       } else {
-        const { data: project, error } = await supabase
-          .from("projects")
-          .insert([projectData])
-          .select()
-          .single();
-
-        if (error) throw error;
+        const project = await createProject.mutateAsync(projectData);
 
         // Om mall användes, kopiera checklist items
         if (selectedTemplateId) {
-          const template = templates.find(t => t.id === selectedTemplateId);
+          const template = templates.find((t) => t.id === selectedTemplateId);
           if (template?.checklist_items && template.checklist_items.length > 0) {
             const checklistItems = template.checklist_items.map((item: any, index: number) => ({
               project_id: project.id,
@@ -253,18 +240,17 @@ export function ProjectFormDialog({
           }
         }
 
-        await supabase.from("project_activity_log").insert({
+        await logActivity.mutateAsync({
           project_id: project.id,
           activity_type: "status_change",
           description: "Projekt skapat",
         });
 
         toast.success("Projekt skapat");
-        
-        // Visa option att skicka beställningsutkast
+
         setCreatedProjectId(project.id);
         setShowOrderDraftOption(true);
-        return; // Stanna här och visa optionen
+        return;
       }
 
       // Vid uppdatering, stäng direkt
