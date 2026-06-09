@@ -317,7 +317,7 @@ const Components = () => {
                   <Badge variant="outline" className="text-base px-4 py-2">
                     {filteredComponents.length}{hasActiveFilters ? ` av ${components.length}` : ''} komponenter
                   </Badge>
-                  <ComponentImportDialog onSuccess={fetchComponents} />
+                  <ComponentImportDialog onSuccess={refreshComponents} />
                   {components.length > 0 && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -524,7 +524,7 @@ const Components = () => {
                                       componentId={component.id}
                                       propertyId={component.property_id}
                                       currentFloorId={component.floor_id}
-                                      onSuccess={fetchComponents}
+                                      onSuccess={refreshComponents}
                                       compact
                                     />
                                   ) : (
@@ -549,7 +549,7 @@ const Components = () => {
                                     <QuickServiceButton
                                       componentId={component.id}
                                       componentName={component.name}
-                                      onSuccess={fetchComponents}
+                                      onSuccess={refreshComponents}
                                     />
                                     <Button
                                       variant="ghost"
@@ -644,7 +644,7 @@ const Components = () => {
           setSelectedComponent(null);
           setSelectedFloorId('');
           setSelectedPropertyId('');
-          fetchComponents();
+          refreshComponents();
         }}
       />
     </SidebarProvider>
