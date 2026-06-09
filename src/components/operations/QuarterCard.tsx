@@ -109,23 +109,18 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
 
   const fetchTasks = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("drift_tasks")
-      .select("*")
-      .eq("property_id", propertyId)
-      .eq("year", year)
-      .eq("quarter", quarter)
-      .order("name");
-
-    if (error) {
+    try {
+      const data = await driftTaskService.list({ propertyId, year, quarter });
+      const sorted = (data as unknown as Task[]).slice().sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
+      setTasks(sorted);
+      calculateStats(sorted);
+    } catch {
       toast.error("Kunde inte hämta uppgifter");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setTasks(data || []);
-    calculateStats(data || []);
-    setLoading(false);
   };
 
   const calculateStats = (taskList: Task[]) => {
@@ -158,49 +153,23 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
   };
 
   const fetchAvailableComponents = async () => {
-    const { data: floors } = await supabase
-      .from("floors")
-      .select("id")
-      .eq("property_id", propertyId);
-
-    if (!floors) return;
-
-    const floorIds = floors.map(f => f.id);
-
-    const { data: components } = await supabase
-      .from("components")
-      .select("id, name, type")
-      .in("floor_id", floorIds)
-      .order("name");
-
-    setAvailableComponents(components || []);
+    try {
+      const components = await componentService.list({ propertyId });
+      setAvailableComponents(
+        components.map((c) => ({ id: c.id, name: c.name, type: c.type })),
+      );
+    } catch {
+      // silent; empty list is acceptable
+    }
   };
 
   const fetchTaskObjects = async (taskId: string) => {
-    const { data } = await supabase
-      .from("drift_task_components")
-      .select(`
-        id,
-        component_id,
-        object_name,
-        is_reported,
-        series_id,
-        registration_number,
-        auto_detected_from,
-        manually_edited,
-        component:components (
-          id,
-          name,
-          type,
-          room_zone,
-          floor_id,
-          serial_number,
-          registration_number
-        )
-      `)
-      .eq("task_id", taskId);
-
-    setTaskObjects(prev => ({ ...prev, [taskId]: data || [] }));
+    try {
+      const data = await driftTaskComponentService.list({ taskId });
+      setTaskObjects((prev) => ({ ...prev, [taskId]: data as unknown as TaskObject[] }));
+    } catch {
+      setTaskObjects((prev) => ({ ...prev, [taskId]: [] }));
+    }
   };
 
   const handleToggleTaskExpanded = (taskId: string) => {
@@ -221,31 +190,23 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
       return;
     }
 
-    const { data: component } = await supabase
-      .from("components")
-      .select("serial_number, registration_number")
-      .eq("id", componentId)
-      .single();
-
-    const { error } = await supabase.from("drift_task_components").insert({
-      task_id: taskId,
-      component_id: componentId,
-      object_name: null,
-      is_reported: false,
-      series_id: component?.serial_number || null,
-      registration_number: component?.registration_number || null,
-      manually_edited: false,
-    });
-
-    if (error) {
+    try {
+      const component = await componentService.getById(componentId);
+      await driftTaskComponentService.create({
+        task_id: taskId,
+        component_id: componentId,
+        object_name: null,
+        is_reported: false,
+        series_id: component?.serial_number || null,
+        registration_number: component?.registration_number || null,
+        manually_edited: false,
+      });
+      toast.success("Komponent tillagd");
+      setSelectedComponentId((prev) => ({ ...prev, [taskId]: "" }));
+      fetchTaskObjects(taskId);
+    } catch {
       toast.error("Kunde inte lägga till objekt");
-      return;
     }
-
-    toast.success("Komponent tillagd");
-    setSelectedComponentId(prev => ({ ...prev, [taskId]: "" }));
-    fetchTaskObjects(taskId);
-    // Removed fetchTasks() - no need to reload all tasks
   };
 
   const handleAddObjectByName = async (taskId: string) => {
@@ -255,25 +216,22 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
       return;
     }
 
-    const { error } = await supabase.from("drift_task_components").insert({
-      task_id: taskId,
-      component_id: null,
-      object_name: objectName,
-      is_reported: false,
-      series_id: null,
-      registration_number: null,
-      manually_edited: false,
-    });
-
-    if (error) {
+    try {
+      await driftTaskComponentService.create({
+        task_id: taskId,
+        component_id: null,
+        object_name: objectName,
+        is_reported: false,
+        series_id: null,
+        registration_number: null,
+        manually_edited: false,
+      });
+      toast.success("Objekt tillagt");
+      setNewObjectName((prev) => ({ ...prev, [taskId]: "" }));
+      fetchTaskObjects(taskId);
+    } catch {
       toast.error("Kunde inte lägga till objekt");
-      return;
     }
-
-    toast.success("Objekt tillagt");
-    setNewObjectName(prev => ({ ...prev, [taskId]: "" }));
-    fetchTaskObjects(taskId);
-    // Removed fetchTasks() - no need to reload all tasks
   };
 
   const handleToggleReported = async (taskId: string, objectId: string, isReported: boolean) => {
@@ -293,19 +251,13 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     calculateStats(updatedTasks);
 
     // Save to database in background
-    const { error: objError } = await supabase
-      .from("drift_task_components")
-      .update({ is_reported: isReported })
-      .eq("id", objectId);
-
-    const { error: taskError } = await supabase
-      .from("drift_tasks")
-      .update({ reported_count: reportedCount })
-      .eq("id", taskId);
-
-    if (objError || taskError) {
+    try {
+      await Promise.all([
+        driftTaskComponentService.update(objectId, { is_reported: isReported }),
+        driftTaskService.update(taskId, { reported_count: reportedCount }),
+      ]);
+    } catch {
       toast.error("Kunde inte spara ändring");
-      // Revert on error
       fetchTaskObjects(taskId);
       fetchTasks();
     }
@@ -317,16 +269,13 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     const newObjects = currentObjects.filter(o => o.id !== objectId);
     setTaskObjects(prev => ({ ...prev, [taskId]: newObjects }));
 
-    const { error } = await supabase.from("drift_task_components").delete().eq("id", objectId);
-    
-    if (error) {
+    try {
+      await driftTaskComponentService.remove(objectId);
+      toast.success("Objekt borttaget");
+    } catch {
       toast.error("Kunde inte ta bort objekt");
-      // Revert on error
       fetchTaskObjects(taskId);
-      return;
     }
-    
-    toast.success("Objekt borttaget");
   };
 
   const handleUpdateField = async (taskId: string, field: keyof Task, value: any) => {
@@ -337,17 +286,14 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     setTasks(updatedTasks);
     calculateStats(updatedTasks);
 
-    const { error } = await supabase
-      .from("drift_tasks")
-      .update({ [field]: value })
-      .eq("id", taskId);
-
-    if (error) {
+    try {
+      await driftTaskService.update(taskId, { [field]: value } as never);
+    } catch {
       toast.error("Kunde inte uppdatera uppgift");
-      // Revert on error
       fetchTasks();
     }
   };
+
 
   const handleExportQuarter = async () => {
     try {
