@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import {
   useAISuggestedActions,
   useUpdateAISuggestedAction,
 } from '@/hooks/useAISuggestedActions';
+import { useExecuteAIAction } from '@/hooks/useEdgeFunctions';
 import { queryKeys } from '@/lib/queryKeys';
 
 export function PendingActionsWidget() {
@@ -25,6 +25,7 @@ export function PendingActionsWidget() {
   const { data: actions = [], isLoading } = useAISuggestedActions({ status: 'pending' });
   const pendingActions = useMemo(() => actions.slice(0, 10) as AIAction[], [actions]);
   const updateAction = useUpdateAISuggestedAction();
+  const executeAction = useExecuteAIAction();
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.aiSuggestedActions.all });
@@ -42,10 +43,7 @@ export function PendingActionsWidget() {
         },
       });
 
-      const { error } = await supabase.functions.invoke('execute-ai-action', {
-        body: { actionId },
-      });
-      if (error) throw error;
+      await executeAction.mutateAsync({ actionId });
 
       toast.success('Åtgärd utförd!');
       invalidate();

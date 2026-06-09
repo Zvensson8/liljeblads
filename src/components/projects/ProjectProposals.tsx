@@ -146,9 +146,7 @@ export function ProjectProposals() {
           })
           .eq('id', id);
 
-        await supabase.functions.invoke('execute-ai-action', {
-          body: { actionId: id }
-        });
+        await executeAction.mutateAsync({ actionId: id });
 
         successCount++;
       } catch (error) {
