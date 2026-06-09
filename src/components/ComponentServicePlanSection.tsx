@@ -88,49 +88,31 @@ export function ComponentServicePlanSection({
 
   const handleToggleTask = async (taskId: string, checked: boolean) => {
     setLoading(true);
-
-    if (checked) {
-      if (selectedTaskIds.includes(taskId)) {
-        toast.error("Komponenten finns redan i denna driftuppgift");
-        setLoading(false);
-        return;
+    try {
+      if (checked) {
+        if (selectedTaskIds.includes(taskId)) {
+          toast.error("Komponenten finns redan i denna driftuppgift");
+          return;
+        }
+        await createLink.mutateAsync({
+          task_id: taskId,
+          component_id: componentId,
+          object_name: null,
+          is_reported: false,
+          series_id: (component as any)?.serial_number || null,
+          registration_number:
+            (component as any)?.registration_number || null,
+        });
+        toast.success("Komponent tillagd i driftuppgift");
+      } else {
+        await deleteLink.mutateAsync({ taskId, componentId });
+        toast.success("Komponent borttagen från driftuppgift");
       }
-
-      const { error } = await supabase.from("drift_task_components").insert({
-        task_id: taskId,
-        component_id: componentId,
-        object_name: null,
-        is_reported: false,
-        series_id: (component as any)?.serial_number || null,
-        registration_number: (component as any)?.registration_number || null,
-      });
-
-      if (error) {
-        toast.error("Kunde inte lägga till komponent");
-        setLoading(false);
-        return;
-      }
-
-      toast.success("Komponent tillagd i driftuppgift");
-      await refetchLinks();
-    } else {
-      const { error } = await supabase
-        .from("drift_task_components")
-        .delete()
-        .eq("task_id", taskId)
-        .eq("component_id", componentId);
-
-      if (error) {
-        toast.error("Kunde inte ta bort komponent");
-        setLoading(false);
-        return;
-      }
-
-      toast.success("Komponent borttagen från driftuppgift");
-      await refetchLinks();
+    } catch {
+      // toast emitted from hook
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const groupedTasks = driftTasks.reduce((acc, task) => {
