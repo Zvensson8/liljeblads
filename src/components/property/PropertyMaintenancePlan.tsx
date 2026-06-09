@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, isSameDay } from "date-fns";
 import { sv } from "date-fns/locale";
 import { CalendarIcon, Clock, Wrench } from "lucide-react";
+import { useComponents } from "@/hooks/useComponents";
 
 interface PropertyMaintenancePlanProps {
   propertyId: string;
@@ -21,59 +21,29 @@ interface MaintenanceEvent {
 }
 
 export function PropertyMaintenancePlan({ propertyId }: PropertyMaintenancePlanProps) {
-  const [loading, setLoading] = useState(true);
-  const [events, setEvents] = useState<MaintenanceEvent[]>([]);
+  const { data: components = [], isLoading } = useComponents({ propertyId });
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedEvents, setSelectedEvents] = useState<MaintenanceEvent[]>([]);
 
-  useEffect(() => {
-    fetchMaintenancePlan();
-  }, [propertyId]);
-
-  useEffect(() => {
-    if (selectedDate) {
-      const eventsOnDate = events.filter(e => 
-        isSameDay(e.next_service_date, selectedDate)
-      );
-      setSelectedEvents(eventsOnDate);
-    }
-  }, [selectedDate, events]);
-
-  const fetchMaintenancePlan = async () => {
-    try {
-      // Fetch components with maintenance dates
-      const result: any = await (supabase as any)
-        .from("components")
-        .select("id, name, type, next_service_date, installation_year")
-        .eq("property_id", propertyId);
-      
-      const { data: allComponents, error: compError } = result;
-      
-      // Filter out components without next_service_date
-      const componentsData = allComponents?.filter(c => c.next_service_date != null) || [];
-
-      if (compError || !componentsData) {
-        setLoading(false);
-        return;
-      }
-
-      const maintenanceEvents: MaintenanceEvent[] = componentsData.map(comp => ({
+  const events = useMemo<MaintenanceEvent[]>(() => {
+    return (components as any[])
+      .filter((c) => c.next_service_date != null)
+      .map((comp) => ({
         id: comp.id,
         component_name: comp.name || "Namnlös komponent",
         component_type: comp.type || "Okänd typ",
         next_service_date: new Date(comp.next_service_date!),
-        service_interval_months: 12
+        service_interval_months: 12,
       }));
+  }, [components]);
 
-      setEvents(maintenanceEvents);
-    } catch (error) {
-      console.error("Error fetching maintenance plan:", error);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (selectedDate) {
+      setSelectedEvents(events.filter((e) => isSameDay(e.next_service_date, selectedDate)));
     }
-  };
+  }, [selectedDate, events]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="grid gap-6 md:grid-cols-2">
         <Skeleton className="h-[400px]" />
@@ -83,24 +53,17 @@ export function PropertyMaintenancePlan({ propertyId }: PropertyMaintenancePlanP
   }
 
   const upcomingEvents = events
-    .filter(e => e.next_service_date >= new Date())
+    .filter((e) => e.next_service_date >= new Date())
     .sort((a, b) => a.next_service_date.getTime() - b.next_service_date.getTime())
     .slice(0, 10);
 
-  const modifiers = {
-    maintenance: events.map(e => e.next_service_date)
-  };
-
+  const modifiers = { maintenance: events.map((e) => e.next_service_date) };
   const modifiersStyles = {
-    maintenance: {
-      backgroundColor: "hsl(var(--primary) / 0.3)",
-      fontWeight: "bold"
-    }
+    maintenance: { backgroundColor: "hsl(var(--primary) / 0.3)", fontWeight: "bold" },
   };
 
   return (
     <div className="grid gap-6 md:grid-cols-2 animate-fade-in">
-      {/* Calendar View */}
       <Card className="border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -118,13 +81,13 @@ export function PropertyMaintenancePlan({ propertyId }: PropertyMaintenancePlanP
             modifiers={modifiers}
             modifiersStyles={modifiersStyles}
           />
-          
+
           {selectedEvents.length > 0 && (
             <div className="mt-4 space-y-2">
               <h4 className="font-semibold text-sm">
                 Planerat för {format(selectedDate!, "d MMMM yyyy", { locale: sv })}:
               </h4>
-              {selectedEvents.map(event => (
+              {selectedEvents.map((event) => (
                 <div key={event.id} className="p-3 bg-primary/5 rounded-lg border border-primary/20">
                   <div className="font-medium">{event.component_name}</div>
                   <div className="text-sm text-muted-foreground">{event.component_type}</div>
@@ -135,7 +98,6 @@ export function PropertyMaintenancePlan({ propertyId }: PropertyMaintenancePlanP
         </CardContent>
       </Card>
 
-      {/* Upcoming Maintenance */}
       <Card className="border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -145,13 +107,15 @@ export function PropertyMaintenancePlan({ propertyId }: PropertyMaintenancePlanP
         </CardHeader>
         <CardContent className="space-y-3 max-h-[500px] overflow-y-auto">
           {upcomingEvents.length > 0 ? (
-            upcomingEvents.map(event => {
-              const daysUntil = Math.ceil((event.next_service_date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            upcomingEvents.map((event) => {
+              const daysUntil = Math.ceil(
+                (event.next_service_date.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+              );
               const isUrgent = daysUntil <= 30;
-              
+
               return (
-                <div 
-                  key={event.id} 
+                <div
+                  key={event.id}
                   className="p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
                 >
                   <div className="flex items-start justify-between">
@@ -160,9 +124,7 @@ export function PropertyMaintenancePlan({ propertyId }: PropertyMaintenancePlanP
                         <Wrench className="h-4 w-4 text-muted-foreground" />
                         <span className="font-semibold">{event.component_name}</span>
                       </div>
-                      <div className="text-sm text-muted-foreground mb-2">
-                        {event.component_type}
-                      </div>
+                      <div className="text-sm text-muted-foreground mb-2">{event.component_type}</div>
                       <div className="text-sm">
                         <span className="text-muted-foreground">Nästa service: </span>
                         <span className="font-medium">
@@ -170,17 +132,13 @@ export function PropertyMaintenancePlan({ propertyId }: PropertyMaintenancePlanP
                         </span>
                       </div>
                     </div>
-                    <Badge variant={isUrgent ? "destructive" : "secondary"}>
-                      {daysUntil} dagar
-                    </Badge>
+                    <Badge variant={isUrgent ? "destructive" : "secondary"}>{daysUntil} dagar</Badge>
                   </div>
                 </div>
               );
             })
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              Inget planerat underhåll
-            </div>
+            <div className="text-center py-8 text-muted-foreground">Inget planerat underhåll</div>
           )}
         </CardContent>
       </Card>
