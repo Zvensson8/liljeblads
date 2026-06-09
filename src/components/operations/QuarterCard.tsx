@@ -678,9 +678,8 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
                                     <ComponentAutoDetect
                                       propertyId={propertyId}
                                       onSelectComponent={async (component) => {
-                                        const { error } = await supabase
-                                          .from("drift_task_components")
-                                          .insert({
+                                        try {
+                                          await driftTaskComponentService.create({
                                             task_id: task.id,
                                             component_id: component.id,
                                             object_name: null,
@@ -690,15 +689,12 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
                                             auto_detected_from: component.name,
                                             manually_edited: false,
                                           });
-
-                                        if (error) {
+                                          toast.success("Komponent länkad");
+                                          fetchTaskObjects(task.id);
+                                          fetchTasks();
+                                        } catch {
                                           toast.error("Kunde inte länka komponent");
-                                          return;
                                         }
-
-                                        toast.success("Komponent länkad");
-                                        fetchTaskObjects(task.id);
-                                        fetchTasks();
                                       }}
                                     />
                                   </TabsContent>
