@@ -194,11 +194,11 @@ export const MaintenanceHistoryDialog = ({
                   key={record.id}
                   record={record}
                   onUpdate={() => {
-                    fetchRecords();
+                    
                     onSuccess?.();
                   }}
                   onDelete={() => {
-                    fetchRecords();
+                    
                     onSuccess?.();
                   }}
                 />
