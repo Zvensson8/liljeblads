@@ -338,12 +338,12 @@ export function WorkOrderDetailDialog({
     if (!previewText.trim()) { toast.error("Skriv eller generera en text först"); return; }
     setSending(true);
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser?.email) throw new Error("Kunde inte hämta din e-post");
-      const { data, error } = await supabase.functions.invoke("send-work-order-draft", {
-        body: { workOrderId: workOrder.id, userEmail: authUser.email, customText: previewText },
-      });
-      if (error) throw error;
+      if (!user?.email) throw new Error("Kunde inte hämta din e-post");
+      const data = await sendWorkOrderDraft.mutateAsync({
+        workOrderId: workOrder.id,
+        userEmail: user.email,
+        customText: previewText,
+      }) as { error?: string };
       if (data?.error) throw new Error(data.error);
       toast.success("Beställningsutkast skickat till din e-post");
       setViewMode("detail");
