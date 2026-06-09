@@ -1,11 +1,11 @@
 import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown, UserCog, User, FileText, Shield, Bot } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { useModuleAccess, ModuleName } from "@/hooks/useModuleAccess";
-import { supabase } from "@/integrations/supabase/client";
+import { useIsFounder } from "@/hooks/useUserRoles";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Sidebar,
