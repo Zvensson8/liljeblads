@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,37 +10,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Plus, Trash2, TrendingUp } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-
-interface RecurringCost {
-  id: string;
-  property_id: string;
-  description: string;
-  amount: number;
-  base_interval_months: number;
-  interval_variation_months?: number;
-  account_code_id?: string;
-  contractor_name?: string;
-  contact_person?: string;
-  last_payment_date?: string;
-  calculated_quarter_start?: string;
-  calculated_quarter_end?: string;
-  user_selected_date?: string;
-  account_code?: {
-    code: string;
-    description: string;
-  };
-}
+import { useProperty } from "@/hooks/useProperties";
+import {
+  useRecurringCosts,
+  useCreateRecurringCost,
+  useDeleteRecurringCost,
+} from "@/hooks/useRecurringCosts";
 
 interface PropertyRecurringCostsProps {
   propertyId: string;
 }
 
 export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsProps) {
-  const [costs, setCosts] = useState<RecurringCost[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [accountCodes, setAccountCodes] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     description: '',
     amount: 0,
@@ -51,70 +34,52 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
     last_payment_date: '',
   });
 
-  useEffect(() => {
-    fetchCosts();
-    fetchAccountCodes();
-  }, [propertyId]);
+  const { data: property } = useProperty(propertyId);
+  const orgId = (property as any)?.organization_id as string | undefined;
+  const { data: rawCosts, isLoading } = useRecurringCosts({ propertyId });
 
-  const fetchAccountCodes = async () => {
-    try {
-      const { data: property } = await supabase
-        .from('properties')
-        .select('organization_id')
-        .eq('id', propertyId)
-        .single();
-
-      if (property) {
-        const { data, error } = await supabase
-          .from('account_codes')
-          .select('*')
-          .eq('organization_id', property.organization_id)
-          .order('code');
-
-        if (error) throw error;
-        setAccountCodes(data || []);
-      }
-    } catch (error) {
-      console.error('Error fetching account codes:', error);
-    }
-  };
-
-  const fetchCosts = async () => {
-    setLoading(true);
-    try {
+  // Account codes — no domain service yet; fetched here scoped to the org.
+  const { data: accountCodes = [] } = useQuery({
+    queryKey: ["account-codes", orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
       const { data, error } = await supabase
-        .from('property_recurring_costs')
-        .select(`
-          *,
-          account_code:account_codes(code, description)
-        `)
-        .eq('property_id', propertyId)
-        .order('last_payment_date', { ascending: false });
-
+        .from('account_codes')
+        .select('*')
+        .eq('organization_id', orgId!)
+        .order('code');
       if (error) throw error;
-      setCosts((data || []) as RecurringCost[]);
-    } catch (error: any) {
-      toast.error('Kunde inte hämta återkommande kostnader');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return data ?? [];
+    },
+  });
+
+  const accountCodeMap = useMemo(() => {
+    const m: Record<string, { code: string; description: string }> = {};
+    accountCodes.forEach((c: any) => (m[c.id] = { code: c.code, description: c.description }));
+    return m;
+  }, [accountCodes]);
+
+  const costs = useMemo(() => {
+    return (rawCosts ?? [])
+      .slice()
+      .sort((a: any, b: any) => (b.last_payment_date ?? "").localeCompare(a.last_payment_date ?? ""))
+      .map((c: any) => ({
+        ...c,
+        account_code: c.account_code_id ? accountCodeMap[c.account_code_id] ?? null : null,
+      }));
+  }, [rawCosts, accountCodeMap]);
+
+  const createCost = useCreateRecurringCost();
+  const deleteCost = useDeleteRecurringCost();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     try {
-      const { error } = await supabase
-        .from('property_recurring_costs')
-        .insert([{
-          property_id: propertyId,
-          ...formData,
-          amount: Number(formData.amount),
-        }]);
-
-      if (error) throw error;
-
-      toast.success('Återkommande kostnad tillagd');
+      await createCost.mutateAsync({
+        property_id: propertyId,
+        ...formData,
+        amount: Number(formData.amount),
+      } as any);
       setDialogOpen(false);
       setFormData({
         description: '',
@@ -126,27 +91,17 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
         contact_person: '',
         last_payment_date: '',
       });
-      fetchCosts();
-    } catch (error: any) {
-      toast.error('Kunde inte lägga till kostnad');
+    } catch {
+      // toast handled by hook
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Är du säker på att du vill ta bort denna kostnad?')) return;
-
     try {
-      const { error } = await supabase
-        .from('property_recurring_costs')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast.success('Kostnad borttagen');
-      fetchCosts();
-    } catch (error: any) {
-      toast.error('Kunde inte ta bort kostnad');
+      await deleteCost.mutateAsync(id);
+    } catch {
+      // toast handled by hook
     }
   };
 
@@ -157,14 +112,14 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
     return `Var ${months} månad${variation ? ` (±${variation} mån)` : ""}`;
   };
 
-  const totalMonthly = costs.reduce((sum, cost) => {
+  const totalMonthly = costs.reduce((sum: number, cost: any) => {
     const multiplier = 1 / (cost.base_interval_months || 12);
     return sum + (cost.amount * multiplier);
   }, 0);
 
   const totalYearly = totalMonthly * 12;
 
-  if (loading) {
+  if (isLoading) {
     return <div>Laddar...</div>;
   }
 
@@ -232,7 +187,7 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {costs.map((cost) => (
+                {costs.map((cost: any) => (
                   <TableRow key={cost.id}>
                     <TableCell className="font-medium">{cost.description}</TableCell>
                     <TableCell>
@@ -296,7 +251,7 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
                   <SelectValue placeholder="Välj kontokod" />
                 </SelectTrigger>
                 <SelectContent>
-                  {accountCodes.map((code) => (
+                  {accountCodes.map((code: any) => (
                     <SelectItem key={code.id} value={code.id}>
                       {code.code} - {code.description}
                     </SelectItem>
