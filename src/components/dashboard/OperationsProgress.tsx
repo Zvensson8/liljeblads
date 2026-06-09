@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { Calendar, CheckCircle2, Clock, AlertCircle, TrendingUp, TrendingDown, Minus, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
+import { useDriftTasks } from '@/hooks/useDriftTasks';
 
 interface QuarterStats {
   quarter: string;
@@ -16,73 +16,71 @@ interface QuarterStats {
   completionRate: number;
 }
 
+/**
+ * Dashboard widget showing operational drift task progress for the
+ * current year, with weekly delta and per-quarter breakdown.
+ *
+ * Migrated to `useDriftTasks` so it picks up realtime invalidations and
+ * optimistic updates from elsewhere in the app — when Operations marks
+ * a task done, this widget recalculates immediately without a refetch
+ * round-trip.
+ */
 export function OperationsProgress() {
-  const [stats, setStats] = useState<QuarterStats[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [missingCount, setMissingCount] = useState(0);
-  const [weeklyChange, setWeeklyChange] = useState(0);
   const navigate = useNavigate();
+  const currentYear = new Date().getFullYear();
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
+  const { data: tasks = [], isLoading } = useDriftTasks({ year: currentYear });
 
-  const fetchStats = async () => {
-    try {
-      const currentYear = new Date().getFullYear();
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const { stats, missingCount, weeklyChange } = useMemo(() => {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-      // Fetch current tasks
-      const { data: tasks } = await supabase
-        .from('drift_tasks')
-        .select('quarter, planned_count, reported_count, updated_at')
-        .eq('year', currentYear);
+    const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+    const quarterStats: QuarterStats[] = quarters.map((quarter) => {
+      const quarterTasks = tasks.filter((t) => t.quarter === quarter);
+      const totalTasks = quarterTasks.length;
+      const completedTasks = quarterTasks.filter(
+        (t) => t.reported_count >= t.planned_count && t.planned_count > 0
+      ).length;
+      const totalPlanned = quarterTasks.reduce(
+        (sum, t) => sum + (t.planned_count || 0),
+        0
+      );
+      const totalReported = quarterTasks.reduce(
+        (sum, t) => sum + (t.reported_count || 0),
+        0
+      );
+      const completionRate =
+        totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+      return {
+        quarter,
+        totalTasks,
+        completedTasks,
+        totalPlanned,
+        totalReported,
+        completionRate,
+      };
+    });
 
-      if (!tasks) return;
+    const totalMissing = tasks.filter(
+      (t) => t.reported_count < t.planned_count
+    ).length;
 
-      // Group by quarter
-      const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
-      const quarterStats: QuarterStats[] = quarters.map(quarter => {
-        const quarterTasks = tasks.filter(t => t.quarter === quarter);
-        const totalTasks = quarterTasks.length;
-        const completedTasks = quarterTasks.filter(
-          t => t.reported_count >= t.planned_count && t.planned_count > 0
-        ).length;
-        const totalPlanned = quarterTasks.reduce((sum, t) => sum + (t.planned_count || 0), 0);
-        const totalReported = quarterTasks.reduce((sum, t) => sum + (t.reported_count || 0), 0);
-        const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    const recentlyCompleted = tasks.filter((t) => {
+      const updatedAt = new Date(t.updated_at);
+      return (
+        t.reported_count >= t.planned_count &&
+        t.planned_count > 0 &&
+        updatedAt >= oneWeekAgo
+      );
+    }).length;
 
-        return {
-          quarter,
-          totalTasks,
-          completedTasks,
-          totalPlanned,
-          totalReported,
-          completionRate,
-        };
-      });
-
-      // Calculate missing tasks
-      const totalMissing = tasks.filter(t => t.reported_count < t.planned_count).length;
-      setMissingCount(totalMissing);
-
-      // Calculate weekly change (tasks completed this week)
-      const recentlyCompleted = tasks.filter(t => {
-        const updatedAt = new Date(t.updated_at);
-        return t.reported_count >= t.planned_count && 
-               t.planned_count > 0 && 
-               updatedAt >= oneWeekAgo;
-      }).length;
-      setWeeklyChange(recentlyCompleted);
-
-      setStats(quarterStats);
-    } catch (error) {
-      console.error('Error fetching operations stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    return {
+      stats: quarterStats,
+      missingCount: totalMissing,
+      weeklyChange: recentlyCompleted,
+    };
+  }, [tasks]);
 
   const getCurrentQuarter = () => {
     const month = new Date().getMonth();
@@ -90,9 +88,9 @@ export function OperationsProgress() {
   };
 
   const currentQuarter = getCurrentQuarter();
-  const currentStats = stats.find(s => s.quarter === currentQuarter);
+  const currentStats = stats.find((s) => s.quarter === currentQuarter);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Card className="border-border/50">
         <CardHeader>
@@ -111,9 +109,9 @@ export function OperationsProgress() {
     );
   }
 
-  const taskCompletionRate = currentStats 
-    ? currentStats.totalTasks > 0 
-      ? Math.round((currentStats.completedTasks / currentStats.totalTasks) * 100) 
+  const taskCompletionRate = currentStats
+    ? currentStats.totalTasks > 0
+      ? Math.round((currentStats.completedTasks / currentStats.totalTasks) * 100)
       : 0
     : 0;
 
@@ -195,7 +193,7 @@ export function OperationsProgress() {
 
         {/* Warning for missing tasks */}
         {missingCount > 0 && (
-          <div 
+          <div
             className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 cursor-pointer hover:bg-yellow-500/20 transition-colors"
             onClick={() => navigate('/operations')}
           >
@@ -224,8 +222,8 @@ export function OperationsProgress() {
           </div>
         )}
 
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className="w-full"
           onClick={() => navigate('/operations')}
         >
