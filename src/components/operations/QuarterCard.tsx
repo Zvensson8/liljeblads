@@ -313,19 +313,13 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     setTasks(updatedTasks);
     calculateStats(updatedTasks);
 
-    const { error } = await supabase
-      .from("drift_tasks")
-      .delete()
-      .eq("id", taskId);
-
-    if (error) {
+    try {
+      await driftTaskService.remove(taskId);
+      toast.success("Uppgift borttagen");
+    } catch {
       toast.error("Kunde inte ta bort uppgift");
-      // Revert on error
       fetchTasks();
-      return;
     }
-
-    toast.success("Uppgift borttagen");
   };
 
   const handleToggleTaskSelection = (taskId: string) => {
@@ -349,29 +343,23 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
   const handleBulkDelete = async () => {
     if (!confirm(`Är du säker på att du vill ta bort ${selectedTaskIds.size} uppgifter?`)) return;
 
-    const { error } = await supabase
-      .from("drift_tasks")
-      .delete()
-      .in("id", Array.from(selectedTaskIds));
-
-    if (error) {
+    try {
+      await deleteDriftTasksByIds(Array.from(selectedTaskIds));
+      toast.success(`${selectedTaskIds.size} uppgifter borttagna`);
+      setSelectedTaskIds(new Set());
+      setBulkActionMode(false);
+      fetchTasks();
+    } catch {
       toast.error("Kunde inte ta bort uppgifter");
-      return;
     }
-
-    toast.success(`${selectedTaskIds.size} uppgifter borttagna`);
-    setSelectedTaskIds(new Set());
-    setBulkActionMode(false);
-    fetchTasks();
   };
 
   const handleBulkMarkReported = async () => {
-    const updates = Array.from(selectedTaskIds).map(taskId => {
-      const task = tasks.find(t => t.id === taskId);
-      return supabase
-        .from("drift_tasks")
-        .update({ reported_count: task?.planned_count || 0 })
-        .eq("id", taskId);
+    const updates = Array.from(selectedTaskIds).map((taskId) => {
+      const task = tasks.find((t) => t.id === taskId);
+      return driftTaskService.update(taskId, {
+        reported_count: task?.planned_count || 0,
+      } as never);
     });
 
     await Promise.all(updates);
@@ -392,16 +380,18 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     setTasks(updatedTasks);
     calculateStats(updatedTasks);
 
-    const { error } = await supabase
-      .from("drift_tasks")
-      .update({ reported_count: task.planned_count })
-      .eq("id", taskId);
-
-    if (error) {
+    try {
+      await driftTaskService.update(taskId, {
+        reported_count: task.planned_count,
+      } as never);
+      toast.success("Uppgift markerad som klar");
+    } catch {
       toast.error("Kunde inte uppdatera");
       fetchTasks();
-      return;
     }
+  };
+
+
 
     toast.success("Uppgift markerad som klar");
   };
