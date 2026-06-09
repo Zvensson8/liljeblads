@@ -54,6 +54,7 @@ export function ProjectChecklistManagement({
 }: ProjectChecklistManagementProps) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const logActivity = useLogProjectActivity();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
