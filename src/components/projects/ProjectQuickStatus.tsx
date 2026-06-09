@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,6 +9,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Check, ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useUpdateProject } from "@/hooks/useProjects";
+import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 
 type ProjectStatus = Database["public"]["Enums"]["project_status"];
 
