@@ -222,19 +222,7 @@ const PropertyDetail = () => {
   const handleExportProperty = async (format: 'excel' | 'pdf') => {
     if (!property) return;
 
-    // Fetch all components for this property
-    const { data: componentsData } = await supabase
-      .from('components')
-      .select(`
-        *,
-        floors!inner(
-          property_id,
-          name
-        )
-      `)
-      .eq('floors.property_id', property.id);
-
-    if (!componentsData || componentsData.length === 0) {
+    if (components.length === 0) {
       toast({
         title: 'Ingen data',
         description: 'Det finns inga komponenter att exportera för denna fastighet.',
@@ -243,22 +231,21 @@ const PropertyDetail = () => {
       return;
     }
 
-    // Fetch maintenance records for all components
+    // Build maintenance map from already-loaded data
     const maintenanceRecords: Record<string, any[]> = {};
-    
-    for (const component of componentsData) {
-      const { data } = await supabase
-        .from('maintenance_history')
-        .select('*')
-        .eq('component_id', component.id)
-        .order('performed_date', { ascending: false });
-      
-      maintenanceRecords[component.id] = data || [];
-    }
+    components.forEach((c) => (maintenanceRecords[c.id] = []));
+    (allMaintenance as any[]).forEach((row) => {
+      if (!row.component_id || !maintenanceRecords[row.component_id]) return;
+      maintenanceRecords[row.component_id].push(row);
+    });
+    Object.values(maintenanceRecords).forEach((arr) =>
+      arr.sort((a, b) => (b.performed_date || '').localeCompare(a.performed_date || '')),
+    );
 
-    const formattedComponents = componentsData.map((comp: any) => ({
+    const floorMap = new Map(floors.map((f) => [f.id, f.name]));
+    const formattedComponents = components.map((comp: any) => ({
       ...comp,
-      floor_name: comp.floors?.name,
+      floor_name: comp.floors?.name ?? (comp.floor_id ? floorMap.get(comp.floor_id) : undefined),
       property_name: property.name,
       property_address: property.address,
     }));
