@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { EnergyDeclarationCard } from './EnergyDeclarationCard';
+import { usePropertyContacts } from '@/hooks/usePropertyContacts';
+import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 
 interface PropertyOverviewProps {
   property: any;
