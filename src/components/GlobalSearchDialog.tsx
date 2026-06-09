@@ -55,7 +55,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
       let title = "";
       let subtitle = "";
       let path = "";
-      let type: SearchResult["type"] = "component";
+      let type: GlobalSearchResult["type"] = "component";
 
       switch (r.source_table) {
         case "properties":
@@ -188,7 +188,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
     maintenance: results.filter((r) => r.type === "maintenance"),
   };
 
-  const isLoading = useAI ? aiSearching : loading;
+  const isLoading = useAI ? aiSearching : standardLoading;
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-export interface SearchResult {
+export interface StandardSearchResult {
   id: string;
   type: 'property' | 'component' | 'work_order' | 'project';
   title: string;
@@ -24,11 +24,11 @@ export function useGlobalSearch({ query, enabled = true }: GlobalSearchOptions) 
 
   return useQuery({
     queryKey: ['global-search', query],
-    queryFn: async (): Promise<SearchResult[]> => {
+    queryFn: async (): Promise<StandardSearchResult[]> => {
       if (!query || query.length < 2) return [];
 
       const pattern = `%${query}%`;
-      const allResults: SearchResult[] = [];
+      const allResults: StandardSearchResult[] = [];
 
       // — Properties: name, address, property_number —
       const propertiesPromises = [
