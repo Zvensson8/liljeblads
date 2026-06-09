@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { useProject, useUpdateProject } from "@/hooks/useProjects";
+import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 import { Database } from "@/integrations/supabase/types";
 import {
   SidebarProvider,
