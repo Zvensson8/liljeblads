@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
 import { Database } from "@/integrations/supabase/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +10,11 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { useDriftTasks } from "@/hooks/useDriftTasks";
 import { useComponents } from "@/hooks/useComponents";
+import {
+  useCreateDriftTaskComponent,
+  useDeleteDriftTaskComponentByTaskAndComponent,
+  useDriftTaskComponentsByTasks,
+} from "@/hooks/useDriftTaskComponents";
 
 interface DriftTask {
   id: string;
