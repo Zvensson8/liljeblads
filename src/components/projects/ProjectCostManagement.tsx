@@ -175,7 +175,7 @@ export function ProjectCostManagement({
 
       // Log activity
       if (costToDelete) {
-        await supabase.from("project_activity_log").insert({
+        await logActivity.mutateAsync({
           project_id: projectId,
           activity_type: "cost_deleted",
           description: `Kostnad borttagen: "${costToDelete.description}" (${costToDelete.amount.toLocaleString("sv-SE")} kr)`,
