@@ -1,23 +1,15 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrganization } from '@/hooks/useOrganization';
+import { queryKeys } from '@/lib/queryKeys';
+import type { Property, CreatePropertyInput } from '@/types/domain/property';
 
-export interface Property {
-  id: string;
-  name: string;
-  address: string | null;
-  description: string | null;
-  area_sqm: number | null;
-  construction_year: number | null;
-  property_type: string | null;
-  loa: string | null;
-  property_number: string | null;
-  invoice_address: string | null;
-  floors?: { id: string; name: string; level: number }[];
-  energy_grade?: string | null;
-}
+// Re-export the canonical domain types so existing imports
+// (`import { Property } from '@/hooks/useProperties'`) keep working.
+export type { Property, CreatePropertyInput } from '@/types/domain/property';
 
 async function fetchPropertiesWithEnergyGrades(): Promise<Property[]> {
   const { data, error } = await supabase
@@ -33,10 +25,9 @@ async function fetchPropertiesWithEnergyGrades(): Promise<Property[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-
   if (!data) return [];
 
-  // Fetch energy grades for all properties in parallel
+  // Enrich with the latest energy grade per property (parallel fetches).
   const propertiesWithEnergyGrades = await Promise.all(
     data.map(async (property) => {
       const { data: historyData } = await supabase
@@ -49,29 +40,49 @@ async function fetchPropertiesWithEnergyGrades(): Promise<Property[]> {
 
       return {
         ...property,
-        energy_grade: historyData?.energy_grade || null
-      };
+        energy_grade: historyData?.energy_grade ?? null,
+      } as Property;
     })
   );
 
   return propertiesWithEnergyGrades;
 }
 
+/**
+ * Hook: fetch all properties for the current user with enriched floors +
+ * latest energy grade. Subscribes to realtime changes on the `properties`
+ * table and invalidates the cache on any mutation so the UI stays fresh.
+ */
 export function useProperties() {
-  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  return useQuery({
-    queryKey: ['properties'],
+  const query = useQuery({
+    queryKey: queryKeys.properties.list(),
     queryFn: fetchPropertiesWithEnergyGrades,
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 30, // 30 minutes
   });
-}
 
-interface CreatePropertyInput {
-  name: string;
-  address?: string;
-  description?: string;
+  // Realtime invalidation. If the table isn't in the supabase_realtime
+  // publication this is a no-op (no errors thrown), so it remains safe.
+  useEffect(() => {
+    const channel = supabase
+      .channel('properties-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'properties' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.properties.all });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  return query;
 }
 
 export function useCreateProperty() {
@@ -93,7 +104,7 @@ export function useCreateProperty() {
           address: address?.trim() || null,
           description: description?.trim() || null,
           owner_id: user?.id,
-          organization_id: organization.id
+          organization_id: organization.id,
         }])
         .select()
         .single();
@@ -102,7 +113,7 @@ export function useCreateProperty() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['properties'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.properties.all });
       toast({
         title: 'Fastighet skapad!',
         description: `${data.name} har lagts till.`,
@@ -132,7 +143,7 @@ export function useDeleteProperty() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['properties'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.properties.all });
       toast({
         title: 'Fastighet borttagen',
         description: 'Fastigheten har tagits bort.',
