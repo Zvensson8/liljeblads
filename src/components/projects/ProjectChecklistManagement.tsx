@@ -157,7 +157,7 @@ export function ProjectChecklistManagement({
         )
       );
 
-      await supabase.from("project_activity_log").insert({
+      await logActivity.mutateAsync({
         project_id: projectId,
         activity_type: "checklist_update",
         description: `Checklistpunkt "${item.title}" markerad som ${!item.completed ? "klar" : "ej klar"}`,
