@@ -130,17 +130,9 @@ export function ProjectCostManagement({
     if (!confirm("Är du säker på att du vill ta bort denna kostnad?")) return;
 
     try {
-      // Get cost details before deleting for logging
-      const costToDelete = costs.find(c => c.id === id);
+      const costToDelete = costs.find((c) => c.id === id);
+      await deleteCost.mutateAsync(id);
 
-      const { error } = await supabase
-        .from("project_cost_items")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      // Log activity
       if (costToDelete) {
         await logActivity.mutateAsync({
           project_id: projectId,
@@ -150,7 +142,6 @@ export function ProjectCostManagement({
       }
 
       toast.success("Kostnad borttagen");
-      fetchCosts();
       onCostUpdate();
     } catch (error: any) {
       toast.error("Kunde inte ta bort kostnad");
