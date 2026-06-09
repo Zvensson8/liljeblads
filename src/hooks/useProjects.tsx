@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useRealtimeInvalidation } from '@/hooks/internal/useRealtimeInvalidation';
 import { queryKeys } from '@/lib/queryKeys';
+import { projectService } from '@/services/supabase';
 import type {
   CreateProjectInput,
   ProjectListFilters,
@@ -21,62 +21,22 @@ export type {
   UpdateProjectInput,
 } from '@/types/domain/project';
 
-async function fetchProjects(
-  filters: ProjectListFilters
-): Promise<ProjectWithRelations[]> {
-  let query = supabase
-    .from('projects')
-    .select(`
-      *,
-      properties (id, name)
-    `)
-    .order('created_at', { ascending: false });
-
-  if (!filters.showArchived) query = query.eq('is_archived', false);
-  if (filters.propertyId) query = query.eq('property_id', filters.propertyId);
-  if (filters.status) query = query.eq('status', filters.status);
-  if (filters.type) query = query.eq('type', filters.type);
-  if (filters.year) query = query.eq('year', filters.year);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as unknown as ProjectWithRelations[];
-}
-
 /**
  * Hook: fetch projects with optional filters. Subscribes to realtime
  * changes on the `projects` table.
  */
 export function useProjects(filters: ProjectListFilters = {}) {
-  const queryClient = useQueryClient();
   const { session } = useAuth();
 
-  const query = useQuery({
+  useRealtimeInvalidation('projects', queryKeys.projects.all);
+
+  return useQuery({
     queryKey: queryKeys.projects.list({ ...filters }),
-    queryFn: () => fetchProjects(filters),
+    queryFn: () => projectService.list(filters),
     enabled: !!session,
     staleTime: 1000 * 60 * 2,
     gcTime: 1000 * 60 * 30,
   });
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('projects-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'projects' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-  return query;
 }
 
 export function useCreateProject() {
@@ -84,15 +44,7 @@ export function useCreateProject() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (input: CreateProjectInput) => {
-      const { data, error } = await supabase
-        .from('projects')
-        .insert(input)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (input: CreateProjectInput) => projectService.create(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
       toast({ title: 'Projekt skapat' });
@@ -112,31 +64,36 @@ export function useUpdateProject() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      patch,
-    }: {
-      id: string;
-      patch: UpdateProjectInput;
-    }) => {
-      const { data, error } = await supabase
-        .from('projects')
-        .update(patch)
-        .eq('id', id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateProjectInput }) =>
+      projectService.update(id, patch),
+    onMutate: async ({ id, patch }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.projects.all });
+      const snapshots = queryClient.getQueriesData<ProjectWithRelations[]>({
+        queryKey: queryKeys.projects.all,
+      });
+      snapshots.forEach(([key, list]) => {
+        if (!list) return;
+        queryClient.setQueryData<ProjectWithRelations[]>(
+          key,
+          list.map((p) =>
+            p.id === id ? ({ ...p, ...patch } as ProjectWithRelations) : p,
+          ),
+        );
+      });
+      return { snapshots };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
-    },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, ctx) => {
+      ctx?.snapshots.forEach(([key, list]) => {
+        queryClient.setQueryData(key, list);
+      });
       toast({
         title: 'Kunde inte uppdatera projekt',
         description: error.message,
         variant: 'destructive',
       });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
     },
   });
 }
@@ -146,10 +103,7 @@ export function useDeleteProject() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('projects').delete().eq('id', id);
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => projectService.remove(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
       toast({ title: 'Projekt borttaget' });

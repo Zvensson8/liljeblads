@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useRealtimeInvalidation } from '@/hooks/internal/useRealtimeInvalidation';
 import { queryKeys } from '@/lib/queryKeys';
+import { componentService } from '@/services/supabase';
 import type {
   ComponentListFilters,
   ComponentWithRelations,
@@ -20,62 +20,22 @@ export type {
   UpdateComponentInput,
 } from '@/types/domain/component';
 
-async function fetchComponents(
-  filters: ComponentListFilters
-): Promise<ComponentWithRelations[]> {
-  let query = supabase
-    .from('components')
-    .select(`
-      *,
-      floors (id, name),
-      properties (id, name)
-    `)
-    .order('created_at', { ascending: false });
-
-  if (filters.propertyId) query = query.eq('property_id', filters.propertyId);
-  if (filters.floorId) query = query.eq('floor_id', filters.floorId);
-  if (filters.type) query = query.eq('type', filters.type);
-  if (filters.status) query = query.eq('status', filters.status);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as unknown as ComponentWithRelations[];
-}
-
 /**
  * Hook: fetch components with optional filters. Subscribes to realtime
  * changes on the `components` table.
  */
 export function useComponents(filters: ComponentListFilters = {}) {
-  const queryClient = useQueryClient();
   const { session } = useAuth();
 
-  const query = useQuery({
+  useRealtimeInvalidation('components', queryKeys.components.all);
+
+  return useQuery({
     queryKey: queryKeys.components.list({ ...filters }),
-    queryFn: () => fetchComponents(filters),
+    queryFn: () => componentService.list(filters),
     enabled: !!session,
     staleTime: 1000 * 60 * 2,
     gcTime: 1000 * 60 * 30,
   });
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('components-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'components' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: queryKeys.components.all });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-  return query;
 }
 
 export function useCreateComponent() {
@@ -83,15 +43,7 @@ export function useCreateComponent() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (input: CreateComponentInput) => {
-      const { data, error } = await supabase
-        .from('components')
-        .insert(input)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (input: CreateComponentInput) => componentService.create(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.components.all });
       toast({ title: 'Komponent skapad' });
@@ -111,31 +63,36 @@ export function useUpdateComponent() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      patch,
-    }: {
-      id: string;
-      patch: UpdateComponentInput;
-    }) => {
-      const { data, error } = await supabase
-        .from('components')
-        .update(patch)
-        .eq('id', id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateComponentInput }) =>
+      componentService.update(id, patch),
+    onMutate: async ({ id, patch }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.components.all });
+      const snapshots = queryClient.getQueriesData<ComponentWithRelations[]>({
+        queryKey: queryKeys.components.all,
+      });
+      snapshots.forEach(([key, list]) => {
+        if (!list) return;
+        queryClient.setQueryData<ComponentWithRelations[]>(
+          key,
+          list.map((c) =>
+            c.id === id ? ({ ...c, ...patch } as ComponentWithRelations) : c,
+          ),
+        );
+      });
+      return { snapshots };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.components.all });
-    },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, ctx) => {
+      ctx?.snapshots.forEach(([key, list]) => {
+        queryClient.setQueryData(key, list);
+      });
       toast({
         title: 'Kunde inte uppdatera komponent',
         description: error.message,
         variant: 'destructive',
       });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.components.all });
     },
   });
 }
@@ -145,10 +102,7 @@ export function useDeleteComponent() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('components').delete().eq('id', id);
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => componentService.remove(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.components.all });
       toast({ title: 'Komponent borttagen' });
