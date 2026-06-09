@@ -201,7 +201,7 @@ export function ProjectChecklistManagement({
 
       setItems(prev => [...prev, data]);
 
-      await supabase.from("project_activity_log").insert({
+      await logActivity.mutateAsync({
         project_id: projectId,
         activity_type: "checklist_update",
         description: `Ny checklistpunkt tillagd: "${newTitle}"`,
