@@ -225,7 +225,7 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
         .from('maintenance_history_documents')
         .insert({
           maintenance_history_id: record.id,
-          file_url: urlData.publicUrl,
+          file_url: publicUrl,
           file_name: file.name,
           file_size: file.size,
           mime_type: file.type
