@@ -31,16 +31,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface ApiKey {
-  id: string;
-  name: string;
-  key_prefix: string;
-  permissions: string[];
-  created_at: string;
-  last_used_at: string | null;
-  expires_at: string | null;
-  is_active: boolean;
-}
+// ApiKey type imported from useApiKeys hook
+
 
 interface OrganizationApiKeysProps {
   organizationId: string;
