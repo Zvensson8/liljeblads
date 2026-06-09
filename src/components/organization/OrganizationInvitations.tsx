@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,108 +21,39 @@ import {
 import { toast } from "sonner";
 import { Mail, Trash2, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-
-interface Invitation {
-  id: string;
-  email: string;
-  role: string;
-  created_at: string;
-  expires_at: string;
-  accepted_at: string | null;
-}
+import {
+  useOrganizationInvitations,
+  useCreateOrganizationInvitation,
+  useDeleteOrganizationInvitation,
+} from "@/hooks/useOrganizationInvitations";
 
 interface OrganizationInvitationsProps {
   organizationId: string;
 }
 
 export function OrganizationInvitations({ organizationId }: OrganizationInvitationsProps) {
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("member");
-  const [sending, setSending] = useState(false);
 
-  useEffect(() => {
-    fetchInvitations();
-  }, [organizationId]);
-
-  const fetchInvitations = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("organization_invitations")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setInvitations(data || []);
-    } catch (error: any) {
-      console.error("Error fetching invitations:", error);
-      toast.error("Kunde inte hämta inbjudningar");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: invitations = [], isLoading } = useOrganizationInvitations(organizationId);
+  const createInvitation = useCreateOrganizationInvitation();
+  const deleteInvitation = useDeleteOrganizationInvitation();
 
   const handleSendInvitation = async () => {
     if (!email) {
       toast.error("Ange en e-postadress");
       return;
     }
-
     try {
-      setSending(true);
-      const { data: userData } = await supabase.auth.getUser();
-
-      const { error } = await supabase.from("organization_invitations").insert({
-        organization_id: organizationId,
-        email: email.toLowerCase(),
-        role,
-        invited_by: userData.user?.id,
-      });
-
-      if (error) {
-        if (error.code === "23505") {
-          toast.error("Denna e-postadress har redan bjudits in");
-        } else {
-          throw error;
-        }
-        return;
-      }
-
-      toast.success("Inbjudan skickad");
+      await createInvitation.mutateAsync({ organizationId, email, role });
       setEmail("");
       setRole("member");
-      fetchInvitations();
-    } catch (error: any) {
-      console.error("Error sending invitation:", error);
-      toast.error("Kunde inte skicka inbjudan");
-    } finally {
-      setSending(false);
+    } catch {
+      /* handled in hook */
     }
   };
 
-  const handleDeleteInvitation = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from("organization_invitations")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      toast.success("Inbjudan borttagen");
-      fetchInvitations();
-    } catch (error: any) {
-      console.error("Error deleting invitation:", error);
-      toast.error("Kunde inte ta bort inbjudan");
-    }
-  };
-
-  const isExpired = (expiresAt: string) => {
-    return new Date(expiresAt) < new Date();
-  };
+  const isExpired = (expiresAt: string) => new Date(expiresAt) < new Date();
 
   return (
     <div className="space-y-6">
@@ -161,7 +91,7 @@ export function OrganizationInvitations({ organizationId }: OrganizationInvitati
               </Select>
             </div>
 
-            <Button onClick={handleSendInvitation} disabled={sending}>
+            <Button onClick={handleSendInvitation} disabled={createInvitation.isPending}>
               <Mail className="h-4 w-4 mr-2" />
               Skicka inbjudan
             </Button>
@@ -175,7 +105,7 @@ export function OrganizationInvitations({ organizationId }: OrganizationInvitati
           <CardDescription>Hantera skickade inbjudningar</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="text-center py-4">Laddar inbjudningar...</div>
           ) : invitations.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
@@ -222,7 +152,7 @@ export function OrganizationInvitations({ organizationId }: OrganizationInvitati
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteInvitation(invitation.id)}
+                          onClick={() => deleteInvitation.mutate(invitation.id)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
