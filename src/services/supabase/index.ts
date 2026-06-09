@@ -33,6 +33,14 @@ export type {
   DriftCategoryFilters,
 } from './driftCategoryService';
 
+export { driftTaskComponentService, deleteDriftTasksByIds } from './driftTaskComponentService';
+export type {
+  DriftTaskComponent,
+  DriftTaskComponentInsert,
+  DriftTaskComponentUpdate,
+  DriftTaskComponentFilters,
+} from './driftTaskComponentService';
+
 export {
   recurringCostService,
   recurringCostHistoryService,
