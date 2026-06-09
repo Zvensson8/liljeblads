@@ -74,6 +74,7 @@ export const QuickServiceButton = ({
   );
 
   const createMaintenance = useCreateMaintenanceHistory();
+  const createMaintenanceDoc = useCreateMaintenanceDocument();
 
   const resetForm = () => {
     setActionType('Service');
