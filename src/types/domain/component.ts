@@ -52,8 +52,8 @@ export type ComponentType = DbComponentType;
 export type Component = z.infer<typeof componentSchema>;
 
 export type ComponentWithRelations = Component & {
-  floors?: { id: string; name: string } | null;
-  properties?: { id: string; name: string } | null;
+  floors?: { id: string; name: string; level?: number | null } | null;
+  properties?: { id: string; name: string; address?: string | null } | null;
 };
 
 export type CreateComponentInput =

@@ -19,8 +19,8 @@ export const componentService = createCrudService<
   table: 'components',
   select: `
     *,
-    floors (id, name),
-    properties (id, name)
+    floors (id, name, level),
+    properties (id, name, address)
   `,
   defaultOrder: { column: 'created_at', ascending: false },
   applyFilters: (query, filters) => {

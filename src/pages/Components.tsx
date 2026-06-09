@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { FloorSelector } from '@/components/FloorSelector';
 import { QuickServiceButton } from '@/components/QuickServiceButton';
 import { LastServiceBadge } from '@/components/LastServiceBadge';
+import { useComponents, useDeleteComponent } from '@/hooks/useComponents';
+import { useMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
+import { useWorkOrders } from '@/hooks/useWorkOrders';
 // Type display name mapping
 const getTypeDisplayName = (typeCode: string): string => {
   const typeMap: Record<string, string> = {
@@ -73,8 +76,6 @@ const Components = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
-  const [components, setComponents] = useState<Component[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectPropertyDialogOpen, setSelectPropertyDialogOpen] = useState(false);
@@ -85,8 +86,60 @@ const Components = () => {
   const [filterProperty, setFilterProperty] = useState<string>('all');
   const [filterManufacturer, setFilterManufacturer] = useState<string>('all');
   const [filterModel, setFilterModel] = useState<string>('all');
-  const [maintenanceStats, setMaintenanceStats] = useState<Record<string, { totalCost: number; count: number; lastDate: string | null }>>({});
-  const [workOrderStats, setWorkOrderStats] = useState<Record<string, { count: number; totalPrice: number }>>({});
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
+
+  const { data: rawComponents = [], isLoading: componentsLoading } = useComponents();
+  const { data: maintenanceRows = [] } = useMaintenanceHistory();
+  const { data: workOrders = [] } = useWorkOrders();
+  const deleteComponent = useDeleteComponent();
+
+  const components: Component[] = useMemo(
+    () =>
+      rawComponents.map((comp: any) => ({
+        ...comp,
+        floor_name: comp.floors?.name,
+        floor_level: comp.floors?.level,
+        property_name: comp.properties?.name,
+        property_address: comp.properties?.address,
+      })),
+    [rawComponents],
+  );
+
+  const maintenanceStats = useMemo(() => {
+    const stats: Record<string, { totalCost: number; count: number; lastDate: string | null }> = {};
+    maintenanceRows.forEach((row: any) => {
+      if (!row.component_id) return;
+      if (!stats[row.component_id]) {
+        stats[row.component_id] = { totalCost: 0, count: 0, lastDate: null };
+      }
+      stats[row.component_id].totalCost += row.cost || 0;
+      stats[row.component_id].count += 1;
+      if (!stats[row.component_id].lastDate || row.performed_date > stats[row.component_id].lastDate!) {
+        stats[row.component_id].lastDate = row.performed_date;
+      }
+    });
+    return stats;
+  }, [maintenanceRows]);
+
+  const workOrderStats = useMemo(() => {
+    const stats: Record<string, { count: number; totalPrice: number }> = {};
+    workOrders.forEach((row: any) => {
+      if (!row.component_id) return;
+      if (!stats[row.component_id]) {
+        stats[row.component_id] = { count: 0, totalPrice: 0 };
+      }
+      stats[row.component_id].count += 1;
+      stats[row.component_id].totalPrice += row.price || 0;
+    });
+    return stats;
+  }, [workOrders]);
+
+  const loading = componentsLoading;
 
   // Get unique values for filter dropdowns
   const uniqueTypes = [...new Set(components.map(c => c.type))].filter(Boolean).sort((a, b) => a.localeCompare(b, 'sv'));
@@ -112,109 +165,18 @@ const Components = () => {
     setFilterModel('all');
   };
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    } else if (user) {
-      fetchComponents();
-      fetchMaintenanceStats();
-      fetchWorkOrderStats();
-    }
-  }, [user, authLoading, navigate]);
-
-  const fetchMaintenanceStats = async () => {
-    const { data } = await supabase
-      .from('maintenance_history')
-      .select('component_id, cost, performed_date');
-    if (!data) return;
-    const stats: Record<string, { totalCost: number; count: number; lastDate: string | null }> = {};
-    data.forEach((row: any) => {
-      if (!stats[row.component_id]) {
-        stats[row.component_id] = { totalCost: 0, count: 0, lastDate: null };
-      }
-      stats[row.component_id].totalCost += row.cost || 0;
-      stats[row.component_id].count += 1;
-      if (!stats[row.component_id].lastDate || row.performed_date > stats[row.component_id].lastDate!) {
-        stats[row.component_id].lastDate = row.performed_date;
-      }
-    });
-    setMaintenanceStats(stats);
-  };
-
-  const fetchWorkOrderStats = async () => {
-    const { data } = await supabase
-      .from('work_orders')
-      .select('component_id, price')
-      .not('component_id', 'is', null);
-    if (!data) return;
-    const stats: Record<string, { count: number; totalPrice: number }> = {};
-    data.forEach((row: any) => {
-      if (!row.component_id) return;
-      if (!stats[row.component_id]) {
-        stats[row.component_id] = { count: 0, totalPrice: 0 };
-      }
-      stats[row.component_id].count += 1;
-      stats[row.component_id].totalPrice += row.price || 0;
-    });
-    setWorkOrderStats(stats);
-  };
-
-  const fetchComponents = async () => {
-    const { data, error } = await supabase
-      .from('components')
-      .select(`
-        *,
-        floors:floor_id (
-          id,
-          name,
-          level,
-          properties:property_id (
-            id,
-            name,
-            address
-          )
-        ),
-        direct_property:property_id (
-          id,
-          name,
-          address
-        )
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      const formattedData = data.map((comp: any) => ({
-        ...comp,
-        floor_name: comp.floors?.name,
-        floor_level: comp.floors?.level,
-        property_name: comp.floors?.properties?.name || comp.direct_property?.name,
-        property_address: comp.floors?.properties?.address || comp.direct_property?.address,
-      }));
-      setComponents(formattedData);
-    }
-
-    setLoading(false);
-  };
-
   const handleExport = async (format: 'excel' | 'pdf') => {
-    // Fetch maintenance records for all components
+    // Build maintenance records map from already-loaded data
     const maintenanceRecords: Record<string, any[]> = {};
-    
-    for (const component of components) {
-      const { data } = await supabase
-        .from('maintenance_history')
-        .select('*')
-        .eq('component_id', component.id)
-        .order('performed_date', { ascending: false });
-      
-      maintenanceRecords[component.id] = data || [];
-    }
+    components.forEach((c) => (maintenanceRecords[c.id] = []));
+    maintenanceRows.forEach((row: any) => {
+      if (!row.component_id) return;
+      if (!maintenanceRecords[row.component_id]) maintenanceRecords[row.component_id] = [];
+      maintenanceRecords[row.component_id].push(row);
+    });
+    Object.values(maintenanceRecords).forEach((arr) =>
+      arr.sort((a, b) => (b.performed_date || '').localeCompare(a.performed_date || '')),
+    );
 
     if (format === 'excel') {
       exportComponentsToExcel(
@@ -282,30 +244,17 @@ const Components = () => {
     setDialogOpen(true);
   };
 
-  const handleDeleteComponent = async (componentId: string, componentName: string) => {
+  const handleDeleteComponent = (componentId: string, componentName: string) => {
     if (!confirm(`Är du säker på att du vill ta bort ${componentName}?`)) {
       return;
     }
-
-    const { error } = await supabase
-      .from('components')
-      .delete()
-      .eq('id', componentId);
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Komponent borttagen',
-        description: `${componentName} har tagits bort.`,
-      });
-      fetchComponents();
-    }
+    deleteComponent.mutate(componentId);
   };
+
+  const refreshComponents = () => {
+    // react-query realtime + mutation invalidations handle refetch automatically.
+  };
+
 
   if (authLoading || loading) {
     return (
@@ -368,7 +317,7 @@ const Components = () => {
                   <Badge variant="outline" className="text-base px-4 py-2">
                     {filteredComponents.length}{hasActiveFilters ? ` av ${components.length}` : ''} komponenter
                   </Badge>
-                  <ComponentImportDialog onSuccess={fetchComponents} />
+                  <ComponentImportDialog onSuccess={refreshComponents} />
                   {components.length > 0 && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -575,7 +524,7 @@ const Components = () => {
                                       componentId={component.id}
                                       propertyId={component.property_id}
                                       currentFloorId={component.floor_id}
-                                      onSuccess={fetchComponents}
+                                      onSuccess={refreshComponents}
                                       compact
                                     />
                                   ) : (
@@ -600,7 +549,7 @@ const Components = () => {
                                     <QuickServiceButton
                                       componentId={component.id}
                                       componentName={component.name}
-                                      onSuccess={fetchComponents}
+                                      onSuccess={refreshComponents}
                                     />
                                     <Button
                                       variant="ghost"
@@ -695,7 +644,7 @@ const Components = () => {
           setSelectedComponent(null);
           setSelectedFloorId('');
           setSelectedPropertyId('');
-          fetchComponents();
+          refreshComponents();
         }}
       />
     </SidebarProvider>
