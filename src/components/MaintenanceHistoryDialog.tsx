@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
+import { useMaintenanceHistory, useCreateMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -36,18 +36,19 @@ export const MaintenanceHistoryDialog = ({
   onSuccess 
 }: MaintenanceHistoryDialogProps) => {
   const [internalOpen, setInternalOpen] = useState(false);
-  
+
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = externalOnOpenChange || setInternalOpen;
-  const [records, setRecords] = useState<MaintenanceRecord[]>([]);
-  const [loading, setLoading] = useState(false);
   const [actionType, setActionType] = useState('');
   const [performedDate, setPerformedDate] = useState('');
   const [supplier, setSupplier] = useState('');
   const [cost, setCost] = useState('');
   const [notes, setNotes] = useState('');
   const [category, setCategory] = useState('');
-  const { toast } = useToast();
+
+  const { data: recordsData = [], isLoading: loading } = useMaintenanceHistory({ componentId });
+  const records = recordsData as MaintenanceRecord[];
+  const createMaintenance = useCreateMaintenanceHistory();
 
   const categories = [
     { value: 'planned', label: 'Planerat underhåll' },
@@ -56,68 +57,31 @@ export const MaintenanceHistoryDialog = ({
     { value: 'warranty', label: 'Garanti' },
   ];
 
-  useEffect(() => {
-    if (open) {
-      fetchRecords();
-    }
-  }, [open, componentId]);
-
-  const fetchRecords = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('maintenance_history')
-      .select('*')
-      .eq('component_id', componentId)
-      .order('performed_date', { ascending: false });
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      setRecords(data || []);
-    }
-    setLoading(false);
-  };
-
   const handleAddRecord = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const { error } = await supabase
-      .from('maintenance_history')
-      .insert([{
+    try {
+      await createMaintenance.mutateAsync({
         component_id: componentId,
         action_type: actionType,
         performed_date: performedDate,
         supplier: supplier || null,
         cost: cost ? parseFloat(cost) : null,
         notes: notes || null,
-        category: category || null,
-      }]);
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Underhåll registrerat',
-        description: 'Åtgärden har lagts till i historiken.',
-      });
+        category: (category || null) as any,
+      } as any);
       setActionType('');
       setPerformedDate('');
       setSupplier('');
       setCost('');
       setNotes('');
       setCategory('');
-      fetchRecords();
       onSuccess?.();
+    } catch {
+      // toast handled by hook
     }
   };
+
 
 
   return (
@@ -230,11 +194,11 @@ export const MaintenanceHistoryDialog = ({
                   key={record.id}
                   record={record}
                   onUpdate={() => {
-                    fetchRecords();
+                    
                     onSuccess?.();
                   }}
                   onDelete={() => {
-                    fetchRecords();
+                    
                     onSuccess?.();
                   }}
                 />

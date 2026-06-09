@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Select,
   SelectContent,
@@ -9,6 +8,8 @@ import {
 } from '@/components/ui/select';
 import { Layers } from 'lucide-react';
 import { toast } from 'sonner';
+import { useFloors } from '@/hooks/useFloors';
+import { useUpdateComponent } from '@/hooks/useComponents';
 
 interface Floor {
   id: string;
@@ -31,44 +32,29 @@ export const FloorSelector = ({
   onSuccess,
   compact = false,
 }: FloorSelectorProps) => {
-  const [floors, setFloors] = useState<Floor[]>([]);
-  const [loading, setLoading] = useState(false);
   const [selectedFloor, setSelectedFloor] = useState<string>(currentFloorId || 'none');
+  const { data: floorsData = [] } = useFloors(propertyId ? { propertyId } : undefined);
+  const updateComponent = useUpdateComponent();
 
-  useEffect(() => {
-    fetchFloors();
-  }, [propertyId]);
+  const floors = useMemo(
+    () => [...(floorsData as Floor[])].sort((a, b) => (a.level ?? 0) - (b.level ?? 0)),
+    [floorsData],
+  );
+
+  const loading = updateComponent.isPending;
 
   useEffect(() => {
     setSelectedFloor(currentFloorId || 'none');
   }, [currentFloorId]);
 
-  const fetchFloors = async () => {
-    if (!propertyId) return;
-
-    const { data, error } = await supabase
-      .from('floors')
-      .select('id, name, level')
-      .eq('property_id', propertyId)
-      .order('level');
-
-    if (!error && data) {
-      setFloors(data);
-    }
-  };
-
   const handleFloorChange = async (value: string) => {
-    setLoading(true);
     const floorId = value === 'none' ? null : value;
 
     try {
-      const { error } = await supabase
-        .from('components')
-        .update({ floor_id: floorId })
-        .eq('id', componentId);
-
-      if (error) throw error;
-
+      await updateComponent.mutateAsync({
+        id: componentId,
+        patch: { floor_id: floorId } as any,
+      });
       setSelectedFloor(value);
       toast.success('Våningsplan uppdaterat');
       onSuccess?.();
@@ -76,10 +62,9 @@ export const FloorSelector = ({
       toast.error('Kunde inte uppdatera våningsplan', {
         description: error.message,
       });
-    } finally {
-      setLoading(false);
     }
   };
+
 
   if (floors.length === 0) {
     return (

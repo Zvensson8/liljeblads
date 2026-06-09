@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useProperties } from '@/hooks/useProperties';
+import { useFloors } from '@/hooks/useFloors';
 
 interface SelectPropertyFloorDialogProps {
   open: boolean;
@@ -12,67 +12,21 @@ interface SelectPropertyFloorDialogProps {
   onSelect: (propertyId: string, floorId: string) => void;
 }
 
-export const SelectPropertyFloorDialog = ({ 
-  open, 
+export const SelectPropertyFloorDialog = ({
+  open,
   onOpenChange,
-  onSelect 
+  onSelect,
 }: SelectPropertyFloorDialogProps) => {
-  const { toast } = useToast();
-  const [properties, setProperties] = useState<any[]>([]);
-  const [floors, setFloors] = useState<any[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string | undefined>(undefined);
   const [selectedFloor, setSelectedFloor] = useState<string | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (open) {
-      fetchProperties();
-    }
-  }, [open]);
+  const { data: properties = [] } = useProperties();
+  const { data: floors = [] } = useFloors(
+    selectedProperty ? { propertyId: selectedProperty } : undefined,
+  );
 
-  useEffect(() => {
-    if (selectedProperty) {
-      fetchFloors(selectedProperty);
-    } else {
-      setFloors([]);
-      setSelectedFloor(undefined);
-    }
-  }, [selectedProperty]);
+  const sortedFloors = [...floors].sort((a: any, b: any) => (a.level ?? 0) - (b.level ?? 0));
 
-  const fetchProperties = async () => {
-    const { data, error } = await supabase
-      .from('properties')
-      .select('id, name, address')
-      .order('name');
-    
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      setProperties(data || []);
-    }
-  };
-
-  const fetchFloors = async (propertyId: string) => {
-    const { data, error } = await supabase
-      .from('floors')
-      .select('id, name, level')
-      .eq('property_id', propertyId)
-      .order('level', { ascending: true });
-    
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      setFloors(data || []);
-    }
-  };
 
   const handleContinue = () => {
     if (selectedProperty) {
@@ -127,14 +81,14 @@ export const SelectPropertyFloorDialog = ({
                   <SelectValue placeholder="Välj våning eller lämna tomt" />
                 </SelectTrigger>
                 <SelectContent>
-                  {floors.length === 0 ? (
+                  {sortedFloors.length === 0 ? (
                     <div className="p-2 text-sm text-muted-foreground text-center">
                       Inga våningar tillgängliga - komponenten knyts direkt till fastigheten
                     </div>
                   ) : (
                     <>
                       <SelectItem value="no-floor">Ingen våning</SelectItem>
-                      {floors.map((floor) => (
+                      {sortedFloors.map((floor) => (
                         <SelectItem key={floor.id} value={floor.id}>
                           {floor.name}
                           {floor.level !== null && ` (Våning ${floor.level})`}
