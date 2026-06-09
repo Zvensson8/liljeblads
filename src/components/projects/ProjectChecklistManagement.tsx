@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
@@ -53,6 +54,7 @@ export function ProjectChecklistManagement({
 }: ProjectChecklistManagementProps) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const logActivity = useLogProjectActivity();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -155,7 +157,7 @@ export function ProjectChecklistManagement({
         )
       );
 
-      await supabase.from("project_activity_log").insert({
+      await logActivity.mutateAsync({
         project_id: projectId,
         activity_type: "checklist_update",
         description: `Checklistpunkt "${item.title}" markerad som ${!item.completed ? "klar" : "ej klar"}`,
@@ -199,7 +201,7 @@ export function ProjectChecklistManagement({
 
       setItems(prev => [...prev, data]);
 
-      await supabase.from("project_activity_log").insert({
+      await logActivity.mutateAsync({
         project_id: projectId,
         activity_type: "checklist_update",
         description: `Ny checklistpunkt tillagd: "${newTitle}"`,

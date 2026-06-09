@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +45,7 @@ export function ProjectCostManagement({
 }: ProjectCostManagementProps) {
   const [costs, setCosts] = useState<CostItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const logActivity = useLogProjectActivity();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCost, setEditingCost] = useState<CostItem | null>(null);
   const [formData, setFormData] = useState({
@@ -100,7 +102,7 @@ export function ProjectCostManagement({
         if (error) throw error;
 
         // Log activity
-        await supabase.from("project_activity_log").insert({
+        await logActivity.mutateAsync({
           project_id: projectId,
           activity_type: "cost_updated",
           description: `Kostnad uppdaterad: "${formData.description}" (${parseFloat(formData.amount).toLocaleString("sv-SE")} kr)`,
@@ -120,7 +122,7 @@ export function ProjectCostManagement({
         if (error) throw error;
 
         // Log activity
-        await supabase.from("project_activity_log").insert({
+        await logActivity.mutateAsync({
           project_id: projectId,
           activity_type: "cost_added",
           description: `Kostnad tillagd: "${formData.description}" (${parseFloat(formData.amount).toLocaleString("sv-SE")} kr)`,
@@ -173,7 +175,7 @@ export function ProjectCostManagement({
 
       // Log activity
       if (costToDelete) {
-        await supabase.from("project_activity_log").insert({
+        await logActivity.mutateAsync({
           project_id: projectId,
           activity_type: "cost_deleted",
           description: `Kostnad borttagen: "${costToDelete.description}" (${costToDelete.amount.toLocaleString("sv-SE")} kr)`,

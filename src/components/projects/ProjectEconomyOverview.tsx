@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Edit, Save, X } from "lucide-react";
+import { useUpdateProject } from "@/hooks/useProjects";
+import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 
 interface ProjectEconomyOverviewProps {
   projectId: string;
@@ -26,21 +27,17 @@ export function ProjectEconomyOverview({
   const [editBudget, setEditBudget] = useState(budget);
   const [editForecast, setEditForecast] = useState(forecast);
   const [saving, setSaving] = useState(false);
+  const updateProject = useUpdateProject();
+  const logActivity = useLogProjectActivity();
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from("projects")
-        .update({
-          budget: editBudget,
-          forecast: editForecast,
-        })
-        .eq("id", projectId);
+      await updateProject.mutateAsync({
+        id: projectId,
+        patch: { budget: editBudget, forecast: editForecast } as any,
+      });
 
-      if (error) throw error;
-
-      // Log activity
       const changes = [];
       if (editBudget !== budget) {
         changes.push(`Budget ändrad från ${budget.toLocaleString("sv-SE")} kr till ${editBudget.toLocaleString("sv-SE")} kr`);
@@ -50,7 +47,7 @@ export function ProjectEconomyOverview({
       }
 
       if (changes.length > 0) {
-        await supabase.from("project_activity_log").insert({
+        await logActivity.mutateAsync({
           project_id: projectId,
           activity_type: "status_change",
           description: changes.join(", "),
