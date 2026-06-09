@@ -40,6 +40,11 @@ import { sv } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useProjectTemplates } from "@/hooks/useProjectTemplates";
 import { useOrganization } from "@/hooks/useOrganization";
+import { useProperties } from "@/hooks/useProperties";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfiles";
+import { useCreateProject, useUpdateProject } from "@/hooks/useProjects";
+import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 
 const projectSchema = z.object({
   property_id: z.string().min(1, "Fastighet krävs"),
@@ -69,16 +74,26 @@ export function ProjectFormDialog({
   onSuccess,
   editingProject,
 }: ProjectFormDialogProps) {
-  const [properties, setProperties] = useState<{ id: string; name: string; property_number: string }[]>([]);
+  
   const [loading, setLoading] = useState(false);
-  const [userName, setUserName] = useState<string>("");
   const [showOrderDraftOption, setShowOrderDraftOption] = useState(false);
   const [sendingDraft, setSendingDraft] = useState(false);
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
-  
+
   const { organization } = useOrganization();
   const { templates } = useProjectTemplates(organization?.id);
+  const { user } = useAuth();
+  const { data: profile } = useProfile(user?.id);
+  const userName = profile?.full_name ?? "";
+  const { data: propertiesData = [] } = useProperties();
+  const properties = (propertiesData as any[])
+    .map((p) => ({ id: p.id, name: p.name, property_number: p.property_number }))
+    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "sv"));
+
+  const createProject = useCreateProject();
+  const updateProject = useUpdateProject();
+  const logActivity = useLogProjectActivity();
 
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -98,8 +113,6 @@ export function ProjectFormDialog({
 
   useEffect(() => {
     if (open) {
-      fetchProperties();
-      fetchUserName();
       if (editingProject) {
         form.reset({
           property_id: editingProject.property_id,
@@ -114,37 +127,13 @@ export function ProjectFormDialog({
           budget: editingProject.budget,
         });
       } else {
-        // Set project manager to current user's name for new projects
         form.setValue("project_manager", userName);
       }
     }
   }, [open, editingProject, userName]);
 
-  const fetchProperties = async () => {
-    const { data } = await supabase
-      .from("properties")
-      .select("id, name, property_number")
-      .order("name");
-    setProperties(data || []);
-  };
-
-  const fetchUserName = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", user.id)
-        .single();
-      
-      if (profile?.full_name) {
-        setUserName(profile.full_name);
-      }
-    }
-  };
-
   const setPropertyNumber = (propertyId: string) => {
-    const property = properties.find(p => p.id === propertyId);
+    const property = properties.find((p) => p.id === propertyId);
     if (property?.property_number) {
       form.setValue("project_number", property.property_number);
     }
@@ -159,12 +148,7 @@ export function ProjectFormDialog({
       };
 
       if (editingProject) {
-        const { error } = await supabase
-          .from("projects")
-          .update(projectData)
-          .eq("id", editingProject.id);
-
-        if (error) throw error;
+        await updateProject.mutateAsync({ id: editingProject.id, patch: projectData });
 
         // Log the update with detailed changes
         const changes: string[] = [];
@@ -172,8 +156,6 @@ export function ProjectFormDialog({
           changes.push(`Namn ändrat från "${editingProject.name}" till "${values.name}"`);
         }
         if (values.description !== editingProject.description) {
-          const oldDesc = editingProject.description || '(ingen beskrivning)';
-          const newDesc = values.description || '(tom beskrivning)';
           if (!editingProject.description && values.description) {
             changes.push(`Beskrivning tillagd: "${values.description.substring(0, 50)}${values.description.length > 50 ? '...' : ''}"`);
           } else if (editingProject.description && !values.description) {
@@ -222,7 +204,7 @@ export function ProjectFormDialog({
         }
 
         if (changes.length > 0) {
-          await supabase.from("project_activity_log").insert({
+          await logActivity.mutateAsync({
             project_id: editingProject.id,
             activity_type: "status_change",
             description: `Projekt uppdaterat: ${changes.join(", ")}`,
@@ -231,17 +213,11 @@ export function ProjectFormDialog({
 
         toast.success("Projekt uppdaterat");
       } else {
-        const { data: project, error } = await supabase
-          .from("projects")
-          .insert([projectData])
-          .select()
-          .single();
-
-        if (error) throw error;
+        const project = await createProject.mutateAsync(projectData);
 
         // Om mall användes, kopiera checklist items
         if (selectedTemplateId) {
-          const template = templates.find(t => t.id === selectedTemplateId);
+          const template = templates.find((t) => t.id === selectedTemplateId);
           if (template?.checklist_items && template.checklist_items.length > 0) {
             const checklistItems = template.checklist_items.map((item: any, index: number) => ({
               project_id: project.id,
@@ -264,18 +240,17 @@ export function ProjectFormDialog({
           }
         }
 
-        await supabase.from("project_activity_log").insert({
+        await logActivity.mutateAsync({
           project_id: project.id,
           activity_type: "status_change",
           description: "Projekt skapat",
         });
 
         toast.success("Projekt skapat");
-        
-        // Visa option att skicka beställningsutkast
+
         setCreatedProjectId(project.id);
         setShowOrderDraftOption(true);
-        return; // Stanna här och visa optionen
+        return;
       }
 
       // Vid uppdatering, stäng direkt
@@ -294,19 +269,17 @@ export function ProjectFormDialog({
     
     setSendingDraft(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
       if (!user?.email) {
         throw new Error("Kunde inte hämta användarens e-post");
       }
-      
+
       const { error } = await supabase.functions.invoke('send-project-order-draft', {
-        body: { 
+        body: {
           projectId: createdProjectId,
           userEmail: user.email
         }
       });
-      
+
       if (error) throw error;
       
       toast.success("Beställningsutkast skickat till din e-post");

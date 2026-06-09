@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +60,7 @@ const FOLDERS = [
 
 export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumentsProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
+  const logActivity = useLogProjectActivity();
   const [loading, setLoading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState("Allmänt");
@@ -161,7 +163,7 @@ const uploadFile = async (file: File) => {
       if (dbError) throw dbError;
 
       // Log activity
-      await supabase.from("project_activity_log").insert({
+      await logActivity.mutateAsync({
         project_id: projectId,
         activity_type: "document_upload",
         description: `Dokument uppladdad: "${file.name}" i mappen "${selectedFolder}"${nextVersion > 1 ? ` (version ${nextVersion})` : ""}`,
