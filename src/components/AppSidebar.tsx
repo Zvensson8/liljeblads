@@ -1,11 +1,10 @@
 import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown, UserCog, User, FileText, Shield, Bot } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
-import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { useModuleAccess, ModuleName } from "@/hooks/useModuleAccess";
-import { supabase } from "@/integrations/supabase/client";
+import { useIsFounder } from "@/hooks/useUserRoles";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Sidebar,
@@ -42,12 +41,12 @@ const navigationItems: Array<{ title: string; url: string; icon: any; moduleName
 export function AppSidebar() {
   const isMobile = useIsMobile();
   const { state } = useSidebar();
-  const { signOut, user } = useAuth();
-  const { organization, loading: orgLoading } = useOrganization();
-  const { hasModuleAccess, isLoading: moduleAccessLoading, moduleAccess } = useModuleAccess();
+  const { signOut } = useAuth();
+  const { organization } = useOrganization();
+  const { hasModuleAccess, moduleAccess } = useModuleAccess();
+  const { isFounder } = useIsFounder();
   const navigate = useNavigate();
   const isCollapsed = state === "collapsed";
-  const [isFounder, setIsFounder] = useState(false);
 
   // Filter navigation items based on module access and founder status
   const visibleNavigationItems = navigationItems.filter(item => {
@@ -58,30 +57,6 @@ export function AppSidebar() {
     // Check module access
     return hasModuleAccess(item.moduleName);
   });
-
-  useEffect(() => {
-    if (user) {
-      checkFounderRole();
-    }
-  }, [user]);
-
-  const checkFounderRole = async () => {
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "founder" as any);
-    
-    if (error) {
-      console.error("Error checking founder role:", error);
-      setIsFounder(false);
-      return;
-    }
-    
-    setIsFounder(data && data.length > 0);
-  };
 
   // Hide sidebar on mobile - use bottom navigation instead
   if (isMobile) {
