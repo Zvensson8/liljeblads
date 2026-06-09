@@ -81,14 +81,14 @@ export const SelectPropertyFloorDialog = ({
                   <SelectValue placeholder="Välj våning eller lämna tomt" />
                 </SelectTrigger>
                 <SelectContent>
-                  {floors.length === 0 ? (
+                  {sortedFloors.length === 0 ? (
                     <div className="p-2 text-sm text-muted-foreground text-center">
                       Inga våningar tillgängliga - komponenten knyts direkt till fastigheten
                     </div>
                   ) : (
                     <>
                       <SelectItem value="no-floor">Ingen våning</SelectItem>
-                      {floors.map((floor) => (
+                      {sortedFloors.map((floor) => (
                         <SelectItem key={floor.id} value={floor.id}>
                           {floor.name}
                           {floor.level !== null && ` (Våning ${floor.level})`}
