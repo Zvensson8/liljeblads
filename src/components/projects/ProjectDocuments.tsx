@@ -60,6 +60,7 @@ const FOLDERS = [
 
 export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumentsProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
+  const logActivity = useLogProjectActivity();
   const [loading, setLoading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState("Allmänt");
