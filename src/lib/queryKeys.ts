@@ -89,6 +89,18 @@ export const queryKeys = {
       ['ai-messages', 'conversation', conversationId] as const,
   },
   profiles: makeEntityKeys('profiles'),
+  projectCostItems: {
+    ...makeEntityKeys('project-cost-items'),
+    byProject: (projectId: string) =>
+      ['project-cost-items', 'project', projectId] as const,
+  },
+  driftTaskComponents: {
+    ...makeEntityKeys('drift-task-components'),
+    byTask: (taskId: string) =>
+      ['drift-task-components', 'task', taskId] as const,
+    byTasks: (taskIds: string[]) =>
+      ['drift-task-components', 'tasks', [...taskIds].sort()] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;
