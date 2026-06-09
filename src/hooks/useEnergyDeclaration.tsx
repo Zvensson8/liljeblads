@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { energyDeclarationService } from '@/services/supabase';
+import type { EnergyFieldIds } from '@/services/supabase/energyDeclarationService';
 import { getLatestEnergyHistory, getPreviousEnergyHistory } from '@/lib/energyUtils';
 
 export interface EnergyData {
