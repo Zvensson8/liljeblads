@@ -68,6 +68,16 @@ export const queryKeys = {
     byProperty: (propertyId: string) =>
       [...queryKeys.projects.all, 'property', propertyId] as const,
   },
+  todos: {
+    all: ['todos'] as const,
+    lists: () => [...queryKeys.todos.all, 'list'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [...queryKeys.todos.lists(), filters ?? {}] as const,
+    details: () => [...queryKeys.todos.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.todos.details(), id] as const,
+    byProperty: (propertyId: string) =>
+      [...queryKeys.todos.all, 'property', propertyId] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;
