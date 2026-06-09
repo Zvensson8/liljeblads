@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { storageService } from "@/services/supabase";
+import { useAuth } from "@/hooks/useAuth";
 import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -59,6 +61,7 @@ const FOLDERS = [
 ];
 
 export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumentsProps) {
+  const { user } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   const logActivity = useLogProjectActivity();
   const [loading, setLoading] = useState(false);
@@ -77,15 +80,12 @@ export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumen
       return storagePath;
     }
     
-    const { data, error } = await supabase.storage
-      .from("project-documents")
-      .createSignedUrl(storagePath, 3600); // 1 hour expiry
-    
-    if (error) {
+    try {
+      return await storageService.createSignedUrl("project-documents", storagePath, 3600);
+    } catch (error) {
       console.error("Error creating signed URL:", error);
       return null;
     }
-    return data.signedUrl;
   };
 
   useEffect(() => {
