@@ -67,50 +67,56 @@ const PropertyDetail = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
 
-  const [property, setProperty] = useState<Property | null>(null);
-  const [floors, setFloors] = useState<Floor[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null);
   const [floorName, setFloorName] = useState('');
   const [floorLevel, setFloorLevel] = useState('');
   const [uploadingFile, setUploadingFile] = useState(false);
-  const [components, setComponents] = useState<any[]>([]);
   const [todoText, setTodoText] = useState('');
-  const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [workOrderDialogOpen, setWorkOrderDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
-  const [overdueTodos, setOverdueTodos] = useState(0);
-  const [urgentWorkOrders, setUrgentWorkOrders] = useState(0);
   const { addRecentItem } = useRecentlyVisited();
 
-  useEffect(() => {
-    if (id) {
-      fetchPropertyAndFloors();
-    }
-  }, [id]);
+  const {
+    data: propertyData,
+    isLoading: propertyLoading,
+    error: propertyError,
+  } = useProperty(id);
+  const property = propertyData as Property | null;
+
+  const { data: floorsData = [], isLoading: floorsLoading } = useFloors({ propertyId: id });
+  const floors = floorsData as Floor[];
+
+  const { data: componentsViaProperty = [] } = useComponents({ propertyId: id });
+  const components: any[] = componentsViaProperty;
+
+  const { data: workOrdersData = [] } = useWorkOrders({ propertyId: id });
+  const workOrders = useMemo(
+    () => (workOrdersData as any[]).filter((wo) => wo.status !== 'archived'),
+    [workOrdersData],
+  );
+
+  const { data: todosData = [] } = useTodos({ propertyId: id });
+  const overdueTodos = useMemo(() => {
+    const now = new Date().toISOString();
+    return (todosData as any[]).filter((t) => !t.completed && t.due_date && t.due_date < now)
+      .length;
+  }, [todosData]);
+  const urgentWorkOrders = useMemo(
+    () => workOrders.filter((wo: any) => wo.priority === 'high').length,
+    [workOrders],
+  );
+
+  const { data: allMaintenance = [] } = useMaintenanceHistory();
+
+  const createFloor = useCreateFloor();
+  const updateFloor = useUpdateFloor();
+  const deleteFloor = useDeleteFloor();
+
+  const loading = propertyLoading || floorsLoading;
 
   useEffect(() => {
-    if (property) {
-      addRecentItem({
-        id: property.id,
-        type: "property",
-        title: property.name,
-        path: `/properties/${property.id}`,
-      });
-    }
-  }, [property]);
-
-  const fetchPropertyAndFloors = async () => {
-    if (!id) return;
-
-    const { data: propertyData, error: propertyError } = await supabase
-      .from('properties')
-      .select('*')
-      .eq('id', id)
-      .single();
-
     if (propertyError) {
       toast({
         title: 'Fel',
@@ -118,104 +124,39 @@ const PropertyDetail = () => {
         variant: 'destructive',
       });
       navigate('/properties');
-      return;
     }
+  }, [propertyError, navigate, toast]);
 
-    setProperty(propertyData);
-
-    const { data: floorsData, error: floorsError } = await supabase
-      .from('floors')
-      .select('*')
-      .eq('property_id', id)
-      .order('level', { ascending: true });
-
-    if (floorsError) {
-      toast({
-        title: 'Fel',
-        description: floorsError.message,
-        variant: 'destructive',
+  useEffect(() => {
+    if (property) {
+      addRecentItem({
+        id: property.id,
+        type: 'property',
+        title: property.name,
+        path: `/properties/${property.id}`,
       });
-    } else {
-      setFloors(floorsData || []);
     }
+  }, [property]);
 
-    // Fetch components for this property (either via floor or direct property link)
-    const { data: componentsViaProperty } = await supabase
-      .from('components')
-      .select('*')
-      .eq('property_id', id);
-    
-    const { data: componentsViaFloor } = await supabase
-      .from('components')
-      .select(`
-        *,
-        floors!inner(id, name, property_id)
-      `)
-      .eq('floors.property_id', id);
-    
-    // Combine both results and remove duplicates
-    const allComponents = [
-      ...(componentsViaProperty || []),
-      ...(componentsViaFloor || [])
-    ];
-    const uniqueComponents = Array.from(
-      new Map(allComponents.map(c => [c.id, c])).values()
-    );
-    
-    setComponents(uniqueComponents);
-
-    // Fetch work orders for this property
-    const { data: workOrdersData } = await supabase
-      .from('work_orders')
-      .select('*')
-      .eq('property_id', id)
-      .neq('status', 'archived');
-    
-    setWorkOrders(workOrdersData || []);
-
-    // Count urgent work orders
-    const urgent = (workOrdersData || []).filter((wo: any) => wo.priority === 'high').length;
-    setUrgentWorkOrders(urgent);
-
-    // Count overdue todos
-    const { data: todosData } = await supabase
-      .from('property_todos')
-      .select('*')
-      .eq('property_id', id)
-      .eq('completed', false)
-      .lt('due_date', new Date().toISOString());
-    
-    setOverdueTodos((todosData || []).length);
-
-    setLoading(false);
+  const fetchPropertyAndFloors = () => {
+    // react-query handles refetching via mutation invalidation + realtime.
   };
 
   const handleCreateFloor = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!id) return;
 
-    const { error } = await supabase
-      .from('floors')
-      .insert([{
+    try {
+      await createFloor.mutateAsync({
         name: floorName,
         level: floorLevel ? parseInt(floorLevel) : null,
         property_id: id,
-      }]);
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Våning skapad!',
-        description: `${floorName} har lagts till.`,
-      });
+      } as any);
       setDialogOpen(false);
       setFloorName('');
       setFloorLevel('');
-      fetchPropertyAndFloors();
+    } catch {
+      // toast handled by hook
     }
   };
 
