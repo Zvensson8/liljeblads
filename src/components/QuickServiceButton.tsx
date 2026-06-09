@@ -195,7 +195,6 @@ export const QuickServiceButton = ({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const { quarter, year } = getQuarterFromDate(performedDate);
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
