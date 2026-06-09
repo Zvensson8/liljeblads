@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { EnergyDeclarationCard } from './EnergyDeclarationCard';
+import { usePropertyContacts } from '@/hooks/usePropertyContacts';
+import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 
 interface PropertyOverviewProps {
   property: any;
@@ -28,6 +30,8 @@ export function PropertyOverview({
 }: PropertyOverviewProps) {
   const [sendingEmail, setSendingEmail] = useState(false);
   const { user } = useAuth();
+  const { data: contacts = [] } = usePropertyContacts({ propertyId: property.id });
+  const { preferences } = useNotificationPreferences();
 
   const handleSendContactInfo = async () => {
     if (!user?.email) {
@@ -36,27 +40,14 @@ export function PropertyOverview({
     }
 
     setSendingEmail(true);
-    
+
     try {
-      // Fetch main contact
-      const { data: contacts } = await supabase
-        .from('property_contacts')
-        .select('*')
-        .eq('property_id', property.id)
-        .order('created_at', { ascending: true })
-        .limit(1);
+      const sortedContacts = [...(contacts as any[])].sort((a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      const mainContact = sortedContacts[0];
 
-      const mainContact = contacts?.[0];
-
-      // Fetch user's notification preferences to get preferred email
-      const { data: prefs } = await supabase
-        .from('user_notification_preferences')
-        .select('notification_email')
-        .eq('user_id', user.id)
-        .single();
-
-      // Use notification_email if set, otherwise use auth email
-      const recipientEmail = prefs?.notification_email || user.email;
+      const recipientEmail = preferences?.notification_email || user.email;
 
       const { error } = await supabase.functions.invoke('send-property-info', {
         body: {
