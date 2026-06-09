@@ -165,6 +165,7 @@ const PropertyDetail = () => {
     const fileExt = file.name.split('.').pop();
     const filePath = `${user?.id}/${floorId}/${Date.now()}.${fileExt}`;
 
+    // Storage operations remain raw (no hook layer for storage).
     const { error: uploadError } = await supabase.storage
       .from('floor-drawings')
       .upload(filePath, file);
@@ -183,23 +184,14 @@ const PropertyDetail = () => {
       .from('floor-drawings')
       .getPublicUrl(filePath);
 
-    const { error: updateError } = await supabase
-      .from('floors')
-      .update({ drawing_url: publicUrl })
-      .eq('id', floorId);
-
-    if (updateError) {
-      toast({
-        title: 'Fel',
-        description: updateError.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await updateFloor.mutateAsync({ id: floorId, patch: { drawing_url: publicUrl } as any });
       toast({
         title: 'Ritning uppladdad!',
         description: 'Du kan nu märka ut komponenter på ritningen.',
       });
-      fetchPropertyAndFloors();
+    } catch {
+      // toast handled by hook
     }
 
     setUploadingFile(false);
@@ -209,49 +201,21 @@ const PropertyDetail = () => {
     if (!confirm('Är du säker på att du vill ta bort denna våning? Alla komponenter på våningen kommer också att tas bort.')) {
       return;
     }
-
-    const { error } = await supabase
-      .from('floors')
-      .delete()
-      .eq('id', floorId);
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Våning borttagen',
-        description: 'Våningen har tagits bort.',
-      });
-      fetchPropertyAndFloors();
-    }
+    deleteFloor.mutate(floorId);
   };
 
   const handleDeleteDrawing = async (floor: Floor) => {
     if (!confirm('Är du säker på att du vill ta bort ritningen? Komponenter på våningen kommer att behållas.')) {
       return;
     }
-
-    const { error } = await supabase
-      .from('floors')
-      .update({ drawing_url: null })
-      .eq('id', floor.id);
-
-    if (error) {
-      toast({
-        title: 'Fel',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await updateFloor.mutateAsync({ id: floor.id, patch: { drawing_url: null } as any });
       toast({
         title: 'Ritning borttagen',
         description: 'Ritningen har tagits bort. Du kan ladda upp en ny.',
       });
-      fetchPropertyAndFloors();
+    } catch {
+      // toast handled by hook
     }
   };
 
