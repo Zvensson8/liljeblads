@@ -101,6 +101,26 @@ export const queryKeys = {
     byTasks: (taskIds: string[]) =>
       ['drift-task-components', 'tasks', [...taskIds].sort()] as const,
   },
+  organizationInvitations: {
+    ...makeEntityKeys('organization-invitations'),
+    byOrganization: (organizationId: string) =>
+      ['organization-invitations', 'organization', organizationId] as const,
+  },
+  apiKeys: {
+    ...makeEntityKeys('api-keys'),
+    byOrganization: (organizationId: string) =>
+      ['api-keys', 'organization', organizationId] as const,
+  },
+  userModuleAccess: {
+    ...makeEntityKeys('user-module-access'),
+    byUser: (userId: string) =>
+      ['user-module-access', 'user', userId] as const,
+  },
+  organizationMembers: {
+    ...makeEntityKeys('organization-members'),
+    byOrganization: (organizationId: string) =>
+      ['organization-members', 'organization', organizationId] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;
