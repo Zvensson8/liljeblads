@@ -129,7 +129,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
     return convertAIResults(aiResults);
   }, [useAI, aiResults, convertAIResults]);
 
-  const results = useAI ? aiResultsMemo : standardResults;
+  const results: GlobalSearchResult[] = useAI ? aiResultsMemo : (standardResults as GlobalSearchResult[]);
 
   const handleSelect = (path: string) => {
     navigate(path);
