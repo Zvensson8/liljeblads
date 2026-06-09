@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useGenerateOrderText, useSendWorkOrderDraft } from "@/hooks/useEdgeFunctions";
 import {
   Sheet,
   SheetTitle,
@@ -26,20 +27,18 @@ export function WorkOrderPreviewSheet({
   const [text, setText] = useState("");
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
+  const { user } = useAuth();
+  const generateOrderText = useGenerateOrderText();
+  const sendWorkOrderDraft = useSendWorkOrderDraft();
 
   const handleGenerate = useCallback(async () => {
     if (!workOrder?.id) return;
     setGenerating(true);
     setText("");
     try {
-      const { data, error } = await supabase.functions.invoke("generate-order-text", {
-        body: { workOrderId: workOrder.id },
-      });
-
-      if (error) throw error;
+      const data = await generateOrderText.mutateAsync({ workOrderId: workOrder.id }) as { text?: string; error?: string };
       if (data?.error) throw new Error(data.error);
-
-      setText(data.text || "");
+      setText(data?.text || "");
     } catch (err: any) {
       setText(`[Fel vid generering: ${err.message || "Okänt fel"}]\n\nDu kan skriva texten manuellt nedan.`);
     } finally {
