@@ -28,8 +28,7 @@ export function subscribeToTable(table: string, listener: Listener): () => void 
     const channel = supabase
       .channel(`realtime:${table}`)
       .on(
-        // @ts-expect-error - Supabase's typing for postgres_changes is loose
-        'postgres_changes',
+        'postgres_changes' as never,
         { event: '*', schema: 'public', table },
         (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
           const current = registry.get(table);

@@ -10,40 +10,32 @@
  *   TRow     - shape returned by `select` (may include joined relations).
  *   TInsert  - payload accepted by `create`.
  *   TUpdate  - payload accepted by `update`.
+ *   TFilters - shape of `applyFilters`'s second argument.
  *
- * The factory is intentionally minimal — anything domain-specific
- * (joins, sub-queries, RPCs) lives in the per-entity service module that
- * wraps the generic instance.
+ * The Supabase generated `from(table)` union type is intentionally relaxed
+ * to `string` here — strict table typing leads to excessively deep type
+ * instantiation when combined with custom select strings, and the runtime
+ * cost is identical.
  */
 import { supabase } from '@/integrations/supabase/client';
-import type { PostgrestFilterBuilder } from '@supabase/postgrest-js';
 
-type SupabaseTable = Parameters<typeof supabase.from>[0];
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-export interface CrudServiceConfig<TRow> {
-  /** Public table name (must match generated types). */
-  table: SupabaseTable;
+export interface CrudServiceConfig<TFilters = unknown> {
+  table: string;
   /** Select clause, including joined relations. Defaults to '*'. */
   select?: string;
-  /**
-   * Default order applied to `list` queries unless overridden.
-   * Tuple of column + ascending flag.
-   */
+  /** Default order applied to `list` queries unless overridden. */
   defaultOrder?: { column: string; ascending?: boolean; nullsFirst?: boolean };
   /**
    * Apply filters to a list query. Receives the running query builder and
    * the filter object passed by the caller. Must return the builder.
    */
-  applyFilters?: <F>(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    query: PostgrestFilterBuilder<any, any, TRow[], any, any>,
-    filters: F,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ) => PostgrestFilterBuilder<any, any, TRow[], any, any>;
+  applyFilters?: (query: any, filters: TFilters) => any;
 }
 
 export interface CrudService<TRow, TInsert, TUpdate, TFilters = unknown> {
-  table: SupabaseTable;
+  table: string;
   list(filters?: TFilters): Promise<TRow[]>;
   getById(id: string): Promise<TRow | null>;
   create(input: TInsert): Promise<TRow>;
@@ -56,22 +48,22 @@ export function createCrudService<
   TInsert = Partial<TRow>,
   TUpdate = Partial<TRow>,
   TFilters = unknown,
->(config: CrudServiceConfig<TRow>): CrudService<TRow, TInsert, TUpdate, TFilters> {
+>(config: CrudServiceConfig<TFilters>): CrudService<TRow, TInsert, TUpdate, TFilters> {
   const select = config.select ?? '*';
+  const from = (): any => (supabase as any).from(config.table);
 
   return {
     table: config.table,
 
     async list(filters?: TFilters) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query: any = supabase.from(config.table).select(select);
+      let query: any = from().select(select);
 
       if (config.defaultOrder) {
         const { column, ascending = false, nullsFirst } = config.defaultOrder;
         query = query.order(column, { ascending, nullsFirst });
       }
 
-      if (config.applyFilters && filters) {
+      if (config.applyFilters && filters !== undefined) {
         query = config.applyFilters(query, filters);
       }
 
@@ -81,32 +73,20 @@ export function createCrudService<
     },
 
     async getById(id: string) {
-      const { data, error } = await supabase
-        .from(config.table)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .select(select as any)
-        .eq('id', id)
-        .maybeSingle();
+      const { data, error } = await from().select(select).eq('id', id).maybeSingle();
       if (error) throw error;
       return (data ?? null) as TRow | null;
     },
 
     async create(input: TInsert) {
-      const { data, error } = await supabase
-        .from(config.table)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .insert(input as any)
-        .select()
-        .single();
+      const { data, error } = await from().insert(input).select().single();
       if (error) throw error;
       return data as TRow;
     },
 
     async update(id: string, patch: TUpdate) {
-      const { data, error } = await supabase
-        .from(config.table)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update(patch as any)
+      const { data, error } = await from()
+        .update(patch)
         .eq('id', id)
         .select()
         .single();
@@ -115,7 +95,7 @@ export function createCrudService<
     },
 
     async remove(id: string) {
-      const { error } = await supabase.from(config.table).delete().eq('id', id);
+      const { error } = await from().delete().eq('id', id);
       if (error) throw error;
     },
   };
