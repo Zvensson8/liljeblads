@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { useUpdateProperty } from "@/hooks/useProperties";
 import { FileText } from "lucide-react";
 import {
   Dialog,
@@ -50,6 +50,7 @@ export function PropertyEditDialog({
   property,
   onSuccess,
 }: PropertyEditDialogProps) {
+  const updateProperty = useUpdateProperty();
   const form = useForm<PropertyFormData>({
     resolver: zodResolver(propertySchema),
     defaultValues: {
@@ -91,18 +92,12 @@ export function PropertyEditDialog({
       invoice_address: data.invoice_address || null,
     };
 
-    const { error } = await supabase
-      .from("properties")
-      .update(payload)
-      .eq("id", property.id);
-
-    if (error) {
-      toast.error("Kunde inte uppdatera fastighet");
-      return;
+    try {
+      await updateProperty.mutateAsync({ id: property.id, patch: payload as any });
+      onSuccess();
+    } catch {
+      // toast handled in hook
     }
-    
-    toast.success("Fastighet uppdaterad");
-    onSuccess();
   };
 
   return (
