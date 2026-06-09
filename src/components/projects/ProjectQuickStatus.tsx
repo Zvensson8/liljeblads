@@ -47,6 +47,8 @@ export function ProjectQuickStatus({
 }: ProjectQuickStatusProps) {
   const [updating, setUpdating] = useState(false);
   const [open, setOpen] = useState(false);
+  const updateProject = useUpdateProject();
+  const logActivity = useLogProjectActivity();
 
   const handleStatusChange = async (newStatus: ProjectStatus) => {
     if (newStatus === currentStatus) {
@@ -56,18 +58,12 @@ export function ProjectQuickStatus({
 
     setUpdating(true);
     try {
-      const { error } = await supabase
-        .from("projects")
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", projectId);
+      await updateProject.mutateAsync({
+        id: projectId,
+        patch: { status: newStatus } as any,
+      });
 
-      if (error) throw error;
-
-      // Log activity
-      await supabase.from("project_activity_log").insert({
+      await logActivity.mutateAsync({
         project_id: projectId,
         activity_type: "status_change",
         description: `Status ändrad från "${statusConfig[currentStatus].label}" till "${statusConfig[newStatus].label}"`,
