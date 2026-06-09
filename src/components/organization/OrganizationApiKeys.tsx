@@ -68,8 +68,10 @@ async function hashApiKey(key: string): Promise<string> {
 
 export function OrganizationApiKeys({ organizationId }: OrganizationApiKeysProps) {
   const { user } = useAuth();
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: apiKeys = [], isLoading: loading } = useApiKeys(organizationId);
+  const createApiKey = useCreateApiKey();
+  const deleteApiKey = useDeleteApiKey();
+
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [keyToDelete, setKeyToDelete] = useState<ApiKey | null>(null);
@@ -82,28 +84,6 @@ export function OrganizationApiKeys({ organizationId }: OrganizationApiKeysProps
   const [creating, setCreating] = useState(false);
 
   const webhookUrl = `https://vfwxpbffadedpvhdxntm.supabase.co/functions/v1/twin-webhook`;
-
-  useEffect(() => {
-    fetchApiKeys();
-  }, [organizationId]);
-
-  const fetchApiKeys = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("api_keys")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setApiKeys((data || []) as ApiKey[]);
-    } catch (error: any) {
-      console.error("Error fetching API keys:", error);
-      toast.error("Kunde inte hämta API-nycklar");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreateKey = async () => {
     if (!newKeyName.trim()) {
@@ -123,23 +103,20 @@ export function OrganizationApiKeys({ organizationId }: OrganizationApiKeysProps
       const keyHash = await hashApiKey(rawKey);
       const keyPrefix = rawKey.substring(0, 8);
 
-      const { error } = await supabase.from("api_keys").insert({
-        organization_id: organizationId,
+      await createApiKey.mutateAsync({
+        organizationId,
         name: newKeyName.trim(),
-        key_hash: keyHash,
-        key_prefix: keyPrefix,
+        keyHash,
+        keyPrefix,
         permissions: selectedPermissions,
-        created_by: user?.id,
+        createdBy: user?.id ?? null,
       });
-
-      if (error) throw error;
 
       setCreatedKey(rawKey);
       toast.success("API-nyckel skapad!");
-      fetchApiKeys();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating API key:", error);
-      toast.error("Kunde inte skapa API-nyckel");
+      /* toast handled in hook */
     } finally {
       setCreating(false);
     }
@@ -147,25 +124,14 @@ export function OrganizationApiKeys({ organizationId }: OrganizationApiKeysProps
 
   const handleDeleteKey = async () => {
     if (!keyToDelete) return;
-
     try {
-      const { error } = await supabase
-        .from("api_keys")
-        .delete()
-        .eq("id", keyToDelete.id);
-
-      if (error) throw error;
-
-      toast.success("API-nyckel borttagen");
-      setApiKeys((prev) => prev.filter((k) => k.id !== keyToDelete.id));
-    } catch (error: any) {
-      console.error("Error deleting API key:", error);
-      toast.error("Kunde inte ta bort API-nyckel");
+      await deleteApiKey.mutateAsync(keyToDelete.id);
     } finally {
       setShowDeleteDialog(false);
       setKeyToDelete(null);
     }
   };
+
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
