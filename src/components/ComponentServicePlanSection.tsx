@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
 import { Database } from "@/integrations/supabase/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +10,11 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { useDriftTasks } from "@/hooks/useDriftTasks";
 import { useComponents } from "@/hooks/useComponents";
+import {
+  useCreateDriftTaskComponent,
+  useDeleteDriftTaskComponentByTaskAndComponent,
+  useDriftTaskComponentsByTasks,
+} from "@/hooks/useDriftTaskComponents";
 
 interface DriftTask {
   id: string;
@@ -44,21 +47,10 @@ export function ComponentServicePlanSection({
     [components, componentId],
   );
 
-  // Counts and existing links remain on the link table (no domain service yet).
-  const { data: taskComponents = [], refetch: refetchLinks } = useQuery({
-    queryKey: ["drift-task-components-for-property", propertyId, componentId],
-    queryFn: async () => {
-      const taskIds = tasksRaw.map((t: any) => t.id);
-      if (taskIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("drift_task_components")
-        .select("task_id, component_id")
-        .in("task_id", taskIds);
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: tasksRaw.length > 0,
-  });
+  const taskIds = useMemo(() => tasksRaw.map((t: any) => t.id), [tasksRaw]);
+  const { data: taskComponents = [] } = useDriftTaskComponentsByTasks(taskIds);
+  const createLink = useCreateDriftTaskComponent();
+  const deleteLink = useDeleteDriftTaskComponentByTaskAndComponent();
 
   useEffect(() => {
     setSelectedTaskIds(
@@ -96,49 +88,31 @@ export function ComponentServicePlanSection({
 
   const handleToggleTask = async (taskId: string, checked: boolean) => {
     setLoading(true);
-
-    if (checked) {
-      if (selectedTaskIds.includes(taskId)) {
-        toast.error("Komponenten finns redan i denna driftuppgift");
-        setLoading(false);
-        return;
+    try {
+      if (checked) {
+        if (selectedTaskIds.includes(taskId)) {
+          toast.error("Komponenten finns redan i denna driftuppgift");
+          return;
+        }
+        await createLink.mutateAsync({
+          task_id: taskId,
+          component_id: componentId,
+          object_name: null,
+          is_reported: false,
+          series_id: (component as any)?.serial_number || null,
+          registration_number:
+            (component as any)?.registration_number || null,
+        });
+        toast.success("Komponent tillagd i driftuppgift");
+      } else {
+        await deleteLink.mutateAsync({ taskId, componentId });
+        toast.success("Komponent borttagen från driftuppgift");
       }
-
-      const { error } = await supabase.from("drift_task_components").insert({
-        task_id: taskId,
-        component_id: componentId,
-        object_name: null,
-        is_reported: false,
-        series_id: (component as any)?.serial_number || null,
-        registration_number: (component as any)?.registration_number || null,
-      });
-
-      if (error) {
-        toast.error("Kunde inte lägga till komponent");
-        setLoading(false);
-        return;
-      }
-
-      toast.success("Komponent tillagd i driftuppgift");
-      await refetchLinks();
-    } else {
-      const { error } = await supabase
-        .from("drift_task_components")
-        .delete()
-        .eq("task_id", taskId)
-        .eq("component_id", componentId);
-
-      if (error) {
-        toast.error("Kunde inte ta bort komponent");
-        setLoading(false);
-        return;
-      }
-
-      toast.success("Komponent borttagen från driftuppgift");
-      await refetchLinks();
+    } catch {
+      // toast emitted from hook
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const groupedTasks = driftTasks.reduce((acc, task) => {

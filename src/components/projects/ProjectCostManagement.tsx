@@ -1,5 +1,11 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import {
+  useCreateProjectCostItem,
+  useDeleteProjectCostItem,
+  useProjectCostItems,
+  useUpdateProjectCostItem,
+  type ProjectCostItem,
+} from "@/hooks/useProjectCostItems";
 import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,15 +30,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 
-interface CostItem {
-  id: string;
-  description: string;
-  amount: number;
-  cost_date: string;
-  actor: string | null;
-  category: string | null;
-  created_at: string;
-}
+type CostItem = ProjectCostItem;
 
 interface ProjectCostManagementProps {
   projectId: string;
@@ -43,8 +41,10 @@ export function ProjectCostManagement({
   projectId,
   onCostUpdate,
 }: ProjectCostManagementProps) {
-  const [costs, setCosts] = useState<CostItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { data: costs = [], isLoading: loading } = useProjectCostItems(projectId);
+  const createCost = useCreateProjectCostItem();
+  const updateCost = useUpdateProjectCostItem();
+  const deleteCost = useDeleteProjectCostItem();
   const logActivity = useLogProjectActivity();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCost, setEditingCost] = useState<CostItem | null>(null);
@@ -56,28 +56,6 @@ export function ProjectCostManagement({
     category: "",
   });
 
-  useEffect(() => {
-    fetchCosts();
-  }, [projectId]);
-
-  const fetchCosts = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("project_cost_items")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("cost_date", { ascending: false });
-
-      if (error) throw error;
-      setCosts(data || []);
-    } catch (error: any) {
-      toast.error("Kunde inte hämta kostnader");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -88,29 +66,24 @@ export function ProjectCostManagement({
 
     try {
       if (editingCost) {
-        const { error } = await supabase
-          .from("project_cost_items")
-          .update({
+        await updateCost.mutateAsync({
+          id: editingCost.id,
+          patch: {
             description: formData.description,
             amount: parseFloat(formData.amount),
             cost_date: formData.cost_date,
             actor: formData.actor || null,
             category: formData.category || null,
-          })
-          .eq("id", editingCost.id);
-
-        if (error) throw error;
-
-        // Log activity
+          },
+        });
         await logActivity.mutateAsync({
           project_id: projectId,
           activity_type: "cost_updated",
           description: `Kostnad uppdaterad: "${formData.description}" (${parseFloat(formData.amount).toLocaleString("sv-SE")} kr)`,
         });
-
         toast.success("Kostnad uppdaterad");
       } else {
-        const { error } = await supabase.from("project_cost_items").insert({
+        await createCost.mutateAsync({
           project_id: projectId,
           description: formData.description,
           amount: parseFloat(formData.amount),
@@ -118,16 +91,11 @@ export function ProjectCostManagement({
           actor: formData.actor || null,
           category: formData.category || null,
         });
-
-        if (error) throw error;
-
-        // Log activity
         await logActivity.mutateAsync({
           project_id: projectId,
           activity_type: "cost_added",
           description: `Kostnad tillagd: "${formData.description}" (${parseFloat(formData.amount).toLocaleString("sv-SE")} kr)`,
         });
-
         toast.success("Kostnad registrerad");
       }
 
@@ -140,7 +108,6 @@ export function ProjectCostManagement({
         actor: "",
         category: "",
       });
-      fetchCosts();
       onCostUpdate();
     } catch (error: any) {
       toast.error("Kunde inte spara kostnad");
@@ -163,17 +130,9 @@ export function ProjectCostManagement({
     if (!confirm("Är du säker på att du vill ta bort denna kostnad?")) return;
 
     try {
-      // Get cost details before deleting for logging
-      const costToDelete = costs.find(c => c.id === id);
+      const costToDelete = costs.find((c) => c.id === id);
+      await deleteCost.mutateAsync(id);
 
-      const { error } = await supabase
-        .from("project_cost_items")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      // Log activity
       if (costToDelete) {
         await logActivity.mutateAsync({
           project_id: projectId,
@@ -183,7 +142,6 @@ export function ProjectCostManagement({
       }
 
       toast.success("Kostnad borttagen");
-      fetchCosts();
       onCostUpdate();
     } catch (error: any) {
       toast.error("Kunde inte ta bort kostnad");
