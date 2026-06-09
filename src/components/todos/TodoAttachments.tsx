@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { storageService } from "@/services/supabase";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -42,15 +43,7 @@ export function TodoAttachments({ todoId, onUpdate }: TodoAttachmentsProps) {
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `${todoId}/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('todo-attachments')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('todo-attachments')
-        .getPublicUrl(filePath);
+      await storageService.upload('todo-attachments', filePath, file);
 
       const { error: dbError } = await supabase
         .from('todo_attachments' as any)
