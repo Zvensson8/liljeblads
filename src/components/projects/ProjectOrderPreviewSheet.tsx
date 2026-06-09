@@ -66,18 +66,13 @@ export function ProjectOrderPreviewSheet({
 
     setSending(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user?.email) throw new Error("Kunde inte hämta din e-post");
 
-      const { data, error } = await supabase.functions.invoke("send-project-order-draft", {
-        body: {
-          projectId: project.id,
-          userEmail: user.email,
-          customText: text,
-        },
-      });
-
-      if (error) throw error;
+      const data = await sendProjectOrderDraft.mutateAsync({
+        projectId: project.id,
+        userEmail: user.email,
+        customText: text,
+      }) as { error?: string };
       if (data?.error) throw new Error(data.error);
 
       toast.success("Beställningsutkast skickat till din e-post");
