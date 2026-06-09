@@ -47,21 +47,10 @@ export function ComponentServicePlanSection({
     [components, componentId],
   );
 
-  // Counts and existing links remain on the link table (no domain service yet).
-  const { data: taskComponents = [], refetch: refetchLinks } = useQuery({
-    queryKey: ["drift-task-components-for-property", propertyId, componentId],
-    queryFn: async () => {
-      const taskIds = tasksRaw.map((t: any) => t.id);
-      if (taskIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("drift_task_components")
-        .select("task_id, component_id")
-        .in("task_id", taskIds);
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: tasksRaw.length > 0,
-  });
+  const taskIds = useMemo(() => tasksRaw.map((t: any) => t.id), [tasksRaw]);
+  const { data: taskComponents = [] } = useDriftTaskComponentsByTasks(taskIds);
+  const createLink = useCreateDriftTaskComponent();
+  const deleteLink = useDeleteDriftTaskComponentByTaskAndComponent();
 
   useEffect(() => {
     setSelectedTaskIds(
