@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
+import {
+  useUserModuleAccess,
+  useUpsertUserModuleAccess,
+  useOrganizationMemberProfiles,
+  useUserRolesFor,
+} from "@/hooks/useUserModuleAccess";
 
 const AVAILABLE_MODULES = [
   { name: "dashboard", label: "Dashboard" },
@@ -23,118 +24,29 @@ const AVAILABLE_MODULES = [
 ];
 
 export const OrganizationModuleAccess = () => {
-  const { user } = useAuth();
   const { organization } = useOrganization();
-  const queryClient = useQueryClient();
   const [selectedUserId, setSelectedUserId] = useState<string>("");
 
-  // Fetch organization members
-  const { data: members } = useQuery({
-    queryKey: ["organization-members", organization?.id],
-    queryFn: async () => {
-      if (!organization?.id) return [];
+  const { data: members } = useOrganizationMemberProfiles(organization?.id);
+  const { data: selectedUserRoles } = useUserRolesFor(selectedUserId);
+  const { data: moduleAccess, isLoading: isLoadingAccess } =
+    useUserModuleAccess(selectedUserId);
+  const upsertAccess = useUpsertUserModuleAccess();
 
-      const { data: orgMembers } = await supabase
-        .from("organization_members")
-        .select("user_id")
-        .eq("organization_id", organization.id);
-
-      if (!orgMembers) return [];
-
-      const userIds = orgMembers.map((m) => m.user_id);
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .in("id", userIds);
-
-      return profiles || [];
-    },
-    enabled: !!organization?.id,
-  });
-
-  // Check if selected user is admin or founder
-  const { data: selectedUserRoles } = useQuery({
-    queryKey: ["selected-user-roles", selectedUserId],
-    queryFn: async () => {
-      if (!selectedUserId) return [];
-
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", selectedUserId);
-
-      return data || [];
-    },
-    enabled: !!selectedUserId,
-  });
-
-  const isSelectedUserSystemAdmin = selectedUserRoles?.some(
-    (r) => r.role === "admin" || r.role === "founder"
-  ) || false;
-
-  // Fetch module access for selected user
-  const { data: moduleAccess, isLoading: isLoadingAccess } = useQuery({
-    queryKey: ["user-module-access", selectedUserId],
-    queryFn: async () => {
-      if (!selectedUserId) return [];
-
-      const { data } = await supabase
-        .from("user_module_access")
-        .select("*")
-        .eq("user_id", selectedUserId);
-
-      return data || [];
-    },
-    enabled: !!selectedUserId,
-  });
-
-  const updateModuleAccessMutation = useMutation({
-    mutationFn: async ({
-      userId,
-      moduleName,
-      isEnabled,
-    }: {
-      userId: string;
-      moduleName: string;
-      isEnabled: boolean;
-    }) => {
-      const { error } = await supabase.from("user_module_access").upsert(
-        {
-          user_id: userId,
-          module_name: moduleName,
-          is_enabled: isEnabled,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "user_id,module_name",
-        }
-      );
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["user-module-access"] });
-      toast.success("Modulåtkomst uppdaterad");
-    },
-    onError: (error) => {
-      console.error("Error updating module access:", error);
-      toast.error("Kunde inte uppdatera modulåtkomst");
-    },
-  });
+  const isSelectedUserSystemAdmin =
+    selectedUserRoles?.some((r) => r.role === "admin" || r.role === "founder") ||
+    false;
 
   const handleModuleToggle = (moduleName: string, isEnabled: boolean) => {
     if (!selectedUserId) return;
-    updateModuleAccessMutation.mutate({
-      userId: selectedUserId,
-      moduleName,
-      isEnabled,
-    });
+    upsertAccess.mutate({ userId: selectedUserId, moduleName, isEnabled });
   };
 
   const isModuleEnabled = (moduleName: string): boolean => {
     const access = moduleAccess?.find((a) => a.module_name === moduleName);
-    return access ? access.is_enabled : true; // Default to enabled if no rule exists
+    return access ? access.is_enabled : true;
   };
+
 
   return (
     <Card>
