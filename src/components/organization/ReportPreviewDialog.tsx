@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Check } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { usePreviewReport } from '@/hooks/useEdgeFunctions';
 import { toast } from 'sonner';
 import { ReportType } from '@/types/notifications';
 
@@ -22,6 +23,8 @@ const reportTitles: Record<ReportType, string> = {
 };
 
 export function ReportPreviewDialog({ open, onOpenChange, reportType, onMarkAsPreviewed }: ReportPreviewDialogProps) {
+  const { user } = useAuth();
+  const previewReport = usePreviewReport();
   const [loading, setLoading] = useState(false);
   const [htmlContent, setHtmlContent] = useState<string>('');
 
@@ -31,33 +34,20 @@ export function ReportPreviewDialog({ open, onOpenChange, reportType, onMarkAsPr
         setLoading(true);
         setHtmlContent('');
         try {
-          console.log('Fetching preview for report type:', reportType);
-          
-          const { data: { user } } = await supabase.auth.getUser();
-          
           if (!user) {
-            console.error('No user found');
             toast.error('Du måste vara inloggad');
             return;
           }
 
-          console.log('Calling preview-report function with userId:', user.id);
-          const { data, error } = await supabase.functions.invoke('preview-report', {
-            body: { reportType, userId: user.id }
-          });
-
-          console.log('Preview response:', { data, error });
-
-          if (error) {
-            console.error('Supabase function error:', error);
-            throw error;
-          }
+          const data = await previewReport.mutateAsync({
+            reportType,
+            userId: user.id,
+          }) as { html?: string };
 
           if (!data?.html) {
             throw new Error('Ingen HTML returnerad från förhandsvisningen');
           }
 
-          console.log('Setting HTML content, length:', data.html.length);
           setHtmlContent(data.html);
         } catch (error: any) {
           console.error('Error generating preview:', error);
