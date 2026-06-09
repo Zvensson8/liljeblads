@@ -1,12 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrganization } from '@/hooks/useOrganization';
-import { Building2, Wrench, FolderKanban, CheckSquare, Loader2, TrendingUp, TrendingDown, Minus, Map as MapIcon } from 'lucide-react';
+import { useProperties } from '@/hooks/useProperties';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
+import {
+  Building2,
+  Wrench,
+  FolderKanban,
+  CheckSquare,
+  Loader2,
+  TrendingUp,
+  Map as MapIcon,
+} from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,23 +27,7 @@ import { PropertyMapDialog } from '@/components/maps/PropertyMapDialog';
 import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
 import { EmbeddingStatsWidget } from '@/components/dashboard/EmbeddingStatsWidget';
 
-interface DashboardStats {
-  totalProperties: number;
-  totalWorkOrders: number;
-  totalProjects: number;
-  totalTodos: number;
-  pendingTodos: number;
-  pendingWorkOrders: number;
-  activeProjects: number;
-  completedTodos: number;
-}
-
-interface Property {
-  id: string;
-  name: string;
-}
-
-interface WorkOrder {
+interface RecentWorkOrder {
   id: string;
   action: string;
   status: string;
@@ -45,7 +38,7 @@ interface WorkOrder {
   properties: { name: string };
 }
 
-interface Project {
+interface RecentProject {
   id: string;
   name: string;
   status: string;
@@ -54,154 +47,87 @@ interface Project {
   properties: { name: string };
 }
 
-interface Todo {
-  id: string;
-  title: string;
-  completed: boolean;
-  due_date: string;
-  properties: { name: string };
-}
-
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { organization } = useOrganization();
-  const [selectedProperty, setSelectedProperty] = useState<string>("all");
-  const [properties, setProperties] = useState<Property[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<string>('all');
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
-  const [stats, setStats] = useState<DashboardStats>({
-    totalProperties: 0,
-    totalWorkOrders: 0,
-    totalProjects: 0,
-    totalTodos: 0,
-    pendingTodos: 0,
-    pendingWorkOrders: 0,
-    activeProjects: 0,
-    completedTodos: 0,
-  });
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [prevStats, setPrevStats] = useState<DashboardStats | null>(null);
 
+  const { data: properties = [] } = useProperties();
+
+  // Redirect unauthenticated users
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        navigate('/auth');
-      } else {
-        fetchProperties();
-      }
-    }
+    if (!authLoading && !user) navigate('/auth');
   }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    if (properties.length > 0) {
-      fetchDashboardData();
-    }
-  }, [selectedProperty, properties]);
+  const propertyIds = useMemo(
+    () => (selectedProperty === 'all' ? properties.map((p) => p.id) : [selectedProperty]),
+    [selectedProperty, properties],
+  );
 
-  const fetchProperties = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('properties')
-        .select('id, name')
-        .order('name');
+  const { data: dashboardData, isLoading: statsLoading } = useDashboardStats({ propertyIds });
 
-      if (error) throw error;
-      setProperties(data || []);
-    } catch (error) {
-      console.error('Error fetching properties:', error);
-    }
-  };
+  const stats = useMemo(
+    () => ({
+      totalProperties: selectedProperty === 'all' ? properties.length : 1,
+      totalWorkOrders: dashboardData?.total_work_orders ?? 0,
+      totalProjects: dashboardData?.total_projects ?? 0,
+      totalTodos: dashboardData?.total_todos ?? 0,
+      pendingTodos: dashboardData?.pending_todos ?? 0,
+      pendingWorkOrders: dashboardData?.pending_work_orders ?? 0,
+      activeProjects: dashboardData?.active_projects ?? 0,
+      completedTodos: dashboardData?.completed_todos ?? 0,
+    }),
+    [dashboardData, properties.length, selectedProperty],
+  );
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
+  const recentWorkOrders = (dashboardData?.recent_work_orders ?? []) as RecentWorkOrder[];
+  const recentProjects = (dashboardData?.recent_projects ?? []) as RecentProject[];
 
-      const propertyFilter = selectedProperty === "all" 
-        ? properties.map(p => p.id)
-        : [selectedProperty];
-
-      // Use new optimized RPC function - 1 query instead of 8+
-      const { data: dashboardData, error } = await supabase
-        .rpc('get_dashboard_stats', {
-          property_ids: propertyFilter
-        });
-
-      if (error) throw error;
-
-      const data = dashboardData as any;
-      
-      setWorkOrders(data.recent_work_orders || []);
-      setProjects(data.recent_projects || []);
-      setTodos(data.recent_todos || []);
-      
-      const newStats = {
-        totalProperties: selectedProperty === "all" ? properties.length : 1,
-        totalWorkOrders: data.total_work_orders || 0,
-        totalProjects: data.total_projects || 0,
-        totalTodos: data.total_todos || 0,
-        pendingTodos: data.pending_todos || 0,
-        pendingWorkOrders: data.pending_work_orders || 0,
-        activeProjects: data.active_projects || 0,
-        completedTodos: data.completed_todos || 0,
-      };
-      
-      setPrevStats(stats.totalWorkOrders > 0 ? stats : prevStats);
-      setStats(newStats);
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = authLoading || (propertyIds.length > 0 && statsLoading);
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      not_started: "outline",
-      awaiting_quote: "secondary",
-      ordered: "default",
-      completed: "secondary",
-      archived: "outline",
-      planerat: "outline",
-      invantar_offert: "secondary",
-      offert_finns: "secondary",
-      pagaende: "default",
-      pausat: "outline",
-      avslutat: "secondary",
+    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+      not_started: 'outline',
+      awaiting_quote: 'secondary',
+      ordered: 'default',
+      completed: 'secondary',
+      archived: 'outline',
+      planerat: 'outline',
+      invantar_offert: 'secondary',
+      offert_finns: 'secondary',
+      pagaende: 'default',
+      pausat: 'outline',
+      avslutat: 'secondary',
     };
     const labels: Record<string, string> = {
-      not_started: "Ej påbörjad",
-      awaiting_quote: "Inväntar offert",
-      ordered: "Beställd",
-      completed: "Klar",
-      archived: "Arkiverad",
-      planerat: "Planerad",
-      invantar_offert: "Inväntar offert",
-      offert_finns: "Offert finns",
-      pagaende: "Pågående",
-      pausat: "Pausad",
-      avslutat: "Avslutad",
+      not_started: 'Ej påbörjad',
+      awaiting_quote: 'Inväntar offert',
+      ordered: 'Beställd',
+      completed: 'Klar',
+      archived: 'Arkiverad',
+      planerat: 'Planerad',
+      invantar_offert: 'Inväntar offert',
+      offert_finns: 'Offert finns',
+      pagaende: 'Pågående',
+      pausat: 'Pausad',
+      avslutat: 'Avslutad',
     };
-    return <Badge variant={variants[status] || "outline"}>{labels[status] || status}</Badge>;
+    return <Badge variant={variants[status] || 'outline'}>{labels[status] || status}</Badge>;
   };
 
   const getPriorityBadge = (priority: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      low: "outline",
-      medium: "secondary",
-      high: "destructive",
+    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+      low: 'outline',
+      medium: 'secondary',
+      high: 'destructive',
     };
-    const labels: Record<string, string> = {
-      low: "Låg",
-      medium: "Medel",
-      high: "Hög",
-    };
-    return <Badge variant={variants[priority] || "outline"}>{labels[priority] || priority}</Badge>;
+    const labels: Record<string, string> = { low: 'Låg', medium: 'Medel', high: 'Hög' };
+    return <Badge variant={variants[priority] || 'outline'}>{labels[priority] || priority}</Badge>;
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <SidebarProvider>
         <div className="flex min-h-screen w-full">
@@ -216,30 +142,13 @@ const Dashboard = () => {
     );
   }
 
-  const getTrendIcon = (current: number, previous: number | undefined) => {
-    if (!previous || previous === 0) return null;
-    const change = ((current - previous) / previous) * 100;
-    if (Math.abs(change) < 1) return <Minus className="h-3 w-3 text-muted-foreground" />;
-    if (change > 0) return <TrendingUp className="h-3 w-3 text-green-500" />;
-    return <TrendingDown className="h-3 w-3 text-red-500" />;
-  };
-
-  const getTrendText = (current: number, previous: number | undefined) => {
-    if (!previous || previous === 0) return null;
-    const change = ((current - previous) / previous) * 100;
-    if (Math.abs(change) < 1) return null;
-    const sign = change > 0 ? "+" : "";
-    return `${sign}${change.toFixed(0)}% från förra perioden`;
-  };
-
   const kpiCards = [
     {
       id: 'kpi-properties',
       title: 'Fastigheter',
       value: stats.totalProperties,
-      prev: prevStats?.totalProperties,
       icon: Building2,
-      description: selectedProperty === "all" ? 'Alla fastigheter' : 'Vald fastighet',
+      description: selectedProperty === 'all' ? 'Alla fastigheter' : 'Vald fastighet',
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/10',
     },
@@ -247,7 +156,6 @@ const Dashboard = () => {
       id: 'kpi-workorders',
       title: 'Arbetsordrar',
       value: stats.totalWorkOrders,
-      prev: prevStats?.totalWorkOrders,
       subtitle: `${stats.pendingWorkOrders} pågående`,
       icon: Wrench,
       description: 'Totalt antal arbetsordrar',
@@ -258,7 +166,6 @@ const Dashboard = () => {
       id: 'kpi-projects',
       title: 'Projekt',
       value: stats.totalProjects,
-      prev: prevStats?.totalProjects,
       subtitle: `${stats.activeProjects} aktiva`,
       icon: FolderKanban,
       description: 'Totalt antal projekt',
@@ -269,7 +176,6 @@ const Dashboard = () => {
       id: 'kpi-todos',
       title: 'Att göra',
       value: stats.pendingTodos,
-      prev: prevStats?.pendingTodos,
       subtitle: `${stats.completedTodos} klara`,
       icon: CheckSquare,
       description: 'Öppna uppgifter',
@@ -290,21 +196,11 @@ const Dashboard = () => {
               <h1 className="text-lg md:text-xl font-semibold">Dashboard</h1>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="hidden sm:flex"
-                onClick={() => setMapDialogOpen(true)}
-              >
+              <Button variant="outline" size="sm" className="hidden sm:flex" onClick={() => setMapDialogOpen(true)}>
                 <MapIcon className="h-4 w-4 mr-2" />
                 Visa karta
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="sm:hidden"
-                onClick={() => setMapDialogOpen(true)}
-              >
+              <Button variant="outline" size="icon" className="sm:hidden" onClick={() => setMapDialogOpen(true)}>
                 <MapIcon className="h-4 w-4" />
               </Button>
               <DashboardCustomizer />
@@ -313,10 +209,11 @@ const Dashboard = () => {
 
           <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              {/* Header with Property Filter */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold">Välkommen till {organization?.name || 'NavRitning'}</h2>
+                  <h2 className="text-2xl sm:text-3xl font-bold">
+                    Välkommen till {organization?.name || 'NavRitning'}
+                  </h2>
                   <p className="text-muted-foreground">
                     Sammanställning av {organization?.name ? 'organisationens' : 'dina'} fastigheter och uppgifter
                   </p>
@@ -338,44 +235,33 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Attention Required Section */}
-              <AttentionRequiredSection 
-                propertyId={selectedProperty === "all" ? undefined : selectedProperty} 
+              <AttentionRequiredSection
+                propertyId={selectedProperty === 'all' ? undefined : selectedProperty}
               />
 
-              {/* KPI Cards - Draggable Grid */}
               <DashboardGrid kpiCards={kpiCards} />
 
-              {/* To-Do List - replaced with TodoWidget */}
-              <TodoWidget propertyId={selectedProperty === "all" ? undefined : selectedProperty} />
+              <TodoWidget propertyId={selectedProperty === 'all' ? undefined : selectedProperty} />
 
-              {/* Projects and Work Orders Grid - Full Width */}
               <div className="grid gap-6 md:grid-cols-2">
-                {/* Ongoing Projects */}
                 <Card className="border-border/50">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Pågående Projekt</CardTitle>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate('/projects')}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => navigate('/projects')}>
                         Visa alla
                       </Button>
                     </div>
                     <CardDescription>
-                      Senaste projekten för {selectedProperty === "all" ? "alla fastigheter" : "vald fastighet"}
+                      Senaste projekten för {selectedProperty === 'all' ? 'alla fastigheter' : 'vald fastighet'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {projects.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-8">
-                        Inga projekt
-                      </p>
+                    {recentProjects.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">Inga projekt</p>
                     ) : (
                       <div className="space-y-4">
-                        {projects.map((project) => (
+                        {recentProjects.map((project) => (
                           <div
                             key={project.id}
                             className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
@@ -399,31 +285,24 @@ const Dashboard = () => {
                   </CardContent>
                 </Card>
 
-                {/* Ongoing Work Orders */}
                 <Card className="border-border/50">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Pågående Arbetsordrar</CardTitle>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate('/work-orders')}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => navigate('/work-orders')}>
                         Visa alla
                       </Button>
                     </div>
                     <CardDescription>
-                      Senaste arbetsordrar för {selectedProperty === "all" ? "alla fastigheter" : "vald fastighet"}
+                      Senaste arbetsordrar för {selectedProperty === 'all' ? 'alla fastigheter' : 'vald fastighet'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {workOrders.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-8">
-                        Inga arbetsordrar
-                      </p>
+                    {recentWorkOrders.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">Inga arbetsordrar</p>
                     ) : (
                       <div className="space-y-4">
-                        {workOrders.map((wo) => (
+                        {recentWorkOrders.map((wo) => (
                           <div
                             key={wo.id}
                             className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
@@ -451,10 +330,7 @@ const Dashboard = () => {
                 </Card>
               </div>
 
-              {/* Embedding Stats Widget */}
               <EmbeddingStatsWidget />
-
-              {/* Recently Visited */}
               <RecentlyVisitedWidget />
             </div>
           </main>
