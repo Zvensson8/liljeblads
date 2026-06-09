@@ -153,21 +153,20 @@ export const QuickServiceButton = ({
             .from('maintenance-documents')
             .getPublicUrl(fileName);
 
-          const { error: docError } = await supabase
-            .from('maintenance_history_documents')
-            .insert({
+          try {
+            await createMaintenanceDoc.mutateAsync({
               maintenance_history_id: maintenanceRecord.id,
               file_url: urlData.publicUrl,
               file_name: selectedFile.name,
               file_size: selectedFile.size,
-              mime_type: selectedFile.type
-            });
-
-          if (docError) {
+              mime_type: selectedFile.type,
+            } as any);
+          } catch (docError: any) {
             console.error('Doc record error:', docError);
           }
         }
       }
+
 
       const selectedTask = driftTasks.find(t => t.id === selectedDriftTaskId);
       toast.success('Service registrerad', {
