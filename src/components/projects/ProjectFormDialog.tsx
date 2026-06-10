@@ -261,8 +261,8 @@ export function ProjectFormDialog({
       form.reset();
       onOpenChange(false);
       onSuccess();
-    } catch (error: any) {
-      toast.error(error.message || editingProject ? "Kunde inte uppdatera projekt" : "Kunde inte skapa projekt");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || (editingProject ? "Kunde inte uppdatera projekt" : "Kunde inte skapa projekt"));
     } finally {
       setLoading(false);
     }
