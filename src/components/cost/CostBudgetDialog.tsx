@@ -76,11 +76,11 @@ export function CostBudgetDialog({
       setBudgetedAmount("");
       setQuarter("YEAR");
       setYear(new Date().getFullYear().toString());
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating budget:', error);
       toast({
         title: "Fel",
-        description: error.message || "Kunde inte skapa budget",
+        description: getErrorMessage(error) || "Kunde inte skapa budget",
         variant: "destructive",
       });
     } finally {
