@@ -75,7 +75,7 @@ export function FounderUsers() {
       if (usersError) throw usersError;
       setUsers(usersData || []);
       setFilteredUsers(usersData || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching data:", error);
       toast.error("Kunde inte hämta användare");
     } finally {
