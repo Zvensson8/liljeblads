@@ -23,23 +23,11 @@ import {
   useUpdateTodo,
   useDeleteTodo,
 } from "@/hooks/useTodos";
+import type { Todo } from "@/types/domain";
 
-interface Todo {
-  id: string;
-  title: string;
-  completed: boolean;
-  due_date: string | null;
-  created_at: string;
-  notes?: string | null;
-  reminder_date?: string | null;
-  reminder_email?: string | null;
-  priority?: string;
-  category?: string | null;
-  parent_todo_id?: string | null;
+type TodoWithProperty = Todo & {
   properties?: { id: string; name: string } | null;
-  subtasks?: any[];
-  attachments?: any[];
-}
+};
 
 interface TodoWidgetProps {
   propertyId?: string;

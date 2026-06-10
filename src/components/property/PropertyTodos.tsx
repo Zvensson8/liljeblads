@@ -312,7 +312,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
                               {todo.title}
                             </p>
                             <div className="flex gap-1">
-                              <TodoPriorityBadge priority={todo.priority || "medium"} />
+                              <TodoPriorityBadge priority={(todo.priority || "medium") as "low" | "medium" | "high" | "critical"} />
                               <TodoCategoryBadge category={todo.category} />
                               {hasAttachments && (
                                 <Paperclip className="h-4 w-4 text-muted-foreground" />
