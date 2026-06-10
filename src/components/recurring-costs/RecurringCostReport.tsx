@@ -19,6 +19,36 @@ interface Property {
   name: string;
 }
 
+interface AccountReportRow {
+  code: string;
+  description: string;
+  amount: number;
+  count: number;
+}
+
+interface PropertyReportRow {
+  name: string;
+  total: number;
+  accounts: Record<string, AccountReportRow>;
+}
+
+interface QuarterReportRow {
+  quarter: string;
+  properties: Record<string, PropertyReportRow>;
+  total: number;
+}
+
+type ReportData = Record<string, QuarterReportRow>;
+
+/** jsPDF with the autoTable plugin's `lastAutoTable` runtime property. */
+type JsPdfWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
+
+/** Cell type accepted by jspdf-autotable. */
+type AutoTableCell =
+  | string
+  | number
+  | { content: string; colSpan?: number; styles?: Record<string, unknown> };
+
 interface RecurringCostReportProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,7 +60,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
   const [selectedProperty, setSelectedProperty] = useState<string>("all");
   const [startQuarter, setStartQuarter] = useState("");
   const [endQuarter, setEndQuarter] = useState("");
-  const [reportData, setReportData] = useState<any>(null);
+  const [reportData, setReportData] = useState<ReportData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
