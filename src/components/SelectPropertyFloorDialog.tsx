@@ -25,7 +25,7 @@ export const SelectPropertyFloorDialog = ({
     selectedProperty ? { propertyId: selectedProperty } : undefined,
   );
 
-  const sortedFloors = [...floors].sort((a: any, b: any) => (a.level ?? 0) - (b.level ?? 0));
+  const sortedFloors = [...floors].sort((a, b) => (a.level ?? 0) - (b.level ?? 0));
 
 
   const handleContinue = () => {
