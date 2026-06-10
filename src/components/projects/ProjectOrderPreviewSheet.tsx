@@ -79,8 +79,8 @@ export function ProjectOrderPreviewSheet({
 
       toast.success("Beställningsutkast skickat till din e-post");
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Kunde inte skicka utkast");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Kunde inte skicka utkast");
     } finally {
       setSending(false);
     }
