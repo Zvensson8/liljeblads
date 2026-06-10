@@ -57,7 +57,7 @@ type WorkOrderFormData = z.infer<typeof workOrderSchema>;
 interface WorkOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  order?: (Partial<import("@/types/domain/workOrder").WorkOrder> & { id: string; reminder_frequency?: string | null }) | null;
+  order?: Record<string, unknown> | null;
   onSuccess: () => void;
   propertyId?: string;
   projectId?: string;
