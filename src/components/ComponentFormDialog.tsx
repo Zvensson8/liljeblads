@@ -34,13 +34,29 @@ const componentSchema = z.object({
   refrigerant_type: z.string().max(100, 'Köldmedietyp får vara max 100 tecken').optional().or(z.literal('')),
 });
 
+interface EditingComponent {
+  id: string;
+  name?: string | null;
+  registration_number?: string | null;
+  type?: string | null;
+  installation_year?: number | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  serial_number?: string | null;
+  room_zone?: string | null;
+  notes?: string | null;
+  refrigerant_code?: string | null;
+  refrigerant_amount_kg?: number | null;
+  refrigerant_type?: string | null;
+}
+
 interface ComponentFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   floorId: string;
   propertyId?: string;
   selectedTemplate?: ComponentTemplate | null;
-  editingComponent?: Partial<Omit<ComponentRow, 'status'>> & { id: string; status?: string | null };
+  editingComponent?: EditingComponent;
   canvasPosition?: { x: number; y: number } | null;
   onSuccess: (componentId?: string) => void;
 }
