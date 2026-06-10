@@ -96,7 +96,7 @@ export const QuickServiceButton = ({
         .select('property_id')
         .eq('id', componentId)
         .single();
-      if (!cancelled && !error && data) setPropertyId((data as any).property_id);
+      if (!cancelled && !error && data) setPropertyId((data as { property_id: string }).property_id);
     })();
     return () => {
       cancelled = true;
