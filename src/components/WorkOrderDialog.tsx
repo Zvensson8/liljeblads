@@ -57,7 +57,8 @@ type WorkOrderFormData = z.infer<typeof workOrderSchema>;
 interface WorkOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  order?: Record<string, unknown> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  order?: any;
   onSuccess: () => void;
   propertyId?: string;
   projectId?: string;
