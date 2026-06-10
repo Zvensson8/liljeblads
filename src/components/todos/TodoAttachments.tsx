@@ -55,29 +55,29 @@ export function TodoAttachments({ todoId, onUpdate }: TodoAttachmentsProps) {
       await storageService.upload('todo-attachments', filePath, file);
 
       const { error: dbError } = await supabase
-        .from('todo_attachments' as any)
+        .from('todo_attachments' as never)
         .insert({
           todo_id: todoId,
           file_name: file.name,
           file_url: filePath,
           file_size: file.size,
           mime_type: file.type,
-        } as any);
+        } as never);
 
       if (dbError) throw dbError;
 
       toast.success("Bilaga uppladdad");
       refetch();
       onUpdate?.();
-    } catch (error: any) {
-      toast.error("Kunde inte ladda upp bilaga");
+    } catch (error: unknown) {
+      toast.error("Kunde inte ladda upp bilaga: " + getErrorMessage(error));
       console.error(error);
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDownload = async (attachment: any) => {
+  const handleDownload = async (attachment: TodoAttachmentRow) => {
     try {
       const data = await storageService.download('todo-attachments', attachment.file_url);
       const url = URL.createObjectURL(data);
@@ -91,12 +91,12 @@ export function TodoAttachments({ todoId, onUpdate }: TodoAttachmentsProps) {
     }
   };
 
-  const handleDelete = async (attachment: any) => {
+  const handleDelete = async (attachment: TodoAttachmentRow) => {
     try {
       await storageService.remove('todo-attachments', [attachment.file_url]);
 
       const { error: dbError } = await supabase
-        .from('todo_attachments' as any)
+        .from('todo_attachments' as never)
         .delete()
         .eq('id', attachment.id);
 
