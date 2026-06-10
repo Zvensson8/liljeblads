@@ -13,6 +13,11 @@ import { sv } from "date-fns/locale";
 import { DocumentUploadZone } from "@/components/documents/DocumentUploadZone";
 import { DocumentPreviewDialog } from "@/components/documents/DocumentPreviewDialog";
 import { ProtocolAnalysisDialog } from "@/components/component/ProtocolAnalysisDialog";
+import { getErrorMessage } from "@/lib/utils";
+import type { Tables } from "@/integrations/supabase/types";
+
+type ComponentDocumentRow = Tables<"component_documents">;
+type DocWithVersions = ComponentDocumentRow & { versions?: ComponentDocumentRow[]; signedUrl?: string | null };
 
 interface ComponentDocumentsProps {
   componentId: string;
@@ -21,9 +26,10 @@ interface ComponentDocumentsProps {
 export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
   const { session } = useAuth();
   const [uploading, setUploading] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [selectedDoc, setSelectedDoc] = useState<DocWithVersions | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [analysisDoc, setAnalysisDoc] = useState<{ id: string; name: string } | null>(null);
+
 
   const { data: documents, refetch } = useQuery({
     queryKey: ["component-documents", componentId],
