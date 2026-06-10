@@ -191,7 +191,7 @@ const Components = () => {
     } else {
       exportComponentsToPDF(
         components,
-        maintenanceRecords as Parameters<typeof exportComponentsToExcel>[1],
+        maintenanceRecords as Parameters<typeof exportComponentsToPDF>[1],
         'Komponentregister',
         `komponenter-${new Date().toISOString().split('T')[0]}.pdf`
       );
