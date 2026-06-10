@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getErrorMessage } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
