@@ -288,8 +288,8 @@ export function ProjectFormDialog({
       form.reset();
       onOpenChange(false);
       onSuccess();
-    } catch (error: any) {
-      toast.error(error.message || "Kunde inte skicka beställningsutkast");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Kunde inte skicka beställningsutkast");
     } finally {
       setSendingDraft(false);
     }
