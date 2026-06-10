@@ -15,6 +15,7 @@ import type { Property } from '@/types/domain';
 
 interface ComponentLite {
   next_maintenance_date?: string | null;
+  [key: string]: unknown;
 }
 
 interface PropertyOverviewProps {
