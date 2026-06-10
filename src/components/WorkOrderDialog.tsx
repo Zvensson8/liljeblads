@@ -164,10 +164,11 @@ export function WorkOrderDialog({
         reminder_recipient_email: data.reminder_recipient_email || null,
       };
 
-      const handleDbError = (actionLabel: string, err: any) => {
+      const handleDbError = (actionLabel: string, err: unknown) => {
         console.error(`${actionLabel} error:`, err, { payload });
-        const msg = String(err?.message || "");
-        if (msg.toLowerCase().includes("row-level security") || err?.code === "42501") {
+        const e = err as { message?: string; code?: string } | null;
+        const msg = String(e?.message || "");
+        if (msg.toLowerCase().includes("row-level security") || e?.code === "42501") {
           toast.error("Du saknar behörighet för vald fastighet");
           return;
         }
@@ -178,12 +179,12 @@ export function WorkOrderDialog({
         if (order) {
           await updateWorkOrder.mutateAsync({
             id: order.id,
-            patch: { ...payload, project_id: projectId || order.project_id || null } as any,
+            patch: { ...payload, project_id: projectId || order.project_id || null },
           });
         } else {
-          await createWorkOrder.mutateAsync({ ...payload, project_id: projectId || null } as any);
+          await createWorkOrder.mutateAsync({ ...payload, project_id: projectId || null });
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         handleDbError(order ? "Uppdatering" : "Skapande", err);
         return;
       }
@@ -191,13 +192,14 @@ export function WorkOrderDialog({
       form.reset();
       onOpenChange(false);
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Unexpected error:", error);
       toast.error("Ett oväntat fel uppstod");
     } finally {
       setSubmitting(false);
     }
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
