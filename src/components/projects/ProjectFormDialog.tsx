@@ -68,7 +68,7 @@ interface ProjectFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
-  editingProject?: any;
+  editingProject?: Project | null;
 }
 
 export function ProjectFormDialog({
