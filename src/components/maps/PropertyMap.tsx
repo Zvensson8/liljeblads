@@ -69,7 +69,7 @@ export const PropertyMap = () => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {validLocations.map((location: any) => (
+        {validLocations.map((location) => (
           <Marker
             key={location.property_id}
             position={[location.latitude, location.longitude]}
