@@ -47,7 +47,7 @@ const Properties = () => {
   const [address, setAddress] = useState('');
   const [description, setDescription] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState<Array<{ id: string; label: string; value: any }>>([]);
+  const [filters, setFilters] = useState<Array<{ id: string; label: string; value: string | number | boolean }>>([]);
   const [filterType, setFilterType] = useState<string>('');
   const [filterValue, setFilterValue] = useState<string>('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
