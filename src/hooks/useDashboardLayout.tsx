@@ -2,12 +2,28 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useDashboardStore } from '@/store/dashboardStore';
 import { useEffect } from 'react';
+import type { Json } from '@/integrations/supabase/types';
+
+interface DashboardLayoutItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  [key: string]: unknown;
+}
+
+interface DashboardWidget {
+  id: string;
+  type: string;
+  [key: string]: unknown;
+}
 
 interface DashboardLayout {
   id: string;
   user_id: string;
-  layout: any[];
-  widgets: any[];
+  layout: DashboardLayoutItem[];
+  widgets: DashboardWidget[];
   is_default: boolean;
 }
 
