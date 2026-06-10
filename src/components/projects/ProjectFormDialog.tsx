@@ -146,7 +146,7 @@ export function ProjectFormDialog({
   const onSubmit = async (values: ProjectFormValues) => {
     setLoading(true);
     try {
-      const projectData: any = {
+      const projectData: CreateProjectInput = {
         ...values,
         forecast: values.budget,
       };
