@@ -181,7 +181,7 @@ const uploadFile = async (file: File) => {
     }
   };
 
-  const handleDelete = async (doc: Document) => {
+  const handleDelete = async (doc: ProjectDocument) => {
     if (!confirm("Är du säker på att du vill ta bort detta dokument?")) return;
 
     try {
@@ -199,7 +199,7 @@ const uploadFile = async (file: File) => {
     }
   };
 
-const handlePreview = async (doc: Document) => {
+const handlePreview = async (doc: ProjectDocument) => {
     const versions = await getDocumentVersions(doc.name);
     // Get signed URL for preview
     const signedUrl = await getSignedUrl(doc.file_url);
@@ -207,7 +207,7 @@ const handlePreview = async (doc: Document) => {
     setPreviewOpen(true);
   };
 
-  const handleDownload = async (doc: Document) => {
+  const handleDownload = async (doc: ProjectDocument) => {
     const signedUrl = await getSignedUrl(doc.file_url);
     if (signedUrl) {
       window.open(signedUrl, "_blank");
