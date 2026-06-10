@@ -104,9 +104,10 @@ export function ComponentServicePlanSection({
           component_id: componentId,
           object_name: null,
           is_reported: false,
-          series_id: (component as any)?.serial_number || null,
+          series_id: (component as { serial_number?: string | null } | undefined)?.serial_number || null,
           registration_number:
-            (component as any)?.registration_number || null,
+            (component as { registration_number?: string | null } | undefined)?.registration_number || null,
+
         });
         toast.success("Komponent tillagd i driftuppgift");
       } else {
