@@ -42,8 +42,8 @@ export const energyDeclarationService = {
     if (catError) throw catError;
     if (!category) return null;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fields = (category.fields ?? []) as any[];
+    type EnergyField = { id: string; field_name: string };
+    const fields = (category.fields ?? []) as EnergyField[];
     const energyGradeField = fields.find((f) => f.field_name === 'Energiklass');
     const primaryEnergyField = fields.find((f) => f.field_name === 'Primärenergital');
     const specificEnergyField = fields.find(

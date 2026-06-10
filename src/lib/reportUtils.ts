@@ -27,6 +27,7 @@ interface ReportRow {
   Redovisat: number;
   Status: "Saknas" | "Klar" | "Pågår";
   "Completion %": number;
+  [key: string]: string | number;
 }
 
 interface DeviationRow extends DriftTaskRow {

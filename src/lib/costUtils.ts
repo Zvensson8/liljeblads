@@ -63,7 +63,8 @@ export async function getTopCostComponents(limit: number = 10, months: number = 
     last_date: string | null;
   }>();
 
-  maintenanceData?.forEach((record: any) => {
+  type MaintRecord = { component_id: string; cost: number | null; performed_date: string; components?: { name: string; type: string } | null };
+  (maintenanceData as unknown as MaintRecord[] | null)?.forEach((record) => {
     const component = record.components;
     if (!component) return;
 
