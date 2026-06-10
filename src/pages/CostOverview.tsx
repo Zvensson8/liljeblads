@@ -79,13 +79,13 @@ export default function CostOverview() {
   const [avgMonthlyCost, setAvgMonthlyCost] = useState(0);
   const [costChange, setCostChange] = useState(0);
   const [criticalComponents, setCriticalComponents] = useState(0);
-  const [topComponents, setTopComponents] = useState<Array<Record<string, unknown>>>([]);
-  const [topSuppliers, setTopSuppliers] = useState<Array<Record<string, unknown>>>([]);
-  const [costTrendData, setCostTrendData] = useState<Array<Record<string, unknown>>>([]);
-  const [monthlyDistribution, setMonthlyDistribution] = useState<Array<Record<string, unknown>>>([]);
+  const [topComponents, setTopComponents] = useState<ComponentCostSummary[]>([]);
+  const [topSuppliers, setTopSuppliers] = useState<SupplierAnalysis[]>([]);
+  const [costTrendData, setCostTrendData] = useState<(CostTrend & { formatted_month?: string })[]>([]);
+  const [monthlyDistribution, setMonthlyDistribution] = useState<Array<{ month: string; cost: number }>>([]);
   
   // Budget tracking state
-  const [budgets, setBudgets] = useState<Array<Record<string, unknown>>>([]);
+  const [budgets, setBudgets] = useState<Array<{ id: string; category: string; planned_amount: number; spent: number; period_start?: string; period_end?: string }>>([]);
   const [budgetProgress, setBudgetProgress] = useState(0);
 
   useEffect(() => {
