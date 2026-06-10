@@ -69,8 +69,8 @@ export const MaintenanceHistoryDialog = ({
         supplier: supplier || null,
         cost: cost ? parseFloat(cost) : null,
         notes: notes || null,
-        category: (category || null) as any,
-      } as any);
+        category: (category || null) as MaintenanceCategory | null,
+      });
       setActionType('');
       setPerformedDate('');
       setSupplier('');
