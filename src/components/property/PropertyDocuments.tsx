@@ -210,7 +210,7 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
         document={selectedDoc}
         versions={selectedDoc?.versions || []}
         onVersionSelect={(version) => {
-          setSelectedDoc(version);
+          setSelectedDoc(version as PropertyDocumentRow);
         }}
       />
     </div>
