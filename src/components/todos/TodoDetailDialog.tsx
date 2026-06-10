@@ -27,8 +27,23 @@ import { TodoAttachments } from "./TodoAttachments";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 
+interface TodoLike {
+  id: string;
+  property_id?: string | null;
+  parent_todo_id?: string | null;
+  title?: string | null;
+  notes?: string | null;
+  due_date?: string | null;
+  priority?: string | null;
+  category?: string | null;
+  reminder_email?: string | null;
+  reminder_date?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface TodoDetailDialogProps {
-  todo: any | null;
+  todo: TodoLike | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void;
