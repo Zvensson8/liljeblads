@@ -136,7 +136,7 @@ export function FounderKnowledgeBase() {
       setContent("");
       fetchSources();
     } catch (err: unknown) {
-      toast.error(err.message || "Kunde inte ingesta dokumentet");
+      toast.error(getErrorMessage(err) || "Kunde inte ingesta dokumentet");
     } finally {
       setIngesting(false);
     }
@@ -273,7 +273,7 @@ export function FounderKnowledgeBase() {
 
       fetchSources();
     } catch (err: unknown) {
-      toast.error(err.message || "Kunde inte bearbeta dokumentet");
+      toast.error(getErrorMessage(err) || "Kunde inte bearbeta dokumentet");
       setUploadStep(0);
       setUploadProgress("");
     } finally {
@@ -295,7 +295,7 @@ export function FounderKnowledgeBase() {
       setDeleteKey(null);
       fetchSources();
     } catch (err: unknown) {
-      toast.error(err.message || "Kunde inte ta bort");
+      toast.error(getErrorMessage(err) || "Kunde inte ta bort");
     } finally {
       setDeleting(false);
     }
