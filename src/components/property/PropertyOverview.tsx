@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getErrorMessage } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Building2, MapPin, FileText, AlertCircle, Mail, Settings, Wrench, Clock } from 'lucide-react';
@@ -62,7 +63,7 @@ export function PropertyOverview({
       toast.success('Kontaktinformation skickad till din e-post!');
     } catch (error: unknown) {
       console.error('Error sending email:', error);
-      toast.error('Kunde inte skicka e-post: ' + error.message);
+      toast.error('Kunde inte skicka e-post: ' + getErrorMessage(error));
     } finally {
       setSendingEmail(false);
     }

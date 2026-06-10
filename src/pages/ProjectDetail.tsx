@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProject, useUpdateProject } from "@/hooks/useProjects";
@@ -173,7 +174,7 @@ export default function ProjectDetail() {
       await exportProjectToZip(project.id);
       toast.success("Projekt exporterat");
     } catch (error: unknown) {
-      toast.error(error.message || "Kunde inte exportera projekt");
+      toast.error(getErrorMessage(error) || "Kunde inte exportera projekt");
     } finally {
       setExporting(false);
     }

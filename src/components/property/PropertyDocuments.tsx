@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { storageService } from "@/services/supabase";
@@ -85,7 +86,7 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
       toast.success(nextVersion > 1 ? `Ny version (v${nextVersion}) uppladdad` : "Dokument uppladdat");
       refetch();
     } catch (error: unknown) {
-      toast.error("Kunde inte ladda upp dokument: " + error.message);
+      toast.error("Kunde inte ladda upp dokument: " + getErrorMessage(error));
     } finally {
       setUploading(false);
     }

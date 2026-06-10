@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getErrorMessage } from "@/lib/utils";
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -61,7 +62,7 @@ const Auth = () => {
       if (error) {
         toast({
           title: 'Inloggning misslyckades',
-          description: error.message,
+          description: getErrorMessage(error),
           variant: 'destructive',
         });
       } else if (data.user) {
@@ -107,7 +108,7 @@ const Auth = () => {
       if (error) {
         toast({
           title: 'Registrering misslyckades',
-          description: error.message,
+          description: getErrorMessage(error),
           variant: 'destructive',
         });
       } else {

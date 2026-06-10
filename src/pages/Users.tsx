@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
@@ -293,7 +294,7 @@ export default function Users() {
       console.error("Error updating user:", error);
       toast({
         title: "Fel",
-        description: `Kunde inte uppdatera användare: ${error.message}`,
+        description: `Kunde inte uppdatera användare: ${getErrorMessage(error)}`,
         variant: "destructive",
       });
     } finally {
