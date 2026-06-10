@@ -223,7 +223,7 @@ export function ProjectFormDialog({
         if (selectedTemplateId) {
           const template = templates.find((t) => t.id === selectedTemplateId);
           if (template?.checklist_items && template.checklist_items.length > 0) {
-            const checklistItems = template.checklist_items.map((item: any, index: number) => ({
+            const checklistItems = template.checklist_items.map((item: { title: string; description?: string | null }, index: number) => ({
               project_id: project.id,
               title: item.title,
               description: item.description || null,
