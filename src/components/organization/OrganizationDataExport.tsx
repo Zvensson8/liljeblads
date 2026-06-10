@@ -180,7 +180,7 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
         .select("user_id, profiles(id, email, full_name)")
         .eq("organization_id", organizationId);
       if (error) throw error;
-      setMembers(data || []);
+      setMembers((data as unknown as MemberRow[]) || []);
     } catch (error: unknown) {
       console.error("Error fetching members:", error);
       toast.error("Kunde inte hämta medlemmar");
@@ -245,7 +245,7 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
         exportType,
         userId: exportType === "user" ? selectedUserId : null,
         propertyIds: exportType === "properties" ? selectedPropertyIds : null,
-      }) as ExportResponse;
+      }) as unknown as ExportResponse;
 
       const baseFilename = data.filename;
       const orgName = data.rawData?.organization?.name || "Organisation";
