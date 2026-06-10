@@ -740,6 +740,10 @@ interface WorkOrderDocxInput {
   due_date?: string | null;
   estimated_cost?: number | null;
   actual_cost?: number | null;
+  contractor?: string | null;
+  price?: number | string | null;
+  quarter?: string | null;
+  comments?: string | null;
   properties?: { name?: string } | null;
   [key: string]: unknown;
 }
