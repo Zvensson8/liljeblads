@@ -35,7 +35,7 @@ export function ProjectEconomyOverview({
     try {
       await updateProject.mutateAsync({
         id: projectId,
-        patch: { budget: editBudget, forecast: editForecast } as any,
+        patch: { budget: editBudget, forecast: editForecast },
       });
 
       const changes = [];
