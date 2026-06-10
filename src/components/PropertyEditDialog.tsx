@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUpdateProperty } from "@/hooks/useProperties";
+import type { Property } from "@/types/domain";
 import { FileText } from "lucide-react";
 import {
   Dialog,
