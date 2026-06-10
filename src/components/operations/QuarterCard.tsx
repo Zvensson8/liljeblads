@@ -277,7 +277,7 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     }
   };
 
-  const handleUpdateField = async (taskId: string, field: keyof Task, value: any) => {
+  const handleUpdateField = async <K extends keyof Task>(taskId: string, field: K, value: Task[K]) => {
     // Optimistic update - update local state immediately (already done via onChange)
     const updatedTasks = tasks.map(t =>
       t.id === taskId ? { ...t, [field]: value } : t
