@@ -60,7 +60,7 @@ export function FounderKnowledgeBase() {
       if (error) throw error;
 
       const grouped: Record<string, KBSource> = {};
-      (data || []).forEach((row: any) => {
+      (data || []).forEach((row: { source_key: string; source_title: string; chunk_index: number; token_count: number | null; created_at: string }) => {
         if (!grouped[row.source_key]) {
           grouped[row.source_key] = {
             source_key: row.source_key,
@@ -75,7 +75,7 @@ export function FounderKnowledgeBase() {
       });
 
       setSources(Object.values(grouped).sort((a, b) => a.source_title.localeCompare(b.source_title)));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching KB sources:", err);
     } finally {
       setLoading(false);
@@ -135,7 +135,7 @@ export function FounderKnowledgeBase() {
       setSourceTitle("");
       setContent("");
       fetchSources();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(err.message || "Kunde inte ingesta dokumentet");
     } finally {
       setIngesting(false);
@@ -216,7 +216,7 @@ export function FounderKnowledgeBase() {
         const filePath = `knowledge-base/${Date.now()}-${selectedFile.name}`;
         try {
           await storageService.upload("property-documents", filePath, selectedFile);
-        } catch (uploadError: any) {
+        } catch (uploadError: unknown) {
           throw new Error("Uppladdning misslyckades: " + uploadError.message);
         }
 
@@ -272,7 +272,7 @@ export function FounderKnowledgeBase() {
       }, 2000);
 
       fetchSources();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(err.message || "Kunde inte bearbeta dokumentet");
       setUploadStep(0);
       setUploadProgress("");
@@ -294,7 +294,7 @@ export function FounderKnowledgeBase() {
       toast.success("Källa borttagen");
       setDeleteKey(null);
       fetchSources();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(err.message || "Kunde inte ta bort");
     } finally {
       setDeleting(false);
