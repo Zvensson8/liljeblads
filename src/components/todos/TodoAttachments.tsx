@@ -7,7 +7,14 @@ import { Download, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AttachmentIcon } from "./AttachmentIcon";
 import { getErrorMessage } from "@/lib/utils";
-import type { TodoAttachment } from "@/types/domain";
+
+interface TodoAttachmentRow {
+  id: string;
+  file_name: string;
+  file_url: string;
+  file_size: number | null;
+  mime_type: string | null;
+}
 
 interface TodoAttachmentsProps {
   todoId: string;
