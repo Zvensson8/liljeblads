@@ -42,7 +42,7 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
   });
 
   const { data: property } = useProperty(propertyId);
-  const orgId = (property as any)?.organization_id as string | undefined;
+  const orgId = (property as { organization_id?: string | null } | null | undefined)?.organization_id ?? undefined;
   const { data: rawCosts, isLoading } = useRecurringCosts({ propertyId });
 
   // Account codes — no domain service yet; fetched here scoped to the org.
