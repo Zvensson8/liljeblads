@@ -249,7 +249,7 @@ export default function Users() {
         .from("profiles")
         .update({
           approved: editForm.approved,
-          role: editForm.profile_role as any,
+          role: editForm.profile_role as Database["public"]["Enums"]["user_role"],
         })
         .eq("id", selectedUser.id);
 
