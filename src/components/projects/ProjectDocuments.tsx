@@ -40,7 +40,7 @@ interface ProjectDocumentsProps {
   onDocumentUpload?: () => void;
 }
 
-interface Document {
+interface ProjectDocument {
   id: string;
   name: string;
   file_url: string;
@@ -63,14 +63,14 @@ const FOLDERS = [
 
 export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumentsProps) {
   const { user } = useAuth();
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const logActivity = useLogProjectActivity();
   const [loading, setLoading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState("Allmänt");
   const [uploading, setUploading] = useState(false);
   const [filterFolder, setFilterFolder] = useState<string>("all");
-  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
+  const [selectedDoc, setSelectedDoc] = useState<ProjectDocument | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   // Get signed URL for accessing private storage
