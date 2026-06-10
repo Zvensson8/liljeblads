@@ -51,7 +51,10 @@ import {
   getTopCostComponents, 
   getCostTrend, 
   getSupplierAnalysis,
-  getFlagEmoji 
+  getFlagEmoji,
+  type ComponentCostSummary,
+  type CostTrend,
+  type SupplierAnalysis,
 } from "@/lib/costUtils";
 import { CostBudgetDialog } from "@/components/cost/CostBudgetDialog";
 import { supabase } from "@/integrations/supabase/client";
