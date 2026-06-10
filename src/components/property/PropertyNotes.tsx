@@ -24,7 +24,7 @@ export function PropertyNotes({ propertyId }: PropertyNotesProps) {
 
   const { data: notesRaw } = usePropertyNotes({ propertyId });
   const notes = (notesRaw ?? []).slice().sort(
-    (a: any, b: any) => (b.created_at ?? "").localeCompare(a.created_at ?? "")
+    (a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? "")
   );
 
   const createNote = useCreatePropertyNote();
@@ -34,7 +34,7 @@ export function PropertyNotes({ propertyId }: PropertyNotesProps) {
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
     try {
-      await createNote.mutateAsync({ property_id: propertyId, content: newNote } as any);
+      await createNote.mutateAsync({ property_id: propertyId, content: newNote });
       toast.success("Anteckning tillagd");
       setNewNote("");
     } catch {
@@ -78,7 +78,7 @@ export function PropertyNotes({ propertyId }: PropertyNotesProps) {
 
       <div className="space-y-2">
         {notes && notes.length > 0 ? (
-          notes.map((note: any) => (
+          notes.map((note) => (
             <Card key={note.id}>
               <CardContent className="pt-4">
                 {editingId === note.id ? (
