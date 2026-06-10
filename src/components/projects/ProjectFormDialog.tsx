@@ -5,6 +5,8 @@ import * as z from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useSendProjectOrderDraft } from "@/hooks/useEdgeFunctions";
 import { toast } from "sonner";
+import type { Project, ProjectType, CreateProjectInput, UpdateProjectInput } from "@/types/domain";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
