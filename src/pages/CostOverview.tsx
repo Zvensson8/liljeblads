@@ -85,7 +85,7 @@ export default function CostOverview() {
   const [monthlyDistribution, setMonthlyDistribution] = useState<Array<{ month: string; cost: number }>>([]);
   
   // Budget tracking state
-  const [budgets, setBudgets] = useState<Array<{ id: string; category: string; planned_amount: number; spent: number; period_start?: string; period_end?: string }>>([]);
+  const [budgets, setBudgets] = useState<Tables<'cost_budgets'>[]>([]);
   const [budgetProgress, setBudgetProgress] = useState(0);
 
   useEffect(() => {
