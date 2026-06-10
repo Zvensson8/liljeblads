@@ -54,7 +54,9 @@ export function OrganizationAuditLogs({ organizationId }: OrganizationAuditLogsP
     queryKey: ["audit-logs", organizationId, eventTypeFilter, resourceTypeFilter],
     queryFn: async () => {
       // Hämta audit logs med användarens email från profiles
-      const { data, error } = await (supabase as unknown as { from: (t: string) => { select: (s: string) => { eq: (c: string, v: string) => { order: (c: string, o: { ascending: boolean }) => { limit: (n: number) => Promise<{ data: unknown; error: { message: string } | null }> } } } } })
+      // Cast supabase to any here to avoid TS2589 deep instantiation with the joined select.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from("audit_logs")
         .select(`
           *,
