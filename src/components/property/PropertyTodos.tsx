@@ -28,6 +28,7 @@ import {
   useUpdateTodo,
   useDeleteTodo,
 } from "@/hooks/useTodos";
+import type { Todo } from "@/types/domain";
 
 interface PropertyTodosProps {
   propertyId: string;
@@ -41,7 +42,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
   const [newPriority, setNewPriority] = useState("medium");
   const [newCategory, setNewCategory] = useState("none");
   const [expandedTodos, setExpandedTodos] = useState<Set<string>>(new Set());
-  const [selectedTodo, setSelectedTodo] = useState<any>(null);
+  const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
@@ -89,14 +90,26 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
     enabled: !!allTodos && allTodos.length > 0,
     queryFn: async () => {
       const todoIds = (allTodos ?? []).map((t: Todo) => t.id);
-      const { data, error } = await (supabase as any)
+      // todo_attachments is not in the generated Supabase types yet.
+      const { data, error } = await (
+        supabase as unknown as {
+          from: (t: string) => {
+            select: (s: string) => {
+              in: (
+                col: string,
+                vals: string[],
+              ) => Promise<{ data: Array<{ todo_id: string }> | null; error: Error | null }>;
+            };
+          };
+        }
+      )
         .from("todo_attachments")
         .select("todo_id")
         .in("todo_id", todoIds);
 
       if (error) throw error;
       const counts: Record<string, number> = {};
-      data?.forEach((item: any) => {
+      data?.forEach((item) => {
         counts[item.todo_id] = (counts[item.todo_id] || 0) + 1;
       });
       return counts;
@@ -118,7 +131,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
         priority: newPriority,
         category: newCategory === "none" ? null : newCategory || null,
         user_id: user.id,
-      } as any);
+      });
       toast.success("Uppgift tillagd");
       setNewTodo("");
       setNewDueDate("");
@@ -131,7 +144,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
 
   const handleToggleTodo = async (id: string, completed: boolean) => {
     try {
-      await updateTodo.mutateAsync({ id, patch: { completed: !completed } as any });
+      await updateTodo.mutateAsync({ id, patch: { completed: !completed } });
       toast.success(completed ? "Uppgift återaktiverad" : "Uppgift slutförd");
     } catch {
       // toast handled in hook
