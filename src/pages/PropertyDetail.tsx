@@ -253,7 +253,7 @@ const PropertyDetail = () => {
     if (format === 'excel') {
       exportComponentsToExcel(
         formattedComponents,
-        maintenanceRecords,
+        maintenanceRecords as Parameters<typeof exportComponentsToExcel>[1],
         `${property.name}-${new Date().toISOString().split('T')[0]}.xlsx`
       );
       toast({
