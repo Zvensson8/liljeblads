@@ -53,9 +53,9 @@ export const PropertyMap = () => {
     );
   }
 
-  const validLocations = locations?.filter(
-    (loc: any) => loc.latitude && loc.longitude
-  ) || [];
+  const validLocations: MapLocation[] = ((locations ?? []) as MapLocation[]).filter(
+    (loc) => loc.latitude != null && loc.longitude != null,
+  );
 
   return (
     <Card className="overflow-hidden">
