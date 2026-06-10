@@ -20,10 +20,16 @@ export function TodoSubtaskList({ parentTodoId, propertyId, onUpdate }: TodoSubt
   const [newSubtask, setNewSubtask] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
-  const { data: subtasks, refetch } = useQuery({
+  interface Subtask {
+    id: string;
+    title: string;
+    completed: boolean;
+  }
+
+  const { data: subtasks, refetch } = useQuery<Subtask[]>({
     queryKey: ["subtasks", parentTodoId],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("property_todos")
         .select("*")
         .eq("parent_todo_id", parentTodoId)
@@ -31,7 +37,7 @@ export function TodoSubtaskList({ parentTodoId, propertyId, onUpdate }: TodoSubt
         .order("created_at");
 
       if (error) throw error;
-      return data as any[];
+      return (data ?? []) as unknown as Subtask[];
     },
   });
 
