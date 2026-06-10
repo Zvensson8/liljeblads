@@ -92,7 +92,7 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
         })
       );
 
-      setMembers(membersWithProfiles as any);
+      setMembers(membersWithProfiles as Member[]);
     } catch (error: unknown) {
       console.error("Error fetching members:", error);
       toast.error("Kunde inte hämta medlemmar");
