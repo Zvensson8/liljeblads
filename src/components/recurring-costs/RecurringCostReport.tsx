@@ -19,6 +19,36 @@ interface Property {
   name: string;
 }
 
+interface AccountReportRow {
+  code: string;
+  description: string;
+  amount: number;
+  count: number;
+}
+
+interface PropertyReportRow {
+  name: string;
+  total: number;
+  accounts: Record<string, AccountReportRow>;
+}
+
+interface QuarterReportRow {
+  quarter: string;
+  properties: Record<string, PropertyReportRow>;
+  total: number;
+}
+
+type ReportData = Record<string, QuarterReportRow>;
+
+/** jsPDF with the autoTable plugin's `lastAutoTable` runtime property. */
+type JsPdfWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
+
+/** Cell type accepted by jspdf-autotable. */
+type AutoTableCell =
+  | string
+  | number
+  | { content: string; colSpan?: number; styles?: Record<string, unknown> };
+
 interface RecurringCostReportProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,7 +60,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
   const [selectedProperty, setSelectedProperty] = useState<string>("all");
   const [startQuarter, setStartQuarter] = useState("");
   const [endQuarter, setEndQuarter] = useState("");
-  const [reportData, setReportData] = useState<any>(null);
+  const [reportData, setReportData] = useState<ReportData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
@@ -130,7 +160,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
       const quarterSummaries = groupByQuarter(allProjections);
 
       // Konvertera till rätt format för rapporten
-      const grouped: any = {};
+      const grouped: ReportData = {};
       
       quarterSummaries.forEach((quarter) => {
         grouped[quarter.quarter] = {
@@ -208,7 +238,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
     yPos += 10;
 
     // Generate tables for each quarter
-    Object.values(reportData).forEach((quarterData: any) => {
+    Object.values(reportData).forEach((quarterData) => {
       if (yPos > 250) {
         doc.addPage();
         yPos = 20;
@@ -218,10 +248,10 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
       doc.text(`${quarterData.quarter} - Total: ${quarterData.total.toLocaleString("sv-SE")} kr`, 14, yPos);
       yPos += 8;
 
-      Object.entries(quarterData.properties).forEach(([propertyName, propertyData]: any) => {
-        const tableData: any[] = [];
-        
-        Object.entries(propertyData.accounts).forEach(([accountKey, accountData]: any) => {
+      Object.entries(quarterData.properties).forEach(([propertyName, propertyData]) => {
+        const tableData: AutoTableCell[][] = [];
+
+        Object.entries(propertyData.accounts).forEach(([, accountData]) => {
           tableData.push([
             accountData.code,
             accountData.description + (accountData.count > 1 ? ` (${accountData.count} poster)` : ""),
@@ -244,7 +274,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
           margin: { left: 14 },
         });
 
-        yPos = (doc as any).lastAutoTable.finalY + 10;
+        yPos = (doc as JsPdfWithAutoTable).lastAutoTable.finalY + 10;
       });
 
       yPos += 5;
@@ -257,7 +287,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
   const exportToExcel = async () => {
     if (!reportData) return;
 
-    const worksheetData: any[] = [];
+    const worksheetData: (string | number)[][] = [];
 
     // Add header
     worksheetData.push([
@@ -274,7 +304,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
     worksheetData.push([]);
 
     // Add data for each quarter
-    Object.values(reportData).forEach((quarterData: any) => {
+    Object.values(reportData).forEach((quarterData) => {
       worksheetData.push([
         `${quarterData.quarter}`,
         "",
@@ -283,10 +313,10 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
       ]);
       worksheetData.push([]);
 
-      Object.entries(quarterData.properties).forEach(([propertyName, propertyData]: any) => {
+      Object.entries(quarterData.properties).forEach(([propertyName, propertyData]) => {
         worksheetData.push(["Konto", "Beskrivning", "Belopp"]);
 
-        Object.entries(propertyData.accounts).forEach(([accountKey, accountData]: any) => {
+        Object.entries(propertyData.accounts).forEach(([, accountData]) => {
           worksheetData.push([
             accountData.code,
             accountData.description + (accountData.count > 1 ? ` (${accountData.count} poster)` : ""),
@@ -401,7 +431,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
 
         {reportData && (
           <div className="space-y-6 mt-6">
-            {Object.values(reportData).map((quarterData: any) => (
+            {Object.values(reportData).map((quarterData) => (
               <Card key={quarterData.quarter}>
                 <CardHeader>
                   <div className="flex justify-between items-center">
@@ -412,7 +442,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {Object.entries(quarterData.properties).map(([propertyName, propertyData]: any) => (
+                  {Object.entries(quarterData.properties).map(([propertyName, propertyData]) => (
                     <div key={propertyName} className="mb-4">
                       <h4 className="font-semibold mb-2">{propertyName}</h4>
                       <Table>
@@ -424,7 +454,7 @@ export function RecurringCostReport({ open, onOpenChange }: RecurringCostReportP
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {Object.entries(propertyData.accounts).map(([accountKey, accountData]: any) => (
+                          {Object.entries(propertyData.accounts).map(([accountKey, accountData]) => (
                             <TableRow key={accountKey}>
                               <TableCell>{accountData.code}</TableCell>
                               <TableCell>
