@@ -152,7 +152,7 @@ export default function ComponentDetail() {
       
       // Set floor if it exists, otherwise create a mock floor object from direct property
       if (componentData.floors) {
-        setFloor(componentData.floors as any);
+        setFloor(componentData.floors as unknown as Floor);
       } else if (componentData.direct_property) {
         setFloor({
           id: '',
@@ -160,7 +160,7 @@ export default function ComponentDetail() {
           level: null,
           property_id: componentData.direct_property.id,
           properties: componentData.direct_property
-        } as any);
+        } as Floor);
       }
 
       // Fetch maintenance history
