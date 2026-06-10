@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { createWorkbook, addJsonSheet, downloadWorkbook } from '@/lib/excelUtils';
 import jsPDF from 'jspdf';
+type JsPdfWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';

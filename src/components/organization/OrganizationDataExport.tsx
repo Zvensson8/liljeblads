@@ -15,6 +15,20 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
+import { getErrorMessage } from "@/lib/utils";
+
+type JsPdfWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
+type RawExportData = Record<string, unknown>;
+interface MemberRow {
+  user_id: string;
+  profiles: { id: string; email: string | null; full_name: string | null } | null;
+}
+interface ExportResponse {
+  filename: string;
+  zipData: string;
+  rawData: RawExportData & { organization?: { name?: string } };
+  summary: { properties_count: number; components_count: number; projects_count: number };
+}
 
 interface OrganizationDataExportProps {
   organizationId: string;
@@ -70,7 +84,7 @@ function downloadZip(zipData: string, filename: string) {
   document.body.removeChild(a);
 }
 
-async function exportRawAsXlsx(rawData: any, filename: string) {
+async function exportRawAsXlsx(rawData: RawExportData, filename: string) {
   const wb = createWorkbook();
   const sections = Object.keys(SECTION_LABELS);
 
@@ -115,10 +129,10 @@ function addPdfSection(doc: jsPDF, title: string, records: Record<string, any>[]
     styles: { fontSize: 5, cellPadding: 1.5 },
   });
 
-  return (doc as any).lastAutoTable.finalY + 10;
+  return (doc as JsPdfWithAutoTable).lastAutoTable.finalY + 10;
 }
 
-function exportRawAsPdf(rawData: any, filename: string, orgName: string) {
+function exportRawAsPdf(rawData: RawExportData, filename: string, orgName: string) {
   const doc = new jsPDF({ orientation: "landscape" });
 
   doc.setFontSize(18);
@@ -148,7 +162,7 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
   const [exportFormat, setExportFormat] = useState<ExportFormat>("zip");
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>([]);
-  const [members, setMembers] = useState<any[]>([]);
+  const [members, setMembers] = useState<MemberRow[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [loadingProperties, setLoadingProperties] = useState(false);
@@ -166,8 +180,8 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
         .select("user_id, profiles(id, email, full_name)")
         .eq("organization_id", organizationId);
       if (error) throw error;
-      setMembers(data || []);
-    } catch (error: any) {
+      setMembers((data as unknown as MemberRow[]) || []);
+    } catch (error: unknown) {
       console.error("Error fetching members:", error);
       toast.error("Kunde inte hämta medlemmar");
     } finally {
@@ -185,7 +199,7 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
         .order("name");
       if (error) throw error;
       setProperties(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching properties:", error);
       toast.error("Kunde inte hämta fastigheter");
     } finally {
@@ -231,7 +245,7 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
         exportType,
         userId: exportType === "user" ? selectedUserId : null,
         propertyIds: exportType === "properties" ? selectedPropertyIds : null,
-      }) as any;
+      }) as unknown as ExportResponse;
 
       const baseFilename = data.filename;
       const orgName = data.rawData?.organization?.name || "Organisation";
@@ -247,9 +261,9 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
       toast.success(
         `Data exporterad som ${exportFormat.toUpperCase()}! Totalt ${data.summary.properties_count} fastigheter, ${data.summary.components_count} komponenter, ${data.summary.projects_count} projekt`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Export error:", error);
-      toast.error("Kunde inte exportera data: " + error.message);
+      toast.error("Kunde inte exportera data: " + getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -291,7 +305,7 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Export-typ</label>
-              <Select value={exportType} onValueChange={(value: any) => setExportType(value)}>
+              <Select value={exportType} onValueChange={(value) => setExportType(value as "all" | "user" | "properties")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -305,7 +319,7 @@ export function OrganizationDataExport({ organizationId }: OrganizationDataExpor
 
             <div>
               <label className="text-sm font-medium mb-2 block">Filformat</label>
-              <Select value={exportFormat} onValueChange={(value: any) => setExportFormat(value)}>
+              <Select value={exportFormat} onValueChange={(value) => setExportFormat(value as ExportFormat)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

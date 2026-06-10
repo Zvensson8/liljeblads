@@ -35,7 +35,7 @@ export function OrganizationInfo({ organization, isAdmin, onUpdate }: Organizati
       toast.success("Organisation uppdaterad");
       setEditing(false);
       onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating organization:", error);
       toast.error("Kunde inte uppdatera organisation");
     } finally {

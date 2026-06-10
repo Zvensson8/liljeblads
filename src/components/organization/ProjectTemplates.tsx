@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import { Plus, Edit, Trash2, Copy, X } from "lucide-react";
 import { useProjectTemplates } from "@/hooks/useProjectTemplates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert } from "@/integrations/supabase/types";
+import type { ProjectTemplate } from "@/hooks/useProjectTemplates";
+
+type TemplateInsert = TablesInsert<"project_templates">;
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
@@ -23,7 +28,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
   const { templates, loading, refetch } = useProjectTemplates(organizationId);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<any>(null);
+  const [editingTemplate, setEditingTemplate] = useState<ProjectTemplate | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -45,7 +50,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
     return labels[type] || type;
   };
 
-  const handleOpenDialog = (template?: any) => {
+  const handleOpenDialog = (template?: ProjectTemplate) => {
     if (template) {
       setEditingTemplate(template);
       setFormData({
@@ -53,7 +58,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
         description: template.description || "",
         type: template.type,
         estimated_duration_quarters: template.estimated_duration_quarters?.toString() || "",
-        checklist_items: template.checklist_items || [],
+        checklist_items: (template.checklist_items as Array<{ title: string; description: string }>) || [],
       });
     } else {
       setEditingTemplate(null);
@@ -70,14 +75,14 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
 
   const handleSubmit = async () => {
     try {
-      const templateData = {
+      const templateData: TemplateInsert = {
         organization_id: organizationId,
         name: formData.name,
         description: formData.description || null,
         type: formData.type,
         estimated_duration_quarters: formData.estimated_duration_quarters ? Number(formData.estimated_duration_quarters) : null,
-        checklist_items: formData.checklist_items,
-        budget_categories: editingTemplate?.budget_categories || [],
+        checklist_items: formData.checklist_items as unknown as TemplateInsert["checklist_items"],
+        budget_categories: (editingTemplate?.budget_categories || []) as unknown as TemplateInsert["budget_categories"],
       };
 
       if (editingTemplate) {
@@ -97,8 +102,8 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
 
       setDialogOpen(false);
       refetch();
-    } catch (error: any) {
-      toast.error("Kunde inte spara mall: " + error.message);
+    } catch (error: unknown) {
+      toast.error("Kunde inte spara mall: " + getErrorMessage(error));
     }
   };
 
@@ -113,30 +118,31 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
       toast.success("Mall borttagen");
       setDeleteDialogOpen(false);
       refetch();
-    } catch (error: any) {
-      toast.error("Kunde inte ta bort mall: " + error.message);
+    } catch (error: unknown) {
+      toast.error("Kunde inte ta bort mall: " + getErrorMessage(error));
     }
   };
 
-  const handleDuplicate = async (template: any) => {
+  const handleDuplicate = async (template: ProjectTemplate) => {
     try {
+      const insertData: TemplateInsert = {
+        organization_id: organizationId,
+        name: `${template.name} (kopia)`,
+        description: template.description,
+        type: template.type,
+        estimated_duration_quarters: template.estimated_duration_quarters,
+        checklist_items: template.checklist_items as unknown as TemplateInsert["checklist_items"],
+        budget_categories: template.budget_categories as unknown as TemplateInsert["budget_categories"],
+        created_by: user?.id,
+      };
       const { error } = await supabase
         .from("project_templates")
-        .insert({
-          organization_id: organizationId,
-          name: `${template.name} (kopia)`,
-          description: template.description,
-          type: template.type,
-          estimated_duration_quarters: template.estimated_duration_quarters,
-          checklist_items: template.checklist_items,
-          budget_categories: template.budget_categories,
-          created_by: user?.id,
-        });
+        .insert(insertData);
       if (error) throw error;
       toast.success("Mall duplicerad");
       refetch();
-    } catch (error: any) {
-      toast.error("Kunde inte duplicera mall: " + error.message);
+    } catch (error: unknown) {
+      toast.error("Kunde inte duplicera mall: " + getErrorMessage(error));
     }
   };
 
@@ -266,7 +272,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
                 <Label htmlFor="type">Typ *</Label>
                 <Select
                   value={formData.type}
-                  onValueChange={(value: any) => setFormData({ ...formData, type: value })}
+                  onValueChange={(value: "investering" | "underhall" | "energi" | "annat") => setFormData({ ...formData, type: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />

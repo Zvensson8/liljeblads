@@ -82,7 +82,7 @@ export function OrganizationBranding({ organization, onUpdate }: OrganizationBra
       }
       
       onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error uploading logo:", error);
       toast.error("Kunde inte ladda upp logotyp");
     } finally {
@@ -102,7 +102,7 @@ export function OrganizationBranding({ organization, onUpdate }: OrganizationBra
 
       toast.success("Primärfärg uppdaterad");
       onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating color:", error);
       toast.error("Kunde inte uppdatera färg");
     } finally {

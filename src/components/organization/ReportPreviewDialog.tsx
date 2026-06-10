@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getErrorMessage } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -49,9 +50,9 @@ export function ReportPreviewDialog({ open, onOpenChange, reportType, onMarkAsPr
           }
 
           setHtmlContent(data.html);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error('Error generating preview:', error);
-          toast.error(`Kunde inte generera förhandsvisning: ${error.message || 'Okänt fel'}`);
+          toast.error(`Kunde inte generera förhandsvisning: ${getErrorMessage(error)}`);
         } finally {
           setLoading(false);
         }

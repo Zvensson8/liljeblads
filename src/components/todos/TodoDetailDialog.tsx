@@ -27,8 +27,23 @@ import { TodoAttachments } from "./TodoAttachments";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 
+interface TodoLike {
+  id?: string;
+  property_id?: string | null;
+  parent_todo_id?: string | null;
+  title?: string | null;
+  notes?: string | null;
+  due_date?: string | null;
+  priority?: string | null;
+  category?: string | null;
+  reminder_email?: string | null;
+  reminder_date?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 interface TodoDetailDialogProps {
-  todo: any | null;
+  todo: TodoLike | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void;
@@ -46,12 +61,12 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
 
   const { data: subtaskCount } = useQuery({
     queryKey: ["subtask-count", todo?.id],
-    enabled: !!todo?.id && !(todo as any)?.parent_todo_id,
+    enabled: !!todo?.id && !todo?.parent_todo_id,
     queryFn: async () => {
-      const { count, error } = await (supabase as any)
+      const { count, error } = await supabase
         .from("property_todos")
         .select("*", { count: "exact", head: true })
-        .eq("parent_todo_id", (todo as any).id);
+        .eq("parent_todo_id", todo.id!);
 
       if (error) throw error;
       return count || 0;
@@ -62,10 +77,10 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
     queryKey: ["attachment-count", todo?.id],
     enabled: !!todo?.id,
     queryFn: async () => {
-      const { count, error } = await (supabase as any)
-        .from("todo_attachments")
+      const { count, error } = await supabase
+        .from("todo_attachments" as never)
         .select("*", { count: "exact", head: true })
-        .eq("todo_id", (todo as any).id);
+        .eq("todo_id", todo.id!);
 
       if (error) throw error;
       return count || 0;
@@ -131,7 +146,7 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
 
   if (!todo) return null;
 
-  const isParentTodo = !(todo as any).parent_todo_id;
+  const isParentTodo = !todo.parent_todo_id;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -262,15 +277,15 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
           {isParentTodo && (
             <TabsContent value="subtasks" className="mt-4">
               <TodoSubtaskList
-                parentTodoId={(todo as any).id}
-                propertyId={(todo as any).property_id}
+                parentTodoId={todo.id}
+                propertyId={todo.property_id}
                 onUpdate={onUpdate}
               />
             </TabsContent>
           )}
 
           <TabsContent value="attachments" className="mt-4">
-            <TodoAttachments todoId={(todo as any).id} onUpdate={onUpdate} />
+            <TodoAttachments todoId={todo.id} onUpdate={onUpdate} />
           </TabsContent>
         </Tabs>
 

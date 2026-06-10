@@ -23,6 +23,8 @@ import { Shield, Clock, User, AlertCircle, CheckCircle, XCircle, FileText } from
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 
+type AuditValue = Record<string, unknown> | string | number | boolean | null;
+
 interface AuditLog {
   id: string;
   timestamp: string;
@@ -31,9 +33,13 @@ interface AuditLog {
   resource_type: string;
   action: string;
   success: boolean;
-  old_value: any;
-  new_value: any;
-  metadata: any;
+  old_value: AuditValue;
+  new_value: AuditValue;
+  metadata: AuditValue;
+}
+
+interface AuditLogRow extends Omit<AuditLog, "user_email"> {
+  profiles?: { email?: string | null } | null;
 }
 
 interface OrganizationAuditLogsProps {
@@ -48,6 +54,8 @@ export function OrganizationAuditLogs({ organizationId }: OrganizationAuditLogsP
     queryKey: ["audit-logs", organizationId, eventTypeFilter, resourceTypeFilter],
     queryFn: async () => {
       // Hämta audit logs med användarens email från profiles
+      // Cast supabase to any here to avoid TS2589 deep instantiation with the joined select.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("audit_logs")
         .select(`
@@ -63,21 +71,21 @@ export function OrganizationAuditLogs({ organizationId }: OrganizationAuditLogsP
       if (error) throw error;
       
       // Mappa till rätt format med user_email
-      let processedData = (data || []).map((log: any) => ({
+      let processedData = ((data ?? []) as unknown as AuditLogRow[]).map((log) => ({
         ...log,
-        user_email: log.profiles?.email || null,
-      }));
+        user_email: log.profiles?.email ?? null,
+      })) as AuditLog[];
       
       // Filtrera på frontend
       if (eventTypeFilter !== "all") {
-        processedData = processedData.filter((log: any) => log.event_type === eventTypeFilter);
+        processedData = processedData.filter((log) => log.event_type === eventTypeFilter);
       }
       
       if (resourceTypeFilter !== "all") {
-        processedData = processedData.filter((log: any) => log.resource_type === resourceTypeFilter);
+        processedData = processedData.filter((log) => log.resource_type === resourceTypeFilter);
       }
       
-      return processedData as AuditLog[];
+      return processedData;
     },
   });
 
