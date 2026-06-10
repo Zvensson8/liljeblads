@@ -10,11 +10,15 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { useDriftTasks } from "@/hooks/useDriftTasks";
 import { useComponents } from "@/hooks/useComponents";
+import type { DriftTask as DriftTaskRow } from "@/types/domain/driftTask";
+import type { ComponentWithRelations } from "@/types/domain/component";
+import type { DriftTaskComponent } from "@/services/supabase/driftTaskComponentService";
 import {
   useCreateDriftTaskComponent,
   useDeleteDriftTaskComponentByTaskAndComponent,
   useDriftTaskComponentsByTasks,
 } from "@/hooks/useDriftTaskComponents";
+
 
 interface DriftTask {
   id: string;
