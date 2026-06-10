@@ -57,7 +57,7 @@ export function ProjectProposals() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return (data || []) as ProjectProposal[];
+      return (data || []) as unknown as ProjectProposal[];
     },
     enabled: !!organization?.id,
   });
