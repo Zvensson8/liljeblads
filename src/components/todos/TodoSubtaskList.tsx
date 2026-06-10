@@ -121,7 +121,7 @@ export function TodoSubtaskList({ parentTodoId, propertyId, onUpdate }: TodoSubt
 
       <div className="space-y-2">
         {subtasks && subtasks.length > 0 ? (
-          subtasks.map((subtask: any) => (
+          subtasks.map((subtask) => (
             <div
               key={subtask.id}
               className={`flex items-center gap-3 p-3 rounded-lg border ${
