@@ -84,10 +84,18 @@ const workOrderSchema = z.object({
 
 type WorkOrderFormData = z.infer<typeof workOrderSchema>;
 
+import type {
+  WorkOrderWithRelations,
+  UpdateWorkOrderInput,
+  CreateProjectInput,
+} from "@/types/domain";
+import type { WorkOrderFile, WorkOrderFileInsert } from "@/services/supabase";
+import type { TablesInsert } from "@/integrations/supabase/types";
+
 interface WorkOrderDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workOrder: any;
+  workOrder: WorkOrderWithRelations | null;
   onUpdate: () => void;
 }
 
@@ -105,7 +113,7 @@ export function WorkOrderDetailDialog({
   const [uploading, setUploading] = useState(false);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [converting, setConverting] = useState(false);
-  const [previewDocument, setPreviewDocument] = useState<any>(null);
+  const [previewDocument, setPreviewDocument] = useState<WorkOrderFile | null>(null);
   const [exporting, setExporting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
@@ -140,14 +148,14 @@ export function WorkOrderDetailDialog({
   const componentsForProperty = useMemo(
     () =>
       (allComponents ?? [])
-        .filter((c: any) => c.property_id === watchedPropertyId)
-        .map((c: any) => ({ id: c.id, name: c.name, type: c.type })),
+        .filter((c) => c.property_id === watchedPropertyId)
+        .map((c) => ({ id: c.id, name: c.name, type: c.type })),
     [allComponents, watchedPropertyId],
   );
 
   const { data: propertiesData } = useProperties();
   const properties = useMemo(
-    () => (propertiesData ?? []).map((p: any) => ({ id: p.id, name: p.name })),
+    () => (propertiesData ?? []).map((p) => ({ id: p.id, name: p.name })),
     [propertiesData],
   );
 
@@ -201,8 +209,9 @@ export function WorkOrderDetailDialog({
       const data = await generateOrderText.mutateAsync({ workOrderId: workOrder.id }) as { text?: string; error?: string };
       if (data?.error) throw new Error(data.error);
       setPreviewText(data?.text || "");
-    } catch (err: any) {
-      setPreviewText(`[Fel vid generering: ${err.message || "Okänt fel"}]\n\nDu kan skriva texten manuellt nedan.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Okänt fel";
+      setPreviewText(`[Fel vid generering: ${msg}]\n\nDu kan skriva texten manuellt nedan.`);
     } finally {
       setGenerating(false);
     }
@@ -232,16 +241,18 @@ export function WorkOrderDetailDialog({
       const filePath = `${session.user.id}/${workOrder.id}/${Date.now()}.${fileExt}`;
       await storageService.upload("property-documents", filePath, file);
       const publicUrl = storageService.getPublicUrl("property-documents", filePath);
-      await createWorkOrderFile.mutateAsync({
+      const fileInsert: WorkOrderFileInsert = {
         work_order_id: workOrder.id,
         name: file.name,
         file_url: publicUrl,
         file_size: file.size,
         mime_type: file.type,
-      } as any);
+      };
+      await createWorkOrderFile.mutateAsync(fileInsert);
       refetchFiles();
-    } catch (error: any) {
-      toast.error("Kunde inte ladda upp fil: " + error.message);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Okänt fel";
+      toast.error("Kunde inte ladda upp fil: " + msg);
     } finally {
       setUploading(false);
     }
@@ -279,7 +290,7 @@ export function WorkOrderDetailDialog({
     if (!user || !workOrder) return;
     setSubmitting(true);
     try {
-      const patch = {
+      const patch: UpdateWorkOrderInput = {
         action: data.action, property_id: data.property_id, component_id: data.component_id || null,
         status: data.status, priority: data.priority,
         price: data.price ? parseFloat(data.price) : null, contractor: data.contractor || null,
@@ -287,14 +298,14 @@ export function WorkOrderDetailDialog({
         reminder_enabled: data.reminder_enabled, reminder_frequency: data.reminder_frequency,
         reminder_recipient_email: data.reminder_recipient_email || null,
         project_id: workOrder.project_id || null, updated_at: new Date().toISOString(),
-      } as any;
+      };
       await updateWorkOrder.mutateAsync({ id: workOrder.id, patch });
 
       // Auto-create maintenance_history if completing with a component
       const componentId = data.component_id || workOrder.component_id;
       if (data.status === "completed" && componentId) {
         try {
-          await createMaintenanceHistory.mutateAsync({
+          const mhInsert: TablesInsert<"maintenance_history"> = {
             component_id: componentId,
             action_type: data.action || workOrder.action,
             performed_date: new Date().toISOString().split("T")[0],
@@ -303,7 +314,8 @@ export function WorkOrderDetailDialog({
             notes: data.comments || workOrder.comments || null,
             category: "planned",
             work_order_id: workOrder.id,
-          } as any);
+          };
+          await createMaintenanceHistory.mutateAsync(mhInsert);
         } catch (mhError) {
           console.error("Kunde inte skapa underhållspost:", mhError);
         }
@@ -311,8 +323,9 @@ export function WorkOrderDetailDialog({
 
       onUpdate();
       setViewMode("detail");
-    } catch (error: any) {
-      toast.error("Uppdatering misslyckades: " + (error.message || "Okänt fel"));
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Okänt fel";
+      toast.error("Uppdatering misslyckades: " + msg);
     } finally {
       setSubmitting(false);
     }
@@ -347,8 +360,9 @@ export function WorkOrderDetailDialog({
       if (data?.error) throw new Error(data.error);
       toast.success("Beställningsutkast skickat till din e-post");
       setViewMode("detail");
-    } catch (err: any) {
-      toast.error(err.message || "Kunde inte skicka utkast");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Kunde inte skicka utkast";
+      toast.error(msg);
     } finally {
       setSending(false);
     }
@@ -359,7 +373,7 @@ export function WorkOrderDetailDialog({
     if (!workOrder) return;
     setConverting(true);
     try {
-      const newProject = await createProject.mutateAsync({
+      const projectInsert: CreateProjectInput = {
         name: workOrder.action,
         property_id: workOrder.property_id,
         description: workOrder.comments || `Konverterat från arbetsorder: ${workOrder.action}`,
@@ -368,21 +382,24 @@ export function WorkOrderDetailDialog({
         budget: workOrder.price || null,
         project_number: `WO-${workOrder.id.substring(0, 8)}`,
         type: "underhall",
-      } as any);
+      };
+      const newProject = await createProject.mutateAsync(projectInsert);
       if (!newProject) throw new Error("Projektet kunde inte skapas");
       const conversionNote = `Konverterad till projekt ${newProject.project_number} - ${newProject.name}`;
       const updatedComments = workOrder.comments ? `${workOrder.comments}\n\n${conversionNote}` : conversionNote;
+      const conversionPatch: UpdateWorkOrderInput = { status: "completed", comments: updatedComments };
       await updateWorkOrder.mutateAsync({
         id: workOrder.id,
-        patch: { status: "completed", comments: updatedComments } as any,
+        patch: conversionPatch,
       });
       toast.success("Arbetsorder konverterad till projekt!");
       onUpdate();
       setConvertDialogOpen(false);
       setConverting(false);
       setTimeout(() => { onOpenChange(false); navigate(`/projects/${newProject.id}`); }, 100);
-    } catch (error: any) {
-      toast.error("Kunde inte konvertera till projekt: " + (error.message || "Okänt fel"));
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Okänt fel";
+      toast.error("Kunde inte konvertera till projekt: " + msg);
       setConverting(false);
     }
   };
@@ -391,7 +408,7 @@ export function WorkOrderDetailDialog({
     if (!workOrder) return;
     setExporting(true);
     try { await exportWorkOrderToZip(workOrder.id); toast.success("Arbetsorder exporterad"); }
-    catch (error: any) { toast.error(error.message || "Kunde inte exportera arbetsorder"); }
+    catch (error: unknown) { toast.error(error instanceof Error ? error.message : "Kunde inte exportera arbetsorder"); }
     finally { setExporting(false); }
   };
 
