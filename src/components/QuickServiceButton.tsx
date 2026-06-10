@@ -69,8 +69,9 @@ export const QuickServiceButton = ({
   const { quarter, year } = getQuarterFromDate(performedDate);
 
   const { data: driftTasksData = [], isLoading: loadingTasks } = useDriftTasks(
-    open && propertyId ? { propertyId, quarter, year } : ({} as any),
+    open && propertyId ? { propertyId, quarter, year } : {},
   );
+
   const driftTasks = (open && propertyId ? (driftTasksData as DriftTask[]) : []).slice().sort(
     (a, b) => a.name.localeCompare(b.name),
   );
