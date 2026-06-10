@@ -32,8 +32,8 @@ const WorkOrders = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<WorkOrderWithRelations | null>(null);
-  const [detailOrder, setDetailOrder] = useState<WorkOrderWithRelations | null>(null);
+  const [editingOrder, setEditingOrder] = useState<WorkOrderRow | null>(null);
+  const [detailOrder, setDetailOrder] = useState<WorkOrderRow | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "table">("table");
   const [selectedProperty, setSelectedProperty] = useState<string>("all");
@@ -68,7 +68,7 @@ const WorkOrders = () => {
   const ordered = workOrders?.filter((wo) => wo.status === "ordered") || [];
   const orderedTotal = ordered.reduce((sum, wo) => sum + (Number(wo.price) || 0), 0);
 
-  const filteredOrders = (orders: WorkOrderWithRelations[]) => {
+  const filteredOrders = (orders: WorkOrderRow[]) => {
     let filtered = orders;
     if (searchQuery) {
       filtered = filtered.filter(
@@ -158,7 +158,7 @@ const WorkOrders = () => {
     return colors[priority as keyof typeof colors] || "border-l-transparent";
   };
 
-  const renderOrdersTable = (orders: WorkOrderWithRelations[], title: string, icon: string, total?: number) => {
+  const renderOrdersTable = (orders: WorkOrderRow[], title: string, icon: string, total?: number) => {
     const tableOrders = filteredOrders(orders);
 
     return (
