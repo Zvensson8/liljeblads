@@ -149,7 +149,15 @@ export function TaskTemplateLibrary({
       } else {
         const { error } = await supabase
           .from("drift_task_templates")
-          .insert({ ...values, user_id: user?.id } as any);
+          .insert({
+            name: values.name,
+            description: values.description ?? null,
+            category_id: values.category_id ?? null,
+            planned_count: values.planned_count,
+            quarters: values.quarters,
+            is_active: values.is_active,
+            user_id: user?.id ?? "",
+          });
 
         if (error) throw error;
         toast.success("Mall skapad");
