@@ -24,7 +24,7 @@ export function WorkOrdersChart() {
   const { data: workOrders = [], isLoading } = useWorkOrders();
 
   const chartData = useMemo(() => {
-    const counts = workOrders.reduce<Record<string, number>>((acc, wo: any) => {
+    const counts = workOrders.reduce<Record<string, number>>((acc, wo) => {
       acc[wo.status] = (acc[wo.status] || 0) + 1;
       return acc;
     }, {});

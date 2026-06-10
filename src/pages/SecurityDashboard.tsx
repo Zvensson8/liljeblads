@@ -66,7 +66,7 @@ export default function SecurityDashboard() {
                   </div>
                 ) : auditLogs && auditLogs.length > 0 ? (
                   <div className="space-y-2">
-                    {auditLogs.map((log: any) => (
+                    {auditLogs.map((log) => (
                       <div
                         key={log.id}
                         className="flex items-center justify-between p-3 border rounded-lg"

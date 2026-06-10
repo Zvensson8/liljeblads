@@ -71,7 +71,7 @@ export default function Users() {
         .from("user_roles")
         .select("role")
         .eq("user_id", user?.id)
-        .eq("role", "founder" as any)
+        .eq("role", "founder")
         .maybeSingle();
 
       setIsFounder(!!data);

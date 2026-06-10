@@ -36,7 +36,7 @@ export default function FounderAdmin() {
         .from("user_roles")
         .select("role")
         .eq("user_id", user?.id)
-        .eq("role", "founder" as any)
+        .eq("role", "founder")
         .single();
 
       if (error || !data) {

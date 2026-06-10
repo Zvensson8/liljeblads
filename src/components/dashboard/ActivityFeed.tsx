@@ -84,7 +84,7 @@ export function ActivityFeed() {
         type: 'maintenance',
         title: `Underhåll: ${maint.action_type}`,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        description: (maint.components as any)?.name || 'Komponent',
+        description: (maint.components as { name?: string } | null)?.name || 'Komponent',
         timestamp: maint.performed_date,
         status: 'success',
       });
