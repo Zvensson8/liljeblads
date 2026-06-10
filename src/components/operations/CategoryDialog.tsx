@@ -55,7 +55,7 @@ export function CategoryDialog({
       await createCategory.mutateAsync({
         property_id: propertyId,
         name: newCategoryName.trim(),
-      } as any);
+      });
       toast.success("Kategori skapad");
       setNewCategoryName("");
     } catch {
