@@ -12,11 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Mail, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
+import type { Project } from "@/types/domain";
 
 interface ProjectOrderPreviewSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  project: any;
+  project: Pick<Project, "id" | "name" | "project_number" | "budget"> | null;
 }
 
 export function ProjectOrderPreviewSheet({
@@ -39,8 +41,8 @@ export function ProjectOrderPreviewSheet({
       const data = await generateProjectOrderText.mutateAsync({ projectId: project.id }) as { text?: string; error?: string };
       if (data?.error) throw new Error(data.error);
       setText(data?.text || "");
-    } catch (err: any) {
-      setText(`[Fel vid generering: ${err.message || "Okänt fel"}]\n\nDu kan skriva texten manuellt nedan.`);
+    } catch (err: unknown) {
+      setText(`[Fel vid generering: ${getErrorMessage(err)}]\n\nDu kan skriva texten manuellt nedan.`);
     } finally {
       setGenerating(false);
     }
@@ -77,8 +79,8 @@ export function ProjectOrderPreviewSheet({
 
       toast.success("Beställningsutkast skickat till din e-post");
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Kunde inte skicka utkast");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Kunde inte skicka utkast");
     } finally {
       setSending(false);
     }
@@ -111,7 +113,7 @@ export function ProjectOrderPreviewSheet({
               )}
               {project?.budget && (
                 <Badge variant="secondary">
-                  {parseInt(project.budget).toLocaleString("sv-SE")} SEK
+                  {project.budget.toLocaleString("sv-SE")} SEK
                 </Badge>
               )}
             </div>

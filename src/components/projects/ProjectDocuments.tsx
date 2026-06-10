@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { storageService } from "@/services/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -39,7 +40,7 @@ interface ProjectDocumentsProps {
   onDocumentUpload?: () => void;
 }
 
-interface Document {
+interface ProjectDocument {
   id: string;
   name: string;
   file_url: string;
@@ -49,6 +50,8 @@ interface Document {
   created_at: string;
   version?: number;
   is_latest?: boolean;
+  versions?: ProjectDocument[];
+  signedUrl?: string | null;
 }
 
 const FOLDERS = [
@@ -62,14 +65,14 @@ const FOLDERS = [
 
 export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumentsProps) {
   const { user } = useAuth();
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const logActivity = useLogProjectActivity();
   const [loading, setLoading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState("Allmänt");
   const [uploading, setUploading] = useState(false);
   const [filterFolder, setFilterFolder] = useState<string>("all");
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [selectedDoc, setSelectedDoc] = useState<ProjectDocument | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   // Get signed URL for accessing private storage
@@ -104,7 +107,7 @@ export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumen
 
       if (error) throw error;
       setDocuments(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte hämta dokument");
     } finally {
       setLoading(false);
@@ -172,15 +175,15 @@ const uploadFile = async (file: File) => {
       if (onDocumentUpload) {
         onDocumentUpload();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Upload error:", error);
-      toast.error(`Kunde inte ladda upp dokument: ${error.message}`);
+      toast.error(`Kunde inte ladda upp dokument: ${getErrorMessage(error)}`);
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDelete = async (doc: Document) => {
+  const handleDelete = async (doc: ProjectDocument) => {
     if (!confirm("Är du säker på att du vill ta bort detta dokument?")) return;
 
     try {
@@ -193,12 +196,12 @@ const uploadFile = async (file: File) => {
 
       toast.success("Dokument borttaget");
       fetchDocuments();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort dokument");
     }
   };
 
-const handlePreview = async (doc: Document) => {
+const handlePreview = async (doc: ProjectDocument) => {
     const versions = await getDocumentVersions(doc.name);
     // Get signed URL for preview
     const signedUrl = await getSignedUrl(doc.file_url);
@@ -206,7 +209,7 @@ const handlePreview = async (doc: Document) => {
     setPreviewOpen(true);
   };
 
-  const handleDownload = async (doc: Document) => {
+  const handleDownload = async (doc: ProjectDocument) => {
     const signedUrl = await getSignedUrl(doc.file_url);
     if (signedUrl) {
       window.open(signedUrl, "_blank");
@@ -412,7 +415,7 @@ const handlePreview = async (doc: Document) => {
         document={selectedDoc}
         versions={selectedDoc?.versions || []}
         onVersionSelect={(version) => {
-          setSelectedDoc(version);
+          setSelectedDoc(version as ProjectDocument);
         }}
       />
     </div>

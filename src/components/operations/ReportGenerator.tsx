@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -88,8 +89,8 @@ export function ReportGenerator({
           break;
       }
       onOpenChange(false);
-    } catch (error: any) {
-      toast.error(error.message || "Kunde inte generera rapport");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Kunde inte generera rapport");
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getErrorMessage } from "@/lib/utils";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -103,7 +104,7 @@ export function ManualProposalDialog({
         status: 'forslag',
       };
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('ai_suggested_actions')
         .insert({
           organization_id: organization.id,
@@ -120,9 +121,9 @@ export function ManualProposalDialog({
       form.reset();
       onOpenChange(false);
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating proposal:', error);
-      toast.error(error.message || 'Kunde inte skapa projektförslag');
+      toast.error(getErrorMessage(error) || 'Kunde inte skapa projektförslag');
     } finally {
       setLoading(false);
     }

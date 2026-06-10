@@ -87,7 +87,7 @@ export function TaskFormDialog({
         description: values.description || null,
         planned_count: values.planned_count,
         reported_count: 0,
-      } as any);
+      });
 
       toast.success("Uppgift skapad");
       form.reset();

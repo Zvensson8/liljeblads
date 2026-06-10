@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { WorkOrderDialog } from "@/components/WorkOrderDialog";
 import { WorkOrderDetailDialog } from "@/components/WorkOrderDetailDialog";
+import type { WorkOrderWithRelations } from "@/types/domain";
 
 interface ProjectWorkOrdersProps {
   projectId: string;
@@ -16,14 +17,14 @@ interface ProjectWorkOrdersProps {
 
 export function ProjectWorkOrders({ projectId, propertyId }: ProjectWorkOrdersProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<WorkOrderWithRelations | null>(null);
 
   const { data: workOrders, refetch } = useQuery({
     queryKey: ["project-work-orders", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("work_orders")
-        .select("*, properties(name)")
+        .select("*, properties(id, name)")
         .eq("project_id", projectId)
         .order("created_at", { ascending: false });
       if (error) throw error;

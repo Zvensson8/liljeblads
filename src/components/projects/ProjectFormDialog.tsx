@@ -5,6 +5,8 @@ import * as z from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useSendProjectOrderDraft } from "@/hooks/useEdgeFunctions";
 import { toast } from "sonner";
+import type { Project, ProjectType, CreateProjectInput, UpdateProjectInput } from "@/types/domain";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -53,7 +55,7 @@ const projectSchema = z.object({
   name: z.string().min(1, "Projektnamn krävs").max(200),
   description: z.string().optional(),
   type: z.enum(["investering", "underhall", "energi", "annat"]),
-  status: z.enum(["planerat", "invantar_offert", "offert_finns", "pagaende", "pausat", "avslutat"]),
+  status: z.enum(["planerat", "invantar_offert", "offert_finns", "pagaende", "pausat", "avslutat", "forslag"]),
   project_manager: z.string().optional(),
   year: z.number().min(2020, "År måste vara minst 2020").max(2050, "År måste vara max 2050"),
   start_quarter: z.number().min(1).max(4),
@@ -66,7 +68,7 @@ interface ProjectFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
-  editingProject?: any;
+  editingProject?: Project | null;
 }
 
 export function ProjectFormDialog({
@@ -88,7 +90,7 @@ export function ProjectFormDialog({
   const { data: profile } = useProfile(user?.id);
   const userName = profile?.full_name ?? "";
   const { data: propertiesData = [] } = useProperties();
-  const properties = (propertiesData as any[])
+  const properties = propertiesData
     .map((p) => ({ id: p.id, name: p.name, property_number: p.property_number }))
     .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "sv"));
 
@@ -144,10 +146,10 @@ export function ProjectFormDialog({
   const onSubmit = async (values: ProjectFormValues) => {
     setLoading(true);
     try {
-      const projectData: any = {
+      const projectData: CreateProjectInput = {
         ...values,
         forecast: values.budget,
-      };
+      } as CreateProjectInput;
 
       if (editingProject) {
         await updateProject.mutateAsync({ id: editingProject.id, patch: projectData });
@@ -221,7 +223,7 @@ export function ProjectFormDialog({
         if (selectedTemplateId) {
           const template = templates.find((t) => t.id === selectedTemplateId);
           if (template?.checklist_items && template.checklist_items.length > 0) {
-            const checklistItems = template.checklist_items.map((item: any, index: number) => ({
+            const checklistItems = template.checklist_items.map((item: { title: string; description?: string | null }, index: number) => ({
               project_id: project.id,
               title: item.title,
               description: item.description || null,
@@ -259,8 +261,8 @@ export function ProjectFormDialog({
       form.reset();
       onOpenChange(false);
       onSuccess();
-    } catch (error: any) {
-      toast.error(error.message || editingProject ? "Kunde inte uppdatera projekt" : "Kunde inte skapa projekt");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || (editingProject ? "Kunde inte uppdatera projekt" : "Kunde inte skapa projekt"));
     } finally {
       setLoading(false);
     }
@@ -286,8 +288,8 @@ export function ProjectFormDialog({
       form.reset();
       onOpenChange(false);
       onSuccess();
-    } catch (error: any) {
-      toast.error(error.message || "Kunde inte skicka beställningsutkast");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Kunde inte skicka beställningsutkast");
     } finally {
       setSendingDraft(false);
     }
@@ -309,7 +311,7 @@ export function ProjectFormDialog({
     if (template) {
       form.setValue("name", template.name);
       form.setValue("description", template.description || "");
-      form.setValue("type", template.type as any);
+      form.setValue("type", template.type as ProjectType);
       toast.success(`Mall "${template.name}" tillagd`);
     }
   };

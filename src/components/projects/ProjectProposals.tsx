@@ -48,7 +48,7 @@ export function ProjectProposals() {
     queryFn: async () => {
       if (!organization?.id) return [];
       
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('ai_suggested_actions')
         .select('*')
         .eq('organization_id', organization.id)
@@ -57,7 +57,7 @@ export function ProjectProposals() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return (data || []) as ProjectProposal[];
+      return (data || []) as unknown as ProjectProposal[];
     },
     enabled: !!organization?.id,
   });
@@ -84,7 +84,7 @@ export function ProjectProposals() {
 
   const handleApprove = async (proposalId: string) => {
     try {
-      await (supabase as any)
+      await supabase
         .from('ai_suggested_actions')
         .update({ 
           status: 'approved', 
@@ -111,7 +111,7 @@ export function ProjectProposals() {
 
   const handleReject = async (proposalId: string) => {
     try {
-      await (supabase as any)
+      await supabase
         .from('ai_suggested_actions')
         .update({ 
           status: 'rejected',
@@ -137,7 +137,7 @@ export function ProjectProposals() {
 
     for (const id of ids) {
       try {
-        await (supabase as any)
+        await supabase
           .from('ai_suggested_actions')
           .update({ 
             status: 'approved', 
@@ -171,7 +171,7 @@ export function ProjectProposals() {
     const ids = Array.from(selectedProposals);
 
     try {
-      await (supabase as any)
+      await supabase
         .from('ai_suggested_actions')
         .update({ 
           status: 'rejected',

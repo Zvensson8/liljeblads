@@ -60,7 +60,7 @@ export function ProjectQuickStatus({
     try {
       await updateProject.mutateAsync({
         id: projectId,
-        patch: { status: newStatus } as any,
+        patch: { status: newStatus },
       });
 
       await logActivity.mutateAsync({

@@ -277,7 +277,7 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
     }
   };
 
-  const handleUpdateField = async (taskId: string, field: keyof Task, value: any) => {
+  const handleUpdateField = async <K extends keyof Task>(taskId: string, field: K, value: Task[K]) => {
     // Optimistic update - update local state immediately (already done via onChange)
     const updatedTasks = tasks.map(t =>
       t.id === taskId ? { ...t, [field]: value } : t
@@ -462,7 +462,7 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 min-w-[200px]"
               />
-              <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue />
                 </SelectTrigger>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -113,9 +114,9 @@ export function MultiPropertyReportDialog({
         }`
       );
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error generating report:", error);
-      toast.error(error.message || "Kunde inte generera rapport");
+      toast.error(getErrorMessage(error) || "Kunde inte generera rapport");
     } finally {
       setLoading(false);
     }

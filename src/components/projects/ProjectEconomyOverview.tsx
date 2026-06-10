@@ -35,7 +35,7 @@ export function ProjectEconomyOverview({
     try {
       await updateProject.mutateAsync({
         id: projectId,
-        patch: { budget: editBudget, forecast: editForecast } as any,
+        patch: { budget: editBudget, forecast: editForecast },
       });
 
       const changes = [];
@@ -57,7 +57,7 @@ export function ProjectEconomyOverview({
       toast.success("Ekonomi uppdaterad");
       setIsEditing(false);
       onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte uppdatera ekonomi");
     } finally {
       setSaving(false);

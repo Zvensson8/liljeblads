@@ -91,8 +91,8 @@ export function ComponentAutoDetect({
 
       if (error) throw error;
 
-      setComponents((data as any) || []);
-    } catch (error: any) {
+      setComponents((data as unknown as Component[]) || []);
+    } catch (error: unknown) {
       console.error("Error searching components:", error);
       toast.error("Kunde inte söka komponenter");
     } finally {

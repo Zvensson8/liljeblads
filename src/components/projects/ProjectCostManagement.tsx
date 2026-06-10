@@ -109,7 +109,7 @@ export function ProjectCostManagement({
         category: "",
       });
       onCostUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte spara kostnad");
     }
   };
@@ -143,7 +143,7 @@ export function ProjectCostManagement({
 
       toast.success("Kostnad borttagen");
       onCostUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort kostnad");
     }
   };

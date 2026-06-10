@@ -114,7 +114,7 @@ export function TaskTemplateLibrary({
 
       if (error) throw error;
       setTemplates(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte hämta mallar");
     } finally {
       setLoading(false);
@@ -131,7 +131,7 @@ export function TaskTemplateLibrary({
 
       if (error) throw error;
       setCategories(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching categories:", error);
     }
   };
@@ -149,7 +149,15 @@ export function TaskTemplateLibrary({
       } else {
         const { error } = await supabase
           .from("drift_task_templates")
-          .insert({ ...values, user_id: user?.id } as any);
+          .insert({
+            name: values.name,
+            description: values.description ?? null,
+            category_id: values.category_id ?? null,
+            planned_count: values.planned_count,
+            quarters: values.quarters,
+            is_active: values.is_active,
+            user_id: user?.id ?? "",
+          });
 
         if (error) throw error;
         toast.success("Mall skapad");
@@ -159,7 +167,7 @@ export function TaskTemplateLibrary({
       setEditingTemplate(null);
       setShowForm(false);
       fetchTemplates();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte spara mall");
     }
   };
@@ -176,7 +184,7 @@ export function TaskTemplateLibrary({
       if (error) throw error;
       toast.success("Mall borttagen");
       fetchTemplates();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort mall");
     }
   };
