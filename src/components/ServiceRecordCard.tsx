@@ -29,6 +29,7 @@ import { Trash2, Pencil, FileText, Upload, X, Download, Loader2 } from 'lucide-r
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/utils';
 
 interface MaintenanceDocument {
   id: string;
@@ -190,8 +191,8 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
       toast.success('Service borttagen');
       onDelete();
       return true;
-    } catch (error: any) {
-      toast.error('Kunde inte ta bort service', { description: error.message });
+    } catch (error: unknown) {
+      toast.error('Kunde inte ta bort service', { description: getErrorMessage(error) });
       return false;
     } finally {
       setIsDeleting(false);
@@ -235,8 +236,8 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
 
       toast.success('Dokument uppladdat');
       fetchDocuments();
-    } catch (error: any) {
-      toast.error('Kunde inte ladda upp dokument', { description: error.message });
+    } catch (error: unknown) {
+      toast.error('Kunde inte ladda upp dokument', { description: getErrorMessage(error) });
     } finally {
       setUploading(false);
       e.target.value = '';
@@ -262,8 +263,8 @@ export function ServiceRecordCard({ record, onUpdate, onDelete }: ServiceRecordC
 
       toast.success('Dokument borttaget');
       fetchDocuments();
-    } catch (error: any) {
-      toast.error('Kunde inte ta bort dokument', { description: error.message });
+    } catch (error: unknown) {
+      toast.error('Kunde inte ta bort dokument', { description: getErrorMessage(error) });
     }
   };
 
