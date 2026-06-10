@@ -62,15 +62,15 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
 
   const accountCodeMap = useMemo(() => {
     const m: Record<string, { code: string; description: string }> = {};
-    accountCodes.forEach((c: any) => (m[c.id] = { code: c.code, description: c.description }));
+    (accountCodes as AccountCode[]).forEach((c) => (m[c.id] = { code: c.code, description: c.description }));
     return m;
   }, [accountCodes]);
 
   const costs = useMemo(() => {
     return (rawCosts ?? [])
       .slice()
-      .sort((a: any, b: any) => (b.last_payment_date ?? "").localeCompare(a.last_payment_date ?? ""))
-      .map((c: any) => ({
+      .sort((a, b) => (b.last_payment_date ?? "").localeCompare(a.last_payment_date ?? ""))
+      .map((c) => ({
         ...c,
         account_code: c.account_code_id ? accountCodeMap[c.account_code_id] ?? null : null,
       }));
@@ -86,7 +86,7 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
         property_id: propertyId,
         ...formData,
         amount: Number(formData.amount),
-      } as any);
+      });
       setDialogOpen(false);
       setFormData({
         description: '',
@@ -119,7 +119,7 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
     return `Var ${months} månad${variation ? ` (±${variation} mån)` : ""}`;
   };
 
-  const totalMonthly = costs.reduce((sum: number, cost: any) => {
+  const totalMonthly = costs.reduce((sum: number, cost: RecurringCostWithAccountCode) => {
     const multiplier = 1 / (cost.base_interval_months || 12);
     return sum + (cost.amount * multiplier);
   }, 0);
@@ -194,7 +194,7 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {costs.map((cost: any) => (
+                {costs.map((cost) => (
                   <TableRow key={cost.id}>
                     <TableCell className="font-medium">{cost.description}</TableCell>
                     <TableCell>
@@ -258,7 +258,7 @@ export function PropertyRecurringCosts({ propertyId }: PropertyRecurringCostsPro
                   <SelectValue placeholder="Välj kontokod" />
                 </SelectTrigger>
                 <SelectContent>
-                  {accountCodes.map((code: any) => (
+                  {(accountCodes as AccountCode[]).map((code) => (
                     <SelectItem key={code.id} value={code.id}>
                       {code.code} - {code.description}
                     </SelectItem>
