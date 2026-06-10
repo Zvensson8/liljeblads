@@ -13,6 +13,10 @@ import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { DocumentUploadZone } from "@/components/documents/DocumentUploadZone";
 import { DocumentPreviewDialog } from "@/components/documents/DocumentPreviewDialog";
+import type { Tables } from "@/integrations/supabase/types";
+
+type PropertyDocumentRow = Tables<"property_documents">;
+type PropertyDocumentWithVersions = PropertyDocumentRow & { versions?: PropertyDocumentRow[] };
 
 interface PropertyDocumentsProps {
   propertyId: string;
@@ -21,7 +25,7 @@ interface PropertyDocumentsProps {
 export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
   const { session } = useAuth();
   const [uploading, setUploading] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [selectedDoc, setSelectedDoc] = useState<PropertyDocumentWithVersions | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const { data: documents, refetch } = useQuery({
