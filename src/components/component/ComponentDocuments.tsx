@@ -110,7 +110,7 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
         // Show analysis dialog
         setAnalysisDoc({ id: insertedDoc.id, name: file.name });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ladda upp dokument: " + error.message);
     } finally {
       setUploading(false);
@@ -136,7 +136,7 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
     }
   };
 
-  const handleDownload = async (doc: any) => {
+  const handleDownload = async (doc: ComponentDocumentRow) => {
     const signedUrl = await getSignedUrl(doc.file_url);
     if (signedUrl) {
       window.open(signedUrl, "_blank");
@@ -168,12 +168,12 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
 
       toast.success("Dokument borttaget");
       refetch();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort dokument");
     }
   };
 
-  const handlePreview = async (doc: any) => {
+  const handlePreview = async (doc: ComponentDocumentRow) => {
     const versions = await getDocumentVersions(doc.name);
     // Get signed URL for preview
     const signedUrl = await getSignedUrl(doc.file_url);
@@ -181,7 +181,7 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
     setPreviewOpen(true);
   };
 
-  const isPdfDocument = (doc: any) => {
+  const isPdfDocument = (doc: ComponentDocumentRow) => {
     return doc.mime_type === 'application/pdf' || doc.name?.toLowerCase().endsWith('.pdf');
   };
 
