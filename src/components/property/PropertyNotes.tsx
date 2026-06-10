@@ -44,7 +44,7 @@ export function PropertyNotes({ propertyId }: PropertyNotesProps) {
 
   const handleUpdateNote = async (id: string) => {
     try {
-      await updateNote.mutateAsync({ id, patch: { content: editContent } as any });
+      await updateNote.mutateAsync({ id, patch: { content: editContent } });
       toast.success("Anteckning uppdaterad");
       setEditingId(null);
     } catch {
