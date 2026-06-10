@@ -248,7 +248,7 @@ const PropertyDetail = () => {
       floor_name: comp.floors?.name ?? (comp.floor_id ? floorMap.get(comp.floor_id) : undefined),
       property_name: property.name,
       property_address: property.address,
-    }));
+    })) as Parameters<typeof exportComponentsToExcel>[0];
 
     if (format === 'excel') {
       exportComponentsToExcel(
