@@ -15,13 +15,15 @@ export function ComponentsChart() {
   const { data: components = [], isLoading } = useComponents();
 
   const data = useMemo<ComponentData[]>(() => {
+    type StatusKey = 'active' | 'maintenance' | 'inactive';
     const grouped = components.reduce<Record<string, { active: number; maintenance: number; inactive: number }>>(
-      (acc, comp: any) => {
+      (acc, comp) => {
         if (!acc[comp.type]) {
           acc[comp.type] = { active: 0, maintenance: 0, inactive: 0 };
         }
-        if (comp.status in acc[comp.type]) {
-          (acc[comp.type] as any)[comp.status]++;
+        const status = comp.status as StatusKey;
+        if (status in acc[comp.type]) {
+          acc[comp.type][status]++;
         }
         return acc;
       },
