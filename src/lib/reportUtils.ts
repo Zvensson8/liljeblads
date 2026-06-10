@@ -3,16 +3,47 @@ import autoTable from "jspdf-autotable";
 import { supabase } from "@/integrations/supabase/client";
 import { createWorkbook, addJsonSheet, downloadWorkbook } from "./excelUtils";
 
-interface Task {
+interface DriftCategoryRef {
+  name: string | null;
+}
+
+interface DriftTaskRow {
   id: string;
   name: string;
   description: string | null;
   planned_count: number;
   reported_count: number;
   quarter: string;
-  category?: {
-    name: string;
-  };
+  category_id?: string | null;
+  drift_categories: DriftCategoryRef | DriftCategoryRef[] | null;
+}
+
+interface ReportRow {
+  Kvartal: string;
+  Kategori: string;
+  Uppgift: string;
+  Beskrivning: string;
+  Planerat: number;
+  Redovisat: number;
+  Status: "Saknas" | "Klar" | "Pågår";
+  "Completion %": number;
+}
+
+interface DeviationRow extends DriftTaskRow {
+  deviation: number;
+  deviationPercent: number;
+  deviationAmount: number;
+  status: "Överrapportering" | "Underrapportering";
+}
+
+// jsPDF augmented with the autoTable plugin's `lastAutoTable` property.
+type JsPdfWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
+
+function categoryName(t: DriftTaskRow): string {
+  const cats = t.drift_categories;
+  if (!cats) return "Ingen kategori";
+  const arr = Array.isArray(cats) ? cats : [cats];
+  return arr[0]?.name ?? "Ingen kategori";
 }
 
 export async function generateYearReport(
