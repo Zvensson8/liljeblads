@@ -41,8 +41,8 @@ export function ProjectOrderPreviewSheet({
       const data = await generateProjectOrderText.mutateAsync({ projectId: project.id }) as { text?: string; error?: string };
       if (data?.error) throw new Error(data.error);
       setText(data?.text || "");
-    } catch (err: any) {
-      setText(`[Fel vid generering: ${err.message || "Okänt fel"}]\n\nDu kan skriva texten manuellt nedan.`);
+    } catch (err: unknown) {
+      setText(`[Fel vid generering: ${getErrorMessage(err)}]\n\nDu kan skriva texten manuellt nedan.`);
     } finally {
       setGenerating(false);
     }
