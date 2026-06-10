@@ -262,8 +262,8 @@ const PropertyDetail = () => {
       });
     } else {
       exportComponentsToPDF(
-        formattedComponents,
-        maintenanceRecords,
+        formattedComponents as Parameters<typeof exportComponentsToPDF>[0],
+        maintenanceRecords as Parameters<typeof exportComponentsToPDF>[1],
         `Komponentregister - ${property.name}`,
         `${property.name}-${new Date().toISOString().split('T')[0]}.pdf`
       );
