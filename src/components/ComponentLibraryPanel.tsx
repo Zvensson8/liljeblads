@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { useComponentLibrary } from '@/hooks/useComponentLibrary';
+import { useComponentLibrary, type ComponentTemplate } from '@/hooks/useComponentLibrary';
 import { ScrollArea } from './ui/scroll-area';
 import { AddCustomComponentDialog } from './AddCustomComponentDialog';
 import { Plus, X, Package, MapPin, Search } from 'lucide-react';
