@@ -273,7 +273,8 @@ export default function AIChat() {
       // Refetch messages from DB before unlocking state sync
       await queryClient.invalidateQueries({ queryKey: ['ai-messages', conversationId] });
     } catch (error: unknown) {
-      const status = error?.context?.status ?? error?.status;
+      const err = error as { context?: { status?: number }; status?: number } | null;
+      const status = err?.context?.status ?? err?.status;
       if (status === 401) {
         toast.error('Sessionen har gått ut. Logga in igen.');
         await supabase.auth.signOut();
