@@ -28,6 +28,7 @@ import {
   useUpdateTodo,
   useDeleteTodo,
 } from "@/hooks/useTodos";
+import type { Todo } from "@/types/domain";
 
 interface PropertyTodosProps {
   propertyId: string;
@@ -41,7 +42,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
   const [newPriority, setNewPriority] = useState("medium");
   const [newCategory, setNewCategory] = useState("none");
   const [expandedTodos, setExpandedTodos] = useState<Set<string>>(new Set());
-  const [selectedTodo, setSelectedTodo] = useState<any>(null);
+  const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
@@ -55,12 +56,12 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
   const deleteTodo = useDeleteTodo();
 
   const topLevel = useMemo(() => {
-    const list = (allTodos ?? []).filter((t: any) => !t.parent_todo_id);
+    const list = (allTodos ?? []).filter((t: Todo) => !t.parent_todo_id);
     return list
-      .filter((t: any) => (showCompleted ? true : !t.completed))
-      .filter((t: any) => (categoryFilter ? t.category === categoryFilter : true))
-      .filter((t: any) => (priorityFilter ? t.priority === priorityFilter : true))
-      .sort((a: any, b: any) => {
+      .filter((t: Todo) => (showCompleted ? true : !t.completed))
+      .filter((t: Todo) => (categoryFilter ? t.category === categoryFilter : true))
+      .filter((t: Todo) => (priorityFilter ? t.priority === priorityFilter : true))
+      .sort((a: Todo, b: Todo) => {
         if (a.completed !== b.completed) return a.completed ? 1 : -1;
         const ad = a.due_date ?? "";
         const bd = b.due_date ?? "";
@@ -69,8 +70,8 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
   }, [allTodos, categoryFilter, priorityFilter, showCompleted]);
 
   const subtasksByParent = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    (allTodos ?? []).forEach((t: any) => {
+    const map: Record<string, Todo[]> = {};
+    (allTodos ?? []).forEach((t: Todo) => {
       if (t.parent_todo_id) {
         (map[t.parent_todo_id] ||= []).push(t);
       }
@@ -85,18 +86,30 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
   }, [subtasksByParent]);
 
   const { data: attachmentCounts } = useQuery({
-    queryKey: ["attachment-counts", (allTodos ?? []).map((t: any) => t.id)],
+    queryKey: ["attachment-counts", (allTodos ?? []).map((t: Todo) => t.id)],
     enabled: !!allTodos && allTodos.length > 0,
     queryFn: async () => {
-      const todoIds = (allTodos ?? []).map((t: any) => t.id);
-      const { data, error } = await (supabase as any)
+      const todoIds = (allTodos ?? []).map((t: Todo) => t.id);
+      // todo_attachments is not in the generated Supabase types yet.
+      const { data, error } = await (
+        supabase as unknown as {
+          from: (t: string) => {
+            select: (s: string) => {
+              in: (
+                col: string,
+                vals: string[],
+              ) => Promise<{ data: Array<{ todo_id: string }> | null; error: Error | null }>;
+            };
+          };
+        }
+      )
         .from("todo_attachments")
         .select("todo_id")
         .in("todo_id", todoIds);
 
       if (error) throw error;
       const counts: Record<string, number> = {};
-      data?.forEach((item: any) => {
+      data?.forEach((item) => {
         counts[item.todo_id] = (counts[item.todo_id] || 0) + 1;
       });
       return counts;
@@ -118,7 +131,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
         priority: newPriority,
         category: newCategory === "none" ? null : newCategory || null,
         user_id: user.id,
-      } as any);
+      });
       toast.success("Uppgift tillagd");
       setNewTodo("");
       setNewDueDate("");
@@ -131,7 +144,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
 
   const handleToggleTodo = async (id: string, completed: boolean) => {
     try {
-      await updateTodo.mutateAsync({ id, patch: { completed: !completed } as any });
+      await updateTodo.mutateAsync({ id, patch: { completed: !completed } });
       toast.success(completed ? "Uppgift återaktiverad" : "Uppgift slutförd");
     } catch {
       // toast handled in hook
@@ -159,7 +172,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
     });
   };
 
-  const openDetailDialog = (todo: any) => {
+  const openDetailDialog = (todo: Todo) => {
     setSelectedTodo(todo);
     setDetailDialogOpen(true);
   };
@@ -270,11 +283,11 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
 
       <div className="space-y-2">
         {displayTodos && displayTodos.length > 0 ? (
-          displayTodos.map((todo: any) => {
+          displayTodos.map((todo: Todo) => {
             const hasSubtasks = (subtaskCounts?.[todo.id] || 0) > 0;
             const isExpanded = expandedTodos.has(todo.id);
             const todoSubtasks = subtasksByParent[todo.id] || [];
-            const completedSubtasks = todoSubtasks.filter((s: any) => s.completed).length;
+            const completedSubtasks = todoSubtasks.filter((s: Todo) => s.completed).length;
             const hasAttachments = (attachmentCounts?.[todo.id] || 0) > 0;
 
             return (
@@ -299,7 +312,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
                               {todo.title}
                             </p>
                             <div className="flex gap-1">
-                              <TodoPriorityBadge priority={todo.priority || "medium"} />
+                              <TodoPriorityBadge priority={(todo.priority || "medium") as "low" | "medium" | "high" | "critical"} />
                               <TodoCategoryBadge category={todo.category} />
                               {hasAttachments && (
                                 <Paperclip className="h-4 w-4 text-muted-foreground" />
@@ -353,7 +366,7 @@ export function PropertyTodos({ propertyId, compact = false }: PropertyTodosProp
                             completed={completedSubtasks}
                             total={todoSubtasks.length}
                           />
-                          {todoSubtasks.map((subtask: any) => (
+                          {todoSubtasks.map((subtask: Todo) => (
                             <div
                               key={subtask.id}
                               className={`flex items-center gap-3 p-2 rounded ${
