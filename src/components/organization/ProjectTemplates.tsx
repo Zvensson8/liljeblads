@@ -55,7 +55,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
         description: template.description || "",
         type: template.type,
         estimated_duration_quarters: template.estimated_duration_quarters?.toString() || "",
-        checklist_items: template.checklist_items || [],
+        checklist_items: (template.checklist_items as Array<{ title: string; description: string }>) || [],
       });
     } else {
       setEditingTemplate(null);
