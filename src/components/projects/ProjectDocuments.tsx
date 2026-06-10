@@ -415,7 +415,7 @@ const handlePreview = async (doc: ProjectDocument) => {
         document={selectedDoc}
         versions={selectedDoc?.versions || []}
         onVersionSelect={(version) => {
-          setSelectedDoc(version);
+          setSelectedDoc(version as ProjectDocument);
         }}
       />
     </div>
