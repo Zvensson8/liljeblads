@@ -5,6 +5,9 @@ import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { createWorkbook, addJsonSheet, downloadWorkbook } from './excelUtils';
 
+type JsPdfWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
+
+
 interface Component {
   id: string;
   name: string;
@@ -60,7 +63,7 @@ export const exportComponentsToExcel = async (
   addJsonSheet(wb, 'Komponenter', componentsData);
   
   // Maintenance history sheet
-  const maintenanceData: any[] = [];
+  const maintenanceData: Record<string, string | number>[] = [];
   components.forEach(comp => {
     const records = maintenanceRecords[comp.id] || [];
     records.forEach(record => {
@@ -118,7 +121,7 @@ export const exportComponentsToPDF = (
   });
   
   // Maintenance history for each component
-  let startY = (doc as any).lastAutoTable.finalY + 15;
+  let startY = (doc as JsPdfWithAutoTable).lastAutoTable.finalY + 15;
   
   components.forEach(comp => {
     const records = maintenanceRecords[comp.id] || [];
@@ -148,7 +151,7 @@ export const exportComponentsToPDF = (
         styles: { fontSize: 8 },
       });
       
-      startY = (doc as any).lastAutoTable.finalY + 15;
+      startY = (doc as JsPdfWithAutoTable).lastAutoTable.finalY + 15;
     }
   });
   

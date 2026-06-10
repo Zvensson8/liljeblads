@@ -121,7 +121,21 @@ function createTableCell(
   });
 }
 
-export async function generateProjectDocx(project: any): Promise<Blob> {
+interface ProjectDocxInput {
+  name: string;
+  project_number?: string;
+  status?: string;
+  type?: string;
+  description?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  budget?: number | null;
+  forecasted_total?: number | null;
+  properties?: { name?: string } | null;
+  [key: string]: unknown;
+}
+
+export async function generateProjectDocx(project: ProjectDocxInput): Promise<Blob> {
   const statusLabels: Record<string, string> = {
     planerat: "Planerat",
     pagaende: "Pågående",
@@ -307,7 +321,8 @@ export async function generateProjectDocx(project: any): Promise<Blob> {
   return await Packer.toBlob(doc);
 }
 
-export async function generateChecklistDocx(checklist: any[]): Promise<Blob> {
+interface ChecklistItemInput { title: string; completed?: boolean; completed_at?: string | null; }
+export async function generateChecklistDocx(checklist: ChecklistItemInput[]): Promise<Blob> {
   const rows = checklist.map((item, index) => {
     const statusSymbol = item.completed ? "✓" : "☐";
     const statusColor = item.completed ? COLORS.success : COLORS.text;
@@ -410,7 +425,8 @@ export async function generateChecklistDocx(checklist: any[]): Promise<Blob> {
   return await Packer.toBlob(doc);
 }
 
-export async function generateActivitiesDocx(activities: any[]): Promise<Blob> {
+interface ActivityInput { created_at: string; activity_type: string; description: string; }
+export async function generateActivitiesDocx(activities: ActivityInput[]): Promise<Blob> {
   const rows = [
     new TableRow({
       children: [
@@ -475,7 +491,8 @@ export async function generateActivitiesDocx(activities: any[]): Promise<Blob> {
   return await Packer.toBlob(doc);
 }
 
-export async function generateCostsDocx(costs: any[]): Promise<Blob> {
+interface CostInput { cost_date: string; amount: number | string; description: string; category?: string | null; actor?: string | null; }
+export async function generateCostsDocx(costs: CostInput[]): Promise<Blob> {
   let total = 0;
   const rows = [
     new TableRow({
@@ -582,7 +599,8 @@ export async function generateCostsDocx(costs: any[]): Promise<Blob> {
   return await Packer.toBlob(doc);
 }
 
-export async function generateBudgetDocx(budget: any[]): Promise<Blob> {
+interface BudgetInput { description: string; category?: string | null; budgeted_amount: number | string; forecasted_amount?: number | string | null; }
+export async function generateBudgetDocx(budget: BudgetInput[]): Promise<Blob> {
   let totalBudget = 0;
   let totalForecast = 0;
 
@@ -713,7 +731,19 @@ export async function generateBudgetDocx(budget: any[]): Promise<Blob> {
   return await Packer.toBlob(doc);
 }
 
-export async function generateWorkOrderDocx(workOrder: any): Promise<Blob> {
+interface WorkOrderDocxInput {
+  action: string;
+  work_order_number?: string;
+  status?: string;
+  priority?: string;
+  description?: string | null;
+  due_date?: string | null;
+  estimated_cost?: number | null;
+  actual_cost?: number | null;
+  properties?: { name?: string } | null;
+  [key: string]: unknown;
+}
+export async function generateWorkOrderDocx(workOrder: WorkOrderDocxInput): Promise<Blob> {
   const statusLabels: Record<string, string> = {
     not_started: "Ej påbörjad",
     awaiting_quote: "Inväntar offert",
