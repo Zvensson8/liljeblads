@@ -113,7 +113,7 @@ export function ProjectOrderPreviewSheet({
               )}
               {project?.budget && (
                 <Badge variant="secondary">
-                  {parseInt(project.budget).toLocaleString("sv-SE")} SEK
+                  {project.budget.toLocaleString("sv-SE")} SEK
                 </Badge>
               )}
             </div>
