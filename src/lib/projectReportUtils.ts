@@ -2,13 +2,25 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
+import type { Database } from "@/integrations/supabase/types";
+import type { ProjectWithRelations } from "@/types/domain";
+
+type ProjectCost = Database["public"]["Tables"]["project_cost_items"]["Row"];
+type ProjectChecklistItem = Database["public"]["Tables"]["project_checklist_items"]["Row"];
+type ProjectDocument = Database["public"]["Tables"]["project_documents"]["Row"];
+type ProjectActivity = Database["public"]["Tables"]["project_activity_log"]["Row"];
+
+/** jsPDF with the autoTable plugin's `lastAutoTable` runtime property. */
+type JsPdfWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
 
 export const generateProjectPDFReport = async (
-  project: any,
-  costs: any[],
-  checklistItems: any[],
-  documents: any[],
-  activityLog: any[]
+  project: ProjectWithRelations,
+  costs: ProjectCost[],
+  checklistItems: ProjectChecklistItem[],
+  documents: ProjectDocument[],
+  // Kept for backwards compatibility; the function does not yet render the log.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _activityLog: ProjectActivity[]
 ) => {
   const doc = new jsPDF();
   let yPos = 20;
@@ -51,7 +63,7 @@ export const generateProjectPDFReport = async (
     margin: { left: 15, right: 15 },
   });
 
-  yPos = (doc as any).lastAutoTable.finalY + 10;
+  yPos = (doc as JsPdfWithAutoTable).lastAutoTable.finalY + 10;
 
   if (project.description) {
     doc.setFontSize(12);
@@ -95,7 +107,7 @@ export const generateProjectPDFReport = async (
     },
   });
 
-  yPos = (doc as any).lastAutoTable.finalY + 10;
+  yPos = (doc as JsPdfWithAutoTable).lastAutoTable.finalY + 10;
 
   // Cost List
   if (costs.length > 0) {
