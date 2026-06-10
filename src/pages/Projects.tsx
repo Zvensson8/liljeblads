@@ -82,7 +82,10 @@ export default function Projects() {
   const [sortField, setSortField] = useState<string>("updated_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [editingCell, setEditingCell] = useState<{ projectId: string; field: string } | null>(null);
-  const [tempValue, setTempValue] = useState<string | number | null>(null);
+  // tempValue is a polymorphic inline-edit buffer (string, number, or
+  // composite { quarter, year } for quarter editing). Domain typing here
+  // would add more noise than value — keep as `unknown` and narrow at use.
+  const [tempValue, setTempValue] = useState<unknown>(null);
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
@@ -233,7 +236,7 @@ export default function Projects() {
     }
   };
 
-  const startEditing = (projectId: string, field: string, currentValue: string | number | null) => {
+  const startEditing = (projectId: string, field: string, currentValue: unknown) => {
     setEditingCell({ projectId, field });
     setTempValue(currentValue);
   };
