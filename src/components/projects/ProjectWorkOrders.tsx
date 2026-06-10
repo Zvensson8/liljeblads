@@ -24,7 +24,7 @@ export function ProjectWorkOrders({ projectId, propertyId }: ProjectWorkOrdersPr
     queryFn: async () => {
       const { data, error } = await supabase
         .from("work_orders")
-        .select("*, properties(name)")
+        .select("*, properties(id, name)")
         .eq("project_id", projectId)
         .order("created_at", { ascending: false });
       if (error) throw error;
