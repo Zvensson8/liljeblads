@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Upload, Download, CheckCircle, AlertCircle, XCircle, Copy, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { parseImportFile, validateAndMatchComponents, importComponents, type ValidationResult, type ParsedComponentRow } from '@/lib/importUtils';
+import { parseImportFile, validateAndMatchComponents, importComponents, type ValidationResult, type ImportRow } from '@/lib/importUtils';
 import { getErrorMessage } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -24,7 +24,7 @@ export const ComponentImportDialog = ({
 }: ComponentImportDialogProps) => {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [parsedData, setParsedData] = useState<ParsedComponentRow[]>([]);
+  const [parsedData, setParsedData] = useState<ImportRow[]>([]);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [importing, setImporting] = useState(false);
   const [stage, setStage] = useState<'upload' | 'preview'>('upload');
