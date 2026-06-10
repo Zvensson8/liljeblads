@@ -29,8 +29,10 @@ function MapUpdater({ locations }: { locations: MapLocation[] }) {
     if (locations && locations.length > 0) {
       const bounds = L.latLngBounds(
         locations
-          .filter(loc => loc.latitude && loc.longitude)
-          .map(loc => [loc.latitude, loc.longitude] as [number, number])
+          .filter((loc): loc is MapLocation & { latitude: number; longitude: number } =>
+            loc.latitude != null && loc.longitude != null,
+          )
+          .map((loc) => [loc.latitude, loc.longitude] as [number, number]),
       );
       
       if (bounds.isValid()) {
