@@ -27,12 +27,10 @@ export function PropertyEconomy({ propertyId }: PropertyEconomyProps) {
   const fetchEconomyData = async () => {
     try {
       // Fetch components
-      const result: any = await (supabase as any)
+      const { data: componentsData, error: compError } = await supabase
         .from("components")
         .select("id, type")
         .eq("property_id", propertyId);
-      
-      const { data: componentsData, error: compError } = result;
 
       if (compError || !componentsData || componentsData.length === 0) {
         setLoading(false);
