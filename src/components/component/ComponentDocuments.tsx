@@ -13,6 +13,11 @@ import { sv } from "date-fns/locale";
 import { DocumentUploadZone } from "@/components/documents/DocumentUploadZone";
 import { DocumentPreviewDialog } from "@/components/documents/DocumentPreviewDialog";
 import { ProtocolAnalysisDialog } from "@/components/component/ProtocolAnalysisDialog";
+import { getErrorMessage } from "@/lib/utils";
+import type { Tables } from "@/integrations/supabase/types";
+
+type ComponentDocumentRow = Tables<"component_documents">;
+type DocWithVersions = ComponentDocumentRow & { versions?: ComponentDocumentRow[]; signedUrl?: string | null };
 
 interface ComponentDocumentsProps {
   componentId: string;
@@ -21,9 +26,10 @@ interface ComponentDocumentsProps {
 export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
   const { session } = useAuth();
   const [uploading, setUploading] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [selectedDoc, setSelectedDoc] = useState<DocWithVersions | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [analysisDoc, setAnalysisDoc] = useState<{ id: string; name: string } | null>(null);
+
 
   const { data: documents, refetch } = useQuery({
     queryKey: ["component-documents", componentId],
@@ -104,8 +110,9 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
         // Show analysis dialog
         setAnalysisDoc({ id: insertedDoc.id, name: file.name });
       }
-    } catch (error: any) {
-      toast.error("Kunde inte ladda upp dokument: " + error.message);
+    } catch (error: unknown) {
+      toast.error("Kunde inte ladda upp dokument: " + getErrorMessage(error));
+
     } finally {
       setUploading(false);
     }
@@ -130,7 +137,7 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
     }
   };
 
-  const handleDownload = async (doc: any) => {
+  const handleDownload = async (doc: ComponentDocumentRow) => {
     const signedUrl = await getSignedUrl(doc.file_url);
     if (signedUrl) {
       window.open(signedUrl, "_blank");
@@ -162,12 +169,12 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
 
       toast.success("Dokument borttaget");
       refetch();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort dokument");
     }
   };
 
-  const handlePreview = async (doc: any) => {
+  const handlePreview = async (doc: ComponentDocumentRow) => {
     const versions = await getDocumentVersions(doc.name);
     // Get signed URL for preview
     const signedUrl = await getSignedUrl(doc.file_url);
@@ -175,7 +182,7 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
     setPreviewOpen(true);
   };
 
-  const isPdfDocument = (doc: any) => {
+  const isPdfDocument = (doc: ComponentDocumentRow) => {
     return doc.mime_type === 'application/pdf' || doc.name?.toLowerCase().endsWith('.pdf');
   };
 
@@ -278,8 +285,9 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
         document={selectedDoc}
         versions={selectedDoc?.versions || []}
         onVersionSelect={(version) => {
-          setSelectedDoc(version);
+          setSelectedDoc(version as unknown as DocWithVersions);
         }}
+
       />
 
       {analysisDoc && (

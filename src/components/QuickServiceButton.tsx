@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { storageService } from '@/services/supabase';
+import { getErrorMessage } from '@/lib/utils';
 import { useCreateMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 import { useCreateMaintenanceDocument } from '@/hooks/useMaintenanceDocuments';
 import { useDriftTasks } from '@/hooks/useDriftTasks';
@@ -68,8 +69,9 @@ export const QuickServiceButton = ({
   const { quarter, year } = getQuarterFromDate(performedDate);
 
   const { data: driftTasksData = [], isLoading: loadingTasks } = useDriftTasks(
-    open && propertyId ? { propertyId, quarter, year } : ({} as any),
+    open && propertyId ? { propertyId, quarter, year } : {},
   );
+
   const driftTasks = (open && propertyId ? (driftTasksData as DriftTask[]) : []).slice().sort(
     (a, b) => a.name.localeCompare(b.name),
   );
@@ -94,7 +96,7 @@ export const QuickServiceButton = ({
         .select('property_id')
         .eq('id', componentId)
         .single();
-      if (!cancelled && !error && data) setPropertyId((data as any).property_id);
+      if (!cancelled && !error && data) setPropertyId((data as { property_id: string }).property_id);
     })();
     return () => {
       cancelled = true;
@@ -132,7 +134,9 @@ export const QuickServiceButton = ({
         action_type: actionType,
         performed_date: performedDate,
         drift_task_id: selectedDriftTaskId || null,
-      } as any);
+      });
+
+
 
 
       // 2. If a file was selected, upload it
@@ -142,12 +146,13 @@ export const QuickServiceButton = ({
 
         try {
           await storageService.upload('maintenance-documents', fileName, selectedFile);
-        } catch (uploadError: any) {
+        } catch (uploadError: unknown) {
           console.error('Upload error:', uploadError);
           toast.error('Service registrerad men dokumentet kunde inte laddas upp', {
-            description: uploadError.message,
+            description: getErrorMessage(uploadError),
           });
         }
+
 
         try {
           const publicUrl = storageService.getPublicUrl('maintenance-documents', fileName);
@@ -157,8 +162,8 @@ export const QuickServiceButton = ({
             file_name: selectedFile.name,
             file_size: selectedFile.size,
             mime_type: selectedFile.type,
-          } as any);
-        } catch (docError: any) {
+          });
+        } catch (docError: unknown) {
           console.error('Doc record error:', docError);
         }
       }
@@ -172,12 +177,13 @@ export const QuickServiceButton = ({
       setOpen(false);
       resetForm();
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Kunde inte registrera service', {
-        description: error.message,
+        description: getErrorMessage(error),
       });
     } finally {
       setLoading(false);
+
     }
   };
 

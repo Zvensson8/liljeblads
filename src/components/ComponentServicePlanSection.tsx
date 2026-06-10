@@ -10,11 +10,15 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { useDriftTasks } from "@/hooks/useDriftTasks";
 import { useComponents } from "@/hooks/useComponents";
+import type { DriftTask as DriftTaskRow } from "@/types/domain/driftTask";
+import type { ComponentWithRelations } from "@/types/domain/component";
+import type { DriftTaskComponent } from "@/services/supabase/driftTaskComponentService";
 import {
   useCreateDriftTaskComponent,
   useDeleteDriftTaskComponentByTaskAndComponent,
   useDriftTaskComponentsByTasks,
 } from "@/hooks/useDriftTaskComponents";
+
 
 interface DriftTask {
   id: string;
@@ -43,33 +47,33 @@ export function ComponentServicePlanSection({
   const { data: tasksRaw = [] } = useDriftTasks({ propertyId });
   const { data: components = [] } = useComponents({ propertyId });
   const component = useMemo(
-    () => components.find((c: any) => c.id === componentId),
+    () => components.find((c) => c.id === componentId) as ComponentWithRelations | undefined,
     [components, componentId],
   );
 
-  const taskIds = useMemo(() => tasksRaw.map((t: any) => t.id), [tasksRaw]);
+  const taskIds = useMemo(() => (tasksRaw as DriftTaskRow[]).map((t) => t.id), [tasksRaw]);
   const { data: taskComponents = [] } = useDriftTaskComponentsByTasks(taskIds);
   const createLink = useCreateDriftTaskComponent();
   const deleteLink = useDeleteDriftTaskComponentByTaskAndComponent();
 
   useEffect(() => {
     setSelectedTaskIds(
-      taskComponents
-        .filter((tc: any) => tc.component_id === componentId)
-        .map((tc: any) => tc.task_id),
+      (taskComponents as DriftTaskComponent[])
+        .filter((tc) => tc.component_id === componentId)
+        .map((tc) => tc.task_id),
     );
   }, [taskComponents, componentId]);
 
   const driftTasks: DriftTask[] = useMemo(() => {
     const counts: Record<string, number> = {};
-    taskComponents.forEach((tc: any) => {
+    (taskComponents as DriftTaskComponent[]).forEach((tc) => {
       counts[tc.task_id] = (counts[tc.task_id] || 0) + 1;
     });
-    return tasksRaw
-      .filter((t: any) => t.year >= currentYear - 1)
+    return (tasksRaw as DriftTaskRow[])
+      .filter((t) => t.year >= currentYear - 1)
       .slice()
-      .sort((a: any, b: any) => a.year - b.year || String(a.quarter).localeCompare(String(b.quarter)))
-      .map((t: any) => ({
+      .sort((a, b) => a.year - b.year || String(a.quarter).localeCompare(String(b.quarter)))
+      .map((t) => ({
         id: t.id,
         name: t.name,
         year: t.year,
@@ -79,6 +83,7 @@ export function ComponentServicePlanSection({
         objectCount: counts[t.id] || 0,
       }));
   }, [tasksRaw, taskComponents, currentYear]);
+
 
   const getTaskStatus = (task: DriftTask) => {
     if (task.reported_count === 0) return "missing";
@@ -99,9 +104,10 @@ export function ComponentServicePlanSection({
           component_id: componentId,
           object_name: null,
           is_reported: false,
-          series_id: (component as any)?.serial_number || null,
+          series_id: (component as { serial_number?: string | null } | undefined)?.serial_number || null,
           registration_number:
-            (component as any)?.registration_number || null,
+            (component as { registration_number?: string | null } | undefined)?.registration_number || null,
+
         });
         toast.success("Komponent tillagd i driftuppgift");
       } else {

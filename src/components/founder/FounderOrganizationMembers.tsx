@@ -116,11 +116,11 @@ export function FounderOrganizationMembers() {
         };
       });
 
-      setMembers(enrichedMembers as any);
-      setFilteredMembers(enrichedMembers as any);
+      setMembers(enrichedMembers as Member[]);
+      setFilteredMembers(enrichedMembers as Member[]);
       setOrganizations(orgsRes.data || []);
       setProfiles(profilesRes.data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching data:", error);
       toast.error("Kunde inte hämta data");
     } finally {
@@ -156,7 +156,7 @@ export function FounderOrganizationMembers() {
       setAddDialogOpen(false);
       setAddForm({ organization_id: "", user_id: "", role: "member" });
       fetchData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding member:", error);
       toast.error("Kunde inte lägga till medlem");
     }
@@ -177,7 +177,7 @@ export function FounderOrganizationMembers() {
 
       toast.success("Medlem borttagen");
       fetchData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting member:", error);
       toast.error("Kunde inte ta bort medlem");
     }
@@ -194,7 +194,7 @@ export function FounderOrganizationMembers() {
 
       toast.success("Roll uppdaterad");
       fetchData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating role:", error);
       toast.error("Kunde inte uppdatera roll");
     }
