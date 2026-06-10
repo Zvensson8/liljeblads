@@ -235,13 +235,13 @@ export function CostAnalysis() {
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie
-                      data={suppliers as any[]}
+                      data={suppliers}
                       dataKey="total_cost"
                       nameKey="supplier"
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
-                      label={(entry: any) => entry.supplier}
+                      label={(entry: { supplier: string }) => entry.supplier}
                     >
                       {suppliers.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
