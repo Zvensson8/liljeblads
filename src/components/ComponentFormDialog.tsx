@@ -13,6 +13,11 @@ import { ComponentTemplate } from '@/hooks/useComponentLibrary';
 import { z } from 'zod';
 import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
 import { ComponentServicePlanSection } from './ComponentServicePlanSection';
+import { getErrorMessage } from '@/lib/utils';
+import type { Tables, TablesInsert, TablesUpdate, Database } from '@/integrations/supabase/types';
+
+type ComponentRow = Tables<'components'>;
+type ComponentType = Database['public']['Enums']['component_type'];
 
 const componentSchema = z.object({
   name: z.string().trim().min(1, 'Beteckning är obligatorisk').max(200, 'Beteckning får vara max 200 tecken'),
@@ -35,7 +40,7 @@ interface ComponentFormDialogProps {
   floorId: string;
   propertyId?: string;
   selectedTemplate?: ComponentTemplate | null;
-  editingComponent?: any;
+  editingComponent?: Partial<ComponentRow> & { id: string };
   canvasPosition?: { x: number; y: number } | null;
   onSuccess: (componentId?: string) => void;
 }
@@ -131,10 +136,10 @@ export const ComponentFormDialog = ({
       // Validate with Zod
       componentSchema.parse(validationData);
 
-      const componentData = {
+      const componentData: TablesInsert<'components'> = {
         name: designation.trim(),
         registration_number: registrationNumber.trim() || null,
-        type: componentType as any,
+        type: componentType as ComponentType,
         installation_year: installationYear ? parseInt(installationYear) : null,
         manufacturer: manufacturer.trim() || null,
         model: model.trim() || null,
@@ -144,7 +149,7 @@ export const ComponentFormDialog = ({
         refrigerant_code: refrigerantCode.trim() || null,
         refrigerant_amount_kg: refrigerantAmount ? parseFloat(refrigerantAmount) : null,
         refrigerant_type: refrigerantType.trim() || null,
-        status: 'active' as const,
+        status: 'active',
         floor_id: floorId || null,
         property_id: selectedProperty || propertyId || null,
       };
@@ -153,7 +158,7 @@ export const ComponentFormDialog = ({
         // Update existing component
         await updateComponent.mutateAsync({
           id: editingComponent.id,
-          patch: componentData as any,
+          patch: componentData as TablesUpdate<'components'>,
         });
 
         toast({
@@ -162,7 +167,7 @@ export const ComponentFormDialog = ({
         });
       } else {
         // Create new component
-        const newComponent = await createComponent.mutateAsync(componentData as any);
+        const newComponent = await createComponent.mutateAsync(componentData);
 
         // Save canvas position if provided (no domain service yet for geometry)
         if (newComponent && canvasPosition) {
@@ -194,7 +199,7 @@ export const ComponentFormDialog = ({
       resetForm();
       onOpenChange(false);
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle Zod validation errors
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
@@ -206,7 +211,7 @@ export const ComponentFormDialog = ({
       } else {
         toast({
           title: 'Fel',
-          description: error.message,
+          description: getErrorMessage(error),
           variant: 'destructive',
         });
       }
