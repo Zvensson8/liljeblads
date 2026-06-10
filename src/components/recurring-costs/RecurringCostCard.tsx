@@ -3,9 +3,24 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2, History } from "lucide-react";
 
+interface RecurringCostLike {
+  id: string;
+  description: string;
+  amount: number;
+  base_interval_months: number;
+  interval_variation_months?: number | null;
+  contractor_name?: string | null;
+  contact_person?: string | null;
+  last_payment_date?: string | null;
+  calculated_quarter_start?: string | null;
+  calculated_quarter_end?: string | null;
+  property?: { name?: string | null } | null;
+  account_code?: { code?: string | null; description?: string | null } | null;
+}
+
 interface RecurringCostCardProps {
-  cost: any;
-  onEdit: (cost: any) => void;
+  cost: RecurringCostLike;
+  onEdit: (cost: RecurringCostLike) => void;
   onDelete: (id: string) => void;
 }
 
