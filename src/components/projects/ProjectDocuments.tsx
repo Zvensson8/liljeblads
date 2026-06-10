@@ -70,7 +70,7 @@ export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumen
   const [selectedFolder, setSelectedFolder] = useState("Allmänt");
   const [uploading, setUploading] = useState(false);
   const [filterFolder, setFilterFolder] = useState<string>("all");
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   // Get signed URL for accessing private storage
