@@ -6,6 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Download, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AttachmentIcon } from "./AttachmentIcon";
+import { getErrorMessage } from "@/lib/utils";
+
+interface TodoAttachment {
+  id: string;
+  todo_id: string;
+  file_name: string;
+  file_url: string;
+  file_size: number | null;
+  mime_type: string | null;
+  created_at: string;
+}
+
+type SupabaseLoose = typeof supabase & {
+  from: (table: string) => ReturnType<typeof supabase.from>;
+};
 
 interface TodoAttachmentsProps {
   todoId: string;
