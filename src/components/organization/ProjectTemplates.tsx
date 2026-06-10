@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import { Plus, Edit, Trash2, Copy, X } from "lucide-react";
 import { useProjectTemplates } from "@/hooks/useProjectTemplates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,7 +99,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
       setDialogOpen(false);
       refetch();
     } catch (error: unknown) {
-      toast.error("Kunde inte spara mall: " + error.message);
+      toast.error("Kunde inte spara mall: " + getErrorMessage(error));
     }
   };
 
@@ -114,7 +115,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
       setDeleteDialogOpen(false);
       refetch();
     } catch (error: unknown) {
-      toast.error("Kunde inte ta bort mall: " + error.message);
+      toast.error("Kunde inte ta bort mall: " + getErrorMessage(error));
     }
   };
 
@@ -136,7 +137,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
       toast.success("Mall duplicerad");
       refetch();
     } catch (error: unknown) {
-      toast.error("Kunde inte duplicera mall: " + error.message);
+      toast.error("Kunde inte duplicera mall: " + getErrorMessage(error));
     }
   };
 
