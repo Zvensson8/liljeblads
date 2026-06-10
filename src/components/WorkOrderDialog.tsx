@@ -57,11 +57,12 @@ type WorkOrderFormData = z.infer<typeof workOrderSchema>;
 interface WorkOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  order?: any;
+  order?: import("@/types/domain/workOrder").WorkOrder | null;
   onSuccess: () => void;
   propertyId?: string;
   projectId?: string;
 }
+
 
 export function WorkOrderDialog({
   open,
