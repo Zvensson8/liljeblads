@@ -15,7 +15,7 @@ export const LastServiceBadge = ({ componentId, className }: LastServiceBadgePro
   const lastService = useMemo(() => {
     if (!history.length) return null;
     const sorted = [...history].sort(
-      (a: any, b: any) =>
+      (a, b) =>
         new Date(b.performed_date).getTime() - new Date(a.performed_date).getTime(),
     );
     return { date: sorted[0].performed_date as string, actionType: sorted[0].action_type as string };
