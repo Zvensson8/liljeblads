@@ -49,8 +49,8 @@ export function PropertyOverview({
     setSendingEmail(true);
 
     try {
-      const sortedContacts = [...(contacts as any[])].sort((a, b) =>
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      const sortedContacts = [...contacts].sort((a, b) =>
+        new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime()
       );
       const mainContact = sortedContacts[0];
 
