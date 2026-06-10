@@ -71,18 +71,18 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
 
   const todos = useMemo(() => {
     return (allTodos ?? [])
-      .filter((t: any) => !t.parent_todo_id)
-      .filter((t: any) => (showCompleted ? true : !t.completed))
-      .map((t: any) => ({
+      .filter((t: Todo) => !t.parent_todo_id)
+      .filter((t: Todo) => (showCompleted ? true : !t.completed))
+      .map((t: Todo) => ({
         ...t,
         properties: t.property_id ? propertyMap[t.property_id] ?? null : null,
       }))
-      .sort((a: any, b: any) => (a.due_date ?? "").localeCompare(b.due_date ?? ""));
+      .sort((a: Todo, b: Todo) => (a.due_date ?? "").localeCompare(b.due_date ?? ""));
   }, [allTodos, showCompleted, propertyMap]);
 
   const subtasksData = useMemo(() => {
-    const grouped: Record<string, any[]> = {};
-    (allTodos ?? []).forEach((t: any) => {
+    const grouped: Record<string, Todo[]> = {};
+    (allTodos ?? []).forEach((t: Todo) => {
       if (t.parent_todo_id) (grouped[t.parent_todo_id] ||= []).push(t);
     });
     return grouped;
@@ -163,12 +163,12 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
     }
   };
 
-  const groupedByCategory = todos.reduce((acc: Record<string, any[]>, todo: any) => {
+  const groupedByCategory = todos.reduce((acc: Record<string, Todo[]>, todo: any) => {
     const category = todo.category || "Okategoriserad";
     if (!acc[category]) acc[category] = [];
     acc[category].push(todo);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, Todo[]>);
 
   return (
     <>
@@ -268,10 +268,10 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                   </AccordionTrigger>
                   <AccordionContent>
                     <div className="space-y-2">
-                      {categoryTodos.map((todo: any) => {
+                      {categoryTodos.map((todo: Todo) => {
                         const hasSubtasks = (subtaskCounts?.[todo.id] || 0) > 0;
                         const todoSubtasks = subtasksData?.[todo.id] || [];
-                        const completedSubtasks = todoSubtasks.filter((s: any) => s.completed).length;
+                        const completedSubtasks = todoSubtasks.filter((s: Todo) => s.completed).length;
                         const hasAttachments = (attachmentCounts?.[todo.id] || 0) > 0;
 
                         return (
