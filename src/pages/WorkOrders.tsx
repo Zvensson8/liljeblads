@@ -42,7 +42,7 @@ const WorkOrders = () => {
 
   // Inline editing state
   const [editingCell, setEditingCell] = useState<{ orderId: string; field: string } | null>(null);
-  const [tempValue, setTempValue] = useState<string | number | null>(null);
+  const [tempValue, setTempValue] = useState<string | null>(null);
 
   const { data: workOrders } = useWorkOrders({ showArchived });
   const updateMutation = useUpdateWorkOrder();
@@ -126,7 +126,7 @@ const WorkOrders = () => {
 
   const startEditing = (orderId: string, field: string, currentValue: string | number | null) => {
     setEditingCell({ orderId, field });
-    setTempValue(currentValue);
+    setTempValue(currentValue == null ? null : String(currentValue));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, orderId: string, field: string) => {
