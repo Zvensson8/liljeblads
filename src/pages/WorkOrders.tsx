@@ -21,7 +21,9 @@ import {
   useUpdateWorkOrder,
   useDeleteWorkOrder,
 } from "@/hooks/useWorkOrders";
-import type { WorkOrderWithRelations, UpdateWorkOrderInput } from "@/types/domain";
+import type { UpdateWorkOrderInput } from "@/types/domain";
+
+type WorkOrderRow = NonNullable<ReturnType<typeof useWorkOrders>["data"]>[number];
 import { queryKeys } from "@/lib/queryKeys";
 
 const WorkOrders = () => {
