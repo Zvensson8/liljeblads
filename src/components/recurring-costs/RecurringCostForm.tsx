@@ -24,7 +24,7 @@ interface AccountCode {
 interface RecurringCostFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cost?: RecurringCost | null;
+  cost?: Partial<RecurringCost> | null;
   onSuccess: () => void;
 }
 
