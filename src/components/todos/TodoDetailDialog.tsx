@@ -77,10 +77,10 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
     queryKey: ["attachment-count", todo?.id],
     enabled: !!todo?.id,
     queryFn: async () => {
-      const { count, error } = await (supabase as any)
-        .from("todo_attachments")
+      const { count, error } = await supabase
+        .from("todo_attachments" as never)
         .select("*", { count: "exact", head: true })
-        .eq("todo_id", todo.id);
+        .eq("todo_id", todo.id!);
 
       if (error) throw error;
       return count || 0;
