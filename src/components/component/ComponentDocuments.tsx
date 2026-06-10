@@ -284,8 +284,9 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
         document={selectedDoc}
         versions={selectedDoc?.versions || []}
         onVersionSelect={(version) => {
-          setSelectedDoc(version);
+          setSelectedDoc(version as unknown as DocWithVersions);
         }}
+
       />
 
       {analysisDoc && (
