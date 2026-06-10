@@ -94,7 +94,8 @@ export function PropertyEditDialog({
     };
 
     try {
-      await updateProperty.mutateAsync({ id: property.id, patch: payload as any });
+      if (!property) return;
+      await updateProperty.mutateAsync({ id: property.id, patch: payload });
       onSuccess();
     } catch {
       // toast handled in hook
