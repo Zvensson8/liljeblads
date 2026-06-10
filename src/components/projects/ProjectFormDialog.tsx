@@ -311,7 +311,7 @@ export function ProjectFormDialog({
     if (template) {
       form.setValue("name", template.name);
       form.setValue("description", template.description || "");
-      form.setValue("type", template.type as any);
+      form.setValue("type", template.type as ProjectType);
       toast.success(`Mall "${template.name}" tillagd`);
     }
   };
