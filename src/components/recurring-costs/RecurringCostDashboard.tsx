@@ -118,11 +118,12 @@ export function RecurringCostDashboard() {
     
     let csv = "Period;Fastighet;Konto;Beskrivning;Belopp\n";
     
-    data.forEach((period: any) => {
-      Object.values(period.properties).forEach((prop: any) => {
-        Object.values(prop.accountCodes).forEach((acc: any) => {
-          acc.costs.forEach((cost: any) => {
-            csv += `${period.quarter || period.month};${prop.name};${acc.code};${cost.description};${cost.amount}\n`;
+    (data as Array<QuarterSummary | MonthSummary>).forEach((period) => {
+      const label = 'quarter' in period ? period.quarter : period.month;
+      Object.values(period.properties).forEach((prop) => {
+        Object.values(prop.accountCodes).forEach((acc) => {
+          acc.costs.forEach((cost) => {
+            csv += `${label};${prop.name};${acc.code};${cost.description};${cost.amount}\n`;
           });
         });
       });
