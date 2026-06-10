@@ -10,6 +10,7 @@ import { Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFloors } from '@/hooks/useFloors';
 import { useUpdateComponent } from '@/hooks/useComponents';
+import { getErrorMessage } from '@/lib/utils';
 
 interface Floor {
   id: string;
