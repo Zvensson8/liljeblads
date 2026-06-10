@@ -25,7 +25,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
   const { templates, loading, refetch } = useProjectTemplates(organizationId);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<any>(null);
+  const [editingTemplate, setEditingTemplate] = useState<ProjectTemplate | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -47,7 +47,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
     return labels[type] || type;
   };
 
-  const handleOpenDialog = (template?: any) => {
+  const handleOpenDialog = (template?: ProjectTemplate) => {
     if (template) {
       setEditingTemplate(template);
       setFormData({
@@ -120,7 +120,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
     }
   };
 
-  const handleDuplicate = async (template: any) => {
+  const handleDuplicate = async (template: ProjectTemplate) => {
     try {
       const { error } = await supabase
         .from("project_templates")
@@ -268,7 +268,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
                 <Label htmlFor="type">Typ *</Label>
                 <Select
                   value={formData.type}
-                  onValueChange={(value: any) => setFormData({ ...formData, type: value })}
+                  onValueChange={(value: "investering" | "underhall" | "energi" | "annat") => setFormData({ ...formData, type: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
