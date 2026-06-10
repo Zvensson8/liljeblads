@@ -15,11 +15,13 @@ interface ExportTask {
   }[];
 }
 
+type Quarter = "Q1" | "Q2" | "Q3" | "Q4";
+
 export async function exportQuarterToExcel(
   propertyId: string,
   propertyName: string,
   year: number,
-  quarter: "Q1" | "Q2" | "Q3" | "Q4"
+  quarter: Quarter
 ) {
   // Fetch tasks
   const { data: tasks } = await supabase
@@ -27,7 +29,7 @@ export async function exportQuarterToExcel(
     .select("*")
     .eq("property_id", propertyId)
     .eq("year", year)
-    .eq("quarter", quarter as any)
+    .eq("quarter", quarter)
     .order("name");
 
   if (!tasks || tasks.length === 0) {
@@ -62,7 +64,7 @@ export async function exportQuarterToExcel(
         reported_count: task.reported_count,
         status,
         objects:
-          objects?.map((obj: any) => ({
+          (objects as Array<{ object_name: string | null; series_id: string | null; registration_number: string | null; is_reported: boolean; component?: { name?: string } | null }> | null)?.map((obj) => ({
             name: obj.component?.name || obj.object_name || "",
             series_id: obj.series_id,
             registration_number: obj.registration_number,
@@ -154,11 +156,11 @@ export async function exportYearToExcel(
   propertyName: string,
   year: number
 ) {
-  const quarters = ["Q1", "Q2", "Q3", "Q4"];
+  const quarters: Quarter[] = ["Q1", "Q2", "Q3", "Q4"];
   const wb = createWorkbook();
 
   // Summary for all quarters
-  const yearSummaryData: any[][] = [
+  const yearSummaryData: (string | number)[][] = [
     ["Årssammanfattning - Driftuppföljning"],
     ["Fastighet:", propertyName],
     ["År:", year.toString()],
@@ -172,7 +174,7 @@ export async function exportYearToExcel(
       .select("*")
       .eq("property_id", propertyId)
       .eq("year", year)
-      .eq("quarter", quarter as any);
+      .eq("quarter", quarter);
 
     if (tasks && tasks.length > 0) {
       const completed = tasks.filter(
@@ -203,7 +205,7 @@ export async function exportYearToExcel(
       .select("*")
       .eq("property_id", propertyId)
       .eq("year", year)
-      .eq("quarter", quarter as any);
+      .eq("quarter", quarter);
 
     if (tasks && tasks.length > 0) {
       const tasksData = [
