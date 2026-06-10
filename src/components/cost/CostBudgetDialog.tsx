@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { getErrorMessage } from "@/lib/utils";
 
 interface CostBudgetDialogProps {
   open: boolean;
@@ -75,11 +76,11 @@ export function CostBudgetDialog({
       setBudgetedAmount("");
       setQuarter("YEAR");
       setYear(new Date().getFullYear().toString());
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating budget:', error);
       toast({
         title: "Fel",
-        description: error.message || "Kunde inte skapa budget",
+        description: getErrorMessage(error) || "Kunde inte skapa budget",
         variant: "destructive",
       });
     } finally {

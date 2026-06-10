@@ -163,12 +163,12 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
     }
   };
 
-  const groupedByCategory = todos.reduce((acc: Record<string, Todo[]>, todo: any) => {
+  const groupedByCategory = (todos as TodoWithProperty[]).reduce<Record<string, TodoWithProperty[]>>((acc, todo) => {
     const category = todo.category || "Okategoriserad";
     if (!acc[category]) acc[category] = [];
     acc[category].push(todo);
     return acc;
-  }, {} as Record<string, Todo[]>);
+  }, {});
 
   return (
     <>
@@ -261,7 +261,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
             </p>
           ) : (
             <Accordion type="multiple" defaultValue={Object.keys(groupedByCategory)} className="w-full">
-              {Object.entries(groupedByCategory).map(([category, categoryTodos]: [string, any[]]) => (
+              {Object.entries(groupedByCategory).map(([category, categoryTodos]) => (
                 <AccordionItem key={category} value={category}>
                   <AccordionTrigger className="text-sm font-medium">
                     {category} ({categoryTodos.length})

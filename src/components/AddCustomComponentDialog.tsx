@@ -5,12 +5,12 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { Box } from 'lucide-react';
+import { Box, type LucideIcon } from 'lucide-react';
 
 interface AddCustomComponentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAdd: (template: { name: string; type: string; description: string; icon: any; color: string }) => void;
+  onAdd: (template: { name: string; type: string; description: string; icon: LucideIcon; color: string }) => void;
 }
 
 export const AddCustomComponentDialog = ({ open, onOpenChange, onAdd }: AddCustomComponentDialogProps) => {

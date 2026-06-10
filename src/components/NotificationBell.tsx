@@ -17,7 +17,7 @@ export const NotificationBell = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotification } = useNotifications();
   const navigate = useNavigate();
 
-  const handleNotificationClick = (notification: any) => {
+  const handleNotificationClick = (notification: { id: string; propertyId?: string }) => {
     markAsRead(notification.id);
     if (notification.propertyId) {
       navigate(`/property/${notification.propertyId}`);

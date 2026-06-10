@@ -69,9 +69,10 @@ export function AccountCodeManager({ open, onOpenChange }: AccountCodeManagerPro
       toast.success("Kontokod tillagd");
       setNewCode({ code: "", description: "" });
       fetchAccountCodes();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding account code:", error);
-      if (error.code === "23505") {
+      const code = (error as { code?: string } | null)?.code;
+      if (code === "23505") {
         toast.error("Kontokoden finns redan");
       } else {
         toast.error("Kunde inte lägga till kontokod");

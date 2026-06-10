@@ -12,7 +12,7 @@ interface LifecycleCostCardProps {
 
 export function LifecycleCostCard({ componentId }: LifecycleCostCardProps) {
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<Awaited<ReturnType<typeof getComponentLifecycleCost>> | null>(null);
 
   useEffect(() => {
     fetchLifecycleCost();

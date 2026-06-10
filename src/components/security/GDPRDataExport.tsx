@@ -73,7 +73,7 @@ const addPdfTable = (doc: jsPDF, title: string, records: Record<string, any>[], 
     columnStyles: headers.reduce((acc, _, i) => ({ ...acc, [i]: { cellWidth: 'auto' } }), {}),
   });
 
-  return (doc as any).lastAutoTable.finalY + 12;
+  return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
 };
 
 const exportAsPdf = (data: Awaited<ReturnType<typeof fetchUserData>>) => {

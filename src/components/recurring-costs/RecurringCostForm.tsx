@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import type { RecurringCost } from "@/services/supabase/recurringCostService";
 
 interface Property {
   id: string;
@@ -23,7 +24,7 @@ interface AccountCode {
 interface RecurringCostFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cost?: any;
+  cost?: Partial<RecurringCost> | null;
   onSuccess: () => void;
 }
 
@@ -165,7 +166,7 @@ export function RecurringCostForm({ open, onOpenChange, cost, onSuccess }: Recur
         calculated_quarter_end: calculatedQuarter.split(" - ")[1] || calculatedQuarter,
       };
 
-      if (cost) {
+      if (cost?.id) {
         const { error } = await supabase
           .from("property_recurring_costs")
           .update(payload)

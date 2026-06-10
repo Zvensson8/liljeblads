@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUpdateProperty } from "@/hooks/useProperties";
+import type { Property } from "@/types/domain";
 import { FileText } from "lucide-react";
 import {
   Dialog,
@@ -40,7 +41,7 @@ type PropertyFormData = z.infer<typeof propertySchema>;
 interface PropertyEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  property: any;
+  property: Property | null;
   onSuccess: () => void;
 }
 
@@ -93,7 +94,8 @@ export function PropertyEditDialog({
     };
 
     try {
-      await updateProperty.mutateAsync({ id: property.id, patch: payload as any });
+      if (!property) return;
+      await updateProperty.mutateAsync({ id: property.id, patch: payload });
       onSuccess();
     } catch {
       // toast handled in hook
