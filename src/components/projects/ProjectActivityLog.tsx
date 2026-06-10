@@ -54,7 +54,7 @@ interface ActivityLogEntry {
   activity_type: string;
   description: string;
   created_at: string;
-  metadata: any;
+  metadata: Record<string, unknown> | null;
 }
 
 interface ProjectActivityLogProps {
