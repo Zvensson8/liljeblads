@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMaintenanceHistory, useCreateMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
+import type { MaintenanceCategory } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
