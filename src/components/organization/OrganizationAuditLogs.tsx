@@ -54,7 +54,7 @@ export function OrganizationAuditLogs({ organizationId }: OrganizationAuditLogsP
     queryKey: ["audit-logs", organizationId, eventTypeFilter, resourceTypeFilter],
     queryFn: async () => {
       // Hämta audit logs med användarens email från profiles
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as unknown as { from: (t: string) => { select: (s: string) => { eq: (c: string, v: string) => { order: (c: string, o: { ascending: boolean }) => { limit: (n: number) => Promise<{ data: unknown; error: { message: string } | null }> } } } } })
         .from("audit_logs")
         .select(`
           *,
