@@ -23,7 +23,7 @@ interface AccountCode {
 interface RecurringCostFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cost?: any;
+  cost?: Record<string, unknown> | null;
   onSuccess: () => void;
 }
 
