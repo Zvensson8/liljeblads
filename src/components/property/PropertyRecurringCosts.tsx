@@ -16,6 +16,13 @@ import {
   useCreateRecurringCost,
   useDeleteRecurringCost,
 } from "@/hooks/useRecurringCosts";
+import type { Tables } from "@/integrations/supabase/types";
+
+type AccountCode = Tables<"account_codes">;
+type RecurringCost = Tables<"property_recurring_costs">;
+type RecurringCostWithAccountCode = RecurringCost & {
+  account_code: { code: string; description: string | null } | null;
+};
 
 interface PropertyRecurringCostsProps {
   propertyId: string;
