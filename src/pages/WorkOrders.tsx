@@ -21,6 +21,7 @@ import {
   useUpdateWorkOrder,
   useDeleteWorkOrder,
 } from "@/hooks/useWorkOrders";
+import type { WorkOrderWithRelations, UpdateWorkOrderInput } from "@/types/domain";
 import { queryKeys } from "@/lib/queryKeys";
 
 const WorkOrders = () => {
@@ -29,8 +30,8 @@ const WorkOrders = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<any>(null);
-  const [detailOrder, setDetailOrder] = useState<any>(null);
+  const [editingOrder, setEditingOrder] = useState<WorkOrderWithRelations | null>(null);
+  const [detailOrder, setDetailOrder] = useState<WorkOrderWithRelations | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "table">("table");
   const [selectedProperty, setSelectedProperty] = useState<string>("all");
@@ -39,7 +40,7 @@ const WorkOrders = () => {
 
   // Inline editing state
   const [editingCell, setEditingCell] = useState<{ orderId: string; field: string } | null>(null);
-  const [tempValue, setTempValue] = useState<any>(null);
+  const [tempValue, setTempValue] = useState<string | number | null>(null);
 
   const { data: workOrders } = useWorkOrders({ showArchived });
   const updateMutation = useUpdateWorkOrder();
@@ -63,9 +64,9 @@ const WorkOrders = () => {
   const notStarted = workOrders?.filter((wo) => wo.status === "not_started") || [];
   const awaitingQuote = workOrders?.filter((wo) => wo.status === "awaiting_quote") || [];
   const ordered = workOrders?.filter((wo) => wo.status === "ordered") || [];
-  const orderedTotal = ordered.reduce((sum, wo: any) => sum + (Number(wo.price) || 0), 0);
+  const orderedTotal = ordered.reduce((sum, wo) => sum + (Number(wo.price) || 0), 0);
 
-  const filteredOrders = (orders: any[]) => {
+  const filteredOrders = (orders: WorkOrderWithRelations[]) => {
     let filtered = orders;
     if (searchQuery) {
       filtered = filtered.filter(
@@ -88,10 +89,10 @@ const WorkOrders = () => {
   };
 
   const uniqueProperties = Array.from(
-    new Set(workOrders?.map((wo: any) => wo.properties?.name).filter(Boolean))
+    new Set(workOrders?.map((wo) => wo.properties?.name).filter(Boolean))
   );
   const uniqueContractors = Array.from(
-    new Set(workOrders?.map((wo: any) => wo.contractor).filter(Boolean))
+    new Set(workOrders?.map((wo) => wo.contractor).filter(Boolean))
   );
 
   const activeFilterCount =
@@ -106,11 +107,11 @@ const WorkOrders = () => {
   };
 
   // Inline editing — delegated to the optimistic useUpdateWorkOrder hook.
-  const updateWorkOrder = async (orderId: string, field: string, value: any) => {
+  const updateWorkOrder = async (orderId: string, field: string, value: unknown) => {
     try {
       await updateMutation.mutateAsync({
         id: orderId,
-        patch: { [field]: value } as any,
+        patch: { [field]: value } as UpdateWorkOrderInput,
       });
       toast.success("Arbetsorder uppdaterad");
     } catch {
@@ -121,7 +122,7 @@ const WorkOrders = () => {
     }
   };
 
-  const startEditing = (orderId: string, field: string, currentValue: any) => {
+  const startEditing = (orderId: string, field: string, currentValue: string | number | null) => {
     setEditingCell({ orderId, field });
     setTempValue(currentValue);
   };
@@ -155,7 +156,7 @@ const WorkOrders = () => {
     return colors[priority as keyof typeof colors] || "border-l-transparent";
   };
 
-  const renderOrdersTable = (orders: any[], title: string, icon: string, total?: number) => {
+  const renderOrdersTable = (orders: WorkOrderWithRelations[], title: string, icon: string, total?: number) => {
     const tableOrders = filteredOrders(orders);
 
     return (
@@ -346,7 +347,7 @@ const WorkOrders = () => {
                               <SelectContent>
                                 <SelectItem value="all">Alla fastigheter</SelectItem>
                                 {uniqueProperties.map((property) => (
-                                  <SelectItem key={property} value={workOrders?.find((wo: any) => wo.properties?.name === property)?.property_id || property}>
+                                  <SelectItem key={property} value={workOrders?.find((wo) => wo.properties?.name === property)?.property_id || property}>
                                     {property}
                                   </SelectItem>
                                 ))}
