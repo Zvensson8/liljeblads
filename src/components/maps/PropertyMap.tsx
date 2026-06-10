@@ -74,7 +74,7 @@ export const PropertyMap = () => {
         {validLocations.map((location) => (
           <Marker
             key={location.property_id}
-            position={[location.latitude, location.longitude]}
+            position={[location.latitude as number, location.longitude as number]}
           >
             <Popup>
               <div className="p-2">
