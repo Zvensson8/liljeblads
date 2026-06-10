@@ -10,12 +10,15 @@ interface PropertyEconomyProps {
   propertyId: string;
 }
 
+interface MonthlyCost { month: string; cost: number; }
+interface CategoryStat { category: string; cost: number; count: number; }
+
 export function PropertyEconomy({ propertyId }: PropertyEconomyProps) {
   const [loading, setLoading] = useState(true);
-  const [costData, setCostData] = useState<any[]>([]);
+  const [costData, setCostData] = useState<MonthlyCost[]>([]);
   const [totalCost, setTotalCost] = useState(0);
   const [avgMonthlyCost, setAvgMonthlyCost] = useState(0);
-  const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryStat[]>([]);
 
   useEffect(() => {
     fetchEconomyData();
