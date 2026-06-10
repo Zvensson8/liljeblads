@@ -462,7 +462,7 @@ export function QuarterCard({ quarter, propertyId, propertyName, year }: Quarter
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 min-w-[200px]"
               />
-              <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
