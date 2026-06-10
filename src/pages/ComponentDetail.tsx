@@ -92,7 +92,7 @@ export default function ComponentDetail() {
   const [component, setComponent] = useState<Component | null>(null);
   const [floor, setFloor] = useState<Floor | null>(null);
   const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceRecord[]>([]);
-  const [componentWorkOrders, setComponentWorkOrders] = useState<any[]>([]);
+  const [componentWorkOrders, setComponentWorkOrders] = useState<Array<{ id: string; action: string; status: string; price: number | null; due_date: string | null; contractor: string | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
@@ -152,7 +152,7 @@ export default function ComponentDetail() {
       
       // Set floor if it exists, otherwise create a mock floor object from direct property
       if (componentData.floors) {
-        setFloor(componentData.floors as any);
+        setFloor(componentData.floors as unknown as Floor);
       } else if (componentData.direct_property) {
         setFloor({
           id: '',
@@ -160,7 +160,7 @@ export default function ComponentDetail() {
           level: null,
           property_id: componentData.direct_property.id,
           properties: componentData.direct_property
-        } as any);
+        } as Floor);
       }
 
       // Fetch maintenance history
@@ -180,7 +180,7 @@ export default function ComponentDetail() {
         .eq("component_id", id)
         .order("created_at", { ascending: false });
       setComponentWorkOrders(woData || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte hämta komponentdata");
       navigate("/components");
     } finally {
@@ -201,7 +201,7 @@ export default function ComponentDetail() {
 
       toast.success("Komponent borttagen");
       navigate("/components");
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort komponent");
     }
   };

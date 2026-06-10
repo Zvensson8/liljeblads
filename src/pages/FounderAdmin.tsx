@@ -36,7 +36,7 @@ export default function FounderAdmin() {
         .from("user_roles")
         .select("role")
         .eq("user_id", user?.id)
-        .eq("role", "founder" as any)
+        .eq("role", "founder")
         .single();
 
       if (error || !data) {
@@ -46,7 +46,7 @@ export default function FounderAdmin() {
       }
 
       setIsFounder(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error checking founder access:", error);
       navigate("/");
     } finally {

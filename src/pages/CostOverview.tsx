@@ -51,10 +51,14 @@ import {
   getTopCostComponents, 
   getCostTrend, 
   getSupplierAnalysis,
-  getFlagEmoji 
+  getFlagEmoji,
+  type ComponentCostSummary,
+  type CostTrend,
+  type SupplierAnalysis,
 } from "@/lib/costUtils";
 import { CostBudgetDialog } from "@/components/cost/CostBudgetDialog";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 
 type TimeRangePreset = '3' | '6' | '12' | '24' | 'custom';
 
@@ -76,13 +80,13 @@ export default function CostOverview() {
   const [avgMonthlyCost, setAvgMonthlyCost] = useState(0);
   const [costChange, setCostChange] = useState(0);
   const [criticalComponents, setCriticalComponents] = useState(0);
-  const [topComponents, setTopComponents] = useState<any[]>([]);
-  const [topSuppliers, setTopSuppliers] = useState<any[]>([]);
-  const [costTrendData, setCostTrendData] = useState<any[]>([]);
-  const [monthlyDistribution, setMonthlyDistribution] = useState<any[]>([]);
+  const [topComponents, setTopComponents] = useState<ComponentCostSummary[]>([]);
+  const [topSuppliers, setTopSuppliers] = useState<SupplierAnalysis[]>([]);
+  const [costTrendData, setCostTrendData] = useState<(CostTrend & { formatted_month?: string })[]>([]);
+  const [monthlyDistribution, setMonthlyDistribution] = useState<Array<{ month: string; cost: number }>>([]);
   
   // Budget tracking state
-  const [budgets, setBudgets] = useState<any[]>([]);
+  const [budgets, setBudgets] = useState<Tables<'cost_budgets'>[]>([]);
   const [budgetProgress, setBudgetProgress] = useState(0);
 
   useEffect(() => {

@@ -26,7 +26,7 @@ export function PropertyMaintenancePlan({ propertyId }: PropertyMaintenancePlanP
   const [selectedEvents, setSelectedEvents] = useState<MaintenanceEvent[]>([]);
 
   const events = useMemo<MaintenanceEvent[]>(() => {
-    return (components as any[])
+    return components
       .filter((c) => c.next_service_date != null)
       .map((comp) => ({
         id: comp.id,

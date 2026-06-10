@@ -84,7 +84,7 @@ export default function RecurringCosts() {
         .order("last_payment_date", { ascending: false });
 
       if (error) throw error;
-      setCosts((data as any[]) || []);
+      setCosts((data ?? []) as typeof costs);
     } catch (error) {
       console.error("Error fetching recurring costs:", error);
       toast.error("Kunde inte hämta återkommande kostnader");

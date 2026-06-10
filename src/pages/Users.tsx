@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -70,7 +72,7 @@ export default function Users() {
         .from("user_roles")
         .select("role")
         .eq("user_id", user?.id)
-        .eq("role", "founder" as any)
+        .eq("role", "founder")
         .maybeSingle();
 
       setIsFounder(!!data);
@@ -248,7 +250,7 @@ export default function Users() {
         .from("profiles")
         .update({
           approved: editForm.approved,
-          role: editForm.profile_role as any,
+          role: editForm.profile_role as Database["public"]["Enums"]["user_role"],
         })
         .eq("id", selectedUser.id);
 
@@ -265,7 +267,7 @@ export default function Users() {
         // Uppdatera befintlig roll
         const { error: roleError } = await supabase
           .from("user_roles")
-          .update({ role: editForm.system_role as any })
+          .update({ role: editForm.system_role as Database["public"]["Enums"]["app_role"] })
           .eq("user_id", selectedUser.id);
 
         if (roleError) throw roleError;
@@ -275,7 +277,7 @@ export default function Users() {
           .from("user_roles")
           .insert({
             user_id: selectedUser.id,
-            role: editForm.system_role as any,
+            role: editForm.system_role as Database["public"]["Enums"]["app_role"],
           });
 
         if (roleError) throw roleError;
@@ -289,11 +291,11 @@ export default function Users() {
       setEditDialogOpen(false);
       setSelectedUser(null);
       fetchProfiles();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating user:", error);
       toast({
         title: "Fel",
-        description: `Kunde inte uppdatera användare: ${error.message}`,
+        description: `Kunde inte uppdatera användare: ${getErrorMessage(error)}`,
         variant: "destructive",
       });
     } finally {

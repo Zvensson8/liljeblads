@@ -47,7 +47,7 @@ const Properties = () => {
   const [address, setAddress] = useState('');
   const [description, setDescription] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState<Array<{ id: string; label: string; value: any }>>([]);
+  const [filters, setFilters] = useState<Array<{ id: string; label: string; value: string | number | boolean | { type: string; value: string } }>>([]);
   const [filterType, setFilterType] = useState<string>('');
   const [filterValue, setFilterValue] = useState<string>('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
@@ -78,7 +78,7 @@ const Properties = () => {
       setName('');
       setAddress('');
       setDescription('');
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle Zod validation errors
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
@@ -139,6 +139,7 @@ const Properties = () => {
 
     // Apply filters
     return filters.every((filter) => {
+      if (typeof filter.value !== 'object') return true;
       const { type, value } = filter.value;
       switch (type) {
         case 'property_type':

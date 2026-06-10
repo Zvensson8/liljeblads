@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getErrorMessage } from "@/lib/utils";
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -61,7 +62,7 @@ const Auth = () => {
       if (error) {
         toast({
           title: 'Inloggning misslyckades',
-          description: error.message,
+          description: getErrorMessage(error),
           variant: 'destructive',
         });
       } else if (data.user) {
@@ -71,7 +72,7 @@ const Auth = () => {
         });
         navigate('/');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
         toast({
@@ -107,7 +108,7 @@ const Auth = () => {
       if (error) {
         toast({
           title: 'Registrering misslyckades',
-          description: error.message,
+          description: getErrorMessage(error),
           variant: 'destructive',
         });
       } else {
@@ -116,7 +117,7 @@ const Auth = () => {
           description: 'Ditt konto har skapats och väntar nu på godkännande från en administratör. Du kommer få ett meddelande när ditt konto är godkänt.',
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
         toast({

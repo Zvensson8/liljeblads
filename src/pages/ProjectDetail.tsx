@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProject, useUpdateProject } from "@/hooks/useProjects";
@@ -140,7 +141,7 @@ export default function ProjectDetail() {
       });
       toast.success("Projekt arkiverat");
       navigate("/projects");
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte arkivera projekt");
     }
   };
@@ -160,7 +161,7 @@ export default function ProjectDetail() {
       });
       toast.success("Projekt återaktiverat");
       fetchProject();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte återaktivera projekt");
     }
   };
@@ -172,8 +173,8 @@ export default function ProjectDetail() {
     try {
       await exportProjectToZip(project.id);
       toast.success("Projekt exporterat");
-    } catch (error: any) {
-      toast.error(error.message || "Kunde inte exportera projekt");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Kunde inte exportera projekt");
     } finally {
       setExporting(false);
     }
@@ -541,7 +542,7 @@ export default function ProjectDetail() {
                             });
                             toast.success("Prognos uppdaterad från simulering");
                             fetchProject();
-                          } catch (error: any) {
+                          } catch (error: unknown) {
                             toast.error("Kunde inte uppdatera prognos");
                           }
                         }}

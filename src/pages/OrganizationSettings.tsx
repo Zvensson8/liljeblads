@@ -81,7 +81,7 @@ export default function OrganizationSettings() {
         return;
       }
 
-      setOrganization(memberData.organization as any);
+      setOrganization(memberData.organization as unknown as Organization);
       setUserRole(memberData.role);
 
       // Kolla om användaren är founder/admin i user_roles
@@ -123,7 +123,7 @@ export default function OrganizationSettings() {
         memberCount: membersResult.count || 0,
         componentCount: componentsResult.count || 0,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching organization:", error);
       toast.error("Kunde inte hämta organisationsdata");
     } finally {
@@ -248,7 +248,7 @@ export default function OrganizationSettings() {
 
               {isAdmin && (
                 <TabsContent value="capacity">
-                  <OrganizationCapacity organization={organization as any} />
+                  <OrganizationCapacity organization={organization as unknown as Parameters<typeof OrganizationCapacity>[0]["organization"]} />
                 </TabsContent>
               )}
 

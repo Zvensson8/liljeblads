@@ -6,7 +6,7 @@ interface KPIWidgetProps {
   value: number;
   prev?: number;
   subtitle?: string;
-  icon: any;
+  icon: import("lucide-react").LucideIcon;
   description: string;
   color: string;
   bgColor: string;

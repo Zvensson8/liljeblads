@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getErrorMessage } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Building2, MapPin, FileText, AlertCircle, Mail, Settings, Wrench, Clock } from 'lucide-react';
@@ -10,12 +11,18 @@ import { useSendPropertyInfo } from '@/hooks/useEdgeFunctions';
 import { EnergyDeclarationCard } from './EnergyDeclarationCard';
 import { usePropertyContacts } from '@/hooks/usePropertyContacts';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
+import type { Property } from '@/types/domain';
+
+interface ComponentLite {
+  next_maintenance_date?: string | null;
+  [key: string]: unknown;
+}
 
 interface PropertyOverviewProps {
-  property: any;
-  components: any[];
-  workOrders: any[];
-  floors: any[];
+  property: Property & { organization_id?: string | null; invoice_address?: string | null };
+  components: ComponentLite[];
+  workOrders: unknown[];
+  floors: unknown[];
   overdueTodos: number;
   urgentWorkOrders: number;
 }
@@ -43,8 +50,8 @@ export function PropertyOverview({
     setSendingEmail(true);
 
     try {
-      const sortedContacts = [...(contacts as any[])].sort((a, b) =>
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      const sortedContacts = [...contacts].sort((a, b) =>
+        new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime()
       );
       const mainContact = sortedContacts[0];
 
@@ -60,16 +67,16 @@ export function PropertyOverview({
       });
 
       toast.success('Kontaktinformation skickad till din e-post!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error sending email:', error);
-      toast.error('Kunde inte skicka e-post: ' + error.message);
+      toast.error('Kunde inte skicka e-post: ' + getErrorMessage(error));
     } finally {
       setSendingEmail(false);
     }
   };
 
   // Calculate components needing service soon (example logic)
-  const componentsNeedingService = components.filter((c: any) => {
+  const componentsNeedingService = components.filter((c) => {
     if (!c.next_maintenance_date) return false;
     const daysUntil = Math.floor((new Date(c.next_maintenance_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
     return daysUntil <= 30 && daysUntil >= 0;

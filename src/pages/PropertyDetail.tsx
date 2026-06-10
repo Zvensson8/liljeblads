@@ -89,22 +89,22 @@ const PropertyDetail = () => {
   const floors = floorsData as Floor[];
 
   const { data: componentsViaProperty = [] } = useComponents({ propertyId: id });
-  const components: any[] = componentsViaProperty;
+  const components = componentsViaProperty;
 
   const { data: workOrdersData = [] } = useWorkOrders({ propertyId: id });
   const workOrders = useMemo(
-    () => (workOrdersData as any[]).filter((wo) => wo.status !== 'archived'),
+    () => workOrdersData.filter((wo) => wo.status !== 'archived'),
     [workOrdersData],
   );
 
   const { data: todosData = [] } = useTodos({ propertyId: id });
   const overdueTodos = useMemo(() => {
     const now = new Date().toISOString();
-    return (todosData as any[]).filter((t) => !t.completed && t.due_date && t.due_date < now)
+    return todosData.filter((t) => !t.completed && t.due_date && t.due_date < now)
       .length;
   }, [todosData]);
   const urgentWorkOrders = useMemo(
-    () => workOrders.filter((wo: any) => wo.priority === 'high').length,
+    () => workOrders.filter((wo) => wo.priority === 'high').length,
     [workOrders],
   );
 
@@ -151,7 +151,7 @@ const PropertyDetail = () => {
         name: floorName,
         level: floorLevel ? parseInt(floorLevel) : null,
         property_id: id,
-      } as any);
+      });
       setDialogOpen(false);
       setFloorName('');
       setFloorLevel('');
@@ -185,7 +185,7 @@ const PropertyDetail = () => {
       .getPublicUrl(filePath);
 
     try {
-      await updateFloor.mutateAsync({ id: floorId, patch: { drawing_url: publicUrl } as any });
+      await updateFloor.mutateAsync({ id: floorId, patch: { drawing_url: publicUrl } });
       toast({
         title: 'Ritning uppladdad!',
         description: 'Du kan nu märka ut komponenter på ritningen.',
@@ -209,7 +209,7 @@ const PropertyDetail = () => {
       return;
     }
     try {
-      await updateFloor.mutateAsync({ id: floor.id, patch: { drawing_url: null } as any });
+      await updateFloor.mutateAsync({ id: floor.id, patch: { drawing_url: null } });
       toast({
         title: 'Ritning borttagen',
         description: 'Ritningen har tagits bort. Du kan ladda upp en ny.',
@@ -232,9 +232,9 @@ const PropertyDetail = () => {
     }
 
     // Build maintenance map from already-loaded data
-    const maintenanceRecords: Record<string, any[]> = {};
+    const maintenanceRecords: Record<string, typeof allMaintenance> = {};
     components.forEach((c) => (maintenanceRecords[c.id] = []));
-    (allMaintenance as any[]).forEach((row) => {
+    allMaintenance.forEach((row) => {
       if (!row.component_id || !maintenanceRecords[row.component_id]) return;
       maintenanceRecords[row.component_id].push(row);
     });
@@ -243,17 +243,17 @@ const PropertyDetail = () => {
     );
 
     const floorMap = new Map(floors.map((f) => [f.id, f.name]));
-    const formattedComponents = components.map((comp: any) => ({
+    const formattedComponents = components.map((comp) => ({
       ...comp,
       floor_name: comp.floors?.name ?? (comp.floor_id ? floorMap.get(comp.floor_id) : undefined),
       property_name: property.name,
       property_address: property.address,
-    }));
+    })) as Parameters<typeof exportComponentsToExcel>[0];
 
     if (format === 'excel') {
       exportComponentsToExcel(
         formattedComponents,
-        maintenanceRecords,
+        maintenanceRecords as Parameters<typeof exportComponentsToExcel>[1],
         `${property.name}-${new Date().toISOString().split('T')[0]}.xlsx`
       );
       toast({
@@ -262,8 +262,8 @@ const PropertyDetail = () => {
       });
     } else {
       exportComponentsToPDF(
-        formattedComponents,
-        maintenanceRecords,
+        formattedComponents as Parameters<typeof exportComponentsToPDF>[0],
+        maintenanceRecords as Parameters<typeof exportComponentsToPDF>[1],
         `Komponentregister - ${property.name}`,
         `${property.name}-${new Date().toISOString().split('T')[0]}.pdf`
       );

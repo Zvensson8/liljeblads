@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { storageService } from "@/services/supabase";
@@ -12,6 +13,10 @@ import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { DocumentUploadZone } from "@/components/documents/DocumentUploadZone";
 import { DocumentPreviewDialog } from "@/components/documents/DocumentPreviewDialog";
+import type { Tables } from "@/integrations/supabase/types";
+
+type PropertyDocumentRow = Tables<"property_documents">;
+type PropertyDocumentWithVersions = PropertyDocumentRow & { versions?: PropertyDocumentRow[] };
 
 interface PropertyDocumentsProps {
   propertyId: string;
@@ -20,7 +25,7 @@ interface PropertyDocumentsProps {
 export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
   const { session } = useAuth();
   const [uploading, setUploading] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [selectedDoc, setSelectedDoc] = useState<PropertyDocumentWithVersions | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const { data: documents, refetch } = useQuery({
@@ -84,8 +89,8 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
 
       toast.success(nextVersion > 1 ? `Ny version (v${nextVersion}) uppladdad` : "Dokument uppladdat");
       refetch();
-    } catch (error: any) {
-      toast.error("Kunde inte ladda upp dokument: " + error.message);
+    } catch (error: unknown) {
+      toast.error("Kunde inte ladda upp dokument: " + getErrorMessage(error));
     } finally {
       setUploading(false);
     }
@@ -107,12 +112,12 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
 
       toast.success("Dokument borttaget");
       refetch();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort dokument");
     }
   };
 
-  const handlePreview = async (doc: any) => {
+  const handlePreview = async (doc: PropertyDocumentRow) => {
     const versions = await getDocumentVersions(doc.name);
     setSelectedDoc({ ...doc, versions });
     setPreviewOpen(true);
@@ -205,7 +210,7 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
         document={selectedDoc}
         versions={selectedDoc?.versions || []}
         onVersionSelect={(version) => {
-          setSelectedDoc(version);
+          setSelectedDoc(version as PropertyDocumentRow);
         }}
       />
     </div>

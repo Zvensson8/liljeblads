@@ -10,12 +10,15 @@ interface PropertyEconomyProps {
   propertyId: string;
 }
 
+interface MonthlyCost { month: string; cost: number; }
+interface CategoryStat { category: string; cost: number; count: number; }
+
 export function PropertyEconomy({ propertyId }: PropertyEconomyProps) {
   const [loading, setLoading] = useState(true);
-  const [costData, setCostData] = useState<any[]>([]);
+  const [costData, setCostData] = useState<MonthlyCost[]>([]);
   const [totalCost, setTotalCost] = useState(0);
   const [avgMonthlyCost, setAvgMonthlyCost] = useState(0);
-  const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryStat[]>([]);
 
   useEffect(() => {
     fetchEconomyData();
@@ -24,12 +27,10 @@ export function PropertyEconomy({ propertyId }: PropertyEconomyProps) {
   const fetchEconomyData = async () => {
     try {
       // Fetch components
-      const result: any = await (supabase as any)
+      const { data: componentsData, error: compError } = await supabase
         .from("components")
         .select("id, type")
         .eq("property_id", propertyId);
-      
-      const { data: componentsData, error: compError } = result;
 
       if (compError || !componentsData || componentsData.length === 0) {
         setLoading(false);
@@ -53,7 +54,7 @@ export function PropertyEconomy({ propertyId }: PropertyEconomyProps) {
       }
 
       // Group by month
-      const monthlyData: Record<string, any> = {};
+      const monthlyData: Record<string, MonthlyCost> = {};
       maintenanceData.forEach(item => {
         const month = new Date(item.performed_date).toLocaleDateString('sv-SE', { month: 'short', year: '2-digit' });
         if (!monthlyData[month]) {
@@ -68,8 +69,7 @@ export function PropertyEconomy({ propertyId }: PropertyEconomyProps) {
       setTotalCost(total);
       setAvgMonthlyCost(total / 12);
 
-      // Group by category using componentsData
-      const categoryStats: Record<string, any> = {};
+      const categoryStats: Record<string, CategoryStat> = {};
       maintenanceData.forEach(item => {
         const comp = componentsData.find(c => c.id === item.component_id);
         const category = comp?.type || "Övrigt";
@@ -80,7 +80,7 @@ export function PropertyEconomy({ propertyId }: PropertyEconomyProps) {
         categoryStats[category].count += 1;
       });
 
-      const sortedCategories = Object.values(categoryStats).sort((a: any, b: any) => b.cost - a.cost);
+      const sortedCategories = Object.values(categoryStats).sort((a, b) => b.cost - a.cost);
       setCategoryData(sortedCategories);
     } catch (error) {
       console.error("Error fetching economy data:", error);

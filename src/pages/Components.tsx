@@ -100,19 +100,19 @@ const Components = () => {
 
   const components: Component[] = useMemo(
     () =>
-      rawComponents.map((comp: any) => ({
+      rawComponents.map((comp) => ({
         ...comp,
         floor_name: comp.floors?.name,
         floor_level: comp.floors?.level,
         property_name: comp.properties?.name,
         property_address: comp.properties?.address,
-      })),
+      })) as Component[],
     [rawComponents],
   );
 
   const maintenanceStats = useMemo(() => {
     const stats: Record<string, { totalCost: number; count: number; lastDate: string | null }> = {};
-    maintenanceRows.forEach((row: any) => {
+    maintenanceRows.forEach((row) => {
       if (!row.component_id) return;
       if (!stats[row.component_id]) {
         stats[row.component_id] = { totalCost: 0, count: 0, lastDate: null };
@@ -128,7 +128,7 @@ const Components = () => {
 
   const workOrderStats = useMemo(() => {
     const stats: Record<string, { count: number; totalPrice: number }> = {};
-    workOrders.forEach((row: any) => {
+    workOrders.forEach((row) => {
       if (!row.component_id) return;
       if (!stats[row.component_id]) {
         stats[row.component_id] = { count: 0, totalPrice: 0 };
@@ -167,9 +167,9 @@ const Components = () => {
 
   const handleExport = async (format: 'excel' | 'pdf') => {
     // Build maintenance records map from already-loaded data
-    const maintenanceRecords: Record<string, any[]> = {};
+    const maintenanceRecords: Record<string, typeof maintenanceRows> = {};
     components.forEach((c) => (maintenanceRecords[c.id] = []));
-    maintenanceRows.forEach((row: any) => {
+    maintenanceRows.forEach((row) => {
       if (!row.component_id) return;
       if (!maintenanceRecords[row.component_id]) maintenanceRecords[row.component_id] = [];
       maintenanceRecords[row.component_id].push(row);
@@ -181,7 +181,7 @@ const Components = () => {
     if (format === 'excel') {
       exportComponentsToExcel(
         components,
-        maintenanceRecords,
+        maintenanceRecords as Parameters<typeof exportComponentsToExcel>[1],
         `komponenter-${new Date().toISOString().split('T')[0]}.xlsx`
       );
       toast({
@@ -191,7 +191,7 @@ const Components = () => {
     } else {
       exportComponentsToPDF(
         components,
-        maintenanceRecords,
+        maintenanceRecords as Parameters<typeof exportComponentsToPDF>[1],
         'Komponentregister',
         `komponenter-${new Date().toISOString().split('T')[0]}.pdf`
       );

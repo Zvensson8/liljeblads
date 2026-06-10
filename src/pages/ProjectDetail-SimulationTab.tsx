@@ -26,7 +26,7 @@ import { ProjectSimulation } from "@/components/projects/ProjectSimulation";
 
             toast.success("Prognos uppdaterad från simulering");
             fetchProject();
-          } catch (error: any) {
+          } catch (error: unknown) {
             toast.error("Kunde inte uppdatera prognos");
           }
         }}
