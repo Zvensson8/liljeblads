@@ -35,7 +35,7 @@ interface TodoWidgetProps {
 
 export function TodoWidget({ propertyId }: TodoWidgetProps) {
   const { user } = useAuth();
-  const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
+  const [selectedTodo, setSelectedTodo] = useState<TodoWithProperty | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [newTodo, setNewTodo] = useState("");
   const [newPropertyId, setNewPropertyId] = useState<string>("none");
