@@ -166,7 +166,7 @@ export function RecurringCostForm({ open, onOpenChange, cost, onSuccess }: Recur
         calculated_quarter_end: calculatedQuarter.split(" - ")[1] || calculatedQuarter,
       };
 
-      if (cost) {
+      if (cost?.id) {
         const { error } = await supabase
           .from("property_recurring_costs")
           .update(payload)
