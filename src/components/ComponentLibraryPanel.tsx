@@ -10,9 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ComponentLibraryPanelProps {
-  onSelectTemplate: (template: any) => void;
+  onSelectTemplate: (template: ComponentTemplate) => void;
   propertyId?: string;
-  onSelectExistingComponent?: (component: any) => void;
+  onSelectExistingComponent?: (component: ExistingComponent) => void;
 }
 
 interface ExistingComponent {
