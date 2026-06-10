@@ -12,11 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Mail, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
+import type { Project } from "@/types/domain";
 
 interface ProjectOrderPreviewSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  project: any;
+  project: Pick<Project, "id" | "name" | "project_number" | "budget"> | null;
 }
 
 export function ProjectOrderPreviewSheet({
