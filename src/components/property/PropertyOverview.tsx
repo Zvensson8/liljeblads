@@ -11,12 +11,17 @@ import { useSendPropertyInfo } from '@/hooks/useEdgeFunctions';
 import { EnergyDeclarationCard } from './EnergyDeclarationCard';
 import { usePropertyContacts } from '@/hooks/usePropertyContacts';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
+import type { Property } from '@/types/domain';
+
+interface ComponentLite {
+  next_maintenance_date?: string | null;
+}
 
 interface PropertyOverviewProps {
-  property: any;
-  components: any[];
-  workOrders: any[];
-  floors: any[];
+  property: Property & { organization_id?: string | null; invoice_address?: string | null };
+  components: ComponentLite[];
+  workOrders: unknown[];
+  floors: unknown[];
   overdueTodos: number;
   urgentWorkOrders: number;
 }
