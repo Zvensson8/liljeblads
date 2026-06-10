@@ -7,14 +7,22 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default marker icons in Leaflet with Vite
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-function MapUpdater({ locations }: { locations: any[] }) {
+interface MapLocation {
+  property_id: string;
+  latitude: number | null;
+  longitude: number | null;
+  formatted_address?: string | null;
+  properties?: { name?: string | null; address?: string | null } | null;
+}
+
+function MapUpdater({ locations }: { locations: MapLocation[] }) {
   const map = useMap();
 
   useEffect(() => {
