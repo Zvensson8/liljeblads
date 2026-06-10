@@ -50,6 +50,8 @@ interface ProjectDocument {
   created_at: string;
   version?: number;
   is_latest?: boolean;
+  versions?: ProjectDocument[];
+  signedUrl?: string | null;
 }
 
 const FOLDERS = [
