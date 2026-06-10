@@ -3,6 +3,11 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "@/integrations/supabase/client";
 
+type JsPdfWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
+type Quarter = "Q1" | "Q2" | "Q3" | "Q4";
+type SheetRow = (string | number)[];
+
+
 interface Property {
   id: string;
   name: string;
@@ -76,7 +81,7 @@ async function fetchTasksForProperty(
       )
       .eq("property_id", propertyId)
       .eq("year", year)
-      .eq("quarter", quarter as "Q1" | "Q2" | "Q3" | "Q4")
+      .eq("quarter", quarter as Quarter)
       .order("name");
 
     if (error) {
@@ -91,8 +96,9 @@ async function fetchTasksForProperty(
         .eq("id", propertyId)
         .single();
 
+      type TaskRow = { id: string; name: string; description: string | null; planned_count: number; reported_count: number; drift_categories?: { name?: string } | null };
       allTasks.push(
-        ...data.map((task: any) => ({
+        ...(data as unknown as TaskRow[]).map((task) => ({
           propertyId,
           propertyName: propData?.name || "Okänd",
           quarter,
@@ -141,11 +147,12 @@ async function fetchTaskObjects(taskId: string): Promise<TaskObject[]> {
     return [];
   }
 
-  return (data || []).map((obj: any) => ({
+  type ObjRow = { id: string; object_name: string | null; is_reported: boolean; component?: TaskObject["component"] };
+  return ((data || []) as unknown as ObjRow[]).map((obj) => ({
     id: obj.id,
     object_name: obj.object_name,
     is_reported: obj.is_reported,
-    component: obj.component,
+    component: obj.component ?? null,
   }));
 }
 
@@ -332,7 +339,7 @@ async function generateExcelReport(
 
   // Sheet 2: Quarter breakdown (for year report)
   if (reportType === "year") {
-    const quarterBreakdownData: any[] = [
+    const quarterBreakdownData: SheetRow[] = [
       ["Kvartalsöversikt per fastighet"],
       [],
       ["Fastighet", "Q1 %", "Q2 %", "Q3 %", "Q4 %", "Totalt %"],
@@ -362,7 +369,7 @@ async function generateExcelReport(
 
   // Deviation summary sheet with objects
   if (allDeviations.length > 0) {
-    const deviationSheetData: any[] = [
+    const deviationSheetData: SheetRow[] = [
       ["Avvikelserapport - Alla avvikelser"],
       [`Totalt antal avvikelser: ${allDeviations.length}`],
       [],
@@ -403,7 +410,7 @@ async function generateExcelReport(
     if (tasks.length === 0) continue;
 
     const propertyDeviations = allDeviations.filter(d => d.propertyName === property.name);
-    const taskData: any[] = [
+    const taskData: SheetRow[] = [
       ["Kvartal", "Kategori", "Uppgift", "Planerat", "Redovisat", "Status", "%"],
       ...tasks.map((t) => [
         t.quarter,
@@ -584,7 +591,7 @@ async function generatePdfReport(
       doc.text(
         `... och ${allDeviations.length - 40} fler avvikelser (se Excel för fullständig lista)`,
         14,
-        (doc as any).lastAutoTable.finalY + 10
+        (doc as JsPdfWithAutoTable).lastAutoTable.finalY + 10
       );
     }
   }
@@ -635,7 +642,7 @@ async function generatePdfReport(
 
     // Add property-specific deviations with objects
     if (propertyDeviations.length > 0) {
-      const yPos = (doc as any).lastAutoTable.finalY + 10;
+      const yPos = (doc as JsPdfWithAutoTable).lastAutoTable.finalY + 10;
       
       if (yPos < 240) {
         doc.setFontSize(11);
