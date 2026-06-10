@@ -359,8 +359,9 @@ export async function generateDeviationReport(
           deviation,
           deviationPercent,
           deviationAmount: Math.abs(task.reported_count - task.planned_count),
-          status:
-            task.reported_count > task.planned_count ? "Överrapportering" : "Underrapportering",
+          status: (task.reported_count > task.planned_count
+            ? "Överrapportering"
+            : "Underrapportering") as DeviationRow["status"],
         };
       })
       .filter((task: DeviationRow) => task.deviation >= threshold);
