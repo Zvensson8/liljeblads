@@ -25,17 +25,17 @@ export function TodoAttachments({ todoId, onUpdate }: TodoAttachmentsProps) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
-  const { data: attachments, refetch } = useQuery({
+  const { data: attachments, refetch } = useQuery<TodoAttachmentRow[]>({
     queryKey: ["todo-attachments", todoId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("todo_attachments" as any)
+        .from("todo_attachments" as never)
         .select("*")
         .eq("todo_id", todoId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as any[];
+      return (data ?? []) as unknown as TodoAttachmentRow[];
     },
   });
 
