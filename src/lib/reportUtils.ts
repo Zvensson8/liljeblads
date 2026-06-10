@@ -80,9 +80,9 @@ export async function generateYearReport(
 
       if (data) {
         allData.push(
-          ...data.map((task: DriftTaskRow) => ({
+          ...(data as unknown as DriftTaskRow[]).map<ReportRow>((task) => ({
             Kvartal: quarter,
-            Kategori: task.drift_categories?.name || "Ingen",
+            Kategori: categoryName(task),
             Uppgift: task.name,
             Beskrivning: task.description || "",
             Planerat: task.planned_count,
@@ -217,8 +217,10 @@ export async function generateCategoryReport(
     if (error) throw error;
 
     // Group by category
-    const grouped = (data || []).reduce((acc: Record<string, DriftTaskRow[]>, task: DriftTaskRow) => {
-      const catName = task.drift_categories?.name || "Ingen kategori";
+    const grouped: Record<string, DriftTaskRow[]> = (
+      (data || []) as unknown as DriftTaskRow[]
+    ).reduce<Record<string, DriftTaskRow[]>>((acc, task) => {
+      const catName = categoryName(task);
       if (!acc[catName]) {
         acc[catName] = [];
       }
@@ -369,7 +371,7 @@ export async function generateDeviationReport(
 
     const reportData = deviations.map((d: DeviationRow) => ({
       Kvartal: d.quarter,
-      Kategori: d.drift_categories?.name || "Ingen",
+      Kategori: categoryName(d),
       Uppgift: d.name,
       Planerat: d.planned_count,
       Redovisat: d.reported_count,
