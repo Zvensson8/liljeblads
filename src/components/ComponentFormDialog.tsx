@@ -40,7 +40,7 @@ interface ComponentFormDialogProps {
   floorId: string;
   propertyId?: string;
   selectedTemplate?: ComponentTemplate | null;
-  editingComponent?: Partial<ComponentRow> & { id: string };
+  editingComponent?: Partial<Omit<ComponentRow, 'status'>> & { id: string; status?: string | null };
   canvasPosition?: { x: number; y: number } | null;
   onSuccess: (componentId?: string) => void;
 }
