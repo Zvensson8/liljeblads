@@ -123,7 +123,7 @@ export default function OrganizationSettings() {
         memberCount: membersResult.count || 0,
         componentCount: componentsResult.count || 0,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching organization:", error);
       toast.error("Kunde inte hämta organisationsdata");
     } finally {

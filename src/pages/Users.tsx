@@ -289,7 +289,7 @@ export default function Users() {
       setEditDialogOpen(false);
       setSelectedUser(null);
       fetchProfiles();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating user:", error);
       toast({
         title: "Fel",

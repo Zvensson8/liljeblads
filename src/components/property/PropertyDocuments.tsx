@@ -84,7 +84,7 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
 
       toast.success(nextVersion > 1 ? `Ny version (v${nextVersion}) uppladdad` : "Dokument uppladdat");
       refetch();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ladda upp dokument: " + error.message);
     } finally {
       setUploading(false);
@@ -107,7 +107,7 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
 
       toast.success("Dokument borttaget");
       refetch();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort dokument");
     }
   };

@@ -180,7 +180,7 @@ export default function ComponentDetail() {
         .eq("component_id", id)
         .order("created_at", { ascending: false });
       setComponentWorkOrders(woData || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte hämta komponentdata");
       navigate("/components");
     } finally {
@@ -201,7 +201,7 @@ export default function ComponentDetail() {
 
       toast.success("Komponent borttagen");
       navigate("/components");
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort komponent");
     }
   };

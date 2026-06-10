@@ -60,7 +60,7 @@ export function PropertyOverview({
       });
 
       toast.success('Kontaktinformation skickad till din e-post!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error sending email:', error);
       toast.error('Kunde inte skicka e-post: ' + error.message);
     } finally {

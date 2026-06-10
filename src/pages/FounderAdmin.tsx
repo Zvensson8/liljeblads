@@ -46,7 +46,7 @@ export default function FounderAdmin() {
       }
 
       setIsFounder(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error checking founder access:", error);
       navigate("/");
     } finally {

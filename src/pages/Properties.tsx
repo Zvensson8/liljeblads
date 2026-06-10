@@ -78,7 +78,7 @@ const Properties = () => {
       setName('');
       setAddress('');
       setDescription('');
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle Zod validation errors
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
