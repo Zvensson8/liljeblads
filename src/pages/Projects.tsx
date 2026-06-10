@@ -82,6 +82,11 @@ export default function Projects() {
   const [sortField, setSortField] = useState<string>("updated_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [editingCell, setEditingCell] = useState<{ projectId: string; field: string } | null>(null);
+  // tempValue is a polymorphic inline-edit buffer (string, number, or
+  // composite { quarter, year } for quarter editing). Strict typing here
+  // would require narrowing at 14+ call sites — left as `any` until the
+  // inline editor itself is split per field type.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [tempValue, setTempValue] = useState<any>(null);
   const [updating, setUpdating] = useState(false);
 
@@ -112,13 +117,13 @@ export default function Projects() {
         .single();
 
       if (error) throw error;
-      
-      setEditingProject(data as any);
+
+      setEditingProject(data as unknown as Project);
       setFormDialogOpen(true);
-      
+
       // Remove edit parameter from URL
       setSearchParams({});
-    } catch (error: any) {
+    } catch {
       toast.error("Kunde inte hämta projekt för redigering");
     }
   };
@@ -155,8 +160,8 @@ export default function Projects() {
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
-      setProjects((data as any) || []);
-    } catch (error: any) {
+      setProjects((data as unknown as Project[]) || []);
+    } catch {
       toast.error("Kunde inte hämta projekt");
     } finally {
       setLoading(false);
@@ -207,24 +212,24 @@ export default function Projects() {
     return "text-green-600";
   };
 
-  const updateProject = async (projectId: string, field: string, value: any) => {
+  const updateProject = async (projectId: string, field: string, value: unknown) => {
     setUpdating(true);
     try {
-      const updateData: any = { [field]: value, updated_at: new Date().toISOString() };
-      
+      const updateData: Record<string, unknown> = { [field]: value, updated_at: new Date().toISOString() };
+
       const { error } = await supabase
         .from("projects")
         .update(updateData)
         .eq("id", projectId);
-      
+
       if (error) throw error;
-      
-      setProjects(projects.map(p => 
-        p.id === projectId ? { ...p, [field]: value } : p
+
+      setProjects(projects.map(p =>
+        p.id === projectId ? { ...p, [field]: value } as Project : p
       ));
-      
+
       toast.success("Projektet uppdaterades");
-    } catch (error) {
+    } catch {
       toast.error("Kunde inte uppdatera projektet");
     } finally {
       setUpdating(false);
@@ -233,6 +238,7 @@ export default function Projects() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const startEditing = (projectId: string, field: string, currentValue: any) => {
     setEditingCell({ projectId, field });
     setTempValue(currentValue);
@@ -281,8 +287,8 @@ export default function Projects() {
 
     return matchesSearch && matchesStatus && matchesType && matchesProperty;
   }).sort((a, b) => {
-    let aValue: any = a[sortField as keyof Project];
-    let bValue: any = b[sortField as keyof Project];
+    let aValue: unknown = a[sortField as keyof Project];
+    let bValue: unknown = b[sortField as keyof Project];
 
     // Handle nested property name
     if (sortField === "property_name") {

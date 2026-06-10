@@ -3,16 +3,47 @@ import autoTable from "jspdf-autotable";
 import { supabase } from "@/integrations/supabase/client";
 import { createWorkbook, addJsonSheet, downloadWorkbook } from "./excelUtils";
 
-interface Task {
+interface DriftCategoryRef {
+  name: string | null;
+}
+
+interface DriftTaskRow {
   id: string;
   name: string;
   description: string | null;
   planned_count: number;
   reported_count: number;
   quarter: string;
-  category?: {
-    name: string;
-  };
+  category_id?: string | null;
+  drift_categories: DriftCategoryRef | DriftCategoryRef[] | null;
+}
+
+interface ReportRow {
+  Kvartal: string;
+  Kategori: string;
+  Uppgift: string;
+  Beskrivning: string;
+  Planerat: number;
+  Redovisat: number;
+  Status: "Saknas" | "Klar" | "Pågår";
+  "Completion %": number;
+}
+
+interface DeviationRow extends DriftTaskRow {
+  deviation: number;
+  deviationPercent: number;
+  deviationAmount: number;
+  status: "Överrapportering" | "Underrapportering";
+}
+
+// jsPDF augmented with the autoTable plugin's `lastAutoTable` property.
+type JsPdfWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
+
+function categoryName(t: DriftTaskRow): string {
+  const cats = t.drift_categories;
+  if (!cats) return "Ingen kategori";
+  const arr = Array.isArray(cats) ? cats : [cats];
+  return arr[0]?.name ?? "Ingen kategori";
 }
 
 export async function generateYearReport(
@@ -23,7 +54,7 @@ export async function generateYearReport(
 ) {
   try {
     const quarters = ["Q1", "Q2", "Q3", "Q4"];
-    const allData: any[] = [];
+    const allData: ReportRow[] = [];
 
     // Fetch data for all quarters
     for (const quarter of quarters) {
@@ -49,9 +80,9 @@ export async function generateYearReport(
 
       if (data) {
         allData.push(
-          ...data.map((task: any) => ({
+          ...(data as unknown as DriftTaskRow[]).map<ReportRow>((task) => ({
             Kvartal: quarter,
-            Kategori: task.drift_categories?.name || "Ingen",
+            Kategori: categoryName(task),
             Uppgift: task.name,
             Beskrivning: task.description || "",
             Planerat: task.planned_count,
@@ -186,8 +217,10 @@ export async function generateCategoryReport(
     if (error) throw error;
 
     // Group by category
-    const grouped = (data || []).reduce((acc: any, task: any) => {
-      const catName = task.drift_categories?.name || "Ingen kategori";
+    const grouped: Record<string, DriftTaskRow[]> = (
+      (data || []) as unknown as DriftTaskRow[]
+    ).reduce<Record<string, DriftTaskRow[]>>((acc, task) => {
+      const catName = categoryName(task);
       if (!acc[catName]) {
         acc[catName] = [];
       }
@@ -199,10 +232,10 @@ export async function generateCategoryReport(
       const wb = createWorkbook();
 
       // Category summary
-      const summaryData = Object.entries(grouped).map(([cat, tasks]: any) => {
+      const summaryData = Object.entries(grouped).map(([cat, tasks]: [string, DriftTaskRow[]]) => {
         const total = tasks.length;
         const completed = tasks.filter(
-          (t: any) => t.reported_count >= t.planned_count
+          (t: DriftTaskRow) => t.reported_count >= t.planned_count
         ).length;
         const completionRate =
           total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -218,8 +251,8 @@ export async function generateCategoryReport(
       addJsonSheet(wb, "Sammanfattning", summaryData);
 
       // Detailed sheets per category
-      Object.entries(grouped).forEach(([cat, tasks]: any) => {
-        const taskData = tasks.map((t: any) => ({
+      Object.entries(grouped).forEach(([cat, tasks]: [string, DriftTaskRow[]]) => {
+        const taskData = tasks.map((t: DriftTaskRow) => ({
           Uppgift: t.name,
           Beskrivning: t.description || "",
           Planerat: t.planned_count,
@@ -249,7 +282,7 @@ export async function generateCategoryReport(
 
       let yPos = 35;
 
-      Object.entries(grouped).forEach(([cat, tasks]: any) => {
+      Object.entries(grouped).forEach(([cat, tasks]: [string, DriftTaskRow[]]) => {
         if (yPos > 250) {
           doc.addPage();
           yPos = 20;
@@ -259,7 +292,7 @@ export async function generateCategoryReport(
         doc.text(cat, 14, yPos);
         yPos += 5;
 
-        const taskData = tasks.map((t: any) => [
+        const taskData = tasks.map((t: DriftTaskRow) => [
           t.name,
           t.planned_count,
           t.reported_count,
@@ -273,7 +306,7 @@ export async function generateCategoryReport(
           styles: { fontSize: 9 },
         });
 
-        yPos = (doc as any).lastAutoTable.finalY + 10;
+        yPos = (doc as JsPdfWithAutoTable).lastAutoTable.finalY + 10;
       });
 
       doc.save(`${propertyName}_Kategorirapport_${quarter}_${year}.pdf`);
@@ -312,8 +345,8 @@ export async function generateDeviationReport(
     if (error) throw error;
 
     // Filter tasks with significant deviation
-    const deviations = (data || [])
-      .map((task: any) => {
+    const deviations: DeviationRow[] = ((data || []) as unknown as DriftTaskRow[])
+      .map<DeviationRow>((task) => {
         const deviation =
           task.planned_count > 0
             ? Math.abs(task.reported_count - task.planned_count) /
@@ -326,19 +359,20 @@ export async function generateDeviationReport(
           deviation,
           deviationPercent,
           deviationAmount: Math.abs(task.reported_count - task.planned_count),
-          status:
-            task.reported_count > task.planned_count ? "Överrapportering" : "Underrapportering",
+          status: (task.reported_count > task.planned_count
+            ? "Överrapportering"
+            : "Underrapportering") as DeviationRow["status"],
         };
       })
-      .filter((task: any) => task.deviation >= threshold);
+      .filter((task: DeviationRow) => task.deviation >= threshold);
 
     if (deviations.length === 0) {
       throw new Error(`Inga avvikelser över ${threshold * 100}% hittades`);
     }
 
-    const reportData = deviations.map((d: any) => ({
+    const reportData = deviations.map((d: DeviationRow) => ({
       Kvartal: d.quarter,
-      Kategori: d.drift_categories?.name || "Ingen",
+      Kategori: categoryName(d),
       Uppgift: d.name,
       Planerat: d.planned_count,
       Redovisat: d.reported_count,
@@ -366,7 +400,7 @@ export async function generateDeviationReport(
         head: [
           ["Kvartal", "Uppgift", "Planerat", "Redovisat", "Avvikelse %", "Typ"],
         ],
-        body: reportData.map((d: any) => [
+        body: reportData.map((d) => [
           d.Kvartal,
           d.Uppgift,
           d.Planerat,
