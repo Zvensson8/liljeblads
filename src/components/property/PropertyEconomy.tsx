@@ -54,7 +54,7 @@ export function PropertyEconomy({ propertyId }: PropertyEconomyProps) {
       }
 
       // Group by month
-      const monthlyData: Record<string, MonthlyCost | CategoryStat> = {};
+      const monthlyData: Record<string, MonthlyCost> = {};
       maintenanceData.forEach(item => {
         const month = new Date(item.performed_date).toLocaleDateString('sv-SE', { month: 'short', year: '2-digit' });
         if (!monthlyData[month]) {
@@ -69,8 +69,7 @@ export function PropertyEconomy({ propertyId }: PropertyEconomyProps) {
       setTotalCost(total);
       setAvgMonthlyCost(total / 12);
 
-      // Group by category using componentsData
-      const categoryStats: Record<string, MonthlyCost | CategoryStat> = {};
+      const categoryStats: Record<string, CategoryStat> = {};
       maintenanceData.forEach(item => {
         const comp = componentsData.find(c => c.id === item.component_id);
         const category = comp?.type || "Övrigt";
@@ -81,7 +80,7 @@ export function PropertyEconomy({ propertyId }: PropertyEconomyProps) {
         categoryStats[category].count += 1;
       });
 
-      const sortedCategories = Object.values(categoryStats).sort((a, b) => (a as CategoryStat).cost > (b as CategoryStat).cost ? -1 : 1);
+      const sortedCategories = Object.values(categoryStats).sort((a, b) => b.cost - a.cost);
       setCategoryData(sortedCategories);
     } catch (error) {
       console.error("Error fetching economy data:", error);
