@@ -194,7 +194,7 @@ export function WorkOrderDetailDialog({
         comments: workOrder.comments || "",
         due_date: workOrder.due_date || "",
         reminder_enabled: workOrder.reminder_enabled || false,
-        reminder_frequency: workOrder.reminder_frequency || "weekly",
+        reminder_frequency: (workOrder.reminder_frequency as WorkOrderFormData["reminder_frequency"]) || "weekly",
         reminder_recipient_email: workOrder.reminder_recipient_email || user?.email || "",
       });
     }
@@ -764,7 +764,7 @@ export function WorkOrderDetailDialog({
                     {workOrder.action && <Badge variant="outline">{workOrder.action}</Badge>}
                     {workOrder.contractor && <Badge variant="secondary">{workOrder.contractor}</Badge>}
                     {workOrder.price && (
-                      <Badge variant="secondary">{parseInt(workOrder.price).toLocaleString("sv-SE")} SEK</Badge>
+                      <Badge variant="secondary">{Number(workOrder.price).toLocaleString("sv-SE")} SEK</Badge>
                     )}
                     {workOrder.quarter && <Badge variant="secondary">{workOrder.quarter}</Badge>}
                   </div>
