@@ -89,7 +89,7 @@ export function ReportGenerator({
       }
       onOpenChange(false);
     } catch (error: unknown) {
-      toast.error(error.message || "Kunde inte generera rapport");
+      toast.error(getErrorMessage(error) || "Kunde inte generera rapport");
     } finally {
       setLoading(false);
     }

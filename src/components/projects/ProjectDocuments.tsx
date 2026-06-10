@@ -174,7 +174,7 @@ const uploadFile = async (file: File) => {
       }
     } catch (error: unknown) {
       console.error("Upload error:", error);
-      toast.error(`Kunde inte ladda upp dokument: ${error.message}`);
+      toast.error(`Kunde inte ladda upp dokument: ${getErrorMessage(error)}`);
     } finally {
       setUploading(false);
     }

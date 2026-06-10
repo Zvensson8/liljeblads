@@ -60,7 +60,7 @@ export const ProjectReportButton = ({ projectId }: ProjectReportButtonProps) => 
       toast.success("PDF-rapport genererad och nedladdad");
     } catch (error: unknown) {
       console.error("Error generating report:", error);
-      toast.error("Kunde inte generera rapport: " + error.message);
+      toast.error("Kunde inte generera rapport: " + getErrorMessage(error));
     } finally {
       setGenerating(false);
     }

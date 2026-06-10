@@ -122,7 +122,7 @@ export function ManualProposalDialog({
       onSuccess();
     } catch (error: unknown) {
       console.error('Error creating proposal:', error);
-      toast.error(error.message || 'Kunde inte skapa projektförslag');
+      toast.error(getErrorMessage(error) || 'Kunde inte skapa projektförslag');
     } finally {
       setLoading(false);
     }
