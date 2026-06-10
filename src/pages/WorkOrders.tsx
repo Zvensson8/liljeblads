@@ -218,7 +218,7 @@ const WorkOrders = () => {
                       >
                         {editingCell?.orderId === order.id && editingCell?.field === "status" ? (
                           <Select
-                            value={tempValue}
+                            value={tempValue ?? undefined}
                             onValueChange={(value) => {
                               setTempValue(value);
                               updateWorkOrder(order.id, "status", value);
@@ -255,7 +255,7 @@ const WorkOrders = () => {
                         {editingCell?.orderId === order.id && editingCell?.field === "price" ? (
                           <Input
                             type="number"
-                            value={tempValue}
+                            value={tempValue ?? ""}
                             onChange={(e) => setTempValue(e.target.value)}
                             onBlur={() => updateWorkOrder(order.id, "price", tempValue ? parseFloat(tempValue) : null)}
                             onKeyDown={(e) => handleKeyDown(e, order.id, "price")}
