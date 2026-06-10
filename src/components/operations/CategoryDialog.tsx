@@ -38,7 +38,7 @@ export function CategoryDialog({
 }: CategoryDialogProps) {
   const [newCategoryName, setNewCategoryName] = useState("");
   const { data: allCategories = [] } = useDriftCategories();
-  const categories = (allCategories as Category[]).filter((c: any) => c.property_id === propertyId);
+  const categories = (allCategories as unknown as Category[]).filter((c) => c.property_id === propertyId);
   const createCategory = useCreateDriftCategory();
   const deleteCategory = useDeleteDriftCategory();
   const loading = createCategory.isPending;
