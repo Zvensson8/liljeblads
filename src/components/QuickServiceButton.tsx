@@ -146,12 +146,13 @@ export const QuickServiceButton = ({
 
         try {
           await storageService.upload('maintenance-documents', fileName, selectedFile);
-        } catch (uploadError: any) {
+        } catch (uploadError: unknown) {
           console.error('Upload error:', uploadError);
           toast.error('Service registrerad men dokumentet kunde inte laddas upp', {
-            description: uploadError.message,
+            description: getErrorMessage(uploadError),
           });
         }
+
 
         try {
           const publicUrl = storageService.getPublicUrl('maintenance-documents', fileName);
