@@ -231,13 +231,11 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
     setFabricCanvas(canvas);
 
     canvas.on('selection:created', (e) => {
-      const obj: any = e.selected?.[0];
-      setSelectedObject(obj);
+      setSelectedObject((e.selected?.[0] as CanvasObject) ?? null);
     });
 
     canvas.on('selection:updated', (e) => {
-      const obj: any = e.selected?.[0];
-      setSelectedObject(obj);
+      setSelectedObject((e.selected?.[0] as CanvasObject) ?? null);
     });
 
     canvas.on('selection:cleared', () => {
@@ -246,7 +244,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
 
     // Double-click to edit component
     canvas.on('mouse:dblclick', (e) => {
-      const obj: any = e.target;
+      const obj = e.target as CanvasObject | undefined;
       if (obj?.componentId) {
         const component = componentsRef.current.find(c => c.id === obj.componentId);
         if (component) {
@@ -257,7 +255,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
     });
 
     // Mouse wheel zoom
-    const handleWheel = (opt: any) => {
+    const handleWheel = (opt: TPointerEventInfo<WheelEvent>) => {
       const e = opt.e;
       e.preventDefault();
       e.stopPropagation();
@@ -279,7 +277,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
     canvas.on('mouse:move', (e) => {
       // Handle panning with Space or Pan tool
       // Fabric v7: use getScenePoint() or scenePoint instead of pointer
-      const scenePoint = e.scenePoint || (e as any).pointer;
+      const scenePoint = e.scenePoint;
       if (isPanning && scenePoint) {
         const vpt = canvas.viewportTransform;
         if (vpt) {
@@ -292,7 +290,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
       }
 
       // Handle hover effect for components
-      const target: any = e.target;
+      const target = e.target as CanvasObject | undefined;
       if (target && target.componentId && scenePoint) {
         target.set({ 
           strokeWidth: 4,
@@ -365,9 +363,10 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
         }
         
         // Reset other objects
-        canvas.getObjects().forEach((obj: any) => {
-          if (obj.componentId && obj !== target) {
-            obj.set({ 
+        canvas.getObjects().forEach((obj) => {
+          const co = obj as CanvasObject;
+          if (co.componentId && co !== target) {
+            co.set({
               strokeWidth: 2,
               stroke: '#3b82f6',
               fill: 'rgba(59, 130, 246, 0.5)'
@@ -378,11 +377,12 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
         // Hide tooltip
         setTooltipVisible(false);
         setTooltipComponent(null);
-        
+
         // Reset all component objects when not hovering
-        canvas.getObjects().forEach((obj: any) => {
-          if (obj.componentId) {
-            obj.set({ 
+        canvas.getObjects().forEach((obj) => {
+          const co = obj as CanvasObject;
+          if (co.componentId) {
+            co.set({
               strokeWidth: 2,
               stroke: '#3b82f6',
               fill: 'rgba(59, 130, 246, 0.5)'
@@ -397,7 +397,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
     canvas.on('mouse:down', (e) => {
       // Enable panning with Space key or Pan tool or middle mouse button
       // Fabric v7: use scenePoint instead of pointer
-      const scenePoint = e.scenePoint || (e as any).pointer;
+      const scenePoint = e.scenePoint;
       const isMiddleButton = e.e instanceof MouseEvent && e.e.button === 1;
       if ((activeTool === 'pan' || spacePressed || isMiddleButton) && scenePoint) {
         if (isMiddleButton) {
@@ -420,7 +420,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
 
     // Auto-save component positions when moved
     canvas.on('object:modified', (e) => {
-      const obj: any = e.target;
+      const obj = e.target as CanvasObject | undefined;
       if (obj && obj.componentId) {
         saveComponentPosition(obj.componentId, obj.left || 0, obj.top || 0);
         toast({
@@ -458,16 +458,16 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
     }
   }, [activeTool, fabricCanvas, gridEnabled]);
 
-  const renderComponentsOnCanvas = useCallback((componentsData: any[]) => {
+  const renderComponentsOnCanvas = useCallback((componentsData: ComponentWithGeometry[]) => {
     if (!fabricCanvas) return;
 
     // Store current positions of components being dragged
     const activeObject = fabricCanvas.getActiveObject();
-    const isDragging = activeObject && (activeObject as any).isMoving;
+    const isDragging = activeObject && (activeObject as CanvasObject).isMoving;
 
     // Remove all component objects
-    fabricCanvas.getObjects().forEach((obj: any) => {
-      if (obj.componentId) {
+    fabricCanvas.getObjects().forEach((obj) => {
+      if ((obj as CanvasObject).componentId) {
         fabricCanvas.remove(obj);
       }
     });
@@ -476,11 +476,11 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
     componentsData.forEach((component) => {
       if (component.component_geometry && component.component_geometry.length > 0) {
         const geometry = component.component_geometry[0];
-        
+
         // Store last known position
         lastSavedPositions.current.set(component.id, { x: geometry.x, y: geometry.y });
-        
-        const circle: any = new Circle({
+
+        const circle = new Circle({
           left: geometry.x,
           top: geometry.y,
           fill: 'rgba(59, 130, 246, 0.5)',
@@ -494,7 +494,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
           hasBorders: true,
           lockScalingX: true,
           lockScalingY: true,
-        });
+        }) as CanvasObject;
         circle.componentId = component.id;
         fabricCanvas.add(circle);
       }
@@ -542,7 +542,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
         selectable: false,
         evented: false,
       });
-      (lineV as any).isGrid = true;
+      (lineV as CanvasObject).isGrid = true;
       fabricCanvas.add(lineV);
     }
 
@@ -553,18 +553,18 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
         selectable: false,
         evented: false,
       });
-      (lineH as any).isGrid = true;
+      (lineH as CanvasObject).isGrid = true;
       fabricCanvas.add(lineH);
     }
     
-    const gridObjects = fabricCanvas.getObjects().filter((obj: any) => obj.isGrid);
+    const gridObjects = fabricCanvas.getObjects().filter((obj) => (obj as CanvasObject).isGrid);
     gridObjects.forEach(obj => fabricCanvas.sendObjectToBack(obj));
   };
 
   const removeGrid = () => {
     if (!fabricCanvas) return;
-    fabricCanvas.getObjects().forEach((obj: any) => {
-      if (obj.isGrid) fabricCanvas.remove(obj);
+    fabricCanvas.getObjects().forEach((obj) => {
+      if ((obj as CanvasObject).isGrid) fabricCanvas.remove(obj);
     });
   };
 
@@ -695,8 +695,8 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
       strokeWidth: 2,
       radius: 20,
     });
-    (shape as any).componentId = null;
-    (shape as any).componentType = template.type;
+    (shape as CanvasObject).componentId = null;
+    (shape as CanvasObject).componentType = template.type;
     
     fabricCanvas.add(shape);
     fabricCanvas.setActiveObject(shape);
@@ -719,7 +719,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
       strokeWidth: 2,
       radius: 15,
     });
-    (shape as any).existingComponentId = component.id;
+    (shape as CanvasObject).existingComponentId = component.id;
     
     fabricCanvas.add(shape);
     fabricCanvas.setActiveObject(shape);
@@ -735,7 +735,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
   const handleSaveComponentPosition = async () => {
     if (!fabricCanvas || !selectedObject) return;
     
-    const existingComponentId = (selectedObject as any).existingComponentId;
+    const existingComponentId = selectedObject.existingComponentId;
     if (!existingComponentId) return;
 
     // Delete existing geometry if any
@@ -816,7 +816,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
           </Button>
         )}
         
-        {selectedObject && (selectedObject as any).existingComponentId && (
+        {selectedObject && selectedObject.existingComponentId && (
           <Button onClick={handleSaveComponentPosition} size="lg">
             Spara position
           </Button>
