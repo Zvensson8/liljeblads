@@ -44,7 +44,7 @@ export function useLogProjectActivity() {
     mutationFn: async (input: LogProjectActivityInput) => {
       const { error } = await supabase
         .from('project_activity_log')
-        .insert(input);
+        .insert(input as unknown as never);
       if (error) throw error;
     },
     onSuccess: (_data, vars) => {

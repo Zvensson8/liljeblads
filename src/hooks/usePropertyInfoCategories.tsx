@@ -98,7 +98,7 @@ export function usePropertyInfoCategories(organizationId: string | null) {
     mutationFn: async (field: { category_id: string; field_name: string; field_type: string; options?: unknown; unit?: string; placeholder?: string; help_text?: string; display_order?: number; required?: boolean }) => {
       const { data, error } = await supabase
         .from('property_info_fields')
-        .insert([field])
+        .insert([field as never])
         .select()
         .single();
 

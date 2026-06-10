@@ -14,7 +14,7 @@ export interface ExcelSheetData {
 
 export interface ExcelJsonSheetData {
   name: string;
-  data: Record<string, ExcelCellValue>[];
+  data: Record<string, unknown>[];
 }
 
 /**
@@ -114,7 +114,7 @@ export function addAoASheet(workbook: ExcelJS.Workbook, sheetName: string, data:
 /**
  * Add a sheet with JSON data to existing workbook
  */
-export function addJsonSheet(workbook: ExcelJS.Workbook, sheetName: string, data: Record<string, ExcelCellValue>[]): ExcelJS.Worksheet {
+export function addJsonSheet(workbook: ExcelJS.Workbook, sheetName: string, data: Record<string, unknown>[]): ExcelJS.Worksheet {
   const worksheet = workbook.addWorksheet(sheetName.substring(0, 31));
   
   if (data.length === 0) return worksheet;
