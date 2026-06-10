@@ -47,7 +47,7 @@ export const UpcomingTasksWidget = () => {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground truncate mt-1">
-                  {task.properties?.name}
+                  {(task as typeof task & { properties?: { name?: string } }).properties?.name}
                 </p>
               </div>
             ))}
