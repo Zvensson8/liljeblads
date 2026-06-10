@@ -230,7 +230,7 @@ export async function generateCategoryReport(
       const wb = createWorkbook();
 
       // Category summary
-      const summaryData = Object.entries(grouped).map(([cat, tasks]: any) => {
+      const summaryData = Object.entries(grouped).map(([cat, tasks]: [string, DriftTaskRow[]]) => {
         const total = tasks.length;
         const completed = tasks.filter(
           (t: DriftTaskRow) => t.reported_count >= t.planned_count
