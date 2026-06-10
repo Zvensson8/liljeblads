@@ -15,6 +15,20 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
+import { getErrorMessage } from "@/lib/utils";
+
+type JsPdfWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
+type RawExportData = Record<string, unknown>;
+interface MemberRow {
+  user_id: string;
+  profiles: { id: string; email: string | null; full_name: string | null } | null;
+}
+interface ExportResponse {
+  filename: string;
+  zipData: string;
+  rawData: RawExportData & { organization?: { name?: string } };
+  summary: { properties_count: number; components_count: number; projects_count: number };
+}
 
 interface OrganizationDataExportProps {
   organizationId: string;
