@@ -65,8 +65,9 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch (error: any) {
-      const status = error?.context?.status ?? error?.status;
+    } catch (error: unknown) {
+      const err = error as { context?: { status?: number }; status?: number } | null;
+      const status = err?.context?.status ?? err?.status;
       if (status === 401) {
         setMessages((prev) => [
           ...prev,
