@@ -75,14 +75,14 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
 
   const handleSubmit = async () => {
     try {
-      const templateData = {
+      const templateData: TemplateInsert = {
         organization_id: organizationId,
         name: formData.name,
         description: formData.description || null,
         type: formData.type,
         estimated_duration_quarters: formData.estimated_duration_quarters ? Number(formData.estimated_duration_quarters) : null,
-        checklist_items: formData.checklist_items,
-        budget_categories: editingTemplate?.budget_categories || [],
+        checklist_items: formData.checklist_items as unknown as TemplateInsert["checklist_items"],
+        budget_categories: (editingTemplate?.budget_categories || []) as unknown as TemplateInsert["budget_categories"],
       };
 
       if (editingTemplate) {
