@@ -139,6 +139,7 @@ const Properties = () => {
 
     // Apply filters
     return filters.every((filter) => {
+      if (typeof filter.value !== 'object') return true;
       const { type, value } = filter.value;
       switch (type) {
         case 'property_type':
