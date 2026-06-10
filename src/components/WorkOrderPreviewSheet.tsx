@@ -12,11 +12,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Mail, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
+
+interface WorkOrderLike {
+  id: string;
+  action?: string | null;
+  contractor?: string | null;
+  price?: number | string | null;
+  quarter?: string | null;
+}
 
 interface WorkOrderPreviewSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workOrder: any;
+  workOrder: WorkOrderLike | null;
 }
 
 export function WorkOrderPreviewSheet({
@@ -39,8 +48,8 @@ export function WorkOrderPreviewSheet({
       const data = await generateOrderText.mutateAsync({ workOrderId: workOrder.id }) as { text?: string; error?: string };
       if (data?.error) throw new Error(data.error);
       setText(data?.text || "");
-    } catch (err: any) {
-      setText(`[Fel vid generering: ${err.message || "Okänt fel"}]\n\nDu kan skriva texten manuellt nedan.`);
+    } catch (err: unknown) {
+      setText(`[Fel vid generering: ${getErrorMessage(err)}]\n\nDu kan skriva texten manuellt nedan.`);
     } finally {
       setGenerating(false);
     }
@@ -78,8 +87,8 @@ export function WorkOrderPreviewSheet({
 
       toast.success("Beställningsutkast skickat till din e-post");
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Kunde inte skicka utkast");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err) || "Kunde inte skicka utkast");
     } finally {
       setSending(false);
     }
@@ -112,7 +121,7 @@ export function WorkOrderPreviewSheet({
               )}
               {workOrder?.price && (
                 <Badge variant="secondary">
-                  {parseInt(workOrder.price).toLocaleString("sv-SE")} SEK
+                  {Number(workOrder.price).toLocaleString("sv-SE")} SEK
                 </Badge>
               )}
               {workOrder?.quarter && (

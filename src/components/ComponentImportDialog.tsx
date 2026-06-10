@@ -7,7 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Upload, Download, CheckCircle, AlertCircle, XCircle, Copy, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { parseImportFile, validateAndMatchComponents, importComponents, type ValidationResult } from '@/lib/importUtils';
+import { parseImportFile, validateAndMatchComponents, importComponents, type ValidationResult, type ImportRow } from '@/lib/importUtils';
+import { getErrorMessage } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ComponentImportDialogProps {
@@ -23,7 +24,7 @@ export const ComponentImportDialog = ({
 }: ComponentImportDialogProps) => {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [parsedData, setParsedData] = useState<any[]>([]);
+  const [parsedData, setParsedData] = useState<ImportRow[]>([]);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [importing, setImporting] = useState(false);
   const [stage, setStage] = useState<'upload' | 'preview'>('upload');
@@ -52,10 +53,10 @@ export const ComponentImportDialog = ({
       const validated = await validateAndMatchComponents(parsed, propertyId || null);
       setValidationResults(validated);
       setStage('preview');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Fel vid läsning av fil',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     }
@@ -79,10 +80,10 @@ export const ComponentImportDialog = ({
         onSuccess();
         handleClose();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Importfel',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     } finally {

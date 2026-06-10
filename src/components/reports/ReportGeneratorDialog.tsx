@@ -9,6 +9,17 @@ import { Loader2 } from 'lucide-react';
 import { generateYearReport } from '@/lib/reportUtils';
 import { exportComponentsToExcel } from '@/lib/exportUtils';
 import { createWorkbook, addJsonSheet, downloadWorkbook } from '@/lib/excelUtils';
+import type { Tables } from '@/integrations/supabase/types';
+
+type ComponentRow = Tables<'components'> & {
+  floors?: { name: string | null } | null;
+  properties?: { name: string | null; address: string | null } | null;
+};
+type MaintenanceRow = Tables<'maintenance_history'>;
+type WorkOrderRow = Tables<'work_orders'>;
+type ProjectCostRow = Tables<'project_cost_items'> & {
+  projects?: { name: string | null; property_id: string | null } | null;
+};
 
 interface Property {
   id: string;
@@ -115,10 +126,10 @@ export const ReportGeneratorDialog = ({
     if (error) throw error;
 
     // Get maintenance records for each component
-    const maintenanceRecords: Record<string, any[]> = {};
+    const maintenanceRecords: Record<string, MaintenanceRow[]> = {};
     
     if (components) {
-      for (const comp of components) {
+      for (const comp of components as ComponentRow[]) {
         const { data: maintenance } = await supabase
           .from('maintenance_history')
           .select('*')
@@ -127,11 +138,11 @@ export const ReportGeneratorDialog = ({
           .limit(10);
 
         if (maintenance) {
-          maintenanceRecords[comp.id] = maintenance;
+          maintenanceRecords[comp.id] = maintenance as MaintenanceRow[];
         }
       }
 
-      const formattedComponents = components.map((c: any) => ({
+      const formattedComponents = (components as ComponentRow[]).map((c) => ({
         ...c,
         floor_name: c.floors?.name,
         property_name: c.properties?.name,
@@ -160,7 +171,7 @@ export const ReportGeneratorDialog = ({
 
     if (workOrders) {
       const wb = createWorkbook();
-      const data = workOrders.map((wo: any) => ({
+      const data = (workOrders as WorkOrderRow[]).map((wo) => ({
         'Åtgärd': wo.action,
         'Status': wo.status,
         'Prioritet': wo.priority,
@@ -190,7 +201,7 @@ export const ReportGeneratorDialog = ({
 
     if (costs) {
       const wb = createWorkbook();
-      const data = costs.map((cost: any) => ({
+      const data = (costs as ProjectCostRow[]).map((cost) => ({
         'Projekt': cost.projects?.name || '-',
         'Beskrivning': cost.description,
         'Belopp': cost.amount,

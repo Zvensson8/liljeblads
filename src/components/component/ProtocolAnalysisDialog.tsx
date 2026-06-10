@@ -101,7 +101,7 @@ export function ProtocolAnalysisDialog({
 
     for (const actionId of actionIds) {
       try {
-        await (supabase as any)
+        await supabase
           .from('ai_suggested_actions')
           .update({ 
             status: 'approved', 
@@ -137,7 +137,7 @@ export function ProtocolAnalysisDialog({
     const actionIds = suggestions.map(s => s.id);
 
     try {
-      await (supabase as any)
+      await supabase
         .from('ai_suggested_actions')
         .update({ 
           status: 'rejected',
@@ -158,7 +158,7 @@ export function ProtocolAnalysisDialog({
 
   const handleApprove = async (actionId: string) => {
     try {
-      await (supabase as any)
+      await supabase
         .from('ai_suggested_actions')
         .update({ 
           status: 'approved', 
@@ -181,7 +181,7 @@ export function ProtocolAnalysisDialog({
 
   const handleReject = async (actionId: string) => {
     try {
-      await (supabase as any)
+      await supabase
         .from('ai_suggested_actions')
         .update({ 
           status: 'rejected',

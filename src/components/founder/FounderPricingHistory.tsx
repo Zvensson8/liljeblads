@@ -60,14 +60,14 @@ export function FounderPricingHistory() {
 
       // Hämta prishistorik
       const { data, error } = await supabase
-        .from("organization_pricing_history" as any)
+        .from("organization_pricing_history")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100);
 
       if (error) throw error;
-      setHistory((data as any) || []);
-    } catch (error: any) {
+      setHistory((data as unknown as PricingHistory[]) || []);
+    } catch (error: unknown) {
       console.error("Error fetching pricing history:", error);
       toast.error("Kunde inte hämta prishistorik");
     } finally {
