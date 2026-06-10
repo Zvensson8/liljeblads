@@ -36,10 +36,13 @@ export function AttentionRequiredSection({ propertyId }: AttentionRequiredSectio
   const items = useMemo<AttentionItem[]>(() => {
     const attention: AttentionItem[] = [];
 
-    workOrders
-      .filter((wo: any) => wo.priority === 'high')
+    type WorkOrderLike = { id: string; priority?: string | null; action: string; properties?: { name?: string | null } | null };
+    type TodoLike = { id: string; title: string; due_date?: string | null; property_id?: string | null; properties?: { name?: string | null } | null };
+
+    (workOrders as WorkOrderLike[])
+      .filter((wo) => wo.priority === 'high')
       .slice(0, 5)
-      .forEach((wo: any) =>
+      .forEach((wo) =>
         attention.push({
           id: wo.id,
           type: 'work_order',
@@ -51,15 +54,15 @@ export function AttentionRequiredSection({ propertyId }: AttentionRequiredSectio
       );
 
     const now = Date.now();
-    todos
-      .filter((t: any) => t.due_date && new Date(t.due_date).getTime() < now)
+    (todos as TodoLike[])
+      .filter((t) => !!t.due_date && new Date(t.due_date).getTime() < now)
       .slice(0, 5)
-      .forEach((t: any) =>
+      .forEach((t) =>
         attention.push({
           id: t.id,
           type: 'todo',
           title: t.title,
-          subtitle: `${t.properties?.name || ''} - Förfallen ${format(new Date(t.due_date), 'PPP', { locale: sv })}`,
+          subtitle: `${t.properties?.name || ''} - Förfallen ${format(new Date(t.due_date!), 'PPP', { locale: sv })}`,
           severity: 'medium',
           path: `/properties/${propertyId || t.property_id}?tab=todos`,
         }),
