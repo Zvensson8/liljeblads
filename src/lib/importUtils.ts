@@ -1,9 +1,18 @@
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import * as XLSX from 'xlsx';
+import type { Database } from '@/integrations/supabase/types';
+
+type ComponentInsert = Database['public']['Tables']['components']['Insert'];
+
+/** Row from a parsed CSV/XLSX file. Header keys are user-supplied strings. */
+export type ImportRow = Record<string, string | number | null | undefined>;
+
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 // Parse CSV or XLSX file into array of objects
-export const parseImportFile = (file: File): Promise<any[]> => {
+export const parseImportFile = (file: File): Promise<ImportRow[]> => {
   const ext = file.name.split('.').pop()?.toLowerCase();
   if (ext === 'xlsx' || ext === 'xls') {
     return parseXLSX(file);
@@ -11,7 +20,7 @@ export const parseImportFile = (file: File): Promise<any[]> => {
   return parseCSV(file);
 };
 
-const parseXLSX = (file: File): Promise<any[]> => {
+const parseXLSX = (file: File): Promise<ImportRow[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -20,14 +29,14 @@ const parseXLSX = (file: File): Promise<any[]> => {
         const workbook = XLSX.read(data, { type: 'array', raw: false });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+        const rows = XLSX.utils.sheet_to_json<ImportRow>(sheet, { defval: '', raw: false });
         if (rows.length === 0) {
           reject(new Error('Filen innehåller inga datarader'));
           return;
         }
         resolve(rows);
-      } catch (error: any) {
-        reject(new Error(`Fel vid parsing av Excel-fil: ${error.message}`));
+      } catch (error: unknown) {
+        reject(new Error(`Fel vid parsing av Excel-fil: ${errorMessage(error)}`));
       }
     };
     reader.onerror = () => reject(new Error('Kunde inte läsa filen'));
@@ -36,7 +45,7 @@ const parseXLSX = (file: File): Promise<any[]> => {
 };
 
 // CSV parsing function
-export const parseCSV = (file: File): Promise<any[]> => {
+export const parseCSV = (file: File): Promise<ImportRow[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -51,11 +60,11 @@ export const parseCSV = (file: File): Promise<any[]> => {
         }
 
         const headers = lines[0].split(',').map((h) => h.trim());
-        const data = [];
+        const data: ImportRow[] = [];
 
         for (let i = 1; i < lines.length; i++) {
           const values = lines[i].split(',').map((v) => v.trim());
-          const row: any = {};
+          const row: ImportRow = {};
 
           headers.forEach((header, index) => {
             row[header] = values[index] || '';
@@ -65,8 +74,8 @@ export const parseCSV = (file: File): Promise<any[]> => {
         }
 
         resolve(data);
-      } catch (error: any) {
-        reject(new Error(`Fel vid parsing av CSV: ${error.message}`));
+      } catch (error: unknown) {
+        reject(new Error(`Fel vid parsing av CSV: ${errorMessage(error)}`));
       }
     };
 
@@ -89,16 +98,13 @@ const validComponentTypes = new Set([
 // Extract SC code from a string like "SC2.3 Entréer, Portar mm" -> "SC2.3"
 const extractComponentType = (raw: string): { code: string; valid: boolean } => {
   const trimmed = raw.trim();
-  // Try to match SC code pattern (most specific first)
   const match = trimmed.match(/^(SC[\d.]+)/);
   const code = match ? match[1] : trimmed;
-  
-  // Try progressively shorter codes if exact match fails
-  // e.g. "SC2.3.4.5" -> try "SC2.3.4.5", "SC2.3.4", "SC2.3", "SC2"
+
   if (validComponentTypes.has(code)) {
     return { code, valid: true };
   }
-  
+
   const parts = code.split('.');
   for (let i = parts.length - 1; i >= 1; i--) {
     const shorter = parts.slice(0, i).join('.');
@@ -106,7 +112,7 @@ const extractComponentType = (raw: string): { code: string; valid: boolean } => 
       return { code: shorter, valid: true };
     }
   }
-  
+
   return { code, valid: false };
 };
 
@@ -140,10 +146,12 @@ const componentSchema = z.object({
   refrigerant_type: z.string().nullish(),
 });
 
+export type MappedComponentData = z.infer<typeof componentSchema>;
+
 export interface ValidationResult {
   status: 'valid' | 'warning' | 'error' | 'duplicate';
   message: string;
-  data: any;
+  data: MappedComponentData | ImportRow;
   floorId?: string;
   propertyId?: string;
   floorName: string;
@@ -153,7 +161,7 @@ export interface ValidationResult {
 }
 
 export const validateAndMatchComponents = async (
-  csvData: any[],
+  csvData: ImportRow[],
   propertyId: string | null
 ): Promise<ValidationResult[]> => {
   // Always fetch all properties for name matching
@@ -220,17 +228,15 @@ export const validateAndMatchComponents = async (
     const result: ValidationResult = {
       status: 'valid',
       message: 'Redo för import',
-      data: {},
+      data: {} as MappedComponentData,
       floorName: col('Våning', 'Våningsplan', 'Floor'),
       propertyName: col('Fastighet', 'Property') || undefined,
     };
 
     try {
-      // Extract component type code from full description (e.g. "SC2.3 Entréer, Portar mm" -> "SC2.3")
       const rawType = col('Komponenttyp', 'Typ', 'Type');
       const { code: typeCode, valid: typeValid } = extractComponentType(rawType);
 
-      // Parse installation year from various formats
       const rawYear = col('Installationsår', 'Inst.år', 'Installation year');
       let installYear: number | null = null;
       if (rawYear) {
@@ -243,7 +249,7 @@ export const validateAndMatchComponents = async (
         }
       }
 
-      const mappedData = {
+      const mappedData: MappedComponentData = {
         name: col('Beteckning', 'Name'),
         type: typeCode,
         floorName: col('Våning', 'Våningsplan', 'Floor') || undefined,
@@ -335,9 +341,10 @@ export const validateAndMatchComponents = async (
       result.floorId = floorId;
       result.propertyId = propId;
       results.push(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const zodErr = error as z.ZodError | undefined;
       result.status = 'error';
-      result.message = error.errors?.[0]?.message || 'Valideringsfel';
+      result.message = zodErr?.errors?.[0]?.message || 'Valideringsfel';
       result.data = row;
       results.push(result);
     }
@@ -364,24 +371,27 @@ export const importComponents = async (
     }
 
     const { data, floorId, propertyId } = component;
+    const mapped = data as MappedComponentData;
 
-    const { error } = await supabase.from('components').insert({
-      name: data.name,
-      type: data.type,
+    const insert: ComponentInsert = {
+      name: mapped.name,
+      type: mapped.type as ComponentInsert['type'],
       floor_id: floorId || null,
       property_id: propertyId,
-      registration_number: data.registration_number,
-      installation_year: data.installation_year,
-      manufacturer: data.manufacturer,
-      model: data.model,
-      serial_number: data.serial_number,
-      room_zone: data.room_zone,
-      status: data.status,
-      notes: data.notes,
-      refrigerant_code: data.refrigerant_code,
-      refrigerant_amount_kg: data.refrigerant_amount_kg,
-      refrigerant_type: data.refrigerant_type,
-    });
+      registration_number: mapped.registration_number ?? null,
+      installation_year: mapped.installation_year ?? null,
+      manufacturer: mapped.manufacturer ?? null,
+      model: mapped.model ?? null,
+      serial_number: mapped.serial_number ?? null,
+      room_zone: mapped.room_zone,
+      status: (mapped.status ?? 'active') as ComponentInsert['status'],
+      notes: mapped.notes ?? null,
+      refrigerant_code: mapped.refrigerant_code ?? null,
+      refrigerant_amount_kg: mapped.refrigerant_amount_kg ?? null,
+      refrigerant_type: mapped.refrigerant_type ?? null,
+    };
+
+    const { error } = await supabase.from('components').insert(insert);
 
     if (error) {
       console.error('Import error:', error);

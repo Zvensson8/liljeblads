@@ -3,6 +3,7 @@ import { saveAs } from "file-saver";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
+import type { Database } from "@/integrations/supabase/types";
 import {
   generateProjectDocx,
   generateChecklistDocx,
@@ -12,30 +13,18 @@ import {
   generateWorkOrderDocx,
 } from "./docxExport";
 
-interface Project {
-  id: string;
-  project_number: string;
-  name: string;
-  description?: string;
-  status: string;
-  type: string;
-  start_date?: string;
-  end_date?: string;
-  budget?: number;
-  actual_cost?: number;
-}
+type Project = Database["public"]["Tables"]["projects"]["Row"];
+type ProjectChecklistItem = Database["public"]["Tables"]["project_checklist_items"]["Row"];
+type ProjectActivity = Database["public"]["Tables"]["project_activity_log"]["Row"];
+type ProjectCost = Database["public"]["Tables"]["project_cost_items"]["Row"];
+type ProjectBudget = Database["public"]["Tables"]["project_budget_items"]["Row"];
+type WorkOrderRow = Database["public"]["Tables"]["work_orders"]["Row"];
+type WorkOrderWithProperty = WorkOrderRow & {
+  properties?: { name?: string | null } | null;
+};
 
-interface WorkOrder {
-  id: string;
-  action: string;
-  due_date?: string;
-  status: string;
-  priority: string;
-  contractor?: string;
-  price?: number;
-  comments?: string;
-  quarter?: string;
-}
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 export async function exportProjectToZip(projectId: string) {
   try {
@@ -127,9 +116,9 @@ export async function exportProjectToZip(projectId: string) {
     saveAs(content, filename);
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Export error:", error);
-    throw new Error(`Kunde inte exportera projekt: ${error.message}`);
+    throw new Error(`Kunde inte exportera projekt: ${errorMessage(error)}`);
   }
 }
 
@@ -179,9 +168,9 @@ export async function exportWorkOrderToZip(workOrderId: string) {
     saveAs(content, filename);
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Export error:", error);
-    throw new Error(`Kunde inte exportera arbetsorder: ${error.message}`);
+    throw new Error(`Kunde inte exportera arbetsorder: ${errorMessage(error)}`);
   }
 }
 
@@ -223,7 +212,7 @@ Faktisk kostnad: ${project.actual_cost ? `${Number(project.actual_cost).toLocale
 `;
 }
 
-function generateWorkOrderInfo(workOrder: any): string {
+function generateWorkOrderInfo(workOrder: WorkOrderWithProperty): string {
   const statusLabels: Record<string, string> = {
     not_started: "Ej påbörjad",
     awaiting_quote: "Inväntar offert",
@@ -259,7 +248,7 @@ ${workOrder.comments || "Ingen kommentar"}
 `;
 }
 
-function generateChecklistText(checklist: any[]): string {
+function generateChecklistText(checklist: ProjectChecklistItem[]): string {
   let text = `CHECKLISTA
 ==========
 
@@ -275,7 +264,7 @@ function generateChecklistText(checklist: any[]): string {
   return text;
 }
 
-function generateActivitiesText(activities: any[]): string {
+function generateActivitiesText(activities: ProjectActivity[]): string {
   let text = `AKTIVITETSLOGG
 ==============
 
@@ -288,7 +277,7 @@ function generateActivitiesText(activities: any[]): string {
   return text;
 }
 
-function generateCostsText(costs: any[]): string {
+function generateCostsText(costs: ProjectCost[]): string {
   let text = `KOSTNADER
 =========
 
@@ -309,7 +298,7 @@ function generateCostsText(costs: any[]): string {
   return text;
 }
 
-function generateBudgetText(budget: any[]): string {
+function generateBudgetText(budget: ProjectBudget[]): string {
   let text = `BUDGET
 ======
 
