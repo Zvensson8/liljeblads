@@ -63,10 +63,10 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
     queryKey: ["subtask-count", todo?.id],
     enabled: !!todo?.id && !todo?.parent_todo_id,
     queryFn: async () => {
-      const { count, error } = await (supabase as any)
+      const { count, error } = await supabase
         .from("property_todos")
         .select("*", { count: "exact", head: true })
-        .eq("parent_todo_id", todo.id);
+        .eq("parent_todo_id", todo.id!);
 
       if (error) throw error;
       return count || 0;
