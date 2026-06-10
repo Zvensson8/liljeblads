@@ -345,8 +345,8 @@ export async function generateDeviationReport(
     if (error) throw error;
 
     // Filter tasks with significant deviation
-    const deviations = (data || [])
-      .map((task: DriftTaskRow) => {
+    const deviations: DeviationRow[] = ((data || []) as unknown as DriftTaskRow[])
+      .map<DeviationRow>((task) => {
         const deviation =
           task.planned_count > 0
             ? Math.abs(task.reported_count - task.planned_count) /
