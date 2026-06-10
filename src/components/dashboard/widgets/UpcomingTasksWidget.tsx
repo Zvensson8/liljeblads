@@ -11,8 +11,8 @@ export const UpcomingTasksWidget = () => {
   const tasks = useMemo(
     () =>
       todos
-        .filter((t: any) => !t.completed && t.due_date)
-        .sort((a: any, b: any) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+        .filter((t) => !t.completed && t.due_date)
+        .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
         .slice(0, 5),
     [todos],
   );
@@ -34,7 +34,7 @@ export const UpcomingTasksWidget = () => {
           </p>
         ) : (
           <div className="space-y-2">
-            {tasks.map((task: any) => (
+            {tasks.map((task) => (
               <div
                 key={task.id}
                 className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
@@ -43,7 +43,7 @@ export const UpcomingTasksWidget = () => {
                 <div className="flex items-center gap-2 mt-1">
                   <Calendar className="h-3 w-3 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">
-                    {format(new Date(task.due_date), 'PPP', { locale: sv })}
+                    {format(new Date(task.due_date!), 'PPP', { locale: sv })}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground truncate mt-1">
