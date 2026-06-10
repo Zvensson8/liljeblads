@@ -181,7 +181,7 @@ const Components = () => {
     if (format === 'excel') {
       exportComponentsToExcel(
         components,
-        maintenanceRecords,
+        maintenanceRecords as Parameters<typeof exportComponentsToExcel>[1],
         `komponenter-${new Date().toISOString().split('T')[0]}.xlsx`
       );
       toast({
@@ -191,7 +191,7 @@ const Components = () => {
     } else {
       exportComponentsToPDF(
         components,
-        maintenanceRecords,
+        maintenanceRecords as Parameters<typeof exportComponentsToExcel>[1],
         'Komponentregister',
         `komponenter-${new Date().toISOString().split('T')[0]}.pdf`
       );
