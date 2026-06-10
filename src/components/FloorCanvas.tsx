@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Canvas as FabricCanvas, Circle, Rect, Line, FabricText, FabricImage, Point } from 'fabric';
+import type { FabricObject, TPointerEventInfo, TPointerEvent } from 'fabric';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from './ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -36,16 +37,37 @@ interface Component {
   serial_number: string | null;
 }
 
+/**
+ * Fabric object with our custom metadata fields. Fabric allows attaching
+ * arbitrary props at runtime; we keep them on a single intersection type to
+ * avoid scattered `(obj as any).foo` casts.
+ */
+type CanvasObject = FabricObject & {
+  componentId?: string | null;
+  componentType?: string;
+  existingComponentId?: string;
+  isGrid?: boolean;
+  isMoving?: boolean;
+};
+
+/** Components data shape returned by the loadComponents query (with geometry join). */
+type ComponentWithGeometry = Component & {
+  component_geometry?: Array<{ x: number; y: number }> | null;
+};
+
+/** History entry returned by `fabricCanvas.toJSON()`. */
+type CanvasHistoryEntry = ReturnType<FabricCanvas['toJSON']>;
+
 export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [activeTool, setActiveTool] = useState<string>('select');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedObject, setSelectedObject] = useState<any>(null);
+  const [selectedObject, setSelectedObject] = useState<CanvasObject | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<ComponentTemplate | null>(null);
   const [components, setComponents] = useState<Component[]>([]);
   const componentsRef = useRef<Component[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<CanvasHistoryEntry[]>([]);
   const [historyStep, setHistoryStep] = useState(-1);
   const [gridEnabled, setGridEnabled] = useState(false);
   const [zoom, setZoom] = useState(1);
