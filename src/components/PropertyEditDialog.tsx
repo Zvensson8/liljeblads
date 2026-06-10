@@ -41,7 +41,7 @@ type PropertyFormData = z.infer<typeof propertySchema>;
 interface PropertyEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  property: any;
+  property: Property | null;
   onSuccess: () => void;
 }
 
