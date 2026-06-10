@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getErrorMessage } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { storageService } from "@/services/supabase";
 import { useAuth } from "@/hooks/useAuth";
