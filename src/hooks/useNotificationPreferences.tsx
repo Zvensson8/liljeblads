@@ -84,7 +84,7 @@ export function useNotificationPreferences() {
     fetchPreferences();
   }, [user]);
 
-  const updatePreference = async (field: string, value: any) => {
+  const updatePreference = async (field: string, value: unknown) => {
     if (!user || !preferences) return;
 
     try {

@@ -50,9 +50,10 @@ export function useGlobalSearch({ query, enabled = true }: GlobalSearchOptions) 
       ];
 
       const propertiesResults = await Promise.all(propertiesPromises);
-      const uniqueProperties = new Map<string, any>();
+      type PropertyHit = { id: string; name: string; address: string | null; property_number: string | null };
+      const uniqueProperties = new Map<string, PropertyHit>();
       propertiesResults.forEach((result) => {
-        result.data?.forEach((p) => uniqueProperties.set(p.id, p));
+        result.data?.forEach((p) => uniqueProperties.set(p.id, p as PropertyHit));
       });
       const properties = Array.from(uniqueProperties.values()).slice(0, 5);
 
@@ -89,9 +90,16 @@ export function useGlobalSearch({ query, enabled = true }: GlobalSearchOptions) 
         .ilike('name', pattern)
         .limit(5);
 
+      type ComponentHit = {
+        id: string;
+        name: string;
+        type: string;
+        floors?: { properties?: { name?: string } | null } | null;
+        direct_property?: { id: string; name: string } | null;
+      };
       if (components) {
         allResults.push(
-          ...components.map((c: any) => {
+          ...(components as unknown as ComponentHit[]).map((c) => {
             const propertyName =
               c.floors?.properties?.name || c.direct_property?.name || '';
             return {
@@ -113,9 +121,10 @@ export function useGlobalSearch({ query, enabled = true }: GlobalSearchOptions) 
         .neq('status', 'archived')
         .limit(5);
 
+      type WorkOrderHit = { id: string; action: string; properties?: { name?: string } | null };
       if (workOrders) {
         allResults.push(
-          ...workOrders.map((w: any) => ({
+          ...(workOrders as unknown as WorkOrderHit[]).map((w) => ({
             id: w.id,
             type: 'work_order' as const,
             title: w.action,
@@ -142,9 +151,10 @@ export function useGlobalSearch({ query, enabled = true }: GlobalSearchOptions) 
       ];
 
       const projectsResults = await Promise.all(projectsPromises);
-      const uniqueProjects = new Map<string, any>();
+      type ProjectHit = { id: string; name: string; project_number: string; properties?: { name?: string } | null };
+      const uniqueProjects = new Map<string, ProjectHit>();
       projectsResults.forEach((result) => {
-        result.data?.forEach((p) => uniqueProjects.set(p.id, p));
+        result.data?.forEach((p) => uniqueProjects.set(p.id, p as ProjectHit));
       });
       const projects = Array.from(uniqueProjects.values()).slice(0, 5);
 

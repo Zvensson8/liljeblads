@@ -9,8 +9,8 @@ export interface ProjectTemplate {
   description: string | null;
   type: "investering" | "underhall" | "energi" | "annat";
   default_budget: number | null;
-  checklist_items: any[];
-  budget_categories: any[];
+  checklist_items: unknown[];
+  budget_categories: unknown[];
   estimated_duration_quarters: number | null;
   created_by: string | null;
   created_at: string;
@@ -34,7 +34,7 @@ export const useProjectTemplates = (organizationId?: string) => {
 
       if (error) throw error;
       setTemplates((data as ProjectTemplate[]) || []);
-    } catch (error: any) {
+    } catch {
       toast.error("Kunde inte hämta mallar");
     } finally {
       setLoading(false);

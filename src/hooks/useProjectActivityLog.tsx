@@ -8,7 +8,7 @@ export interface ProjectActivityLogEntry {
   activity_type: string;
   description: string;
   created_at: string;
-  metadata: any;
+  metadata: Record<string, unknown> | null;
 }
 
 export interface LogProjectActivityInput {
@@ -44,7 +44,7 @@ export function useLogProjectActivity() {
     mutationFn: async (input: LogProjectActivityInput) => {
       const { error } = await supabase
         .from('project_activity_log')
-        .insert(input as any);
+        .insert(input);
       if (error) throw error;
     },
     onSuccess: (_data, vars) => {

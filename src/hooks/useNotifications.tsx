@@ -89,7 +89,12 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
       .gte("next_service_date", new Date().toISOString());
 
     if (components && components.length > 0) {
-      components.forEach((component: any) => {
+      type ComponentRow = {
+        id: string;
+        name: string;
+        floors?: { properties?: { id: string; name: string } | null } | null;
+      };
+      (components as unknown as ComponentRow[]).forEach((component) => {
         const property = component.floors?.properties;
         if (!property) return;
 
@@ -132,7 +137,12 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
       .lt("updated_at", sevenDaysAgo.toISOString());
 
     if (workOrders && workOrders.length > 0) {
-      workOrders.forEach((wo: any) => {
+      type WorkOrderRow = {
+        id: string;
+        action: string;
+        properties: { id: string; name: string };
+      };
+      (workOrders as unknown as WorkOrderRow[]).forEach((wo) => {
         const notification: Notification = {
           id: `work-order-stale-${wo.id}`,
           type: "warning",

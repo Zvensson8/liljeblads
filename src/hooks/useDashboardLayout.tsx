@@ -10,16 +10,15 @@ interface DashboardLayoutItem {
   y: number;
   w: number;
   h: number;
-  [key: string]: unknown;
 }
 
 interface DashboardWidget {
   id: string;
   type: string;
-  [key: string]: unknown;
+  config: Record<string, unknown>;
 }
 
-interface DashboardLayout {
+interface DashboardLayoutRow {
   id: string;
   user_id: string;
   layout: DashboardLayoutItem[];
@@ -41,7 +40,7 @@ export const useDashboardLayout = () => {
         .maybeSingle();
 
       if (error) throw error;
-      return data as DashboardLayout | null;
+      return (data as unknown as DashboardLayoutRow | null) ?? null;
     },
   });
 
@@ -60,22 +59,22 @@ export const useDashboardLayout = () => {
         .eq('is_default', true)
         .maybeSingle();
 
+      const layoutJson = layout as unknown as Json;
+      const widgetsJson = widgets as unknown as Json;
+
       if (existing) {
         const { error } = await supabase
           .from('dashboard_layouts')
-          .update({
-            layout: layout as any,
-            widgets: widgets as any,
-          })
+          .update({ layout: layoutJson, widgets: widgetsJson })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
-        
+
         const { error } = await supabase.from('dashboard_layouts').insert({
-          layout: layout as any,
-          widgets: widgets as any,
+          layout: layoutJson,
+          widgets: widgetsJson,
           is_default: true,
           user_id: user.id,
         });

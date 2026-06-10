@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Zap, Wind, Thermometer, DoorOpen, Factory, Warehouse, Snowflake, MoreHorizontal } from 'lucide-react';
+import { Zap, Wind, Thermometer, DoorOpen, Factory, Warehouse, Snowflake, MoreHorizontal, type LucideIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ComponentTemplate {
   id: string;
   name: string;
   type: string;
-  icon: any;
+  icon: LucideIcon;
   color: string;
   description: string;
   isCustom?: boolean;

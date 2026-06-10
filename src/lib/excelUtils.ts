@@ -5,14 +5,16 @@ import ExcelJS from 'exceljs';
  * Replaces vulnerable xlsx package with secure ExcelJS alternative
  */
 
+export type ExcelCellValue = string | number | boolean | Date | null | undefined;
+
 export interface ExcelSheetData {
   name: string;
-  data: any[][];
+  data: ExcelCellValue[][];
 }
 
 export interface ExcelJsonSheetData {
   name: string;
-  data: Record<string, any>[];
+  data: Record<string, ExcelCellValue>[];
 }
 
 /**
@@ -89,7 +91,7 @@ export async function createWorkbookFromJson(sheets: ExcelJsonSheetData[]): Prom
 /**
  * Add a sheet with array-of-arrays data to existing workbook
  */
-export function addAoASheet(workbook: ExcelJS.Workbook, sheetName: string, data: any[][]): ExcelJS.Worksheet {
+export function addAoASheet(workbook: ExcelJS.Workbook, sheetName: string, data: ExcelCellValue[][]): ExcelJS.Worksheet {
   const worksheet = workbook.addWorksheet(sheetName.substring(0, 31));
   
   data.forEach((row) => {
@@ -112,7 +114,7 @@ export function addAoASheet(workbook: ExcelJS.Workbook, sheetName: string, data:
 /**
  * Add a sheet with JSON data to existing workbook
  */
-export function addJsonSheet(workbook: ExcelJS.Workbook, sheetName: string, data: Record<string, any>[]): ExcelJS.Worksheet {
+export function addJsonSheet(workbook: ExcelJS.Workbook, sheetName: string, data: Record<string, ExcelCellValue>[]): ExcelJS.Worksheet {
   const worksheet = workbook.addWorksheet(sheetName.substring(0, 31));
   
   if (data.length === 0) return worksheet;
