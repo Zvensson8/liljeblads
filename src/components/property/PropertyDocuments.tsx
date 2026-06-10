@@ -117,7 +117,7 @@ export function PropertyDocuments({ propertyId }: PropertyDocumentsProps) {
     }
   };
 
-  const handlePreview = async (doc: any) => {
+  const handlePreview = async (doc: PropertyDocumentRow) => {
     const versions = await getDocumentVersions(doc.name);
     setSelectedDoc({ ...doc, versions });
     setPreviewOpen(true);
