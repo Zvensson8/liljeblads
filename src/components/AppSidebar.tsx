@@ -23,7 +23,7 @@ import { NotificationBell } from "./NotificationBell";
 import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
-const navigationItems: Array<{ title: string; url: string; icon: any; moduleName: ModuleName; founderOnly?: boolean }> = [
+const navigationItems: Array<{ title: string; url: string; icon: LucideIcon; moduleName: ModuleName; founderOnly?: boolean }> = [
   { title: "Dashboard", url: "/dashboard", icon: Home, moduleName: "dashboard" },
   { title: "Fastigheter", url: "/properties", icon: Building2, moduleName: "properties" },
   { title: "Komponenter", url: "/components", icon: Settings, moduleName: "components" },
