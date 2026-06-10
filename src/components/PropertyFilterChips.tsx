@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 interface Filter {
   id: string;
   label: string;
-  value: any;
+  value: unknown;
 }
 
 interface PropertyFilterChipsProps {
