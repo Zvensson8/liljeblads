@@ -75,7 +75,7 @@ export function PropertyOverview({
   };
 
   // Calculate components needing service soon (example logic)
-  const componentsNeedingService = components.filter((c: any) => {
+  const componentsNeedingService = components.filter((c) => {
     if (!c.next_maintenance_date) return false;
     const daysUntil = Math.floor((new Date(c.next_maintenance_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
     return daysUntil <= 30 && daysUntil >= 0;
