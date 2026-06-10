@@ -134,7 +134,9 @@ export const QuickServiceButton = ({
         action_type: actionType,
         performed_date: performedDate,
         drift_task_id: selectedDriftTaskId || null,
-      } as any);
+      });
+
+
 
 
       // 2. If a file was selected, upload it
