@@ -97,7 +97,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
 
       setDialogOpen(false);
       refetch();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte spara mall: " + error.message);
     }
   };
@@ -113,7 +113,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
       toast.success("Mall borttagen");
       setDeleteDialogOpen(false);
       refetch();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort mall: " + error.message);
     }
   };
@@ -135,7 +135,7 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
       if (error) throw error;
       toast.success("Mall duplicerad");
       refetch();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte duplicera mall: " + error.message);
     }
   };

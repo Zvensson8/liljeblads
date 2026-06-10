@@ -93,7 +93,7 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
       );
 
       setMembers(membersWithProfiles as any);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching members:", error);
       toast.error("Kunde inte hämta medlemmar");
     } finally {
@@ -112,7 +112,7 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
 
       toast.success("Roll uppdaterad");
       fetchMembers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating role:", error);
       toast.error("Kunde inte uppdatera roll");
     }
@@ -133,7 +133,7 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
       setDeleteDialogOpen(false);
       setMemberToDelete(null);
       fetchMembers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting member:", error);
       toast.error("Kunde inte ta bort medlem");
     }

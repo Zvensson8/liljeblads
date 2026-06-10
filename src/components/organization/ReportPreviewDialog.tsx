@@ -49,7 +49,7 @@ export function ReportPreviewDialog({ open, onOpenChange, reportType, onMarkAsPr
           }
 
           setHtmlContent(data.html);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error('Error generating preview:', error);
           toast.error(`Kunde inte generera förhandsvisning: ${error.message || 'Okänt fel'}`);
         } finally {

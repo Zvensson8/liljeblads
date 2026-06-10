@@ -62,7 +62,7 @@ export function OrganizationSubscription({
 
       toast.success(`Prenumeration uppgraderad till ${tier.name}`);
       onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error upgrading subscription:", error);
       toast.error("Kunde inte uppgradera prenumeration");
     } finally {
