@@ -125,18 +125,19 @@ export const ProjectTemplates = ({ organizationId }: ProjectTemplatesProps) => {
 
   const handleDuplicate = async (template: ProjectTemplate) => {
     try {
+      const insertData: TemplateInsert = {
+        organization_id: organizationId,
+        name: `${template.name} (kopia)`,
+        description: template.description,
+        type: template.type,
+        estimated_duration_quarters: template.estimated_duration_quarters,
+        checklist_items: template.checklist_items as unknown as TemplateInsert["checklist_items"],
+        budget_categories: template.budget_categories as unknown as TemplateInsert["budget_categories"],
+        created_by: user?.id,
+      };
       const { error } = await supabase
         .from("project_templates")
-        .insert({
-          organization_id: organizationId,
-          name: `${template.name} (kopia)`,
-          description: template.description,
-          type: template.type,
-          estimated_duration_quarters: template.estimated_duration_quarters,
-          checklist_items: template.checklist_items,
-          budget_categories: template.budget_categories,
-          created_by: user?.id,
-        });
+        .insert(insertData);
       if (error) throw error;
       toast.success("Mall duplicerad");
       refetch();
