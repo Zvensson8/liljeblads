@@ -104,7 +104,7 @@ export function ManualProposalDialog({
         status: 'forslag',
       };
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('ai_suggested_actions')
         .insert({
           organization_id: organization.id,
