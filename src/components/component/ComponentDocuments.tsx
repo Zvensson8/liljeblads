@@ -111,7 +111,8 @@ export function ComponentDocuments({ componentId }: ComponentDocumentsProps) {
         setAnalysisDoc({ id: insertedDoc.id, name: file.name });
       }
     } catch (error: unknown) {
-      toast.error("Kunde inte ladda upp dokument: " + error.message);
+      toast.error("Kunde inte ladda upp dokument: " + getErrorMessage(error));
+
     } finally {
       setUploading(false);
     }
