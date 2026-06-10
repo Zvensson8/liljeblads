@@ -53,7 +53,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
 
   const propertyMap = useMemo(() => {
     const m: Record<string, { id: string; name: string }> = {};
-    (properties ?? []).forEach((p: any) => (m[p.id] = { id: p.id, name: p.name }));
+    (properties ?? []).forEach((p: { id: string; name: string }) => (m[p.id] = { id: p.id, name: p.name }));
     return m;
   }, [properties]);
 
@@ -87,14 +87,26 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
     enabled: todos.length > 0,
     queryFn: async () => {
       const todoIds = todos.map(t => t.id);
-      const { data, error } = await (supabase as any)
+      // todo_attachments is not in the generated Supabase types yet.
+      const { data, error } = await (
+        supabase as unknown as {
+          from: (t: string) => {
+            select: (s: string) => {
+              in: (
+                col: string,
+                vals: string[],
+              ) => Promise<{ data: Array<{ todo_id: string }> | null; error: Error | null }>;
+            };
+          };
+        }
+      )
         .from("todo_attachments")
         .select("todo_id")
         .in("todo_id", todoIds);
 
       if (error) throw error;
       const counts: Record<string, number> = {};
-      data?.forEach((item: any) => {
+      data?.forEach((item) => {
         counts[item.todo_id] = (counts[item.todo_id] || 0) + 1;
       });
       return counts;
@@ -103,7 +115,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
 
   const handleToggleComplete = async (id: string, completed: boolean) => {
     try {
-      await updateTodo.mutateAsync({ id, patch: { completed: !completed } as any });
+      await updateTodo.mutateAsync({ id, patch: { completed: !completed } });
       toast.success(completed ? "Uppgift återaktiverad" : "Uppgift slutförd");
     } catch {
       // toast handled in hook
@@ -130,7 +142,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
         priority: newPriority,
         category: newCategory === "none" ? null : newCategory || null,
         user_id: user.id,
-      } as any);
+      });
       toast.success("Uppgift tillagd");
       setNewTodo("");
       setNewPropertyId("none");
@@ -218,7 +230,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Ingen fastighet</SelectItem>
-                    {properties?.map((property: any) => (
+                    {properties?.map((property: { id: string; name: string }) => (
                       <SelectItem key={property.id} value={property.id}>
                         {property.name}
                       </SelectItem>
