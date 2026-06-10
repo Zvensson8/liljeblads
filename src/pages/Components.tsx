@@ -106,7 +106,7 @@ const Components = () => {
         floor_level: comp.floors?.level,
         property_name: comp.properties?.name,
         property_address: comp.properties?.address,
-      })),
+      })) as Component[],
     [rawComponents],
   );
 
