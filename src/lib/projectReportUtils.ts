@@ -3,18 +3,26 @@ import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import type { Database } from "@/integrations/supabase/types";
-import type { ProjectWithRelations } from "@/types/domain";
+import type { Project } from "@/types/domain";
 
 type ProjectCost = Database["public"]["Tables"]["project_cost_items"]["Row"];
 type ProjectChecklistItem = Database["public"]["Tables"]["project_checklist_items"]["Row"];
 type ProjectDocument = Database["public"]["Tables"]["project_documents"]["Row"];
 type ProjectActivity = Database["public"]["Tables"]["project_activity_log"]["Row"];
 
+/**
+ * Project shape the PDF report renders. Callers may join a subset of property
+ * columns (name/address), so the relation is intentionally loose.
+ */
+export type ProjectReportInput = Project & {
+  properties?: { name?: string | null; address?: string | null } | null;
+};
+
 /** jsPDF with the autoTable plugin's `lastAutoTable` runtime property. */
 type JsPdfWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
 
 export const generateProjectPDFReport = async (
-  project: ProjectWithRelations,
+  project: ProjectReportInput,
   costs: ProjectCost[],
   checklistItems: ProjectChecklistItem[],
   documents: ProjectDocument[],
