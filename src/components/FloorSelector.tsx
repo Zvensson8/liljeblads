@@ -54,14 +54,14 @@ export const FloorSelector = ({
     try {
       await updateComponent.mutateAsync({
         id: componentId,
-        patch: { floor_id: floorId } as any,
+        patch: { floor_id: floorId },
       });
       setSelectedFloor(value);
       toast.success('Våningsplan uppdaterat');
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Kunde inte uppdatera våningsplan', {
-        description: error.message,
+        description: getErrorMessage(error),
       });
     }
   };
