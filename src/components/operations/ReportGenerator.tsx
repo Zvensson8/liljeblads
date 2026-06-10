@@ -88,7 +88,7 @@ export function ReportGenerator({
           break;
       }
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message || "Kunde inte generera rapport");
     } finally {
       setLoading(false);

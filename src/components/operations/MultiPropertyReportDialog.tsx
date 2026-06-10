@@ -113,7 +113,7 @@ export function MultiPropertyReportDialog({
         }`
       );
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error generating report:", error);
       toast.error(error.message || "Kunde inte generera rapport");
     } finally {

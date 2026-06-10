@@ -126,7 +126,7 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
       setAddDialogOpen(false);
       setNewActivityDescription("");
       setNewActivityType("manual_entry");
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte lägga till aktivitet");
     } finally {
       setSubmitting(false);
@@ -150,7 +150,7 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
       toast.success("Aktivitet uppdaterad");
       setEditDialogOpen(false);
       setEditingActivity(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte uppdatera aktivitet");
     } finally {
       setSubmitting(false);
@@ -165,7 +165,7 @@ export function ProjectActivityLog({ projectId }: ProjectActivityLogProps) {
       toast.success("Aktivitet raderad");
       setDeleteDialogOpen(false);
       setActivityToDelete(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte radera aktivitet");
     }
   };

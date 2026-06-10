@@ -120,7 +120,7 @@ export function ManualProposalDialog({
       form.reset();
       onOpenChange(false);
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating proposal:', error);
       toast.error(error.message || 'Kunde inte skapa projektförslag');
     } finally {

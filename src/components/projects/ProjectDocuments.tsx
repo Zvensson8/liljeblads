@@ -104,7 +104,7 @@ export function ProjectDocuments({ projectId, onDocumentUpload }: ProjectDocumen
 
       if (error) throw error;
       setDocuments(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte hämta dokument");
     } finally {
       setLoading(false);
@@ -172,7 +172,7 @@ const uploadFile = async (file: File) => {
       if (onDocumentUpload) {
         onDocumentUpload();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Upload error:", error);
       toast.error(`Kunde inte ladda upp dokument: ${error.message}`);
     } finally {
@@ -193,7 +193,7 @@ const uploadFile = async (file: File) => {
 
       toast.success("Dokument borttaget");
       fetchDocuments();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort dokument");
     }
   };

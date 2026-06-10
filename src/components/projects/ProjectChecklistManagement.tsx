@@ -89,7 +89,7 @@ export function ProjectChecklistManagement({
 
       if (error) throw error;
       setItems(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte hämta checklista");
     } finally {
       setLoading(false);
@@ -106,7 +106,7 @@ export function ProjectChecklistManagement({
 
       if (error) throw error;
       setExistingTodos(data?.map(todo => todo.title) || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Kunde inte hämta todos:", error);
     }
   };
@@ -168,7 +168,7 @@ export function ProjectChecklistManagement({
       toast.success(
         !item.completed ? "Markerad som klar" : "Markerad som ej klar"
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte uppdatera checklista");
     }
   };
@@ -217,7 +217,7 @@ export function ProjectChecklistManagement({
       setNewDeadline(undefined);
       setNewCategory("uncategorized");
       setNewPriority("normal");
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte lägga till checklistpunkt");
     } finally {
       setSubmitting(false);
@@ -244,7 +244,7 @@ export function ProjectChecklistManagement({
 
       toast.success("Tillagd i att göra-listan");
       fetchExistingTodos();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte lägga till i att göra-listan");
     }
   };

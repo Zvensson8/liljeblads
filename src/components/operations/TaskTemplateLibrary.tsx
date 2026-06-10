@@ -114,7 +114,7 @@ export function TaskTemplateLibrary({
 
       if (error) throw error;
       setTemplates(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte hämta mallar");
     } finally {
       setLoading(false);
@@ -131,7 +131,7 @@ export function TaskTemplateLibrary({
 
       if (error) throw error;
       setCategories(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching categories:", error);
     }
   };
@@ -159,7 +159,7 @@ export function TaskTemplateLibrary({
       setEditingTemplate(null);
       setShowForm(false);
       fetchTemplates();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte spara mall");
     }
   };
@@ -176,7 +176,7 @@ export function TaskTemplateLibrary({
       if (error) throw error;
       toast.success("Mall borttagen");
       fetchTemplates();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte ta bort mall");
     }
   };

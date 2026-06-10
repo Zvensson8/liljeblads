@@ -57,7 +57,7 @@ export function ProjectEconomyOverview({
       toast.success("Ekonomi uppdaterad");
       setIsEditing(false);
       onUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Kunde inte uppdatera ekonomi");
     } finally {
       setSaving(false);
