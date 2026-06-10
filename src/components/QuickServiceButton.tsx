@@ -162,8 +162,8 @@ export const QuickServiceButton = ({
             file_name: selectedFile.name,
             file_size: selectedFile.size,
             mime_type: selectedFile.type,
-          } as any);
-        } catch (docError: any) {
+          });
+        } catch (docError: unknown) {
           console.error('Doc record error:', docError);
         }
       }
@@ -177,12 +177,13 @@ export const QuickServiceButton = ({
       setOpen(false);
       resetForm();
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Kunde inte registrera service', {
-        description: error.message,
+        description: getErrorMessage(error),
       });
     } finally {
       setLoading(false);
+
     }
   };
 
