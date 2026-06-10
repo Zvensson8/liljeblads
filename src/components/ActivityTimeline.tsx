@@ -32,7 +32,13 @@ export const ActivityTimeline = ({ propertyId }: ActivityTimelineProps) => {
   const activities = useMemo<Activity[]>(() => {
     const all: Activity[] = [];
 
-    (notes as any[]).slice(0, 5).forEach((n) =>
+    type NoteLike = { id: string; content: string; created_at: string };
+    type TodoLike = { id: string; title: string; completed?: boolean | null; updated_at: string };
+    type WorkOrderLike = { id: string; action: string; created_at: string };
+    type ContactLike = { id: string; name: string; created_at: string };
+    type DocumentLike = { id: string; name: string; created_at: string };
+
+    (notes as NoteLike[]).slice(0, 5).forEach((n) =>
       all.push({
         id: n.id,
         type: 'note',
@@ -42,7 +48,7 @@ export const ActivityTimeline = ({ propertyId }: ActivityTimelineProps) => {
       }),
     );
 
-    (todos as any[]).slice(0, 5).forEach((t) =>
+    (todos as TodoLike[]).slice(0, 5).forEach((t) =>
       all.push({
         id: t.id,
         type: 'todo',
@@ -52,7 +58,7 @@ export const ActivityTimeline = ({ propertyId }: ActivityTimelineProps) => {
       }),
     );
 
-    (workOrders as any[]).slice(0, 5).forEach((wo) =>
+    (workOrders as WorkOrderLike[]).slice(0, 5).forEach((wo) =>
       all.push({
         id: wo.id,
         type: 'work_order',
@@ -62,7 +68,7 @@ export const ActivityTimeline = ({ propertyId }: ActivityTimelineProps) => {
       }),
     );
 
-    (contacts as any[]).slice(0, 5).forEach((c) =>
+    (contacts as ContactLike[]).slice(0, 5).forEach((c) =>
       all.push({
         id: c.id,
         type: 'contact',
@@ -72,7 +78,7 @@ export const ActivityTimeline = ({ propertyId }: ActivityTimelineProps) => {
       }),
     );
 
-    (documents as any[]).slice(0, 5).forEach((d) =>
+    (documents as DocumentLike[]).slice(0, 5).forEach((d) =>
       all.push({
         id: d.id,
         type: 'document',

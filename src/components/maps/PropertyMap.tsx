@@ -7,22 +7,32 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default marker icons in Leaflet with Vite
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-function MapUpdater({ locations }: { locations: any[] }) {
+interface MapLocation {
+  property_id: string;
+  latitude: number | null;
+  longitude: number | null;
+  formatted_address?: string | null;
+  properties?: { name?: string | null; address?: string | null } | null;
+}
+
+function MapUpdater({ locations }: { locations: MapLocation[] }) {
   const map = useMap();
 
   useEffect(() => {
     if (locations && locations.length > 0) {
       const bounds = L.latLngBounds(
         locations
-          .filter(loc => loc.latitude && loc.longitude)
-          .map(loc => [loc.latitude, loc.longitude] as [number, number])
+          .filter((loc): loc is MapLocation & { latitude: number; longitude: number } =>
+            loc.latitude != null && loc.longitude != null,
+          )
+          .map((loc) => [loc.latitude, loc.longitude] as [number, number]),
       );
       
       if (bounds.isValid()) {
@@ -45,9 +55,9 @@ export const PropertyMap = () => {
     );
   }
 
-  const validLocations = locations?.filter(
-    (loc: any) => loc.latitude && loc.longitude
-  ) || [];
+  const validLocations: MapLocation[] = ((locations ?? []) as MapLocation[]).filter(
+    (loc) => loc.latitude != null && loc.longitude != null,
+  );
 
   return (
     <Card className="overflow-hidden">
@@ -61,10 +71,10 @@ export const PropertyMap = () => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {validLocations.map((location: any) => (
+        {validLocations.map((location) => (
           <Marker
             key={location.property_id}
-            position={[location.latitude, location.longitude]}
+            position={[location.latitude as number, location.longitude as number]}
           >
             <Popup>
               <div className="p-2">
