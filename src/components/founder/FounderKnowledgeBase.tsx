@@ -217,7 +217,7 @@ export function FounderKnowledgeBase() {
         try {
           await storageService.upload("property-documents", filePath, selectedFile);
         } catch (uploadError: unknown) {
-          throw new Error("Uppladdning misslyckades: " + uploadError.message);
+          throw new Error("Uppladdning misslyckades: " + getErrorMessage(uploadError));
         }
 
         setUploadStep(2);
