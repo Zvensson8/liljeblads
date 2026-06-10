@@ -76,13 +76,13 @@ export default function CostOverview() {
   const [avgMonthlyCost, setAvgMonthlyCost] = useState(0);
   const [costChange, setCostChange] = useState(0);
   const [criticalComponents, setCriticalComponents] = useState(0);
-  const [topComponents, setTopComponents] = useState<any[]>([]);
-  const [topSuppliers, setTopSuppliers] = useState<any[]>([]);
-  const [costTrendData, setCostTrendData] = useState<any[]>([]);
-  const [monthlyDistribution, setMonthlyDistribution] = useState<any[]>([]);
+  const [topComponents, setTopComponents] = useState<Array<Record<string, unknown>>>([]);
+  const [topSuppliers, setTopSuppliers] = useState<Array<Record<string, unknown>>>([]);
+  const [costTrendData, setCostTrendData] = useState<Array<Record<string, unknown>>>([]);
+  const [monthlyDistribution, setMonthlyDistribution] = useState<Array<Record<string, unknown>>>([]);
   
   // Budget tracking state
-  const [budgets, setBudgets] = useState<any[]>([]);
+  const [budgets, setBudgets] = useState<Array<Record<string, unknown>>>([]);
   const [budgetProgress, setBudgetProgress] = useState(0);
 
   useEffect(() => {
