@@ -146,10 +146,10 @@ export function ProjectFormDialog({
   const onSubmit = async (values: ProjectFormValues) => {
     setLoading(true);
     try {
-      const projectData = {
+      const projectData: CreateProjectInput = {
         ...values,
         forecast: values.budget,
-      } satisfies CreateProjectInput;
+      } as CreateProjectInput;
 
       if (editingProject) {
         await updateProject.mutateAsync({ id: editingProject.id, patch: projectData });
