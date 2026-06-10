@@ -47,7 +47,7 @@ export const RecentProjectsWidget = () => {
           </p>
         ) : (
           <div className="space-y-2">
-            {projects.map((project: any) => (
+            {projects.map((project) => (
               <div
                 key={project.id}
                 className="p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
@@ -57,7 +57,7 @@ export const RecentProjectsWidget = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{project.name}</p>
                     <p className="text-xs text-muted-foreground truncate mt-1">
-                      {project.properties?.name}
+                      {(project as typeof project & { properties?: { name?: string } }).properties?.name}
                     </p>
                   </div>
                   <Badge variant="outline" className="shrink-0">
