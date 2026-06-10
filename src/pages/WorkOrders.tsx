@@ -446,14 +446,14 @@ const WorkOrders = () => {
 
               {viewMode === "kanban" ? (
                 <WorkOrderKanban
-                  workOrders={filteredOrders(workOrders || [])}
+                  workOrders={filteredOrders(workOrders || []) as unknown as Parameters<typeof WorkOrderKanban>[0]["workOrders"]}
                   onEdit={(order) => {
-                    setEditingOrder(order);
+                    setEditingOrder(order as unknown as WorkOrderRow);
                     setDialogOpen(true);
                   }}
                   onDelete={handleDelete}
                   onViewDetails={(order) => {
-                    setDetailOrder(order);
+                    setDetailOrder(order as unknown as WorkOrderRow);
                     setDetailDialogOpen(true);
                   }}
                   onRefetch={refetch}
