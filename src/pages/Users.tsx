@@ -267,7 +267,7 @@ export default function Users() {
         // Uppdatera befintlig roll
         const { error: roleError } = await supabase
           .from("user_roles")
-          .update({ role: editForm.system_role as any })
+          .update({ role: editForm.system_role as Database["public"]["Enums"]["app_role"] })
           .eq("user_id", selectedUser.id);
 
         if (roleError) throw roleError;
@@ -277,7 +277,7 @@ export default function Users() {
           .from("user_roles")
           .insert({
             user_id: selectedUser.id,
-            role: editForm.system_role as any,
+            role: editForm.system_role as Database["public"]["Enums"]["app_role"],
           });
 
         if (roleError) throw roleError;
