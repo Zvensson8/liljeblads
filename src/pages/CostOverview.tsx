@@ -58,6 +58,7 @@ import {
 } from "@/lib/costUtils";
 import { CostBudgetDialog } from "@/components/cost/CostBudgetDialog";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 
 type TimeRangePreset = '3' | '6' | '12' | '24' | 'custom';
 
