@@ -261,7 +261,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
             </p>
           ) : (
             <Accordion type="multiple" defaultValue={Object.keys(groupedByCategory)} className="w-full">
-              {Object.entries(groupedByCategory).map(([category, categoryTodos]: [string, any[]]) => (
+              {Object.entries(groupedByCategory).map(([category, categoryTodos]) => (
                 <AccordionItem key={category} value={category}>
                   <AccordionTrigger className="text-sm font-medium">
                     {category} ({categoryTodos.length})
