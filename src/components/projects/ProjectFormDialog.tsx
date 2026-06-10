@@ -90,7 +90,7 @@ export function ProjectFormDialog({
   const { data: profile } = useProfile(user?.id);
   const userName = profile?.full_name ?? "";
   const { data: propertiesData = [] } = useProperties();
-  const properties = (propertiesData as any[])
+  const properties = propertiesData
     .map((p) => ({ id: p.id, name: p.name, property_number: p.property_number }))
     .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "", "sv"));
 
