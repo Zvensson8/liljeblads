@@ -110,7 +110,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
     }
   };
 
-  const openDetailDialog = (todo: Todo) => {
+  const openDetailDialog = (todo: TodoWithProperty) => {
     setSelectedTodo(todo);
     setDetailDialogOpen(true);
   };
@@ -256,7 +256,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                   </AccordionTrigger>
                   <AccordionContent>
                     <div className="space-y-2">
-                      {categoryTodos.map((todo: Todo) => {
+                      {categoryTodos.map((todo: TodoWithProperty) => {
                         const hasSubtasks = (subtaskCounts?.[todo.id] || 0) > 0;
                         const todoSubtasks = subtasksData?.[todo.id] || [];
                         const completedSubtasks = todoSubtasks.filter((s: Todo) => s.completed).length;
@@ -288,7 +288,7 @@ export function TodoWidget({ propertyId }: TodoWidgetProps) {
                                   {todo.title}
                                 </p>
                                 <div className="flex gap-1">
-                                  <TodoPriorityBadge priority={(todo.priority || "medium") as any} />
+                                  <TodoPriorityBadge priority={(todo.priority || "medium") as "low" | "medium" | "high" | "critical"} />
                                   {hasAttachments && <Paperclip className="h-4 w-4 text-muted-foreground" />}
                                 </div>
                               </div>
