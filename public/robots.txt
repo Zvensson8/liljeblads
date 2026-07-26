@@ -1,0 +1,3 @@
+# Internal B2B app — do not index
+User-agent: *
+Disallow: /

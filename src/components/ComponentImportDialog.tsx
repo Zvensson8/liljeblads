@@ -1,0 +1,390 @@
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { Upload, Download, CheckCircle, AlertCircle, XCircle, Copy, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { parseImportFile, validateAndMatchComponents, importComponents, type ValidationResult, type ImportRow } from '@/lib/importUtils';
+import { getErrorMessage } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+interface ComponentImportDialogProps {
+  propertyId?: string;
+  propertyName?: string;
+  onSuccess: () => void;
+}
+
+export const ComponentImportDialog = ({
+  propertyId,
+  propertyName,
+  onSuccess,
+}: ComponentImportDialogProps) => {
+  const [open, setOpen] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [parsedData, setParsedData] = useState<ImportRow[]>([]);
+  const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [stage, setStage] = useState<'upload' | 'preview'>('upload');
+  const { toast } = useToast();
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    const validExtensions = ['.csv', '.xlsx', '.xls'];
+    if (!validExtensions.some(ext => selectedFile.name.toLowerCase().endsWith(ext))) {
+      toast({
+        title: 'Fel filtyp',
+        description: 'Vänligen välj en CSV- eller Excel-fil (.xlsx/.xls)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setFile(selectedFile);
+
+    try {
+      const parsed = await parseImportFile(selectedFile);
+      setParsedData(parsed);
+
+      const validated = await validateAndMatchComponents(parsed, propertyId || null);
+      setValidationResults(validated);
+      setStage('preview');
+    } catch (error: unknown) {
+      toast({
+        title: 'Fel vid läsning av fil',
+        description: getErrorMessage(error),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleImport = async () => {
+    setImporting(true);
+
+    try {
+      const importable = validationResults.filter(
+        (r) => r.status === 'valid' || r.status === 'warning' || (r.status === 'duplicate' && r.approved)
+      );
+      const result = await importComponents(importable);
+
+      toast({
+        title: 'Import slutförd!',
+        description: `${result.success} komponenter importerade, ${result.failed} misslyckades`,
+      });
+
+      if (result.success > 0) {
+        onSuccess();
+        handleClose();
+      }
+    } catch (error: unknown) {
+      toast({
+        title: 'Importfel',
+        description: getErrorMessage(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    setFile(null);
+    setParsedData([]);
+    setValidationResults([]);
+    setStage('upload');
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = propertyId 
+      ? [
+          'Beteckning',
+          'Komponenttyp',
+          'Placering',
+          'Våning',
+          'Reg.nr',
+          'Installationsår',
+          'Tillverkare',
+          'Modell',
+          'Serie-ID',
+          'Status',
+          'Anteckningar',
+          'Kod',
+          'Fyllnadsmängd (kg)',
+          'Köldmedietyp',
+        ]
+      : [
+          'Beteckning',
+          'Komponenttyp',
+          'Fastighet',
+          'Placering',
+          'Våning',
+          'Reg.nr',
+          'Installationsår',
+          'Tillverkare',
+          'Modell',
+          'Serie-ID',
+          'Status',
+          'Anteckningar',
+          'Kod',
+          'Fyllnadsmängd (kg)',
+          'Köldmedietyp',
+        ];
+
+    const exampleRow = propertyId
+      ? [
+          'VP-01-Källare',
+          'SC4.6.2.6',
+          'Pannrum',
+          'Källare',
+          'REG-123',
+          '2020',
+          'NIBE',
+          'F2120',
+          'SN-123456',
+          'active',
+          'Testkomponent',
+          'R410A',
+          '2.5',
+          'R410A',
+        ]
+      : [
+          'VP-01-Källare',
+          'SC4.6.2.6',
+          'Centrumhuset',
+          'Pannrum',
+          'Källare',
+          'REG-123',
+          '2020',
+          'NIBE',
+          'F2120',
+          'SN-123456',
+          'active',
+          'Testkomponent',
+          'R410A',
+          '2.5',
+          'R410A',
+        ];
+
+    const csvContent = [headers.join(','), exampleRow.join(',')].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = propertyId 
+      ? `komponent-mall-${propertyName}.csv`
+      : `komponent-mall-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+
+    toast({
+      title: 'Mall nedladdad',
+      description: 'CSV-mall har laddats ner',
+    });
+  };
+
+  const handleApproveDuplicate = (index: number) => {
+    setValidationResults(prev => prev.map((r, i) => 
+      i === index ? { ...r, approved: true } : r
+    ));
+  };
+
+  const handleRejectDuplicate = (index: number) => {
+    setValidationResults(prev => prev.map((r, i) => 
+      i === index ? { ...r, approved: false } : r
+    ));
+  };
+
+  const getStatusIcon = (status: string, approved?: boolean) => {
+    switch (status) {
+      case 'valid':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'warning':
+        return <AlertCircle className="h-4 w-4 text-yellow-600" />;
+      case 'duplicate':
+        if (approved === true) return <CheckCircle className="h-4 w-4 text-green-600" />;
+        if (approved === false) return <XCircle className="h-4 w-4 text-red-600" />;
+        return <Copy className="h-4 w-4 text-orange-600" />;
+      case 'error':
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      default:
+        return null;
+    }
+  };
+
+  const getStatusBadge = (status: string, approved?: boolean) => {
+    switch (status) {
+      case 'valid':
+        return <Badge variant="default" className="bg-green-600">OK</Badge>;
+      case 'warning':
+        return <Badge variant="default" className="bg-yellow-600">Varning</Badge>;
+      case 'duplicate':
+        if (approved === true) return <Badge variant="default" className="bg-green-600">Godkänd</Badge>;
+        if (approved === false) return <Badge variant="destructive">Nekad</Badge>;
+        return <Badge variant="default" className="bg-orange-600">Dubblett</Badge>;
+      case 'error':
+        return <Badge variant="destructive">Fel</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  const validCount = validationResults.filter((r) => r.status === 'valid' || r.status === 'warning').length;
+  const duplicateCount = validationResults.filter((r) => r.status === 'duplicate').length;
+  const approvedDuplicates = validationResults.filter((r) => r.status === 'duplicate' && r.approved).length;
+  const errorCount = validationResults.filter((r) => r.status === 'error').length;
+  const importableCount = validCount + approvedDuplicates;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <Upload className="h-4 w-4 mr-2" />
+          Importera
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col" aria-describedby="import-dialog-description">
+        <DialogHeader>
+          <DialogTitle>
+            Importera komponenter
+            {propertyName && ` - ${propertyName}`}
+          </DialogTitle>
+          <DialogDescription id="import-dialog-description" className="sr-only">
+            Importera komponenter från en CSV- eller Excel-fil
+          </DialogDescription>
+        </DialogHeader>
+
+        {stage === 'upload' && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="csv-file">Välj CSV- eller Excel-fil</Label>
+              <Input
+                id="csv-file"
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={handleFileChange}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+              <div>
+                <p className="font-medium">Behöver du en mall?</p>
+                <p className="text-sm text-muted-foreground">
+                  Ladda ner CSV-mall med rätt kolumner och exempel
+                </p>
+              </div>
+              <Button variant="outline" onClick={handleDownloadTemplate}>
+                <Download className="h-4 w-4 mr-2" />
+                Ladda ner mall
+              </Button>
+            </div>
+
+            <div className="p-4 border rounded-lg bg-muted/50">
+              <h4 className="font-medium mb-2">Obligatoriska kolumner:</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Beteckning</li>
+                <li>• Komponenttyp</li>
+                <li>• Fastighet</li>
+                <li>• Placering</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {stage === 'preview' && (
+          <div className="flex flex-col overflow-hidden min-h-0">
+            <div className="flex flex-wrap gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm">{validCount} giltig(a)</span>
+              </div>
+              {duplicateCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <Copy className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm">{duplicateCount} dubblett(er) ({approvedDuplicates} godkänd(a))</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <XCircle className="h-4 w-4 text-red-600" />
+                <span className="text-sm">{errorCount} fel</span>
+              </div>
+            </div>
+
+            <div className="h-[50vh] overflow-auto border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">Status</TableHead>
+                    <TableHead>Beteckning</TableHead>
+                    <TableHead>Typ</TableHead>
+                    {!propertyId && <TableHead>Fastighet</TableHead>}
+                    <TableHead>Våning</TableHead>
+                    <TableHead>Meddelande</TableHead>
+                    <TableHead className="w-24">Åtgärd</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {validationResults.map((result, index) => (
+                    <TableRow key={index} className={result.status === 'duplicate' && result.approved === false ? 'opacity-50' : ''}>
+                      <TableCell>{getStatusIcon(result.status, result.approved)}</TableCell>
+                      <TableCell className="font-medium">{result.data.name}</TableCell>
+                      <TableCell>{result.data.type}</TableCell>
+                      {!propertyId && <TableCell>{result.propertyName}</TableCell>}
+                      <TableCell>{result.floorName}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(result.status, result.approved)}
+                          <span className="text-sm text-muted-foreground">
+                            {result.message}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {result.status === 'duplicate' && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant={result.approved === true ? 'default' : 'outline'}
+                              className="h-7 w-7"
+                              onClick={() => handleApproveDuplicate(index)}
+                              title="Godkänn import"
+                            >
+                              <ThumbsUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant={result.approved === false ? 'destructive' : 'outline'}
+                              className="h-7 w-7"
+                              onClick={() => handleRejectDuplicate(index)}
+                              title="Neka import"
+                            >
+                              <ThumbsDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={handleClose}>
+                Avbryt
+              </Button>
+              <Button
+                onClick={handleImport}
+                disabled={importing || importableCount === 0 || validationResults.some(r => r.status === 'duplicate' && r.approved === undefined)}
+              >
+                {importing ? 'Importerar...' : `Importera ${importableCount} komponenter`}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};

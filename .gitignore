@@ -1,0 +1,59 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+
+# Jarvis worker local
+jarvis-worker/.venv/
+jarvis-worker/inbox/
+jarvis-worker/**/__pycache__/
+jarvis-worker/*.egg-info/
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local operator secrets
+.secrets.local
+
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+
+# Google service account keys
+jarvis-worker/credentials/
+
+# Local import/staging dumps & backups (may contain prod data)
+import_staging/*.json
+import_staging/*.json.bak*
+import_staging/*.bak*
+!import_staging/.gitkeep
+
+# Worker logs
+jarvis-worker/logs/
+

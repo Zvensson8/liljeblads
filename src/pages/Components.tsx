@@ -1,0 +1,687 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { AppSidebar } from '@/components/AppSidebar';
+import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
+import { useAuth } from '@/hooks/useAuth';
+import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download, Upload, LayoutGrid, Table as TableIcon, Edit, Filter, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ComponentFormDialog } from '@/components/ComponentFormDialog';
+import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
+import { SelectPropertyFloorDialog } from '@/components/SelectPropertyFloorDialog';
+import { ComponentImportDialog } from '@/components/ComponentImportDialog';
+import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { FloorSelector } from '@/components/FloorSelector';
+import { QuickServiceButton } from '@/components/QuickServiceButton';
+import { LastServiceBadge } from '@/components/LastServiceBadge';
+import { useComponents, useDeleteComponent } from '@/hooks/useComponents';
+import { useMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
+import { useWorkOrders } from '@/hooks/useWorkOrders';
+// Type display name mapping
+const getTypeDisplayName = (typeCode: string): string => {
+  const typeMap: Record<string, string> = {
+    'SC1': 'SC1 Styr och övervakningssystem',
+    'SC2.1.1': 'SC2.1.1 Takbeläggningar och Tätskikt',
+    'SC2.3': 'SC2.3 Entréer Portar mm',
+    'SC2.3.1': 'SC2.3.1 Entrépartier Karuselldörrar',
+    'SC2.3.3': 'SC2.3.3 Manuella Portar',
+    'SC2.3.4': 'SC2.3.4 Maskindrivna Portar',
+    'SC2.3.7': 'SC2.3.7 Lastbryggor',
+    'SC2.6.2': 'SC2.6.2 Skyddsrum',
+    'SC4.1.2.5.1': 'SC4.1.2.5.1 Fettavskiljare',
+    'SC4.1.2.5.3': 'SC4.1.2.5.3 Oljeavskiljare',
+    'SC4.1.6.9': 'SC4.1.6.9 Fjärrvärmeväxlare',
+    'SC4.2.4.6': 'SC4.2.4.6 Port Vertikal',
+    'SC4.2.4.7': 'SC4.2.4.7 Port Horisontell',
+    'SC4.5.1': 'SC4.5.1 Kylanläggning',
+    'SC4.6.2.6': 'SC4.6.2.6 Värmepump',
+    'SC4.6.2.6.1': 'SC4.6.2.6.1 Värmeväxlare',
+    'SC4.7': 'SC4.7 Ventsystem',
+    'SC5.5': 'SC5.5 Reserv eller nödkraftsystem',
+    'SC7.1': 'SC7.1 Hiss',
+    'SC7.2': 'SC7.2 Rulltrappor och Rullramper',
+  };
+  return typeMap[typeCode] || typeCode;
+};
+
+interface Component {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  manufacturer: string | null;
+  model: string | null;
+  serial_number: string | null;
+  room_zone: string | null;
+  installation_year: number | null;
+  registration_number: string | null;
+  refrigerant_code: string | null;
+  refrigerant_amount_kg: number | null;
+  refrigerant_type: string | null;
+  floor_id: string;
+  floor_name?: string;
+  floor_level?: number | null;
+  property_id?: string;
+  property_name?: string;
+  property_address?: string | null;
+}
+
+const Components = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectPropertyDialogOpen, setSelectPropertyDialogOpen] = useState(false);
+  const [selectedPropertyId, setSelectedPropertyId] = useState('');
+  const [selectedFloorId, setSelectedFloorId] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterProperty, setFilterProperty] = useState<string>('all');
+  const [filterManufacturer, setFilterManufacturer] = useState<string>('all');
+  const [filterModel, setFilterModel] = useState<string>('all');
+  const [filterService, setFilterService] = useState<'all' | 'latest' | 'none' | 'with_service'>('all');
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
+
+  const { data: rawComponents = [], isLoading: componentsLoading } = useComponents();
+  const { data: maintenanceRows = [] } = useMaintenanceHistory();
+  const { data: workOrders = [] } = useWorkOrders();
+  const deleteComponent = useDeleteComponent();
+
+  const components: Component[] = useMemo(
+    () =>
+      rawComponents.map((comp) => ({
+        ...comp,
+        floor_name: comp.floors?.name,
+        floor_level: comp.floors?.level,
+        property_name: comp.properties?.name,
+        property_address: comp.properties?.address,
+      })) as Component[],
+    [rawComponents],
+  );
+
+  const maintenanceStats = useMemo(() => {
+    const stats: Record<string, { totalCost: number; count: number; lastDate: string | null }> = {};
+    maintenanceRows.forEach((row) => {
+      if (!row.component_id) return;
+      if (!stats[row.component_id]) {
+        stats[row.component_id] = { totalCost: 0, count: 0, lastDate: null };
+      }
+      stats[row.component_id].totalCost += row.cost || 0;
+      stats[row.component_id].count += 1;
+      if (!stats[row.component_id].lastDate || row.performed_date > stats[row.component_id].lastDate!) {
+        stats[row.component_id].lastDate = row.performed_date;
+      }
+    });
+    return stats;
+  }, [maintenanceRows]);
+
+  const workOrderStats = useMemo(() => {
+    const stats: Record<string, { count: number; totalPrice: number }> = {};
+    workOrders.forEach((row) => {
+      if (!row.component_id) return;
+      if (!stats[row.component_id]) {
+        stats[row.component_id] = { count: 0, totalPrice: 0 };
+      }
+      stats[row.component_id].count += 1;
+      stats[row.component_id].totalPrice += row.price || 0;
+    });
+    return stats;
+  }, [workOrders]);
+
+  const loading = componentsLoading;
+
+  // Get unique values for filter dropdowns
+  const uniqueTypes = [...new Set(components.map(c => c.type))].filter(Boolean).sort((a, b) => a.localeCompare(b, 'sv'));
+  const uniqueProperties = [...new Set(components.map(c => c.property_name))].filter(Boolean).sort((a, b) => (a || '').localeCompare(b || '', 'sv'));
+  const uniqueManufacturers = [...new Set(components.map(c => c.manufacturer))].filter(Boolean).sort((a, b) => (a || '').localeCompare(b || '', 'sv'));
+  const uniqueModels = [...new Set(components.map(c => c.model))].filter(Boolean).sort((a, b) => (a || '').localeCompare(b || '', 'sv'));
+
+  // Filter components
+  const filteredComponents = useMemo(() => {
+    const result = components.filter(component => {
+      if (filterType !== 'all' && component.type !== filterType) return false;
+      if (filterProperty !== 'all' && component.property_name !== filterProperty) return false;
+      if (filterManufacturer !== 'all' && component.manufacturer !== filterManufacturer) return false;
+      if (filterModel !== 'all' && component.model !== filterModel) return false;
+      if (filterService === 'none' && maintenanceStats[component.id]?.lastDate) return false;
+      if (filterService === 'with_service' && !maintenanceStats[component.id]?.lastDate) return false;
+      return true;
+    });
+
+    if (filterService === 'latest' || filterService === 'with_service') {
+      return [...result].sort((a, b) => {
+        const dateA = maintenanceStats[a.id]?.lastDate;
+        const dateB = maintenanceStats[b.id]?.lastDate;
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateB.localeCompare(dateA);
+      });
+    }
+
+    return result;
+  }, [components, filterType, filterProperty, filterManufacturer, filterModel, filterService, maintenanceStats]);
+
+  const hasActiveFilters = filterType !== 'all' || filterProperty !== 'all' || filterManufacturer !== 'all' || filterModel !== 'all' || filterService !== 'all';
+
+  const clearFilters = () => {
+    setFilterType('all');
+    setFilterProperty('all');
+    setFilterManufacturer('all');
+    setFilterModel('all');
+    setFilterService('all');
+  };
+
+  const handleExport = async (format: 'excel' | 'pdf') => {
+    const exportList = filteredComponents.length > 0 ? filteredComponents : components;
+    const exportIds = new Set(exportList.map((c) => c.id));
+
+    const maintenanceRecords: Record<string, typeof maintenanceRows> = {};
+    exportList.forEach((c) => (maintenanceRecords[c.id] = []));
+    maintenanceRows.forEach((row) => {
+      if (!row.component_id || !exportIds.has(row.component_id)) return;
+      maintenanceRecords[row.component_id].push(row);
+    });
+    Object.values(maintenanceRecords).forEach((arr) =>
+      arr.sort((a, b) => (b.performed_date || '').localeCompare(a.performed_date || '')),
+    );
+
+    const datestamp = new Date().toISOString().split('T')[0];
+    if (format === 'excel') {
+      await exportComponentsToExcel(
+        exportList,
+        maintenanceRecords as Parameters<typeof exportComponentsToExcel>[1],
+        `komponenter-${datestamp}.xlsx`
+      );
+      toast({
+        title: 'Export lyckades',
+        description: `${exportList.length} komponenter exporterade till Excel`,
+      });
+    } else {
+      exportComponentsToPDF(
+        exportList,
+        maintenanceRecords as Parameters<typeof exportComponentsToPDF>[1],
+        'Komponentregister',
+        `komponenter-${datestamp}.pdf`
+      );
+      toast({
+        title: 'Export lyckades',
+        description: `${exportList.length} komponenter exporterade till PDF`,
+      });
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-500/10 text-green-500 hover:bg-green-500/20';
+      case 'maintenance':
+        return 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20';
+      case 'inactive':
+        return 'bg-red-500/10 text-red-500 hover:bg-red-500/20';
+      default:
+        return 'bg-gray-500/10 text-gray-500 hover:bg-gray-500/20';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'Aktiv';
+      case 'maintenance':
+        return 'Underhåll';
+      case 'inactive':
+        return 'Inaktiv';
+      default:
+        return status;
+    }
+  };
+
+  const handleEditComponent = (component: Component) => {
+    setSelectedComponent(component);
+    setDialogOpen(true);
+  };
+
+  const handleNewComponent = () => {
+    setSelectPropertyDialogOpen(true);
+  };
+
+  const handlePropertyFloorSelected = (propertyId: string, floorId: string) => {
+    setSelectedPropertyId(propertyId);
+    setSelectedFloorId(floorId);
+    setSelectPropertyDialogOpen(false);
+    setDialogOpen(true);
+  };
+
+  const handleDeleteComponent = (componentId: string, componentName: string) => {
+    if (!confirm(`Är du säker på att du vill ta bort ${componentName}?`)) {
+      return;
+    }
+    deleteComponent.mutate(componentId);
+  };
+
+  const refreshComponents = () => {
+    // react-query realtime + mutation invalidations handle refetch automatically.
+  };
+
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background">
+        <AppSidebar />
+        <SidebarInset className="flex-1 w-full">
+          <header className="sticky top-0 z-10 flex h-14 md:h-16 items-center gap-2 md:gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6">
+            <SidebarTrigger className="hidden md:flex" />
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              <h1 className="text-lg md:text-xl font-semibold">Komponenter</h1>
+            </div>
+          </header>
+
+          <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
+            <div className="max-w-7xl mx-auto space-y-6">
+              <Tabs defaultValue="components" className="w-full">
+                <TabsList>
+                  <TabsTrigger value="components">Komponenter</TabsTrigger>
+                  <TabsTrigger value="costs">Kostnadsöversikt</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="components" className="space-y-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <p className="text-muted-foreground">
+                        Hantera alla komponenter från dina fastigheter
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                  <div className="flex gap-1 border border-border rounded-lg p-1">
+                    <Button
+                      variant={viewMode === "cards" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("cards")}
+                      className="h-8"
+                    >
+                      <LayoutGrid className="h-4 w-4 mr-2" />
+                      Kort
+                    </Button>
+                    <Button
+                      variant={viewMode === "table" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("table")}
+                      className="h-8"
+                    >
+                      <TableIcon className="h-4 w-4 mr-2" />
+                      Tabell
+                    </Button>
+                  </div>
+                  
+                  <Badge variant="outline" className="text-base px-4 py-2">
+                    {filteredComponents.length}{hasActiveFilters ? ` av ${components.length}` : ''} komponenter
+                  </Badge>
+                  <ComponentImportDialog onSuccess={refreshComponents} />
+                  {components.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Download className="h-4 w-4 mr-2" />
+                          Exportera
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleExport('excel')}>
+                          Exportera till Excel
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                          Exportera till PDF
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                      <Button onClick={handleNewComponent} className="flex-1 sm:flex-none">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Ny komponent
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Filter section */}
+                  {components.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Filter className="h-4 w-4" />
+                        <span>Filtrera:</span>
+                      </div>
+                      
+                      <Select value={filterType} onValueChange={setFilterType}>
+                        <SelectTrigger className="w-[220px] h-9">
+                          <SelectValue placeholder="Komponenttyp">
+                            {filterType !== 'all' ? getTypeDisplayName(filterType) : 'Alla typer'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alla typer</SelectItem>
+                          {uniqueTypes.map(type => (
+                            <SelectItem key={type} value={type}>{getTypeDisplayName(type)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={filterProperty} onValueChange={setFilterProperty}>
+                        <SelectTrigger className="w-[160px] h-9">
+                          <SelectValue placeholder="Fastighet" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alla fastigheter</SelectItem>
+                          {uniqueProperties.map(prop => (
+                            <SelectItem key={prop} value={prop!}>{prop}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={filterManufacturer} onValueChange={setFilterManufacturer}>
+                        <SelectTrigger className="w-[160px] h-9">
+                          <SelectValue placeholder="Tillverkare" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alla tillverkare</SelectItem>
+                          {uniqueManufacturers.map(mfr => (
+                            <SelectItem key={mfr} value={mfr!}>{mfr}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={filterModel} onValueChange={setFilterModel}>
+                        <SelectTrigger className="w-[160px] h-9">
+                          <SelectValue placeholder="Modell" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alla modeller</SelectItem>
+                          {uniqueModels.map(model => (
+                            <SelectItem key={model} value={model!}>{model}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={filterService} onValueChange={(value) => setFilterService(value as 'all' | 'latest' | 'none' | 'with_service')}>
+                        <SelectTrigger className="w-[200px] h-9">
+                          <SelectValue placeholder="Service" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alla service</SelectItem>
+                          <SelectItem value="latest">Senaste service</SelectItem>
+                          <SelectItem value="with_service">Med registrerad service</SelectItem>
+                          <SelectItem value="none">Ingen service</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      {hasActiveFilters && (
+                        <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9">
+                          <X className="h-4 w-4 mr-1" />
+                          Rensa filter
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {components.length === 0 ? (
+                    <Card className="text-center py-16 border-dashed">
+                      <CardContent>
+                        <div className="inline-flex p-4 rounded-full bg-primary/10 text-primary mb-4">
+                          <Package className="h-8 w-8" />
+                        </div>
+                        <CardTitle className="mb-2 text-xl">Inga komponenter ännu</CardTitle>
+                        <CardDescription className="text-base mb-4">
+                          Lägg till komponenter via ritningarna i dina fastigheter
+                        </CardDescription>
+                        <Button onClick={() => navigate('/properties')}>
+                          Gå till Fastigheter
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : viewMode === 'cards' ? (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {filteredComponents.map((component) => (
+                        <Card
+                          key={component.id}
+                          className="group hover:shadow-lg transition-all duration-300 cursor-pointer"
+                          onClick={() => navigate(`/components/${component.id}`)}
+                        >
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">{component.name}</CardTitle>
+                        <CardDescription className="text-sm font-medium text-foreground/70">
+                          {getTypeDisplayName(component.type)}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0 space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Building2 className="h-4 w-4 text-primary" />
+                          <span>{component.property_name || 'Ej kopplad'}</span>
+                        </div>
+                        
+                        {component.serial_number && (
+                          <div className="text-sm text-muted-foreground">
+                            Serienr: <span className="font-medium text-foreground">{component.serial_number}</span>
+                          </div>
+                        )}
+                        
+                        {component.registration_number && (
+                          <div className="text-sm text-muted-foreground">
+                            Regnr: <span className="font-medium text-foreground">{component.registration_number}</span>
+                          </div>
+                        )}
+                        
+                        {component.installation_year && (
+                          <div className="text-sm text-muted-foreground">
+                            Installerad: <span className="font-medium text-foreground">{component.installation_year}</span>
+                          </div>
+                        )}
+
+                        {(maintenanceStats[component.id] || workOrderStats[component.id]) && (
+                          <div className="border-t pt-2 mt-2 space-y-1">
+                            {maintenanceStats[component.id] && (
+                              <div className="text-sm text-muted-foreground">
+                                Underhållskostnad: <span className="font-semibold text-foreground">{maintenanceStats[component.id].totalCost.toLocaleString('sv-SE')} kr</span>
+                              </div>
+                            )}
+                            {workOrderStats[component.id] && (
+                              <div className="text-sm text-muted-foreground">
+                                Arbetsordrar: <span className="font-medium text-foreground">{workOrderStats[component.id].count} st</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b text-sm text-muted-foreground">
+                              <th className="text-left py-3 px-4 font-medium">Komponent</th>
+                              <th className="text-left py-3 px-4 font-medium hidden md:table-cell">Typ</th>
+                              <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Tillverkare</th>
+                              <th className="text-left py-3 px-4 font-medium">Fastighet</th>
+                              <th className="text-left py-3 px-4 font-medium">Våning</th>
+                              <th className="text-left py-3 px-4 font-medium hidden sm:table-cell">Senaste service</th>
+                              <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Kostnad</th>
+                              <th className="text-left py-3 px-4 font-medium">Status</th>
+                              <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredComponents.map((component) => (
+                              <tr 
+                                key={component.id} 
+                                className="border-b hover:bg-muted/50 cursor-pointer"
+                                onClick={() => navigate(`/components/${component.id}`)}
+                              >
+                                <td className="py-3 px-4">
+                                  <div className="font-medium">{component.name}</div>
+                                  <div className="text-xs text-muted-foreground md:hidden">{component.type}</div>
+                                  {component.room_zone && (
+                                    <div className="text-xs text-muted-foreground">{component.room_zone}</div>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-sm hidden md:table-cell">{component.type}</td>
+                                <td className="py-3 px-4 text-sm hidden lg:table-cell">{component.manufacturer || '-'}</td>
+                                <td className="py-3 px-4">
+                                  <div className="text-sm font-medium">{component.property_name}</div>
+                                </td>
+                                <td className="py-2 px-4" onClick={(e) => e.stopPropagation()}>
+                                  {component.property_id ? (
+                                    <FloorSelector
+                                      componentId={component.id}
+                                      propertyId={component.property_id}
+                                      currentFloorId={component.floor_id}
+                                      onSuccess={refreshComponents}
+                                      compact
+                                    />
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground italic">-</span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-4 hidden sm:table-cell" onClick={(e) => e.stopPropagation()}>
+                                  <LastServiceBadge componentId={component.id} />
+                                </td>
+                                <td className="py-3 px-4 text-sm hidden lg:table-cell">
+                                  {(maintenanceStats[component.id]?.totalCost || 0 + (workOrderStats[component.id]?.totalPrice || 0)) > 0
+                                    ? `${((maintenanceStats[component.id]?.totalCost || 0) + (workOrderStats[component.id]?.totalPrice || 0)).toLocaleString('sv-SE')} kr`
+                                    : '-'}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Badge className={getStatusColor(component.status)}>
+                                    {getStatusText(component.status)}
+                                  </Badge>
+                                </td>
+                                <td className="py-2 px-4">
+                                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                    <QuickServiceButton
+                                      componentId={component.id}
+                                      componentName={component.name}
+                                      onSuccess={refreshComponents}
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive hover:text-destructive"
+                                      onClick={() => handleDeleteComponent(component.id, component.name)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="costs">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Kostnadsöversikt</CardTitle>
+                    <CardDescription>
+                      Analysera och följ upp underhållskostnader för alla komponenter
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {components.length === 0 ? (
+                      <p className="text-center py-8 text-muted-foreground">Inga komponenter att visa</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {[...components]
+                          .map(c => ({
+                            ...c,
+                            totalCost: (maintenanceStats[c.id]?.totalCost || 0) + (workOrderStats[c.id]?.totalPrice || 0),
+                            serviceCount: (maintenanceStats[c.id]?.count || 0),
+                            woCount: (workOrderStats[c.id]?.count || 0),
+                          }))
+                          .filter(c => c.totalCost > 0)
+                          .sort((a, b) => b.totalCost - a.totalCost)
+                          .map(c => (
+                            <div
+                              key={c.id}
+                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                              onClick={() => navigate(`/components/${c.id}`)}
+                            >
+                              <div>
+                                <p className="font-medium">{c.name}</p>
+                                <p className="text-sm text-muted-foreground">{c.property_name} · {c.serviceCount} åtgärder · {c.woCount} arbetsordrar</p>
+                              </div>
+                              <p className="font-semibold">{c.totalCost.toLocaleString('sv-SE')} kr</p>
+                            </div>
+                          ))}
+                        {components.every(c => ((maintenanceStats[c.id]?.totalCost || 0) + (workOrderStats[c.id]?.totalPrice || 0)) === 0) && (
+                          <p className="text-center py-8 text-muted-foreground">Ingen kostnadsdata registrerad ännu</p>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+            </div>
+          </main>
+        </SidebarInset>
+      </div>
+
+      <SelectPropertyFloorDialog
+        open={selectPropertyDialogOpen}
+        onOpenChange={setSelectPropertyDialogOpen}
+        onSelect={handlePropertyFloorSelected}
+      />
+
+      <ComponentFormDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setSelectedComponent(null);
+            setSelectedFloorId('');
+            setSelectedPropertyId('');
+          }
+        }}
+        floorId={selectedComponent?.floor_id || selectedFloorId}
+        propertyId={selectedComponent?.property_id || selectedPropertyId}
+        editingComponent={selectedComponent}
+        onSuccess={() => {
+          setDialogOpen(false);
+          setSelectedComponent(null);
+          setSelectedFloorId('');
+          setSelectedPropertyId('');
+          refreshComponents();
+        }}
+      />
+    </SidebarProvider>
+  );
+};
+
+export default Components;
