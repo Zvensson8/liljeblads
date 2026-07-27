@@ -29,6 +29,7 @@ import { PropertyContacts } from '@/components/property/PropertyContacts';
 import { PropertyDocuments } from '@/components/property/PropertyDocuments';
 import { PropertyOverview } from '@/components/property/PropertyOverview';
 import { PropertyEconomy } from '@/components/property/PropertyEconomy';
+import { RiskMaintenancePlan } from '@/components/property/RiskMaintenancePlan';
 
 import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { Badge } from '@/components/ui/badge';
@@ -364,6 +365,7 @@ const PropertyDetail = () => {
             <div className="container mx-auto px-6">
             <TabsList className="h-12 w-full justify-start rounded-none border-0 bg-transparent p-0 overflow-x-auto">
               <TabsTrigger value="overview">Översikt</TabsTrigger>
+              <TabsTrigger value="maintenance-plan">Underhållsplan</TabsTrigger>
               <TabsTrigger value="drawings">Ritningar</TabsTrigger>
               <TabsTrigger value="notes">Anteckningar</TabsTrigger>
               <TabsTrigger value="todos">Att göra</TabsTrigger>
@@ -386,6 +388,12 @@ const PropertyDetail = () => {
                 floors={floors}
                 overdueTodos={overdueTodos}
                 urgentWorkOrders={urgentWorkOrders}
+              />
+            </TabsContent>
+            <TabsContent value="maintenance-plan">
+              <RiskMaintenancePlan
+                propertyId={property.id}
+                propertyName={property.name}
               />
             </TabsContent>
             <TabsContent value="drawings">
@@ -687,6 +695,7 @@ const PropertyDetail = () => {
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="h-12 w-full justify-start rounded-none border-0 bg-transparent p-0 overflow-x-auto">
                   <TabsTrigger value="overview">Översikt</TabsTrigger>
+                  <TabsTrigger value="maintenance-plan">Underhållsplan</TabsTrigger>
                   <TabsTrigger value="drawings">Ritningar</TabsTrigger>
                   <TabsTrigger value="notes">Anteckningar</TabsTrigger>
                   <TabsTrigger value="todos">Att göra</TabsTrigger>
@@ -704,6 +713,12 @@ const PropertyDetail = () => {
                     floors={floors}
                     overdueTodos={overdueTodos}
                     urgentWorkOrders={urgentWorkOrders}
+                  />
+                </TabsContent>
+                <TabsContent value="maintenance-plan">
+                  <RiskMaintenancePlan
+                    propertyId={property.id}
+                    propertyName={property.name}
                   />
                 </TabsContent>
                 <TabsContent value="drawings">

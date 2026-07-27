@@ -564,6 +564,53 @@ export type Database = {
           },
         ]
       }
+      component_unit_prices: {
+        Row: {
+          component_type: string
+          created_at: string
+          currency: string
+          id: string
+          is_active: boolean
+          label: string
+          organization_id: string
+          replacement_cost: number
+          service_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          component_type: string
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          organization_id: string
+          replacement_cost: number
+          service_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          component_type?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          organization_id?: string
+          replacement_cost?: number
+          service_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "component_unit_prices_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       components: {
         Row: {
           aff_code: string | null
@@ -1272,6 +1319,150 @@ export type Database = {
             columns: ["maintenance_history_id"]
             isOneToOne: false
             referencedRelation: "maintenance_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_plan_items: {
+        Row: {
+          action_type: string
+          component_id: string
+          confidence: string
+          cost_source: string | null
+          created_at: string
+          estimated_cost: number | null
+          id: string
+          notes: string | null
+          plan_id: string
+          quarter: number
+          remaining_b10_years: number | null
+          risk_level: string
+          risk_score: number
+          sort_order: number
+          status: string
+          title: string
+          year: number
+        }
+        Insert: {
+          action_type?: string
+          component_id: string
+          confidence: string
+          cost_source?: string | null
+          created_at?: string
+          estimated_cost?: number | null
+          id?: string
+          notes?: string | null
+          plan_id: string
+          quarter: number
+          remaining_b10_years?: number | null
+          risk_level: string
+          risk_score?: number
+          sort_order?: number
+          status?: string
+          title: string
+          year: number
+        }
+        Update: {
+          action_type?: string
+          component_id?: string
+          confidence?: string
+          cost_source?: string | null
+          created_at?: string
+          estimated_cost?: number | null
+          id?: string
+          notes?: string | null
+          plan_id?: string
+          quarter?: number
+          remaining_b10_years?: number | null
+          risk_level?: string
+          risk_score?: number
+          sort_order?: number
+          status?: string
+          title?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_plan_items_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_plan_items_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_plans: {
+        Row: {
+          created_at: string
+          generated_at: string
+          generated_by: string | null
+          horizon_years: number
+          id: string
+          min_confidence: string
+          min_risk_level: string
+          name: string
+          notes: string | null
+          organization_id: string
+          property_id: string
+          start_quarter: number
+          start_year: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          generated_at?: string
+          generated_by?: string | null
+          horizon_years?: number
+          id?: string
+          min_confidence?: string
+          min_risk_level?: string
+          name: string
+          notes?: string | null
+          organization_id: string
+          property_id: string
+          start_quarter: number
+          start_year: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          generated_at?: string
+          generated_by?: string | null
+          horizon_years?: number
+          id?: string
+          min_confidence?: string
+          min_risk_level?: string
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          property_id?: string
+          start_quarter?: number
+          start_year?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_plans_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_plans_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]

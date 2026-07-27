@@ -50,6 +50,18 @@ export const queryKeys = {
     byComponent: (componentId: string) =>
       ['maintenance-history', 'component', componentId] as const,
   },
+  maintenancePlans: {
+    ...makeEntityKeys('maintenance-plans'),
+    byProperty: (propertyId: string) =>
+      ['maintenance-plans', 'property', propertyId] as const,
+    items: (planId: string) =>
+      ['maintenance-plans', 'items', planId] as const,
+  },
+  unitPrices: {
+    ...makeEntityKeys('unit-prices'),
+    byOrg: (organizationId: string) =>
+      ['unit-prices', 'org', organizationId] as const,
+  },
   dashboardStats: makeEntityKeys('dashboard-stats'),
   projects: {
     ...makeEntityKeys('projects'),

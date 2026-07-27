@@ -23,6 +23,12 @@ dist
 dist-ssr
 *.local
 
+# Prefer npm (package-lock.json); ignore alternate package managers
+bun.lock
+bun.lockb
+yarn.lock
+pnpm-lock.yaml
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

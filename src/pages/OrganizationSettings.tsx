@@ -21,6 +21,7 @@ import { OrganizationModuleAccess } from "@/components/organization/Organization
 import { OrganizationCapacity } from "@/components/organization/OrganizationCapacity";
 import { OrganizationApiKeys } from "@/components/organization/OrganizationApiKeys";
 import { AgentRiskPolicySettings } from "@/components/organization/AgentRiskPolicySettings";
+import { OrganizationUnitPrices } from "@/components/organization/OrganizationUnitPrices";
 
 
 interface Organization {
@@ -224,6 +225,7 @@ export default function OrganizationSettings() {
                 {isAdmin && <TabsTrigger value="module-access">Modulåtkomst</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="integrations">Integrationer</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="agent">Agent & risk</TabsTrigger>}
+                {isAdmin && <TabsTrigger value="unit-prices">Áprislista</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="invitations">Inbjudningar</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="audit">Säkerhetslogg</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="branding">Varumärke</TabsTrigger>}
@@ -269,6 +271,15 @@ export default function OrganizationSettings() {
               {isAdmin && (
                 <TabsContent value="agent">
                   <AgentRiskPolicySettings
+                    organizationId={organization.id}
+                    canEdit={isAdmin}
+                  />
+                </TabsContent>
+              )}
+
+              {isAdmin && (
+                <TabsContent value="unit-prices">
+                  <OrganizationUnitPrices
                     organizationId={organization.id}
                     canEdit={isAdmin}
                   />

@@ -1,6 +1,5 @@
 -- Baseline core schema for fresh Supabase projects.
--- Lovable Cloud kept the original schema outside of migrations; this recreates
--- the tables/enums that later migrations assume already exist.
+-- Recreates tables/enums that later migrations assume already exist.
 
 -- ---------------------------------------------------------------------------
 -- Extensions

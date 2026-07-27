@@ -3,7 +3,7 @@
 ## Klart i kodbasen
 
 - [x] Validerad `.env` vid boot (`src/lib/env.ts`)
-- [x] Inga Lovable-beroenden (tagger, gateway, project-ID)
+- [x] Fristående stack: Vite + Supabase + Gemini (inga tredjeparts AI-gateways)
 - [x] Roll-guards: founder/admin på känsliga rutter
 - [x] Modulåtkomst fail-closed
 - [x] Cron edge functions kräver `CRON_SECRET`
@@ -24,7 +24,6 @@
    GEMINI_MODEL=gemini-flash-latest
    LLM_PROVIDER=gemini            # eller xai + XAI_API_KEY
    RESEND_API_KEY=...             # e-post (om används)
-   # LOVABLE_API_KEY används inte (Gemini/xAI via llmClient)
    ```
 
 3. **Deploy edge functions**

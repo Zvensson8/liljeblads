@@ -100,7 +100,8 @@ npx supabase secrets set LLM_PROVIDER=gemini
 | `ALLOWED_ORIGINS` | ✅ satt (localhost) |
 | `RESEND_API_KEY` | ❌ du sätter |
 | `GOOGLE_AI_API_KEY` | ✅ chat + embeddings (Gemini) |
-| `LOVABLE_API_KEY` | ❌ borttaget – används inte |
+| `GEMINI_MODEL` | ✅ t.ex. `gemini-flash-latest` |
+| `LLM_PROVIDER` | ✅ `gemini` (eller `xai`) |
 
 ---
 
