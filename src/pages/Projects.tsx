@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -37,6 +36,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
+import { projectStatusBadge, projectTypeBadge } from "@/lib/projectLabels";
+import {
+  budgetVarianceClass,
+  filterAndSortProjects,
+} from "@/lib/projectsListFilter";
 
 type ProjectStatus = Database["public"]["Enums"]["project_status"];
 type ProjectType = Database["public"]["Enums"]["project_type"];
@@ -179,39 +183,6 @@ export default function Projects() {
     setProperties(data || []);
   };
 
-  const getStatusBadge = (status: ProjectStatus) => {
-    const statusConfig: Record<string, { label: string; className: string }> = {
-      forslag: { label: "Förslag", className: "bg-yellow-500" },
-      planerat: { label: "Planerat", className: "bg-gray-500" },
-      invantar_offert: { label: "Inväntar offert", className: "bg-yellow-500" },
-      offert_finns: { label: "Offert finns", className: "bg-blue-500" },
-      pagaende: { label: "Pågående", className: "bg-green-500" },
-      pausat: { label: "Pausat", className: "bg-orange-500" },
-      avslutat: { label: "Avslutat", className: "bg-gray-700" },
-    };
-    const config = statusConfig[status] || statusConfig.planerat;
-    return <Badge className={config.className}>{config.label}</Badge>;
-  };
-
-  const getTypeBadge = (type: ProjectType) => {
-    const typeConfig = {
-      investering: { label: "Investering", className: "bg-purple-500" },
-      underhall: { label: "Underhåll", className: "bg-blue-500" },
-      energi: { label: "Energi", className: "bg-green-500" },
-      annat: { label: "Annat", className: "bg-gray-500" },
-    };
-    const config = typeConfig[type];
-    return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
-  };
-
-  const getBudgetVarianceColor = (budget: number, actual: number) => {
-    if (actual === 0) return "text-muted-foreground";
-    const variance = ((actual - budget) / budget) * 100;
-    if (variance > 10) return "text-red-600";
-    if (variance > 0) return "text-yellow-600";
-    return "text-green-600";
-  };
-
   const updateProject = async (projectId: string, field: string, value: unknown) => {
     setUpdating(true);
     try {
@@ -275,51 +246,18 @@ export default function Projects() {
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
 
-  const filteredProjects = projects.filter((project) => {
-    const matchesSearch =
-      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.project_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.property.name.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesStatus = statusFilter === "all" || project.status === statusFilter;
-    const matchesType = typeFilter === "all" || project.type === typeFilter;
-    const matchesProperty = propertyFilter === "all" || project.property_id === propertyFilter;
-
-    return matchesSearch && matchesStatus && matchesType && matchesProperty;
-  }).sort((a, b) => {
-    let aValue: unknown = a[sortField as keyof Project];
-    let bValue: unknown = b[sortField as keyof Project];
-
-    // Handle nested property name
-    if (sortField === "property_name") {
-      aValue = a.property.name;
-      bValue = b.property.name;
-    }
-
-    // Handle quarter sorting
-    if (sortField === "quarter") {
-      aValue = a.year * 10 + (a.start_quarter || 0);
-      bValue = b.year * 10 + (b.start_quarter || 0);
-    }
-
-    // Handle null values
-    if (aValue === null || aValue === undefined) return 1;
-    if (bValue === null || bValue === undefined) return -1;
-
-    // String comparison
-    if (typeof aValue === "string" && typeof bValue === "string") {
-      return sortDirection === "asc" 
-        ? aValue.localeCompare(bValue, "sv")
-        : bValue.localeCompare(aValue, "sv");
-    }
-
-    // Number comparison
-    if (sortDirection === "asc") {
-      return aValue > bValue ? 1 : -1;
-    } else {
-      return aValue < bValue ? 1 : -1;
-    }
-  });
+  const filteredProjects = useMemo(
+    () =>
+      filterAndSortProjects(projects as Parameters<typeof filterAndSortProjects>[0], {
+        searchQuery,
+        statusFilter,
+        typeFilter,
+        propertyFilter,
+        sortField,
+        sortDirection,
+      }) as Project[],
+    [projects, searchQuery, statusFilter, typeFilter, propertyFilter, sortField, sortDirection],
+  );
 
   if (authLoading || loading) {
     return (
@@ -592,7 +530,7 @@ export default function Projects() {
                                         </Select>
                                       ) : (
                                         <div onClick={() => startEditing(project.id, "type", project.type)}>
-                                          {getTypeBadge(project.type)}
+                                          {projectTypeBadge(project.type)}
                                         </div>
                                       )}
                                     </TableCell>
@@ -623,7 +561,7 @@ export default function Projects() {
                                         </Select>
                                       ) : (
                                         <div onClick={() => startEditing(project.id, "status", project.status)}>
-                                          {getStatusBadge(project.status)}
+                                          {projectStatusBadge(project.status)}
                                         </div>
                                       )}
                                     </TableCell>
@@ -700,7 +638,7 @@ export default function Projects() {
                                       {project.actual_cost.toLocaleString("sv-SE")} kr
                                     </TableCell>
                                    <TableCell
-                                      className={`text-right font-medium ${getBudgetVarianceColor(
+                                      className={`text-right font-medium ${budgetVarianceClass(
                                         project.budget,
                                         project.actual_cost
                                       )}`}
@@ -821,7 +759,7 @@ export default function Projects() {
                                         </Select>
                                       ) : (
                                         <div onClick={() => startEditing(project.id, "type", project.type)}>
-                                          {getTypeBadge(project.type)}
+                                          {projectTypeBadge(project.type)}
                                         </div>
                                       )}
                                     </TableCell>
@@ -852,7 +790,7 @@ export default function Projects() {
                                         </Select>
                                       ) : (
                                         <div onClick={() => startEditing(project.id, "status", project.status)}>
-                                          {getStatusBadge(project.status)}
+                                          {projectStatusBadge(project.status)}
                                         </div>
                                       )}
                                     </TableCell>
@@ -929,7 +867,7 @@ export default function Projects() {
                                       {project.actual_cost.toLocaleString("sv-SE")} kr
                                     </TableCell>
                                     <TableCell
-                                      className={`text-right font-medium ${getBudgetVarianceColor(
+                                      className={`text-right font-medium ${budgetVarianceClass(
                                         project.budget,
                                         project.actual_cost
                                       )}`}
