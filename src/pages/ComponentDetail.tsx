@@ -26,7 +26,6 @@ import {
   CheckCircle2,
   Home,
   Building2,
-  Wrench,
   ClipboardList,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -41,6 +40,8 @@ import { FloorSelector } from "@/components/FloorSelector";
 import { QuickServiceButton } from "@/components/QuickServiceButton";
 import { ServiceRecordCard } from "@/components/ServiceRecordCard";
 import { ServiceListTab } from "@/components/ServiceListTab";
+import { useComponentRisk } from "@/hooks/useComponentRisk";
+import { ComponentRiskBadge } from "@/components/ComponentRiskBadge";
 
 interface Component {
   id: string;
@@ -100,6 +101,7 @@ export default function ComponentDetail() {
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [serviceListOpen, setServiceListOpen] = useState(false);
   const { addRecentItem } = useRecentlyVisited();
+  const { data: risk } = useComponentRisk(id);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -125,7 +127,6 @@ export default function ComponentDetail() {
     
     setLoading(true);
     try {
-      // Fetch component with both floor and direct property relationships
       const { data: componentData, error: componentError } = await supabase
         .from("components")
         .select(`
@@ -153,7 +154,6 @@ export default function ComponentDetail() {
       if (componentError) throw componentError;
       setComponent(componentData);
       
-      // Set floor if it exists, otherwise create a mock floor object from direct property
       if (componentData.floors) {
         setFloor(componentData.floors as unknown as Floor);
       } else if (componentData.direct_property) {
@@ -166,7 +166,6 @@ export default function ComponentDetail() {
         } as Floor);
       }
 
-      // Fetch maintenance history
       const { data: maintenanceData, error: maintenanceError } = await supabase
         .from("maintenance_history")
         .select("*")
@@ -176,7 +175,6 @@ export default function ComponentDetail() {
       if (maintenanceError) throw maintenanceError;
       setMaintenanceHistory(maintenanceData || []);
 
-      // Fetch work orders linked to this component
       const { data: woData } = await supabase
         .from("work_orders")
         .select("*, properties(id, name)")
@@ -228,7 +226,6 @@ export default function ComponentDetail() {
   const totalMaintenanceCost = maintenanceHistory.reduce((sum, record) => sum + (record.cost || 0), 0);
   const totalWorkOrderCost = componentWorkOrders.reduce((sum, wo) => sum + (wo.price || 0), 0);
   const totalCombinedCost = totalMaintenanceCost + totalWorkOrderCost;
-  // Unique service occasions (one service = one date, even with multiple åtgärder)
   const uniqueServiceDates = Array.from(
     new Set(maintenanceHistory.map((r) => r.performed_date.slice(0, 10))),
   );
@@ -291,10 +288,11 @@ export default function ComponentDetail() {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Tillbaka
             </Button>
-            <div className="flex items-center gap-2 flex-1">
+            <div className="flex items-center gap-2 flex-1 flex-wrap">
               <Package className="h-5 w-5 text-primary" />
               <h1 className="text-xl font-semibold">{component.name}</h1>
               {getStatusBadge(component.status)}
+              <ComponentRiskBadge risk={risk} />
             </div>
             <div className="flex items-center gap-2">
               <QuickServiceButton
@@ -316,7 +314,22 @@ export default function ComponentDetail() {
 
           <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              {/* Quick Stats */}
+              {risk && risk.riskLevel !== 'low' && (
+                <Card className="border-l-4 border-l-orange-500">
+                  <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{risk.recommendation}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Ålder {risk.ageYears.toFixed(1)} år · Tillförlitlighet R(t) {(risk.reliability * 100).toFixed(1)} %
+                        {risk.remainingB10Years != null && ` · B10 kvar ≈ ${risk.remainingB10Years.toFixed(1)} år`}
+                        {' · '}Akuta händelser: {risk.acuteCount}
+                      </p>
+                    </div>
+                    <ComponentRiskBadge risk={risk} />
+                  </CardContent>
+                </Card>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card>
                   <CardHeader className="pb-3">
@@ -392,7 +405,6 @@ export default function ComponentDetail() {
                 </Card>
               </div>
 
-              {/* Main Content Tabs */}
               <Tabs defaultValue="info" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
                   <TabsTrigger value="info">Info</TabsTrigger>
