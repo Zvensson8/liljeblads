@@ -102,16 +102,37 @@ serve(async (req) => {
     try {
       switch (action.action_type) {
         case 'create_work_order': {
-          // Need a property_id - try to find from payload or use first property
-          let propertyId = action.payload.property_id;
-          
+          const payload = (action.payload || {}) as Record<string, unknown>;
+          // Resolve property: explicit id → property_name → component → first in org
+          let propertyId = (payload.property_id as string) || null;
+          let componentId = (payload.component_id as string) || null;
+
+          if (!propertyId && payload.property_name) {
+            const { data: byName } = await supabase
+              .from('properties')
+              .select('id')
+              .eq('organization_id', profile.organization_id)
+              .ilike('name', String(payload.property_name))
+              .limit(1)
+              .maybeSingle();
+            propertyId = byName?.id ?? null;
+          }
+
+          if (componentId && !propertyId) {
+            const { data: comp } = await supabase
+              .from('components')
+              .select('id, property_id')
+              .eq('id', componentId)
+              .maybeSingle();
+            if (comp?.property_id) propertyId = comp.property_id;
+          }
+
           if (!propertyId) {
             const { data: properties } = await supabase
               .from('properties')
               .select('id')
               .eq('organization_id', profile.organization_id)
               .limit(1);
-            
             if (properties && properties.length > 0) {
               propertyId = properties[0].id;
             }
@@ -125,18 +146,28 @@ serve(async (req) => {
             .from('work_orders')
             .insert({
               property_id: propertyId,
-              action: action.payload.action || action.payload.title || 'AI-föreslagen åtgärd',
-              priority: action.payload.priority || 'medium',
+              component_id: componentId,
+              action: (payload.action as string) || (payload.title as string) || 'AI-föreslagen åtgärd',
+              priority: (payload.priority as string) || 'medium',
               status: 'not_started',
               comments: `Skapad via AI-förslag: ${action.reasoning || 'Ingen motivering'}`,
-              due_date: action.payload.due_date || null,
+              due_date: (payload.due_date as string) || null,
+              price:
+                payload.price_estimate != null && !Number.isNaN(Number(payload.price_estimate))
+                  ? Number(payload.price_estimate)
+                  : null,
             })
             .select()
             .single();
 
           if (woError) throw woError;
-          result = { work_order_id: workOrder.id };
-          console.log('Created work order:', workOrder.id);
+          result = {
+            work_order_id: workOrder.id,
+            component_id: componentId,
+            property_id: propertyId,
+            source: payload.source || null,
+          };
+          console.log('Created work order:', workOrder.id, 'component:', componentId);
           break;
         }
 

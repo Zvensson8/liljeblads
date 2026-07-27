@@ -1,8 +1,13 @@
 /**
  * When a work order is completed, register cost on the linked component
- * via maintenance_history (final cost or proposed price).
+ * via maintenance_history (final cost or proposed price), then run risk feedback.
  */
 import { supabase } from "@/integrations/supabase/client";
+import {
+  applyWorkOrderRiskFeedback,
+  type RiskFeedbackResult,
+} from "@/lib/riskFeedback";
+import type { ComponentRiskResult } from "@/lib/componentRisk";
 
 export interface CompleteWorkOrderParams {
   workOrderId: string;
@@ -22,6 +27,8 @@ export interface CompleteWorkOrderResult {
   };
   maintenanceHistoryId: string | null;
   costRegistered: number | null;
+  riskFeedback?: RiskFeedbackResult | null;
+  riskAfter?: ComponentRiskResult | null;
 }
 
 export async function completeWorkOrderWithCost(
@@ -106,9 +113,24 @@ export async function completeWorkOrderWithCost(
     }
   }
 
+  // Feedback loop: close risk suggestions + snapshot re-scored risk
+  let riskFeedback: RiskFeedbackResult | null = null;
+  if (updated.component_id) {
+    try {
+      riskFeedback = await applyWorkOrderRiskFeedback({
+        workOrderId,
+        componentId: updated.component_id,
+      });
+    } catch (e) {
+      console.warn("[completeWorkOrder] risk feedback failed", e);
+    }
+  }
+
   return {
     workOrder: updated,
     maintenanceHistoryId,
     costRegistered: cost,
+    riskFeedback,
+    riskAfter: riskFeedback?.riskAfter ?? null,
   };
 }
