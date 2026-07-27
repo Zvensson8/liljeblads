@@ -1,9 +1,7 @@
 /**
  * Smoke-test Jarvis webhook endpoints with API key from jarvis-worker/.env
- * Run from repo root after deploy:
- *   node --env-file=jarvis-worker/.env scripts/test-jarvis-webhook.mjs
- * or PowerShell:
- *   npx tsx scripts/test-jarvis-webhook.mjs
+ * Run from repo root:
+ *   node scripts/test-jarvis-webhook.mjs
  */
 import fs from 'fs';
 import path from 'path';
@@ -19,12 +17,44 @@ function loadEnv(p) {
     const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*)$/);
     if (!m) continue;
     let v = m[2].trim();
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    if (
+      (v.startsWith('"') && v.endsWith('"')) ||
+      (v.startsWith("'") && v.endsWith("'"))
+    ) {
       v = v.slice(1, -1);
     }
     out[m[1]] = v;
   }
   return out;
+}
+
+function summarize(type, data) {
+  if (!data || data.success === false) {
+    return data?.error || JSON.stringify(data).slice(0, 120);
+  }
+  switch (type) {
+    case 'list_properties':
+    case 'list_work_orders':
+    case 'list_high_risk_components':
+      return `count=${data.count ?? (data.results || []).length}`;
+    case 'get_property_overview': {
+      const r = data.result || {};
+      const c = r.counts || {};
+      return (
+        `property=${r.property?.name || '?'} · components=${c.components ?? 0} · ` +
+        `open_WO=${c.open_work_orders ?? 0} · docs=${c.documents ?? 0} · ` +
+        `high_risk=${c.high_risk ?? 0} · plan=${r.maintenance_plan ? 'yes' : 'no'}`
+      );
+    }
+    case 'search_property_documents':
+      return (
+        `metadata=${data.count ?? (data.results || []).length} · ` +
+        `semantic=${(data.semantic_hits || []).length}` +
+        (data.note ? ` · note=${String(data.note).slice(0, 60)}…` : '')
+      );
+    default:
+      return `keys=${Object.keys(data).join(',')}`;
+  }
 }
 
 const env = loadEnv(envPath);
@@ -60,15 +90,18 @@ const tests = [
   ['search_property_documents', { query: 'vent', limit: 5 }],
 ];
 
-console.log('Webhook:', base.replace(/lbl_.*/, 'lbl_***'));
+console.log('Webhook:', base);
 let fail = 0;
 for (const [type, body] of tests) {
   const { status, data } = await call(type, body);
   const ok = status < 400 && data.success !== false;
   if (!ok) fail += 1;
-  const detail = ok
-    ? `count=${data.count ?? data.result?.counts?.components ?? Object.keys(data).length}`
-    : (data.error || JSON.stringify(data)).slice(0, 120);
-  console.log(`${ok ? 'OK  ' : 'FAIL'} ${status} ${type}: ${detail}`);
+  console.log(`${ok ? 'OK  ' : 'FAIL'} ${status} ${type}: ${summarize(type, data)}`);
+}
+
+if (fail === 0) {
+  console.log('\nAll webhook smoke tests passed.');
+} else {
+  console.log(`\n${fail} test(s) failed.`);
 }
 process.exit(fail ? 1 : 0);
