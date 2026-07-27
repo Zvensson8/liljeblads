@@ -1,7 +1,7 @@
 /**
  * Shared LLM client for edge functions.
  * Providers: gemini (default) | xai
- * Returns OpenAI-style chat.completion JSON for drop-in replacement of Lovable gateway.
+ * Returns OpenAI-style chat.completion JSON (Gemini default, optional xAI).
  */
 
 export type ChatMessage = {
@@ -68,8 +68,8 @@ export function getDefaultModel(): string {
   return env("GEMINI_MODEL", "gemini-flash-latest");
 }
 
-function stripLovableModelPrefix(model: string): string {
-  // "google/gemini-2.5-flash" → prefer env default or flash-latest
+function normalizeModelId(model: string): string {
+  // Legacy gateway-style ids: "google/gemini-…" → env default
   if (model.startsWith("google/")) {
     return getDefaultModel();
   }
@@ -227,7 +227,7 @@ function parseGeminiResponse(data: Record<string, unknown>, model: string): Chat
 async function geminiChat(
   req: ChatCompletionRequest,
 ): Promise<ChatCompletionResponse | Response> {
-  const model = stripLovableModelPrefix(req.model || getDefaultModel());
+  const model = normalizeModelId(req.model || getDefaultModel());
   const key = googleKey();
   const { system, rest } = splitSystem(req.messages);
   const contents = toGeminiContents(rest);

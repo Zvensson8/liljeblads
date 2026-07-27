@@ -163,7 +163,7 @@ DOKUMENTINNEHÅLL (Serviceprotokoll):
 ${documentContent.substring(0, 8000)}
 `;
 
-    // Call Lovable AI to analyze and suggest actions
+    // Call Gemini (llmClient) to analyze and suggest actions
     const systemPrompt = `Du är en expert på fastighetsförvaltning och teknisk drift. 
 Analysera serviceprotokollet och komponentinformationen för att identifiera:
 

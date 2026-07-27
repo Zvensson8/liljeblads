@@ -1,7 +1,7 @@
 # Liljeblads – ny Supabase-databas
 
 Guiden sätter upp en **ny** Supabase-instans och applicerar projektets migrationer
-(inkl. baseline för kärntabeller som saknades i den ursprungliga Lovable-exporten).
+(inkl. baseline för kärntabeller).
 
 ## Förutsättningar
 
@@ -55,7 +55,7 @@ Detta kör:
 1. `20251001000000_baseline_core_schema.sql` – profiles, properties, floors, components, geometry, enums, auth-trigger
 2. Övriga ~135 historiska migrationer (RLS, organisationer, projekt, embeddings, m.m.)
 
-Om något steg faller: spara felmeddelandet och kör om efter fix. Lovable-migrationer kan ibland anta delvis data/state.
+Om något steg faller: spara felmeddelandet och kör om efter fix. Äldre migrationer kan ibland anta delvis data/state.
 
 ### Alternativ: SQL Editor
 
@@ -124,7 +124,7 @@ Importera via appens CSV/XLSX eller egna SQL/scripts – inte automatiskt via de
 | Migration failer på CREATE TYPE | Typen finns redan – ofta OK att skippa / justera baseline |
 | 401 från API | Fel URL/key i `.env`, starta om `npm run dev` |
 | Peer deps vid install | `npm install --legacy-peer-deps` |
-| Gamla Lovable-nycklar | Skapa **nytt** projekt; uppdatera `.env` |
+| Gamla/fel API-nycklar | Skapa **nytt** projekt eller rotera keys; uppdatera `.env` |
 
 ## Säkerhet
 

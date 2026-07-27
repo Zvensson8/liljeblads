@@ -90,7 +90,8 @@ Sedan: skapa cron-jobb i Dashboard med header `x-cron-secret` (värde i `.secret
 
 ```powershell
 npx supabase secrets set GOOGLE_AI_API_KEY=xxx
-npx supabase secrets set LOVABLE_API_KEY=xxx
+npx supabase secrets set GEMINI_MODEL=gemini-flash-latest
+npx supabase secrets set LLM_PROVIDER=gemini
 ```
 
 | Secret | Status |
@@ -98,7 +99,8 @@ npx supabase secrets set LOVABLE_API_KEY=xxx
 | `CRON_SECRET` | ✅ satt |
 | `ALLOWED_ORIGINS` | ✅ satt (localhost) |
 | `RESEND_API_KEY` | ❌ du sätter |
-| `GOOGLE_AI_API_KEY` / `LOVABLE_API_KEY` | valfritt |
+| `GOOGLE_AI_API_KEY` | ✅ chat + embeddings (Gemini) |
+| `LOVABLE_API_KEY` | ❌ borttaget – används inte |
 
 ---
 

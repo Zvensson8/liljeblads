@@ -1,4 +1,4 @@
-// CrewAI webhook — accepts the LovableWebhookTool payload from CrewAI
+// Agent webhook — API-key auth for Jarvis / external workers (lbl_ keys)
 // and creates a todo in `property_todos`, scoped to the organization
 // that owns the API key (lbl_ prefix, hashed in `api_keys`).
 //
@@ -503,7 +503,7 @@ Deno.serve(async (req) => {
         executed_at: new Date().toISOString(),
         execution_result: { deleted_id: payload.service_id },
         confidence_score: 1.0,
-        reasoning: "Deleted via CrewAI LovableWebhookTool",
+        reasoning: "Deleted via agent webhook",
       });
 
       return json({ success: true, type: "delete_service", deleted_id: payload.service_id });
@@ -603,7 +603,7 @@ Deno.serve(async (req) => {
         executed_at: new Date().toISOString(),
         execution_result: mh as Record<string, unknown>,
         confidence_score: 1.0,
-        reasoning: "Logged via CrewAI LovableWebhookTool",
+        reasoning: "Logged via agent webhook",
       });
 
       return json({ success: true, type: "log_service", result: mh });
@@ -805,7 +805,7 @@ Deno.serve(async (req) => {
       executed_at: new Date().toISOString(),
       execution_result: created,
       confidence_score: 1.0,
-      reasoning: "Created via CrewAI LovableWebhookTool",
+      reasoning: "Created via agent webhook",
     });
 
     return json({
