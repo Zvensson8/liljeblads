@@ -7,6 +7,8 @@ import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useUpdateWorkOrder, type WorkOrderStatus } from '@/hooks/useWorkOrders';
+import { ComponentRiskBadge } from '@/components/ComponentRiskBadge';
+import type { ComponentRiskResult } from '@/lib/componentRisk';
 
 interface WorkOrder {
   id: string;
@@ -17,7 +19,9 @@ interface WorkOrder {
   due_date: string | null;
   contractor: string | null;
   quarter: string | null;
+  component_id?: string | null;
   properties: { id: string; name: string };
+  components?: { id: string; name: string; type: string } | null;
 }
 
 interface WorkOrderKanbanProps {
@@ -26,6 +30,8 @@ interface WorkOrderKanbanProps {
   onDelete: (id: string) => void;
   onViewDetails: (order: WorkOrder) => void;
   onRefetch: () => void;
+  /** Optional map of componentId → risk for badge */
+  riskByComponentId?: Map<string, ComponentRiskResult>;
 }
 
 const columns = [
@@ -40,6 +46,7 @@ export const WorkOrderKanban = ({
   onDelete,
   onViewDetails,
   onRefetch,
+  riskByComponentId,
 }: WorkOrderKanbanProps) => {
   const [draggedOrder, setDraggedOrder] = useState<WorkOrder | null>(null);
   const updateWorkOrder = useUpdateWorkOrder();
@@ -129,12 +136,20 @@ export const WorkOrderKanban = ({
                     >
                       <CardContent className="p-4 space-y-3">
                         <div className="flex items-start justify-between gap-2">
-                          <div className="space-y-1 flex-1">
+                          <div className="space-y-1 flex-1 min-w-0">
                             <h4 className="font-medium text-sm leading-tight">{order.action}</h4>
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <span>🏢</span>
-                              <span>{order.properties?.name}</span>
+                              <span className="truncate">{order.properties?.name}</span>
                             </div>
+                            {order.component_id && riskByComponentId?.has(order.component_id) && (
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <ComponentRiskBadge
+                                  risk={riskByComponentId.get(order.component_id)}
+                                  compact
+                                />
+                              </div>
+                            )}
                           </div>
                           {getPriorityBadge(order.priority)}
                         </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -22,6 +22,8 @@ import {
   useDeleteWorkOrder,
 } from "@/hooks/useWorkOrders";
 import type { UpdateWorkOrderInput } from "@/types/domain";
+import { useComponentRiskList } from "@/hooks/useComponentRisk";
+import { ComponentRiskBadge } from "@/components/ComponentRiskBadge";
 
 type WorkOrderRow = NonNullable<ReturnType<typeof useWorkOrders>["data"]>[number];
 import { queryKeys } from "@/lib/queryKeys";
@@ -45,6 +47,12 @@ const WorkOrders = () => {
   const [tempValue, setTempValue] = useState<string | null>(null);
 
   const { data: workOrders } = useWorkOrders({ showArchived });
+  const { data: riskList = [] } = useComponentRiskList({ limit: 500 });
+  const riskByComponentId = useMemo(() => {
+    const m = new Map<string, (typeof riskList)[0]>();
+    for (const r of riskList) m.set(r.componentId, r);
+    return m;
+  }, [riskList]);
   const updateMutation = useUpdateWorkOrder();
   const deleteMutation = useDeleteWorkOrder();
   const updating = updateMutation.isPending;
@@ -205,6 +213,7 @@ const WorkOrders = () => {
                   <tr className="border-b text-sm text-muted-foreground">
                     <th className="text-left py-3 px-3 font-medium">Åtgärd</th>
                     <th className="text-left py-3 px-3 font-medium">Fastighet</th>
+                    <th className="text-left py-3 px-3 font-medium">Komponentrisk</th>
                     <th className="text-left py-3 px-3 font-medium">Status</th>
                     <th className="text-left py-3 px-3 font-medium">Pris</th>
                     <th className="text-left py-3 px-3 font-medium">Datum</th>
@@ -220,12 +229,32 @@ const WorkOrders = () => {
                         setDetailDialogOpen(true);
                       }}
                     >
-                      <td className="py-3 px-3 font-medium">{order.action}</td>
+                      <td className="py-3 px-3 font-medium">
+                        <div>{order.action}</div>
+                        {order.components?.name && (
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {order.components.name}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2">
                           <Building2 className="h-4 w-4 text-muted-foreground" />
                           <span>{order.properties?.name}</span>
                         </div>
+                      </td>
+                      <td
+                        className="py-3 px-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {order.component_id ? (
+                          <ComponentRiskBadge
+                            risk={riskByComponentId.get(order.component_id)}
+                            compact
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">–</span>
+                        )}
                       </td>
                       <td
                         className="py-3 px-3"
@@ -475,6 +504,7 @@ const WorkOrders = () => {
                     setDetailDialogOpen(true);
                   }}
                   onRefetch={refetch}
+                  riskByComponentId={riskByComponentId}
                 />
               ) : (
                 <div className="space-y-4">

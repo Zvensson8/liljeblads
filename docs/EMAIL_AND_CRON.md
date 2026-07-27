@@ -37,6 +37,8 @@ Skapa jobb som anropar edge functions **varje timme** (påminnelser avgör själ
 | `todo-reminders` | `.../functions/v1/send-todo-reminders` | `0 * * * *` |
 | `work-order-reminders` | `.../functions/v1/send-work-order-reminders` | `0 7 * * *` |
 | `maintenance-reminders` | `.../functions/v1/send-maintenance-reminders` | `0 7 * * 1` |
+| `risk-suggest-actions` | `.../functions/v1/risk-suggest-actions` | `0 6 * * *` (dagligen 06:00 UTC) |
+| `generate-embeddings` | `.../functions/v1/generate-embeddings` | `*/15 * * * *` (kö-poll) |
 
 **Headers (obligatoriskt):**
 
@@ -75,6 +77,13 @@ SELECT cron.schedule(
 $secret = (Get-Content .secrets.local | Where-Object { $_ -match '^CRON_SECRET=' }) -replace 'CRON_SECRET=',''
 Invoke-RestMethod `
   -Uri "https://ojiswgqntenvbwtopxbu.supabase.co/functions/v1/send-todo-reminders" `
+  -Method POST `
+  -Headers @{ "x-cron-secret" = $secret; "Content-Type" = "application/json" } `
+  -Body "{}"
+
+# Prediktiv risk → AI-förslag (HITL)
+Invoke-RestMethod `
+  -Uri "https://ojiswgqntenvbwtopxbu.supabase.co/functions/v1/risk-suggest-actions" `
   -Method POST `
   -Headers @{ "x-cron-secret" = $secret; "Content-Type" = "application/json" } `
   -Body "{}"
