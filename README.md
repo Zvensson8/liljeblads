@@ -276,7 +276,29 @@ Detaljer: `docs/JARVIS.md`.
 - Playwright E2E (`npm run test:e2e`)
 - TypeScript strict + ESLint
 - Zod på formulär och kritiska API-svar
-- Lokal CI-smoke: `npm run ci:local`
+- **Prediktiv underhåll smoke** (Weibull + planmotor, utan DB): `npm run test:smoke:pm`
+- Synka edge-kopior av riskmoduler: `node scripts/sync-edge-risk.mjs`
+- Lokal CI-smoke: `npm run ci:local` (typecheck + PM-smoke + build)
+
+### Prediktiv underhåll – workflow-karta (klar innan Jarvis-fas)
+
+| Yta | Status | Plats |
+|-----|--------|--------|
+| Weibull math (R, F, h, B10, MLE) | ✅ | `src/lib/weibull.ts` (+ edge shared) |
+| Riskscore / confidence / rekommendation | ✅ | `src/lib/componentRisk.ts` |
+| Batch + filter hooks | ✅ | `useComponentRisk` / `useComponentRiskList` |
+| Komponentlista filter/sort + Riskförslag | ✅ | `Components.tsx` |
+| Dashboard högrisk-widget | ✅ | `HighRiskComponentsWidget` |
+| WO risk-badge | ✅ | `WorkOrders.tsx` |
+| HITL risk → `ai_suggested_actions` | ✅ | `riskSuggestions.ts` + policy |
+| Cron risk-förslag + snapshots | ✅ | `risk-suggest-actions` edge |
+| WO completed → stäng förslag + snapshot | ✅ | `riskFeedback` / `completeWorkOrder` |
+| Agentpolicy UI | ✅ | Org → Agent & risk |
+| Agent activity | ✅ | `AgentActivity.tsx` |
+| Chat tool `list_high_risk_components` | ✅ | `jarvisTools.ts` |
+| 5-årsplan (år+kvartal, start-Q) | ✅ | `maintenancePlanEngine` + Property-flik |
+| Áprislista CRUD | ✅ | Org → Áprislista |
+| Edge/FE risk i sync | ✅ | `scripts/sync-edge-risk.mjs` |
 
 ---
 
