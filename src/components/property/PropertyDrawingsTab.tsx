@@ -194,6 +194,7 @@ export function PropertyDrawingsTab({
           <CardContent>
             {floor.drawing_url ? (
               <FloorCanvas
+                key={`${floor.id}:${floor.drawing_url}`}
                 floorId={floor.id}
                 drawingUrl={floor.drawing_url}
                 onUpdate={onCanvasUpdate}

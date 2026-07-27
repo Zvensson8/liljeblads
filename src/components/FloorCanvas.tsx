@@ -42,8 +42,10 @@ interface FloorCanvasProps {
 }
 
 export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanvasProps) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  /** Host div only — Fabric creates/disposes the <canvas> so React never owns that node. */
+  const containerRef = useRef<HTMLDivElement>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
+  const mountedRef = useRef(true);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
 
   const [activeTool, setActiveTool] = useState('select');
@@ -253,37 +255,71 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
     };
   }, [floorId]);
 
-  // Init / dispose canvas when floor or drawing changes
   useEffect(() => {
-    if (!canvasRef.current) return;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Init / dispose canvas when floor or drawing changes.
+  // Fabric mutates the DOM around <canvas>; React must not own that node.
+  useEffect(() => {
+    const host = containerRef.current;
+    if (!host) return;
+
     if (!drawingUrl) {
-      setImageError(true);
-      setImageLoading(false);
+      if (mountedRef.current) {
+        setImageError(true);
+        setImageLoading(false);
+      }
       return;
     }
 
     const gen = ++loadGenRef.current;
-    setImageLoading(true);
-    setImageError(false);
-    setHistory([]);
-    setHistoryStep(-1);
+    if (mountedRef.current) {
+      setImageLoading(true);
+      setImageError(false);
+      setHistory([]);
+      setHistoryStep(-1);
+      setSelectedObject(null);
+      setTooltipVisible(false);
+    }
     historyRef.current = [];
     historyStepRef.current = -1;
 
-    const canvas = new FabricCanvas(canvasRef.current, {
-      width: 1200,
-      height: 800,
-      backgroundColor: '#ffffff',
-    });
+    // Fresh canvas element — Fabric will wrap it; dispose cleans wrappers.
+    host.innerHTML = '';
+    const el = document.createElement('canvas');
+    el.setAttribute('data-floor-canvas', 'true');
+    host.appendChild(el);
+
+    let canvas: FabricCanvas;
+    try {
+      canvas = new FabricCanvas(el, {
+        width: 1200,
+        height: 800,
+        backgroundColor: '#ffffff',
+      });
+    } catch (e) {
+      console.error('FloorCanvas: Fabric init failed', e);
+      if (mountedRef.current) {
+        setImageError(true);
+        setImageLoading(false);
+      }
+      return;
+    }
+
     fabricRef.current = canvas;
-    setFabricCanvas(canvas);
+    if (mountedRef.current) setFabricCanvas(canvas);
+
+    const safeSet = (fn: () => void) => {
+      if (mountedRef.current && loadGenRef.current === gen) fn();
+    };
 
     FabricImage.fromURL(drawingUrl, { crossOrigin: 'anonymous' })
       .then((img) => {
-        if (loadGenRef.current !== gen || fabricRef.current !== canvas) {
-          // Stale load — ignore
-          return;
-        }
+        if (loadGenRef.current !== gen || fabricRef.current !== canvas) return;
         const cw = canvas.getWidth() || 1200;
         const ch = canvas.getHeight() || 800;
         const iw = img.width || 1;
@@ -292,35 +328,43 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
         img.scale(scale);
         canvas.backgroundImage = img;
         canvas.requestRenderAll();
-        setImageLoading(false);
+        safeSet(() => setImageLoading(false));
       })
       .catch((error) => {
         if (loadGenRef.current !== gen) return;
         console.error('FloorCanvas: Failed to load image:', error);
-        setImageError(true);
-        setImageLoading(false);
-        toast({
-          title: 'Fel vid laddning av ritning',
-          description: 'Kunde inte ladda ritningen. Kontrollera URL/behörighet.',
-          variant: 'destructive',
+        safeSet(() => {
+          setImageError(true);
+          setImageLoading(false);
         });
+        if (mountedRef.current) {
+          toast({
+            title: 'Fel vid laddning av ritning',
+            description: 'Kunde inte ladda ritningen. Kontrollera URL/behörighet.',
+            variant: 'destructive',
+          });
+        }
       });
 
     canvas.on('selection:created', (e) => {
-      setSelectedObject((e.selected?.[0] as CanvasObject) ?? null);
+      safeSet(() => setSelectedObject((e.selected?.[0] as CanvasObject) ?? null));
     });
     canvas.on('selection:updated', (e) => {
-      setSelectedObject((e.selected?.[0] as CanvasObject) ?? null);
+      safeSet(() => setSelectedObject((e.selected?.[0] as CanvasObject) ?? null));
     });
-    canvas.on('selection:cleared', () => setSelectedObject(null));
+    canvas.on('selection:cleared', () => {
+      safeSet(() => setSelectedObject(null));
+    });
 
     canvas.on('mouse:dblclick', (e) => {
       const obj = e.target as CanvasObject | undefined;
       if (!obj?.componentId) return;
       const component = componentsRef.current.find((c) => c.id === obj.componentId);
       if (component) {
-        setEditingComponent(component);
-        setDialogOpen(true);
+        safeSet(() => {
+          setEditingComponent(component);
+          setDialogOpen(true);
+        });
       }
     });
 
@@ -332,11 +376,12 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
       z *= 0.999 ** e.deltaY;
       z = clampZoom(z, ZOOM_MIN, ZOOM_MAX);
       canvas.zoomToPoint(new Point(e.offsetX, e.offsetY), z);
-      setZoom(z);
+      safeSet(() => setZoom(z));
     };
     canvas.on('mouse:wheel', handleWheel);
 
     canvas.on('mouse:move', (e) => {
+      if (loadGenRef.current !== gen) return;
       const scenePoint = e.scenePoint;
       if (isPanningRef.current && scenePoint) {
         const vpt = canvas.viewportTransform;
@@ -356,9 +401,12 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
         canvas.requestRenderAll();
 
         const component = componentsRef.current.find((c) => c.id === target.componentId);
-        const canvasElement = canvasRef.current;
-        if (component && canvasElement) {
-          const rect = canvasElement.getBoundingClientRect();
+        // Prefer lower-canvas for layout box (Fabric wraps with upper-canvas sibling)
+        const canvasEl =
+          (canvas.lowerCanvasEl as HTMLCanvasElement | undefined) ||
+          (host.querySelector('canvas') as HTMLCanvasElement | null);
+        if (component && canvasEl) {
+          const rect = canvasEl.getBoundingClientRect();
           const center = target.getCenterPoint
             ? target.getCenterPoint()
             : { x: target.left || 0, y: target.top || 0 };
@@ -370,9 +418,11 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
             canvasHeight: canvas.getHeight() || 800,
             canvasRect: rect,
           });
-          setTooltipPosition(pos);
-          setTooltipComponent(component);
-          setTooltipVisible(true);
+          safeSet(() => {
+            setTooltipPosition(pos);
+            setTooltipComponent(component);
+            setTooltipVisible(true);
+          });
         }
 
         canvas.getObjects().forEach((obj) => {
@@ -380,8 +430,10 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
           if (co.componentId && co !== target) resetMarkerStyle(co);
         });
       } else {
-        setTooltipVisible(false);
-        setTooltipComponent(null);
+        safeSet(() => {
+          setTooltipVisible(false);
+          setTooltipComponent(null);
+        });
         canvas.getObjects().forEach((obj) => {
           const co = obj as CanvasObject;
           if (co.componentId) resetMarkerStyle(co);
@@ -400,8 +452,8 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
         scenePoint
       ) {
         if (isMiddleButton) e.e.preventDefault();
-        setIsPanning(true);
         isPanningRef.current = true;
+        safeSet(() => setIsPanning(true));
         panStart.current = { x: scenePoint.x, y: scenePoint.y };
         canvas.selection = false;
         canvas.defaultCursor = 'grabbing';
@@ -409,8 +461,8 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
     });
 
     canvas.on('mouse:up', () => {
-      setIsPanning(false);
       isPanningRef.current = false;
+      safeSet(() => setIsPanning(false));
       const panMode = activeToolRef.current === 'pan' || spacePressedRef.current;
       canvas.selection = !panMode;
       canvas.defaultCursor = panMode ? 'grab' : 'default';
@@ -423,11 +475,13 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
         const y = obj.top ?? 0;
         if (Number.isFinite(x) && Number.isFinite(y)) {
           savePosition(obj.componentId, x, y);
-          toast({
-            title: 'Position sparad',
-            description: 'Komponentens position uppdaterades automatiskt.',
-            duration: 2000,
-          });
+          if (mountedRef.current) {
+            toast({
+              title: 'Position sparad',
+              description: 'Komponentens position uppdaterades automatiskt.',
+              duration: 2000,
+            });
+          }
         }
       }
       saveHistory();
@@ -436,13 +490,20 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
     return () => {
       loadGenRef.current += 1;
       try {
+        canvas.off();
         canvas.dispose();
       } catch (e) {
         console.warn('FloorCanvas dispose', e);
       }
       if (fabricRef.current === canvas) fabricRef.current = null;
-      setFabricCanvas(null);
-      setTooltipVisible(false);
+      // Clear Fabric leftovers so React's host stays a plain empty div
+      if (host.isConnected) {
+        host.innerHTML = '';
+      }
+      if (mountedRef.current) {
+        setFabricCanvas(null);
+        setTooltipVisible(false);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-init on floor/drawing/reload
   }, [drawingUrl, floorId, reloadNonce]);
@@ -788,7 +849,7 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
           gridEnabled={gridEnabled}
         />
 
-        <div className="border-2 border-border rounded-lg overflow-hidden shadow-[var(--shadow-card)] bg-white relative">
+        <div className="border-2 border-border rounded-lg overflow-hidden shadow-[var(--shadow-card)] bg-white relative min-h-[400px]">
           {imageLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-10">
               <div className="text-center space-y-2">
@@ -815,9 +876,14 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
               </div>
             </div>
           )}
-          <canvas ref={canvasRef} />
+          {/* Fabric owns all children of this host — never put React-managed canvas here */}
+          <div
+            ref={containerRef}
+            className="w-full overflow-auto"
+            data-fabric-host="floor-canvas"
+          />
           {spacePressed && (
-            <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-3 py-1 rounded-md text-sm font-medium">
+            <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-3 py-1 rounded-md text-sm font-medium z-20">
               Panoreringläge · zoom {Math.round(zoom * 100)}%
             </div>
           )}
