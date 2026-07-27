@@ -1,3 +1,4 @@
+/** AUTO-GENERATED from src/lib — do not edit. Run: npm run sync:edge-risk */
 /**
  * Weibull reliability utilities for component risk / remaining useful life.
  *
@@ -6,6 +7,9 @@
  * Hazard h(t) = (β/η) * (t/η)^(β-1)
  *
  * Pure TypeScript – no external stats dependencies.
+ *
+ * CANONICAL SOURCE for edge: run `npm run sync:edge-risk` after changes.
+ * Do not edit supabase/functions/_shared/weibull.ts by hand.
  */
 
 export interface WeibullParams {

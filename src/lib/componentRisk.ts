@@ -10,6 +10,9 @@
  * 1. If ≥ 3 inter-acute intervals exist → fit Weibull (MLE preferred, rank-regression fallback).
  * 2. Else use expected_lifespan (or type default) as scale η and adjust shape from acute intensity.
  * 3. Evaluate R(t), F(t), hazard, B10/median, risk score 0–100 at current age.
+ *
+ * CANONICAL SOURCE for edge: run `npm run sync:edge-risk` after changes.
+ * Do not edit supabase/functions/_shared/componentRisk.ts by hand.
  */
 
 import {

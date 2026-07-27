@@ -27,6 +27,9 @@ jobs:
         with:
           version: latest
 
+      - name: Check edge risk modules match frontend
+        run: npm run sync:edge-risk:check
+
       - name: Deploy jarvis-webhook
         run: supabase functions deploy jarvis-webhook --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
         env:

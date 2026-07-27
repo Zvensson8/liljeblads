@@ -25,36 +25,17 @@ import { useMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 import { useWorkOrders } from '@/hooks/useWorkOrders';
 import { useComponentRiskList } from '@/hooks/useComponentRisk';
 import { ComponentRiskBadge } from '@/components/ComponentRiskBadge';
-import { riskLevelMeetsMin, type RiskLevel } from '@/lib/componentRisk';
+import { type RiskLevel } from '@/lib/componentRisk';
 import { generateRiskSuggestions } from '@/lib/riskSuggestions';
 import { useOrganization } from '@/hooks/useOrganization';
 import { toast as sonnerToast } from 'sonner';
-// Type display name mapping
-const getTypeDisplayName = (typeCode: string): string => {
-  const typeMap: Record<string, string> = {
-    'SC1': 'SC1 Styr och övervakningssystem',
-    'SC2.1.1': 'SC2.1.1 Takbeläggningar och Tätskikt',
-    'SC2.3': 'SC2.3 Entréer Portar mm',
-    'SC2.3.1': 'SC2.3.1 Entrépartier Karuselldörrar',
-    'SC2.3.3': 'SC2.3.3 Manuella Portar',
-    'SC2.3.4': 'SC2.3.4 Maskindrivna Portar',
-    'SC2.3.7': 'SC2.3.7 Lastbryggor',
-    'SC2.6.2': 'SC2.6.2 Skyddsrum',
-    'SC4.1.2.5.1': 'SC4.1.2.5.1 Fettavskiljare',
-    'SC4.1.2.5.3': 'SC4.1.2.5.3 Oljeavskiljare',
-    'SC4.1.6.9': 'SC4.1.6.9 Fjärrvärmeväxlare',
-    'SC4.2.4.6': 'SC4.2.4.6 Port Vertikal',
-    'SC4.2.4.7': 'SC4.2.4.7 Port Horisontell',
-    'SC4.5.1': 'SC4.5.1 Kylanläggning',
-    'SC4.6.2.6': 'SC4.6.2.6 Värmepump',
-    'SC4.6.2.6.1': 'SC4.6.2.6.1 Värmeväxlare',
-    'SC4.7': 'SC4.7 Ventsystem',
-    'SC5.5': 'SC5.5 Reserv eller nödkraftsystem',
-    'SC7.1': 'SC7.1 Hiss',
-    'SC7.2': 'SC7.2 Rulltrappor och Rullramper',
-  };
-  return typeMap[typeCode] || typeCode;
-};
+import { getTypeDisplayName } from '@/lib/componentTypeLabels';
+import {
+  filterAndSortComponents,
+  hasActiveComponentFilters,
+  type ServiceFilter,
+  type ComponentsSort,
+} from '@/lib/componentsListFilter';
 
 interface Component {
   id: string;
@@ -92,9 +73,9 @@ const Components = () => {
   const [filterProperty, setFilterProperty] = useState<string>('all');
   const [filterManufacturer, setFilterManufacturer] = useState<string>('all');
   const [filterModel, setFilterModel] = useState<string>('all');
-  const [filterService, setFilterService] = useState<'all' | 'latest' | 'none' | 'with_service'>('all');
+  const [filterService, setFilterService] = useState<ServiceFilter>('all');
   const [filterRisk, setFilterRisk] = useState<'all' | RiskLevel>('all');
-  const [sortBy, setSortBy] = useState<'default' | 'risk'>('default');
+  const [sortBy, setSortBy] = useState<ComponentsSort>('default');
   const [suggesting, setSuggesting] = useState(false);
 
   useEffect(() => {
@@ -165,52 +146,39 @@ const Components = () => {
   const uniqueManufacturers = [...new Set(components.map(c => c.manufacturer))].filter(Boolean).sort((a, b) => (a || '').localeCompare(b || '', 'sv'));
   const uniqueModels = [...new Set(components.map(c => c.model))].filter(Boolean).sort((a, b) => (a || '').localeCompare(b || '', 'sv'));
 
-  // Filter components
-  const filteredComponents = useMemo(() => {
-    const result = components.filter(component => {
-      if (filterType !== 'all' && component.type !== filterType) return false;
-      if (filterProperty !== 'all' && component.property_name !== filterProperty) return false;
-      if (filterManufacturer !== 'all' && component.manufacturer !== filterManufacturer) return false;
-      if (filterModel !== 'all' && component.model !== filterModel) return false;
-      if (filterService === 'none' && maintenanceStats[component.id]?.lastDate) return false;
-      if (filterService === 'with_service' && !maintenanceStats[component.id]?.lastDate) return false;
-      if (filterRisk !== 'all') {
-        const risk = riskById.get(component.id);
-        if (!risk || !riskLevelMeetsMin(risk.riskLevel, filterRisk)) return false;
-      }
-      return true;
-    });
+  const listFilters = useMemo(
+    () => ({
+      filterType,
+      filterProperty,
+      filterManufacturer,
+      filterModel,
+      filterService,
+      filterRisk,
+      sortBy,
+    }),
+    [
+      filterType,
+      filterProperty,
+      filterManufacturer,
+      filterModel,
+      filterService,
+      filterRisk,
+      sortBy,
+    ],
+  );
 
-    if (sortBy === 'risk') {
-      return [...result].sort((a, b) => {
-        const ra = riskById.get(a.id)?.riskScore ?? -1;
-        const rb = riskById.get(b.id)?.riskScore ?? -1;
-        return rb - ra;
-      });
-    }
+  const filteredComponents = useMemo(
+    () =>
+      filterAndSortComponents(
+        components,
+        listFilters,
+        maintenanceStats,
+        riskById,
+      ),
+    [components, listFilters, maintenanceStats, riskById],
+  );
 
-    if (filterService === 'latest' || filterService === 'with_service') {
-      return [...result].sort((a, b) => {
-        const dateA = maintenanceStats[a.id]?.lastDate;
-        const dateB = maintenanceStats[b.id]?.lastDate;
-        if (!dateA && !dateB) return 0;
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-        return dateB.localeCompare(dateA);
-      });
-    }
-
-    return result;
-  }, [components, filterType, filterProperty, filterManufacturer, filterModel, filterService, filterRisk, sortBy, maintenanceStats, riskById]);
-
-  const hasActiveFilters =
-    filterType !== 'all' ||
-    filterProperty !== 'all' ||
-    filterManufacturer !== 'all' ||
-    filterModel !== 'all' ||
-    filterService !== 'all' ||
-    filterRisk !== 'all' ||
-    sortBy === 'risk';
+  const hasActiveFilters = hasActiveComponentFilters(listFilters);
 
   const clearFilters = () => {
     setFilterType('all');

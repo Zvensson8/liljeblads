@@ -6,6 +6,9 @@
  * Hazard h(t) = (β/η) * (t/η)^(β-1)
  *
  * Pure TypeScript – no external stats dependencies.
+ *
+ * CANONICAL SOURCE for edge: run `npm run sync:edge-risk` after changes.
+ * Do not edit supabase/functions/_shared/weibull.ts by hand.
  */
 
 export interface WeibullParams {

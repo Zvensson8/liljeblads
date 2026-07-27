@@ -282,9 +282,11 @@ cd jarvis-worker
 - Playwright E2E (`npm run test:e2e`)
 - TypeScript strict + ESLint
 - Zod på formulär och kritiska API-svar
-- **Prediktiv underhåll smoke** (Weibull + planmotor, utan DB): `npm run test:smoke:pm`
-- Synka edge-kopior av riskmoduler: `node scripts/sync-edge-risk.mjs`
-- Lokal CI-smoke: `npm run ci:local` (typecheck + PM-smoke + build)
+- **Unit-tester (Vitest):** `npm run test:unit` — weibull, componentRisk, maintenancePlanEngine, agentPolicy
+- **Prediktiv underhåll smoke** (utan DB): `npm run test:smoke:pm`
+- **Risk single source:** kanonisk kod i `src/lib/{weibull,componentRisk}.ts` → edge via `npm run sync:edge-risk`  
+  CI: `npm run sync:edge-risk:check` (failar om FE/edge divergerar)
+- Lokal CI: `npm run ci:local` (typecheck + unit + edge-check + PM-smoke + build)
 
 ### Prediktiv underhåll – workflow-karta (klar innan Jarvis-fas)
 

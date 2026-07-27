@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { storageService } from "@/services/supabase";
@@ -63,26 +62,16 @@ import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { DocumentPreviewDialog } from "./documents/DocumentPreviewDialog";
 import { exportWorkOrderToZip } from "@/lib/zipExport";
+import {
+  workOrderFormSchema,
+  type WorkOrderFormData,
+} from "@/lib/workOrderFormSchema";
+import {
+  workOrderPriorityBadge,
+  workOrderStatusLabel,
+} from "@/lib/workOrderLabels";
 
 type ViewMode = "detail" | "edit" | "preview";
-
-const workOrderSchema = z.object({
-  action: z.string().min(1, "Åtgärd krävs").max(200, "Max 200 tecken"),
-  property_id: z.string().min(1, "Fastighet krävs"),
-  component_id: z.string().optional(),
-  due_date: z.string().optional(),
-  status: z.enum(["not_started", "awaiting_quote", "ordered", "completed", "archived"]),
-  priority: z.enum(["low", "medium", "high"]),
-  price: z.string().optional(),
-  contractor: z.string().max(100, "Max 100 tecken").optional(),
-  quarter: z.string().max(10, "Max 10 tecken").optional(),
-  comments: z.string().max(1000, "Max 1000 tecken").optional(),
-  reminder_enabled: z.boolean().default(false),
-  reminder_frequency: z.enum(["weekly", "biweekly", "triweekly", "monthly", "none"]).default("weekly"),
-  reminder_recipient_email: z.string().email("Ogiltig e-postadress").optional().or(z.literal("")),
-});
-
-type WorkOrderFormData = z.infer<typeof workOrderSchema>;
 
 import type {
   WorkOrderWithRelations,
@@ -126,7 +115,7 @@ export function WorkOrderDetailDialog({
   const [sending, setSending] = useState(false);
 
   const form = useForm<WorkOrderFormData>({
-    resolver: zodResolver(workOrderSchema),
+    resolver: zodResolver(workOrderFormSchema),
     defaultValues: {
       action: "", property_id: "", component_id: "", status: "not_started", priority: "medium",
       price: "", contractor: "", quarter: "", comments: "", due_date: "",
@@ -439,24 +428,6 @@ export function WorkOrderDetailDialog({
     finally { setExporting(false); }
   };
 
-  const getPriorityBadge = (priority: string) => {
-    const colors: Record<string, string> = {
-      low: "bg-green-500/10 text-green-500 border-green-500/20",
-      medium: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-      high: "bg-red-500/10 text-red-500 border-red-500/20",
-    };
-    const labels: Record<string, string> = { low: "Låg", medium: "Medel", high: "Hög" };
-    return <Badge className={colors[priority]}>{labels[priority]}</Badge>;
-  };
-
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, string> = {
-      not_started: "Ej påbörjad", awaiting_quote: "Inväntar offert",
-      ordered: "Beställt", completed: "Slutförd", archived: "Arkiverad",
-    };
-    return labels[status] || status;
-  };
-
   if (!workOrder) return null;
 
   const sheetTitle = viewMode === "edit" ? "Redigera Arbetsorder"
@@ -533,11 +504,11 @@ export function WorkOrderDetailDialog({
                         )}
                         <div>
                           <Label className="text-muted-foreground">Status</Label>
-                          <div className="mt-1"><Badge variant="outline">{getStatusLabel(workOrder.status)}</Badge></div>
+                          <div className="mt-1"><Badge variant="outline">{workOrderStatusLabel(workOrder.status)}</Badge></div>
                         </div>
                         <div>
                           <Label className="text-muted-foreground">Prioritet</Label>
-                          <div className="mt-1">{getPriorityBadge(workOrder.priority)}</div>
+                          <div className="mt-1">{workOrderPriorityBadge(workOrder.priority)}</div>
                         </div>
                         <div>
                           <Label className="text-muted-foreground">Entreprenör</Label>
