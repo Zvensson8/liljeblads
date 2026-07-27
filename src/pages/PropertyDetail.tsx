@@ -170,12 +170,27 @@ const PropertyDetail = () => {
 
   const handleFileUpload = async (floorId: string, file: File) => {
     setUploadingFile(true);
-    const fileExt = file.name.split('.').pop();
-    const filePath = `${user?.id}/${floorId}/${Date.now()}.${fileExt}`;
+    if (!user?.id) {
+      toast({
+        title: 'Ej inloggad',
+        description: 'Logga in igen för att ladda upp ritning.',
+        variant: 'destructive',
+      });
+      setUploadingFile(false);
+      return;
+    }
+
+    const fileExt = file.name.split('.').pop() || 'png';
+    // Store object path only — bucket is private (public URLs do not work)
+    const filePath = `${user.id}/${floorId}/${Date.now()}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
       .from('floor-drawings')
-      .upload(filePath, file);
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || undefined,
+      });
 
     if (uploadError) {
       toast({
@@ -187,12 +202,9 @@ const PropertyDetail = () => {
       return;
     }
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from('floor-drawings').getPublicUrl(filePath);
-
     try {
-      await updateFloor.mutateAsync({ id: floorId, patch: { drawing_url: publicUrl } });
+      // Persist storage path (not getPublicUrl) so FloorCanvas can download/sign
+      await updateFloor.mutateAsync({ id: floorId, patch: { drawing_url: filePath } });
       toast({
         title: 'Ritning uppladdad!',
         description: 'Du kan nu märka ut komponenter på ritningen.',

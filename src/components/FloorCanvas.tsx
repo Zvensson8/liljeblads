@@ -33,6 +33,10 @@ import {
   resetMarkerStyle,
 } from '@/lib/floorCanvas/geometry';
 import { useComponentGeometrySave } from '@/hooks/useComponentGeometrySave';
+import {
+  resolveFloorDrawingUrl,
+  type ResolvedDrawing,
+} from '@/lib/floorCanvas/resolveDrawingUrl';
 
 interface FloorCanvasProps {
   floorId: string;
@@ -317,9 +321,43 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
       if (mountedRef.current && loadGenRef.current === gen) fn();
     };
 
-    FabricImage.fromURL(drawingUrl, { crossOrigin: 'anonymous' })
-      .then((img) => {
-        if (loadGenRef.current !== gen || fabricRef.current !== canvas) return;
+    let resolved: ResolvedDrawing | null = null;
+    let cleanedUp = false;
+
+    const loadBackground = async () => {
+      try {
+        const next = await resolveFloorDrawingUrl(drawingUrl);
+        if (
+          cleanedUp ||
+          loadGenRef.current !== gen ||
+          fabricRef.current !== canvas
+        ) {
+          next.revoke();
+          return;
+        }
+        resolved = next;
+
+        // blob: is same-origin — no crossOrigin needed
+        // signed/direct may need anonymous for canvas export
+        const fromUrlOpts =
+          resolved.source === 'blob'
+            ? undefined
+            : ({ crossOrigin: 'anonymous' } as const);
+
+        const img = fromUrlOpts
+          ? await FabricImage.fromURL(resolved.url, fromUrlOpts)
+          : await FabricImage.fromURL(resolved.url);
+
+        if (
+          cleanedUp ||
+          loadGenRef.current !== gen ||
+          fabricRef.current !== canvas
+        ) {
+          resolved.revoke();
+          resolved = null;
+          return;
+        }
+
         const cw = canvas.getWidth() || 1200;
         const ch = canvas.getHeight() || 800;
         const iw = img.width || 1;
@@ -329,22 +367,30 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
         canvas.backgroundImage = img;
         canvas.requestRenderAll();
         safeSet(() => setImageLoading(false));
-      })
-      .catch((error) => {
-        if (loadGenRef.current !== gen) return;
+      } catch (error) {
+        if (cleanedUp || loadGenRef.current !== gen) return;
         console.error('FloorCanvas: Failed to load image:', error);
+        resolved?.revoke();
+        resolved = null;
         safeSet(() => {
           setImageError(true);
           setImageLoading(false);
         });
         if (mountedRef.current) {
+          const msg =
+            error instanceof Error
+              ? error.message
+              : 'Kontrollera att du är inloggad och har tillgång till ritningen.';
           toast({
             title: 'Fel vid laddning av ritning',
-            description: 'Kunde inte ladda ritningen. Kontrollera URL/behörighet.',
+            description: msg,
             variant: 'destructive',
           });
         }
-      });
+      }
+    };
+
+    void loadBackground();
 
     canvas.on('selection:created', (e) => {
       safeSet(() => setSelectedObject((e.selected?.[0] as CanvasObject) ?? null));
@@ -488,7 +534,14 @@ export const FloorCanvas = ({ floorId, drawingUrl, onUpdate, onBack }: FloorCanv
     });
 
     return () => {
+      cleanedUp = true;
       loadGenRef.current += 1;
+      try {
+        resolved?.revoke();
+      } catch {
+        /* ignore */
+      }
+      resolved = null;
       try {
         canvas.off();
         canvas.dispose();
