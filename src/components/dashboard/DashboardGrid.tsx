@@ -9,6 +9,8 @@ import { ActivityWidget } from './widgets/ActivityWidget';
 import { QuickStatsWidget } from './widgets/QuickStatsWidget';
 import { RecentProjectsWidget } from './widgets/RecentProjectsWidget';
 import { UpcomingTasksWidget } from './widgets/UpcomingTasksWidget';
+import { HighRiskComponentsWidget } from './widgets/HighRiskComponentsWidget';
+import { PendingActionsWidget } from './widgets/PendingActionsWidget';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
@@ -97,6 +99,10 @@ export const DashboardGrid = ({ kpiCards }: DashboardGridProps) => {
         return <RecentProjectsWidget />;
       case 'upcoming-tasks':
         return <UpcomingTasksWidget />;
+      case 'high-risk-components':
+        return <HighRiskComponentsWidget />;
+      case 'pending-ai-actions':
+        return <PendingActionsWidget />;
       default:
         return null;
     }

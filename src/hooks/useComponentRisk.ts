@@ -5,15 +5,18 @@ import { queryKeys } from '@/lib/queryKeys';
 import {
   computeComponentRisk,
   computeComponentRiskBatch,
+  filterRiskResults,
   type ComponentRiskInput,
   type ComponentRiskResult,
+  type Confidence,
+  type RiskLevel,
 } from '@/lib/componentRisk';
 
 async function fetchComponentRiskData(componentId: string): Promise<ComponentRiskInput> {
   const [compRes, purchaseRes, histRes] = await Promise.all([
     supabase
       .from('components')
-      .select('id, name, type, installation_year')
+      .select('id, name, type, installation_year, property_id, properties(name)')
       .eq('id', componentId)
       .single(),
     supabase
@@ -30,10 +33,14 @@ async function fetchComponentRiskData(componentId: string): Promise<ComponentRis
 
   if (compRes.error) throw compRes.error;
 
+  const prop = compRes.data.properties as { name?: string } | null;
+
   return {
     componentId,
     name: compRes.data.name,
     type: compRes.data.type,
+    propertyId: compRes.data.property_id,
+    propertyName: prop?.name ?? null,
     installationYear: compRes.data.installation_year,
     purchaseDate: purchaseRes.data?.purchase_date ?? null,
     expectedLifespanYears: purchaseRes.data?.expected_lifespan_years ?? null,
@@ -54,7 +61,14 @@ export function useComponentRisk(componentId: string | undefined | null) {
     queryKey: [...queryKeys.components.detail(componentId ?? 'none'), 'risk'] as const,
     queryFn: async (): Promise<ComponentRiskResult> => {
       const input = await fetchComponentRiskData(componentId!);
-      return computeComponentRisk(input);
+      const r = computeComponentRisk(input);
+      return {
+        ...r,
+        name: input.name,
+        type: input.type,
+        propertyId: input.propertyId,
+        propertyName: input.propertyName,
+      };
     },
     enabled: !!session && !!componentId,
     staleTime: 1000 * 60 * 5,
@@ -64,24 +78,34 @@ export function useComponentRisk(componentId: string | undefined | null) {
 
 export interface ComponentRiskListFilters {
   propertyId?: string;
-  /** Max number of highest-risk components to return */
+  /** Max number of results after filter/sort (default 50) */
   limit?: number;
+  /** Minimum risk level (inclusive), e.g. 'high' → high + critical */
+  minLevel?: RiskLevel;
+  /** Minimum confidence (inclusive) */
+  minConfidence?: Confidence;
 }
 
 /**
  * Batch risk for components (optionally scoped to a property).
- * Sorted highest risk first.
+ * Sorted highest risk first; supports level/confidence filters.
  */
 export function useComponentRiskList(filters: ComponentRiskListFilters = {}) {
   const { session } = useAuth();
   const limit = filters.limit ?? 50;
 
   return useQuery({
-    queryKey: ['component-risk-list', filters.propertyId ?? 'all', limit] as const,
+    queryKey: [
+      'component-risk-list',
+      filters.propertyId ?? 'all',
+      limit,
+      filters.minLevel ?? 'any',
+      filters.minConfidence ?? 'any',
+    ] as const,
     queryFn: async (): Promise<ComponentRiskResult[]> => {
       let compQuery = supabase
         .from('components')
-        .select('id, name, type, installation_year, property_id')
+        .select('id, name, type, installation_year, property_id, properties(name)')
         .neq('status', 'decommissioned');
 
       if (filters.propertyId) {
@@ -109,7 +133,10 @@ export function useComponentRiskList(filters: ComponentRiskListFilters = {}) {
       const purchaseMap = new Map(
         (purchaseRes.data ?? []).map((p) => [p.component_id, p]),
       );
-      const histMap = new Map<string, Array<{ performed_date: string; category: string | null }>>();
+      const histMap = new Map<
+        string,
+        Array<{ performed_date: string; category: string | null }>
+      >();
       for (const h of histRes.data ?? []) {
         const list = histMap.get(h.component_id) ?? [];
         list.push({ performed_date: h.performed_date, category: h.category });
@@ -118,10 +145,13 @@ export function useComponentRiskList(filters: ComponentRiskListFilters = {}) {
 
       const inputs: ComponentRiskInput[] = components.map((c) => {
         const p = purchaseMap.get(c.id);
+        const prop = c.properties as { name?: string } | null;
         return {
           componentId: c.id,
           name: c.name,
           type: c.type,
+          propertyId: c.property_id,
+          propertyName: prop?.name ?? null,
           installationYear: c.installation_year,
           purchaseDate: p?.purchase_date ?? null,
           expectedLifespanYears: p?.expected_lifespan_years ?? null,
@@ -129,7 +159,12 @@ export function useComponentRiskList(filters: ComponentRiskListFilters = {}) {
         };
       });
 
-      return computeComponentRiskBatch(inputs).slice(0, limit);
+      const batch = computeComponentRiskBatch(inputs);
+      return filterRiskResults(batch, {
+        minLevel: filters.minLevel,
+        minConfidence: filters.minConfidence,
+        limit,
+      });
     },
     enabled: !!session,
     staleTime: 1000 * 60 * 5,
@@ -141,4 +176,6 @@ export type { ComponentRiskResult, RiskLevel, Confidence } from '@/lib/component
 export {
   riskLevelLabel,
   riskLevelColor,
+  riskLevelMeetsMin,
+  filterRiskResults,
 } from '@/lib/componentRisk';

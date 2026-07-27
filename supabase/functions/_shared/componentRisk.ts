@@ -22,7 +22,7 @@ import {
   reliability,
   type WeibullFitResult,
   type WeibullParams,
-} from '@/lib/weibull';
+} from './weibull.ts';
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 export type Confidence = 'low' | 'medium' | 'high';

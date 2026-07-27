@@ -5,6 +5,12 @@
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { ChatTool } from "./llmClient.ts";
+import {
+  computeComponentRiskBatch,
+  filterRiskResults,
+  type ComponentRiskInput,
+  type RiskLevel,
+} from "./componentRisk.ts";
 
 export type ToolContext = {
   supabase: SupabaseClient;
@@ -179,6 +185,29 @@ export const jarvisTools: ChatTool[] = [
           limit: { type: "number" },
         },
         required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_high_risk_components",
+      description:
+        "Lista komponenter med högst prediktiv risk (Weibull-baserad). Använd för frågor om risk, prioritering, högrisk, B10, utbyte.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Max antal (default 10)" },
+          min_level: {
+            type: "string",
+            description: "low | medium | high | critical (default high)",
+          },
+          property_name: { type: "string" },
+          min_confidence: {
+            type: "string",
+            description: "low | medium | high — default medium",
+          },
+        },
       },
     },
   },
@@ -481,6 +510,95 @@ export async function executeJarvisTool(
           suggestion: inserted,
           message:
             "Förslag sparat som utkast. Användaren måste godkänna i AI-inkorgen innan det skapas.",
+        };
+      }
+
+      case "list_high_risk_components": {
+        const { ids, names } = await resolvePropertyIds(
+          supabase,
+          orgId,
+          String(rawArgs.property_name || "") || undefined,
+        );
+        if (!ids.length) return { count: 0, components: [] };
+
+        const { data: components, error: cErr } = await supabase
+          .from("components")
+          .select("id, name, type, installation_year, property_id")
+          .in("property_id", ids)
+          .neq("status", "decommissioned");
+        if (cErr) return { error: cErr.message };
+        if (!components?.length) return { count: 0, components: [] };
+
+        const compIds = components.map((c) => c.id as string);
+        const [purchaseRes, histRes] = await Promise.all([
+          supabase
+            .from("component_purchase_info")
+            .select("component_id, expected_lifespan_years, purchase_date")
+            .in("component_id", compIds),
+          supabase
+            .from("maintenance_history")
+            .select("component_id, performed_date, category")
+            .in("component_id", compIds),
+        ]);
+
+        const purchaseMap = new Map(
+          (purchaseRes.data ?? []).map((p) => [p.component_id as string, p]),
+        );
+        const histMap = new Map<
+          string,
+          Array<{ performed_date: string; category: string | null }>
+        >();
+        for (const h of histRes.data ?? []) {
+          const cid = h.component_id as string;
+          const list = histMap.get(cid) ?? [];
+          list.push({
+            performed_date: h.performed_date as string,
+            category: (h.category as string | null) ?? null,
+          });
+          histMap.set(cid, list);
+        }
+
+        const inputs: ComponentRiskInput[] = components.map((c) => {
+          const p = purchaseMap.get(c.id as string);
+          return {
+            componentId: c.id as string,
+            name: c.name as string,
+            type: c.type as string,
+            propertyId: c.property_id as string,
+            propertyName: names.get(c.property_id as string) ?? null,
+            installationYear: (c.installation_year as number | null) ?? null,
+            purchaseDate: (p?.purchase_date as string | null) ?? null,
+            expectedLifespanYears:
+              (p?.expected_lifespan_years as number | null) ?? null,
+            history: histMap.get(c.id as string) ?? [],
+          };
+        });
+
+        const minLevel = (String(rawArgs.min_level || "high") ||
+          "high") as RiskLevel;
+        const minConf = (String(rawArgs.min_confidence || "medium") ||
+          "medium") as "low" | "medium" | "high";
+        const batch = computeComponentRiskBatch(inputs);
+        const filtered = filterRiskResults(batch, {
+          minLevel,
+          minConfidence: minConf,
+          limit: Math.min(limit, 25),
+        });
+
+        return {
+          count: filtered.length,
+          components: filtered.map((r) => ({
+            id: r.componentId,
+            name: r.name,
+            type: r.type,
+            property_name: r.propertyName,
+            risk_level: r.riskLevel,
+            risk_score: r.riskScore,
+            confidence: r.confidence,
+            recommendation: r.recommendation,
+            age_years: r.ageYears,
+            remaining_b10_years: r.remainingB10Years,
+          })),
         };
       }
 

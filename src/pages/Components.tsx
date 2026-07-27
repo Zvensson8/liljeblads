@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, MapPin, Package, ExternalLink, Plus, Trash2, Download, Upload, LayoutGrid, Table as TableIcon, Edit, Filter, X } from 'lucide-react';
+import { Building2, Package, Plus, Trash2, Download, LayoutGrid, Table as TableIcon, Filter, X, Sparkles } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
 import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
@@ -23,6 +23,12 @@ import { LastServiceBadge } from '@/components/LastServiceBadge';
 import { useComponents, useDeleteComponent } from '@/hooks/useComponents';
 import { useMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 import { useWorkOrders } from '@/hooks/useWorkOrders';
+import { useComponentRiskList } from '@/hooks/useComponentRisk';
+import { ComponentRiskBadge } from '@/components/ComponentRiskBadge';
+import { riskLevelMeetsMin, type RiskLevel } from '@/lib/componentRisk';
+import { generateRiskSuggestions } from '@/lib/riskSuggestions';
+import { useOrganization } from '@/hooks/useOrganization';
+import { toast as sonnerToast } from 'sonner';
 // Type display name mapping
 const getTypeDisplayName = (typeCode: string): string => {
   const typeMap: Record<string, string> = {
@@ -87,6 +93,9 @@ const Components = () => {
   const [filterManufacturer, setFilterManufacturer] = useState<string>('all');
   const [filterModel, setFilterModel] = useState<string>('all');
   const [filterService, setFilterService] = useState<'all' | 'latest' | 'none' | 'with_service'>('all');
+  const [filterRisk, setFilterRisk] = useState<'all' | RiskLevel>('all');
+  const [sortBy, setSortBy] = useState<'default' | 'risk'>('default');
+  const [suggesting, setSuggesting] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -97,7 +106,15 @@ const Components = () => {
   const { data: rawComponents = [], isLoading: componentsLoading } = useComponents();
   const { data: maintenanceRows = [] } = useMaintenanceHistory();
   const { data: workOrders = [] } = useWorkOrders();
+  const { data: riskList = [] } = useComponentRiskList({ limit: 500 });
+  const { organization } = useOrganization();
   const deleteComponent = useDeleteComponent();
+
+  const riskById = useMemo(() => {
+    const m = new Map<string, (typeof riskList)[0]>();
+    for (const r of riskList) m.set(r.componentId, r);
+    return m;
+  }, [riskList]);
 
   const components: Component[] = useMemo(
     () =>
@@ -157,8 +174,20 @@ const Components = () => {
       if (filterModel !== 'all' && component.model !== filterModel) return false;
       if (filterService === 'none' && maintenanceStats[component.id]?.lastDate) return false;
       if (filterService === 'with_service' && !maintenanceStats[component.id]?.lastDate) return false;
+      if (filterRisk !== 'all') {
+        const risk = riskById.get(component.id);
+        if (!risk || !riskLevelMeetsMin(risk.riskLevel, filterRisk)) return false;
+      }
       return true;
     });
+
+    if (sortBy === 'risk') {
+      return [...result].sort((a, b) => {
+        const ra = riskById.get(a.id)?.riskScore ?? -1;
+        const rb = riskById.get(b.id)?.riskScore ?? -1;
+        return rb - ra;
+      });
+    }
 
     if (filterService === 'latest' || filterService === 'with_service') {
       return [...result].sort((a, b) => {
@@ -172,9 +201,16 @@ const Components = () => {
     }
 
     return result;
-  }, [components, filterType, filterProperty, filterManufacturer, filterModel, filterService, maintenanceStats]);
+  }, [components, filterType, filterProperty, filterManufacturer, filterModel, filterService, filterRisk, sortBy, maintenanceStats, riskById]);
 
-  const hasActiveFilters = filterType !== 'all' || filterProperty !== 'all' || filterManufacturer !== 'all' || filterModel !== 'all' || filterService !== 'all';
+  const hasActiveFilters =
+    filterType !== 'all' ||
+    filterProperty !== 'all' ||
+    filterManufacturer !== 'all' ||
+    filterModel !== 'all' ||
+    filterService !== 'all' ||
+    filterRisk !== 'all' ||
+    sortBy === 'risk';
 
   const clearFilters = () => {
     setFilterType('all');
@@ -182,6 +218,40 @@ const Components = () => {
     setFilterManufacturer('all');
     setFilterModel('all');
     setFilterService('all');
+    setFilterRisk('all');
+    setSortBy('default');
+  };
+
+  const handleGenerateRiskSuggestions = async () => {
+    if (!organization?.id) {
+      sonnerToast.error('Ingen organisation hittades');
+      return;
+    }
+    setSuggesting(true);
+    try {
+      const res = await generateRiskSuggestions({
+        organizationId: organization.id,
+        risks: riskList,
+        maxSuggestions: 20,
+      });
+      if (res.created > 0) {
+        sonnerToast.success(
+          `${res.created} riskförslag skapade — granska i AI-inkorgen`,
+        );
+      } else {
+        sonnerToast.info(
+          res.skipped
+            ? `Inga nya förslag (${res.skipped} hoppades över p.g.a. dedupe/filter)`
+            : 'Inga högriskkomponenter att föreslå',
+        );
+      }
+    } catch (e) {
+      sonnerToast.error(
+        e instanceof Error ? e.message : 'Kunde inte generera riskförslag',
+      );
+    } finally {
+      setSuggesting(false);
+    }
   };
 
   const handleExport = async (format: 'excel' | 'pdf') => {
@@ -434,6 +504,45 @@ const Components = () => {
                         </SelectContent>
                       </Select>
 
+                      <Select
+                        value={filterRisk}
+                        onValueChange={(value) => setFilterRisk(value as 'all' | RiskLevel)}
+                      >
+                        <SelectTrigger className="w-[160px] h-9">
+                          <SelectValue placeholder="Risk" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alla risknivåer</SelectItem>
+                          <SelectItem value="medium">Medel och högre</SelectItem>
+                          <SelectItem value="high">Hög och kritisk</SelectItem>
+                          <SelectItem value="critical">Endast kritisk</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={sortBy}
+                        onValueChange={(value) => setSortBy(value as 'default' | 'risk')}
+                      >
+                        <SelectTrigger className="w-[160px] h-9">
+                          <SelectValue placeholder="Sortering" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">Standardsortering</SelectItem>
+                          <SelectItem value="risk">Högst risk först</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9"
+                        disabled={suggesting || riskList.length === 0}
+                        onClick={handleGenerateRiskSuggestions}
+                      >
+                        <Sparkles className="h-4 w-4 mr-1" />
+                        {suggesting ? 'Skapar…' : 'Riskförslag'}
+                      </Button>
+
                       {hasActiveFilters && (
                         <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9">
                           <X className="h-4 w-4 mr-1" />
@@ -467,10 +576,21 @@ const Components = () => {
                           onClick={() => navigate(`/components/${component.id}`)}
                         >
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-lg">{component.name}</CardTitle>
-                        <CardDescription className="text-sm font-medium text-foreground/70">
-                          {getTypeDisplayName(component.type)}
-                        </CardDescription>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <CardTitle className="text-lg">{component.name}</CardTitle>
+                            <CardDescription className="text-sm font-medium text-foreground/70">
+                              {getTypeDisplayName(component.type)}
+                            </CardDescription>
+                          </div>
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <ComponentRiskBadge
+                              risk={riskById.get(component.id)}
+                              compact
+                              className="shrink-0"
+                            />
+                          </div>
+                        </div>
                       </CardHeader>
                       <CardContent className="pt-0 space-y-1.5">
                         <div className="flex items-center gap-2 text-sm">
@@ -525,6 +645,7 @@ const Components = () => {
                               <th className="text-left py-3 px-4 font-medium hidden md:table-cell">Typ</th>
                               <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Tillverkare</th>
                               <th className="text-left py-3 px-4 font-medium">Fastighet</th>
+                              <th className="text-left py-3 px-4 font-medium">Risk</th>
                               <th className="text-left py-3 px-4 font-medium">Våning</th>
                               <th className="text-left py-3 px-4 font-medium hidden sm:table-cell">Senaste service</th>
                               <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Kostnad</th>
@@ -550,6 +671,12 @@ const Components = () => {
                                 <td className="py-3 px-4 text-sm hidden lg:table-cell">{component.manufacturer || '-'}</td>
                                 <td className="py-3 px-4">
                                   <div className="text-sm font-medium">{component.property_name}</div>
+                                </td>
+                                <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                                  <ComponentRiskBadge
+                                    risk={riskById.get(component.id)}
+                                    compact
+                                  />
                                 </td>
                                 <td className="py-2 px-4" onClick={(e) => e.stopPropagation()}>
                                   {component.property_id ? (

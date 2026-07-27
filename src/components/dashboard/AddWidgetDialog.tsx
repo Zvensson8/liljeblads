@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useDashboardStore } from '@/store/dashboardStore';
-import { Building2, Wrench, FolderKanban, CheckSquare, TrendingUp, Calendar, Zap } from 'lucide-react';
+import { Building2, Wrench, FolderKanban, CheckSquare, TrendingUp, Calendar, Zap, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface AddWidgetDialogProps {
@@ -80,6 +80,14 @@ const availableWidgets = [
     title: 'AI-förslag',
     description: 'Väntande AI-åtgärdsförslag att godkänna',
     icon: Zap,
+    config: {},
+  },
+  {
+    id: 'high-risk-components',
+    type: 'high-risk-components',
+    title: 'Högriskkomponenter',
+    description: 'Topp komponenter med prediktiv risk (Weibull)',
+    icon: AlertTriangle,
     config: {},
   },
 ];
