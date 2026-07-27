@@ -179,3 +179,42 @@ export {
   riskLevelMeetsMin,
   filterRiskResults,
 } from '@/lib/componentRisk';
+
+export interface ComponentRiskSnapshot {
+  id: string;
+  component_id: string;
+  risk_score: number;
+  risk_level: string;
+  confidence: string;
+  recommendation: string | null;
+  trigger_source: string;
+  work_order_id: string | null;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
+/**
+ * Historical risk snapshots for a component (feedback loop / trends).
+ */
+export function useComponentRiskHistory(componentId: string | undefined | null) {
+  const { session } = useAuth();
+
+  return useQuery({
+    queryKey: [...queryKeys.components.detail(componentId ?? 'none'), 'risk-history'] as const,
+    queryFn: async (): Promise<ComponentRiskSnapshot[]> => {
+      const { data, error } = await (supabase as any)
+        .from('component_risk_snapshots')
+        .select(
+          'id, component_id, risk_score, risk_level, confidence, recommendation, trigger_source, work_order_id, created_at, metadata',
+        )
+        .eq('component_id', componentId!)
+        .order('created_at', { ascending: true })
+        .limit(100);
+
+      if (error) throw error;
+      return (data ?? []) as ComponentRiskSnapshot[];
+    },
+    enabled: !!session && !!componentId,
+    staleTime: 1000 * 60 * 2,
+  });
+}

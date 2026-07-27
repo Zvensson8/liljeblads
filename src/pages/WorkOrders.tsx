@@ -143,6 +143,11 @@ const WorkOrders = () => {
               : "Arbetsorder markerad som slutförd (ingen komponent kopplad).",
         );
         await queryClient.invalidateQueries({ queryKey: ["component-risk-list"] });
+        if (result.workOrder.component_id) {
+          await queryClient.invalidateQueries({
+            queryKey: queryKeys.components.detail(result.workOrder.component_id),
+          });
+        }
       } else {
         await updateMutation.mutateAsync({
           id: orderId,

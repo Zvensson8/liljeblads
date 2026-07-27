@@ -42,6 +42,7 @@ import { ServiceRecordCard } from "@/components/ServiceRecordCard";
 import { ServiceListTab } from "@/components/ServiceListTab";
 import { useComponentRisk } from "@/hooks/useComponentRisk";
 import { ComponentRiskBadge } from "@/components/ComponentRiskBadge";
+import { ComponentRiskHistoryCard } from "@/components/ComponentRiskHistoryCard";
 
 interface Component {
   id: string;
@@ -328,6 +329,10 @@ export default function ComponentDetail() {
                     <ComponentRiskBadge risk={risk} />
                   </CardContent>
                 </Card>
+              )}
+
+              {id && (
+                <ComponentRiskHistoryCard componentId={id} currentRisk={risk} />
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
