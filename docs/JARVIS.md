@@ -87,10 +87,39 @@ Loggar: `jarvis-worker/logs/`
 
 ## Designval
 
-- **LangGraph** (inte CrewAI runtime)
+- **LangGraph** (inte CrewAI runtime) — pipeline i `jarvis-worker/`
+- Webhook-funktionen kan heta `crewai-webhook` **eller** `jarvis-webhook` (samma kod; CrewAI-namnet är legacy-URL)
 - Prediktiv risk = samma Weibull som appen (`_shared/componentRisk`)
 - Auto-WO default; HITL via `MODE=hitl`
 - Innehålls-hash + Drive-id för dedupe
+
+## Full fastighets-Q&A
+
+| Kanal | Hur |
+|-------|-----|
+| **App AI-chat** | Tools: `get_property_overview`, dokument-RAG, risk, WO, … |
+| **Worker CLI** | Samma data via webhook-tools |
+
+`get_property_overview` samlar: grunddata, komponenter, öppna WO/todos, anteckningar, dokumentlista, högrisk, underhållsplan.
+
+Dokument**innehåll** kräver indexerade embeddings (`search_property_documents` / app-upload).
+
+### Deploy (krävs efter kodändring)
+
+```powershell
+npx supabase login
+npx supabase functions deploy jarvis-webhook --project-ref ojiswgqntenvbwtopxbu
+npx supabase functions deploy crewai-webhook --project-ref ojiswgqntenvbwtopxbu
+npx supabase functions deploy ai-chat --project-ref ojiswgqntenvbwtopxbu
+```
+
+Test:
+
+```powershell
+node scripts/test-jarvis-webhook.mjs
+cd jarvis-worker
+python -m jarvis_worker.cli ask "Berätta om Automaten 11"
+```
 
 ## Runbook
 

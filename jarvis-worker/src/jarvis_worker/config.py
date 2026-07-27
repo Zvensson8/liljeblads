@@ -11,8 +11,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Prefer jarvis-webhook; crewai-webhook is a legacy alias with the same code.
     liljeblads_webhook_url: str = (
-        "https://ojiswgqntenvbwtopxbu.supabase.co/functions/v1/crewai-webhook"
+        "https://ojiswgqntenvbwtopxbu.supabase.co/functions/v1/jarvis-webhook"
     )
     liljeblads_api_key: str = ""
 

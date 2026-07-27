@@ -1,4 +1,8 @@
-"""Jarvis chat — tool-calling over Liljeblads webhook API + predictive risk."""
+"""Jarvis chat — tool-calling over Liljeblads webhook API (LangGraph worker CLI).
+
+Full property Q&A uses get_property_overview + document search + risk tools.
+In-app AI Chat (ai-chat edge) has the same capability via jarvisTools.
+"""
 
 from __future__ import annotations
 
@@ -31,6 +35,16 @@ def _make_tools(client: LiljebladsClient):
         )
 
     @tool
+    def get_property_overview(property_name: str) -> str:
+        """
+        Hämta ALLT om en fastighet: grunddata, komponenter, öppna WO, todos,
+        anteckningar, dokumentlista, kontakter, högriskkomponenter, underhållsplan.
+        Använd alltid detta först när frågan gäller en specifik fastighet.
+        """
+        data = client.get_property_overview(property_name=property_name)
+        return json.dumps(data, ensure_ascii=False, default=str)
+
+    @tool
     def search_components(query: str = "", property_name: str = "") -> str:
         """Sök komponenter. query = namn/serienr; property_name filtrerar på fastighet."""
         rows = client.search_components(
@@ -61,10 +75,7 @@ def _make_tools(client: LiljebladsClient):
         status: str = "",
         limit: int = 30,
     ) -> str:
-        """
-        Lista öppna arbetsordrar. Valfritt filter property_name och status
-        (not_started|awaiting_quote|ordered|completed|archived). Tom status = öppna.
-        """
+        """Lista öppna arbetsordrar. Valfritt property_name och status."""
         rows = client.list_work_orders(
             property_name=property_name or None,
             status=status or None,
@@ -78,11 +89,7 @@ def _make_tools(client: LiljebladsClient):
         min_level: str = "high",
         limit: int = 15,
     ) -> str:
-        """
-        Lista komponenter med högst prediktiv Weibull-risk.
-        min_level: medium|high|critical. Valfritt property_name.
-        Returnerar risk_score, risk_level, B10, rekommendation.
-        """
+        """Lista komponenter med högst prediktiv Weibull-risk (hela org eller en fastighet)."""
         rows = client.list_high_risk_components(
             property_name=property_name or None,
             min_level=min_level or "high",
@@ -90,28 +97,64 @@ def _make_tools(client: LiljebladsClient):
         )
         return json.dumps(rows, ensure_ascii=False, default=str)
 
+    @tool
+    def search_property_documents(query: str, property_name: str = "") -> str:
+        """
+        Sök fastighetsdokument (namn/metadata + ev. semantiska utdrag om indexerade).
+        query t.ex. 'energideklaration', 'OVK', 'ritning'.
+        """
+        data = client.search_property_documents(
+            query=query,
+            property_name=property_name or None,
+            limit=20,
+        )
+        return json.dumps(data, ensure_ascii=False, default=str)
+
     return [
         list_properties,
+        get_property_overview,
         search_components,
         list_services,
         list_work_orders,
         list_high_risk_components,
+        search_property_documents,
     ]
 
 
-SYSTEM = """Du är Jarvis, assistent för fastighetsförvaltning (Liljeblads).
+def _content_to_text(content: Any) -> str:
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and block.get("type") == "text":
+                parts.append(str(block.get("text") or ""))
+            elif hasattr(block, "text"):
+                parts.append(str(getattr(block, "text") or ""))
+        return "\n".join(p for p in parts if p).strip() or str(content)
+    return str(content)
 
-Svara på svenska, kort och konkret.
-Använd tools för fakta — hitta aldrig på UUID, riskscore eller kostnader.
 
-Du har tillgång till:
-- Fastigheter och komponenter
-- Servicehistorik
-- Arbetsordrar
-- Prediktiv Weibull-risk (list_high_risk_components)
+SYSTEM = """Du är Jarvis, assistent för fastighetsförvaltning i Liljeblads.
 
-Vid riskfrågor: anropa list_high_risk_components. Förklara score/nivå/B10 enkelt.
-Om data saknas — säg det och peka på appen (Underhållsplan, Komponenter, Arbetsordrar).
+Runtime: LangGraph-worker + Gemini tools mot Liljeblads API. Inte CrewAI.
+
+Svara på svenska, kort och konkret. Hitta aldrig på UUID, belopp eller riskscore.
+
+När användaren frågar om en **fastighet**:
+1. Anropa get_property_overview(property_name=...)
+2. Komplettera vid behov med list_high_risk_components, list_work_orders,
+   search_property_documents, search_components.
+
+När användaren frågar om **risk generellt**: list_high_risk_components.
+När det gäller **dokument/innehåll**: search_property_documents (och säg om
+semantisk sökning saknas — då finns bara filnamn/metadata).
+
+Peka gärna på app-ytor: Underhållsplan, Komponenter, Arbetsordrar, Dokument.
 """
 
 
@@ -133,12 +176,11 @@ def chat_once(question: str, settings: Settings | None = None) -> str:
         HumanMessage(content=question),
     ]
 
-    for _ in range(6):
+    for _ in range(8):
         ai: AIMessage = llm.invoke(messages)  # type: ignore[assignment]
         messages.append(ai)
         if not getattr(ai, "tool_calls", None):
-            content = ai.content
-            return content if isinstance(content, str) else str(content)
+            return _content_to_text(ai.content)
 
         for tc in ai.tool_calls:
             name = tc["name"]
@@ -160,8 +202,8 @@ def chat_once(question: str, settings: Settings | None = None) -> str:
 
 def chat_repl(settings: Settings | None = None) -> None:
     settings = settings or get_settings()
-    print("Jarvis chat (skriv exit för att avsluta)")
-    print("Tips: 'Vilka komponenter har högst risk?' · 'Öppna arbetsordrar på X'")
+    print("Jarvis chat (LangGraph worker) — skriv exit för att avsluta")
+    print("Ex: 'Berätta om Automaten 11' · 'Vilka har högst risk?' · 'Dokument om OVK'")
     while True:
         try:
             q = input("\nDu> ").strip()

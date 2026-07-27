@@ -211,6 +211,21 @@ export const jarvisTools: ChatTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_property_overview",
+      description:
+        "Hämta samlad översikt för en fastighet: grunddata, komponenter, öppna WO, todos, anteckningar, dokument, kontakter, högrisk och aktiv underhållsplan. Använd först vid frågor om en specifik fastighet.",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+        },
+      },
+    },
+  },
 ];
 
 async function resolvePropertyIds(
@@ -510,6 +525,148 @@ export async function executeJarvisTool(
           suggestion: inserted,
           message:
             "Förslag sparat som utkast. Användaren måste godkänna i AI-inkorgen innan det skapas.",
+        };
+      }
+
+      case "get_property_overview": {
+        const propName = String(rawArgs.property_name || "").trim();
+        const propIdArg = String(rawArgs.property_id || "").trim();
+        if (!propName && !propIdArg) {
+          return { error: "property_name eller property_id krävs" };
+        }
+        let pq = supabase
+          .from("properties")
+          .select(
+            "id, name, address, area_sqm, construction_year, property_type, property_number, description",
+          )
+          .eq("organization_id", orgId)
+          .limit(1);
+        if (propIdArg) pq = pq.eq("id", propIdArg);
+        else pq = pq.ilike("name", `%${propName}%`);
+        const { data: prop, error: pErr } = await pq.maybeSingle();
+        if (pErr) return { error: pErr.message };
+        if (!prop) return { error: "Fastighet hittades inte" };
+        const pid = prop.id as string;
+
+        const [comps, wos, todos, notes, docs, plan] = await Promise.all([
+          supabase
+            .from("components")
+            .select("id, name, type, status, installation_year, manufacturer, model")
+            .eq("property_id", pid)
+            .neq("status", "decommissioned")
+            .order("name")
+            .limit(120),
+          supabase
+            .from("work_orders")
+            .select("id, action, status, priority, price, due_date")
+            .eq("property_id", pid)
+            .in("status", ["not_started", "awaiting_quote", "ordered"])
+            .limit(25),
+          supabase
+            .from("property_todos")
+            .select("id, title, priority, due_date, completed")
+            .eq("property_id", pid)
+            .eq("completed", false)
+            .limit(25),
+          supabase
+            .from("property_notes")
+            .select("id, content, created_at")
+            .eq("property_id", pid)
+            .order("created_at", { ascending: false })
+            .limit(10),
+          supabase
+            .from("property_documents")
+            .select("id, name, mime_type, created_at")
+            .eq("property_id", pid)
+            .order("created_at", { ascending: false })
+            .limit(30),
+          supabase
+            .from("maintenance_plans")
+            .select("id, name, start_year, start_quarter, horizon_years, status, generated_at")
+            .eq("property_id", pid)
+            .eq("status", "active")
+            .order("generated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
+        const components = comps.data ?? [];
+        const compIds = components.map((c) => c.id as string);
+        let highRisk: Array<Record<string, unknown>> = [];
+        if (compIds.length) {
+          const [purchaseRes, histRes] = await Promise.all([
+            supabase
+              .from("component_purchase_info")
+              .select("component_id, expected_lifespan_years, purchase_date")
+              .in("component_id", compIds),
+            supabase
+              .from("maintenance_history")
+              .select("component_id, performed_date, category")
+              .in("component_id", compIds),
+          ]);
+          const purchaseMap = new Map(
+            (purchaseRes.data ?? []).map((p) => [p.component_id as string, p]),
+          );
+          const histMap = new Map<
+            string,
+            Array<{ performed_date: string; category: string | null }>
+          >();
+          for (const h of histRes.data ?? []) {
+            const cid = h.component_id as string;
+            const list = histMap.get(cid) ?? [];
+            list.push({
+              performed_date: h.performed_date as string,
+              category: (h.category as string | null) ?? null,
+            });
+            histMap.set(cid, list);
+          }
+          const inputs: ComponentRiskInput[] = components.map((c) => {
+            const p = purchaseMap.get(c.id as string);
+            return {
+              componentId: c.id as string,
+              name: c.name as string,
+              type: (c.type as string) ?? null,
+              propertyId: pid,
+              propertyName: prop.name as string,
+              installationYear: (c.installation_year as number | null) ?? null,
+              purchaseDate: (p?.purchase_date as string | null) ?? null,
+              expectedLifespanYears:
+                (p?.expected_lifespan_years as number | null) ?? null,
+              history: histMap.get(c.id as string) ?? [],
+            };
+          });
+          highRisk = filterRiskResults(computeComponentRiskBatch(inputs), {
+            minLevel: "medium",
+            limit: 10,
+          }).map((r) => ({
+            name: r.name,
+            risk_level: r.riskLevel,
+            risk_score: r.riskScore,
+            remaining_b10_years: r.remainingB10Years,
+            recommendation: r.recommendation,
+          }));
+        }
+
+        return {
+          property: prop,
+          counts: {
+            components: components.length,
+            open_work_orders: (wos.data ?? []).length,
+            open_todos: (todos.data ?? []).length,
+            notes: (notes.data ?? []).length,
+            documents: (docs.data ?? []).length,
+            high_risk: highRisk.length,
+          },
+          components: components.slice(0, 60),
+          open_work_orders: wos.data ?? [],
+          open_todos: todos.data ?? [],
+          notes: (notes.data ?? []).map((n) => ({
+            excerpt: String(n.content || "").slice(0, 300),
+            created_at: n.created_at,
+          })),
+          documents: docs.data ?? [],
+          high_risk_components: highRisk,
+          maintenance_plan: plan.data ?? null,
         };
       }
 

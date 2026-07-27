@@ -3,7 +3,7 @@
 En modern webbapplikation för fastighetsförvaltning, driftplanering och underhåll.
 Byggd på **React + Vite** med **Supabase** som backend och **Google Gemini** för AI
 (chat, embeddings, protokollanalys). **Jarvis** (LangGraph-worker) läser servicerapporter
-från Google Drive och skapar arbetsordrar via `crewai-webhook`.
+från Google Drive och skapar arbetsordrar via **Jarvis webhook** (LangGraph-worker; ej CrewAI-runtime).
 
 - **Kod:** https://github.com/Zvensson8/liljeblads  
 - **Backend:** Supabase (t.ex. projekt Liljeblads2.0)  
@@ -120,7 +120,7 @@ Backend (Supabase)
   └── Storage
 
 Jarvis worker (Python / LangGraph)
-  └── Drive inbox → parse → extract → crewai-webhook → WO + service
+  └── Drive inbox → parse → extract → jarvis-webhook → WO / HITL
 ```
 
 ### Underhållsplan (översikt)
@@ -243,7 +243,8 @@ Senaste underhållsrelaterade: `supabase/migrations/20260727200000_maintenance_p
 | `parse-document`         | PDF → text                                 |
 | `execute-ai-action`      | Kör granskade AI-förslag                   |
 | `risk-suggest-actions`   | Cron: risk → pending AI-förslag            |
-| `crewai-webhook`         | Extern agent-API (`lbl_` keys)             |
+| `jarvis-webhook`         | Agent-API för LangGraph-worker (`lbl_` keys) |
+| `crewai-webhook`         | Legacy-alias (samma kod som jarvis-webhook) |
 | `send-*-reminders`       | E-post via Resend                          |
 
 ---

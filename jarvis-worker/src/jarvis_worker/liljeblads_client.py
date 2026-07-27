@@ -1,4 +1,4 @@
-"""HTTP client for Liljeblads crewai-webhook (API key auth)."""
+"""HTTP client for Liljeblads Jarvis webhook (API key auth, LangGraph worker)."""
 
 from __future__ import annotations
 
@@ -190,3 +190,33 @@ class LiljebladsClient:
             payload["property_name"] = property_name
         data = self._post(payload)
         return list(data.get("results") or [])
+
+    def get_property_overview(
+        self,
+        *,
+        property_name: str | None = None,
+        property_id: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"type": "get_property_overview"}
+        if property_name:
+            payload["property_name"] = property_name
+        if property_id:
+            payload["property_id"] = property_id
+        data = self._post(payload)
+        return dict(data.get("result") or data)
+
+    def search_property_documents(
+        self,
+        *,
+        query: str,
+        property_name: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "type": "search_property_documents",
+            "query": query,
+            "limit": limit,
+        }
+        if property_name:
+            payload["property_name"] = property_name
+        return self._post(payload)

@@ -547,7 +547,8 @@ const systemPromptBase = `Du är Jarvis — AI-assistent för fastighetsförvalt
 VERKTYG (använd dem aktivt):
 - list_properties, get_project, list_work_orders, list_services, search_components: LÄS data från systemet
 - list_high_risk_components: prediktiv Weibull-risk (högrisk, prioritering, utbyte)
-- search_property_documents: sök i uppladdade fastighetsdokument
+- get_property_overview: samlad bild av en fastighet (komponenter, WO, risk, plan, dokumentlista) — använd först vid fastighetsfrågor
+- search_property_documents: sök i uppladdade/indexerade fastighetsdokument
 - draft_work_order_order_text: skapa UTKAST till beställningstext (skickar INTE mail)
 - suggest_work_order / suggest_todo: spara förslag som UTKAST (kräver användarens godkännande i UI)
 
