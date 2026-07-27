@@ -9,33 +9,29 @@ import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, Package, Plus, Trash2, Download, LayoutGrid, Table as TableIcon, Filter, X, Sparkles } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Package, Plus, Download, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
-import { MaintenanceHistoryDialog } from '@/components/MaintenanceHistoryDialog';
 import { SelectPropertyFloorDialog } from '@/components/SelectPropertyFloorDialog';
 import { ComponentImportDialog } from '@/components/ComponentImportDialog';
 import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { FloorSelector } from '@/components/FloorSelector';
-import { QuickServiceButton } from '@/components/QuickServiceButton';
-import { LastServiceBadge } from '@/components/LastServiceBadge';
 import { useComponents, useDeleteComponent } from '@/hooks/useComponents';
 import { useMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 import { useWorkOrders } from '@/hooks/useWorkOrders';
 import { useComponentRiskList } from '@/hooks/useComponentRisk';
-import { ComponentRiskBadge } from '@/components/ComponentRiskBadge';
 import { type RiskLevel } from '@/lib/componentRisk';
 import { generateRiskSuggestions } from '@/lib/riskSuggestions';
 import { useOrganization } from '@/hooks/useOrganization';
 import { toast as sonnerToast } from 'sonner';
-import { getTypeDisplayName } from '@/lib/componentTypeLabels';
 import {
   filterAndSortComponents,
   hasActiveComponentFilters,
   type ServiceFilter,
   type ComponentsSort,
 } from '@/lib/componentsListFilter';
+import { ComponentsFiltersBar } from '@/components/components-list/ComponentsFiltersBar';
+import { ComponentsCardsView } from '@/components/components-list/ComponentsCardsView';
+import { ComponentsTableView } from '@/components/components-list/ComponentsTableView';
 
 interface Component {
   id: string;
@@ -402,122 +398,32 @@ const Components = () => {
                     </div>
                   </div>
 
-                  {/* Filter section */}
                   {components.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Filter className="h-4 w-4" />
-                        <span>Filtrera:</span>
-                      </div>
-                      
-                      <Select value={filterType} onValueChange={setFilterType}>
-                        <SelectTrigger className="w-[220px] h-9">
-                          <SelectValue placeholder="Komponenttyp">
-                            {filterType !== 'all' ? getTypeDisplayName(filterType) : 'Alla typer'}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alla typer</SelectItem>
-                          {uniqueTypes.map(type => (
-                            <SelectItem key={type} value={type}>{getTypeDisplayName(type)}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Select value={filterProperty} onValueChange={setFilterProperty}>
-                        <SelectTrigger className="w-[160px] h-9">
-                          <SelectValue placeholder="Fastighet" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alla fastigheter</SelectItem>
-                          {uniqueProperties.map(prop => (
-                            <SelectItem key={prop} value={prop!}>{prop}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Select value={filterManufacturer} onValueChange={setFilterManufacturer}>
-                        <SelectTrigger className="w-[160px] h-9">
-                          <SelectValue placeholder="Tillverkare" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alla tillverkare</SelectItem>
-                          {uniqueManufacturers.map(mfr => (
-                            <SelectItem key={mfr} value={mfr!}>{mfr}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Select value={filterModel} onValueChange={setFilterModel}>
-                        <SelectTrigger className="w-[160px] h-9">
-                          <SelectValue placeholder="Modell" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alla modeller</SelectItem>
-                          {uniqueModels.map(model => (
-                            <SelectItem key={model} value={model!}>{model}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Select value={filterService} onValueChange={(value) => setFilterService(value as 'all' | 'latest' | 'none' | 'with_service')}>
-                        <SelectTrigger className="w-[200px] h-9">
-                          <SelectValue placeholder="Service" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alla service</SelectItem>
-                          <SelectItem value="latest">Senaste service</SelectItem>
-                          <SelectItem value="with_service">Med registrerad service</SelectItem>
-                          <SelectItem value="none">Ingen service</SelectItem>
-                        </SelectContent>
-                      </Select>
-
-                      <Select
-                        value={filterRisk}
-                        onValueChange={(value) => setFilterRisk(value as 'all' | RiskLevel)}
-                      >
-                        <SelectTrigger className="w-[160px] h-9">
-                          <SelectValue placeholder="Risk" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alla risknivåer</SelectItem>
-                          <SelectItem value="medium">Medel och högre</SelectItem>
-                          <SelectItem value="high">Hög och kritisk</SelectItem>
-                          <SelectItem value="critical">Endast kritisk</SelectItem>
-                        </SelectContent>
-                      </Select>
-
-                      <Select
-                        value={sortBy}
-                        onValueChange={(value) => setSortBy(value as 'default' | 'risk')}
-                      >
-                        <SelectTrigger className="w-[160px] h-9">
-                          <SelectValue placeholder="Sortering" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Standardsortering</SelectItem>
-                          <SelectItem value="risk">Högst risk först</SelectItem>
-                        </SelectContent>
-                      </Select>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-9"
-                        disabled={suggesting || riskList.length === 0}
-                        onClick={handleGenerateRiskSuggestions}
-                      >
-                        <Sparkles className="h-4 w-4 mr-1" />
-                        {suggesting ? 'Skapar…' : 'Riskförslag'}
-                      </Button>
-
-                      {hasActiveFilters && (
-                        <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9">
-                          <X className="h-4 w-4 mr-1" />
-                          Rensa filter
-                        </Button>
-                      )}
-                    </div>
+                    <ComponentsFiltersBar
+                      uniqueTypes={uniqueTypes}
+                      uniqueProperties={uniqueProperties as string[]}
+                      uniqueManufacturers={uniqueManufacturers as string[]}
+                      uniqueModels={uniqueModels as string[]}
+                      filterType={filterType}
+                      filterProperty={filterProperty}
+                      filterManufacturer={filterManufacturer}
+                      filterModel={filterModel}
+                      filterService={filterService}
+                      filterRisk={filterRisk}
+                      sortBy={sortBy}
+                      hasActiveFilters={hasActiveFilters}
+                      suggesting={suggesting}
+                      riskListEmpty={riskList.length === 0}
+                      onFilterType={setFilterType}
+                      onFilterProperty={setFilterProperty}
+                      onFilterManufacturer={setFilterManufacturer}
+                      onFilterModel={setFilterModel}
+                      onFilterService={setFilterService}
+                      onFilterRisk={setFilterRisk}
+                      onSortBy={setSortBy}
+                      onClearFilters={clearFilters}
+                      onGenerateRiskSuggestions={handleGenerateRiskSuggestions}
+                    />
                   )}
 
                   {components.length === 0 ? (
@@ -536,167 +442,24 @@ const Components = () => {
                       </CardContent>
                     </Card>
                   ) : viewMode === 'cards' ? (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {filteredComponents.map((component) => (
-                        <Card
-                          key={component.id}
-                          className="group hover:shadow-lg transition-all duration-300 cursor-pointer"
-                          onClick={() => navigate(`/components/${component.id}`)}
-                        >
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <CardTitle className="text-lg">{component.name}</CardTitle>
-                            <CardDescription className="text-sm font-medium text-foreground/70">
-                              {getTypeDisplayName(component.type)}
-                            </CardDescription>
-                          </div>
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <ComponentRiskBadge
-                              risk={riskById.get(component.id)}
-                              compact
-                              className="shrink-0"
-                            />
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-0 space-y-1.5">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Building2 className="h-4 w-4 text-primary" />
-                          <span>{component.property_name || 'Ej kopplad'}</span>
-                        </div>
-                        
-                        {component.serial_number && (
-                          <div className="text-sm text-muted-foreground">
-                            Serienr: <span className="font-medium text-foreground">{component.serial_number}</span>
-                          </div>
-                        )}
-                        
-                        {component.registration_number && (
-                          <div className="text-sm text-muted-foreground">
-                            Regnr: <span className="font-medium text-foreground">{component.registration_number}</span>
-                          </div>
-                        )}
-                        
-                        {component.installation_year && (
-                          <div className="text-sm text-muted-foreground">
-                            Installerad: <span className="font-medium text-foreground">{component.installation_year}</span>
-                          </div>
-                        )}
-
-                        {(maintenanceStats[component.id] || workOrderStats[component.id]) && (
-                          <div className="border-t pt-2 mt-2 space-y-1">
-                            {maintenanceStats[component.id] && (
-                              <div className="text-sm text-muted-foreground">
-                                Underhållskostnad: <span className="font-semibold text-foreground">{maintenanceStats[component.id].totalCost.toLocaleString('sv-SE')} kr</span>
-                              </div>
-                            )}
-                            {workOrderStats[component.id] && (
-                              <div className="text-sm text-muted-foreground">
-                                Arbetsordrar: <span className="font-medium text-foreground">{workOrderStats[component.id].count} st</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="p-0">
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b text-sm text-muted-foreground">
-                              <th className="text-left py-3 px-4 font-medium">Komponent</th>
-                              <th className="text-left py-3 px-4 font-medium hidden md:table-cell">Typ</th>
-                              <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Tillverkare</th>
-                              <th className="text-left py-3 px-4 font-medium">Fastighet</th>
-                              <th className="text-left py-3 px-4 font-medium">Risk</th>
-                              <th className="text-left py-3 px-4 font-medium">Våning</th>
-                              <th className="text-left py-3 px-4 font-medium hidden sm:table-cell">Senaste service</th>
-                              <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Kostnad</th>
-                              <th className="text-left py-3 px-4 font-medium">Status</th>
-                              <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredComponents.map((component) => (
-                              <tr 
-                                key={component.id} 
-                                className="border-b hover:bg-muted/50 cursor-pointer"
-                                onClick={() => navigate(`/components/${component.id}`)}
-                              >
-                                <td className="py-3 px-4">
-                                  <div className="font-medium">{component.name}</div>
-                                  <div className="text-xs text-muted-foreground md:hidden">{component.type}</div>
-                                  {component.room_zone && (
-                                    <div className="text-xs text-muted-foreground">{component.room_zone}</div>
-                                  )}
-                                </td>
-                                <td className="py-3 px-4 text-sm hidden md:table-cell">{component.type}</td>
-                                <td className="py-3 px-4 text-sm hidden lg:table-cell">{component.manufacturer || '-'}</td>
-                                <td className="py-3 px-4">
-                                  <div className="text-sm font-medium">{component.property_name}</div>
-                                </td>
-                                <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                                  <ComponentRiskBadge
-                                    risk={riskById.get(component.id)}
-                                    compact
-                                  />
-                                </td>
-                                <td className="py-2 px-4" onClick={(e) => e.stopPropagation()}>
-                                  {component.property_id ? (
-                                    <FloorSelector
-                                      componentId={component.id}
-                                      propertyId={component.property_id}
-                                      currentFloorId={component.floor_id}
-                                      onSuccess={refreshComponents}
-                                      compact
-                                    />
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground italic">-</span>
-                                  )}
-                                </td>
-                                <td className="py-2 px-4 hidden sm:table-cell" onClick={(e) => e.stopPropagation()}>
-                                  <LastServiceBadge componentId={component.id} />
-                                </td>
-                                <td className="py-3 px-4 text-sm hidden lg:table-cell">
-                                  {(maintenanceStats[component.id]?.totalCost || 0 + (workOrderStats[component.id]?.totalPrice || 0)) > 0
-                                    ? `${((maintenanceStats[component.id]?.totalCost || 0) + (workOrderStats[component.id]?.totalPrice || 0)).toLocaleString('sv-SE')} kr`
-                                    : '-'}
-                                </td>
-                                <td className="py-3 px-4">
-                                  <Badge className={getStatusColor(component.status)}>
-                                    {getStatusText(component.status)}
-                                  </Badge>
-                                </td>
-                                <td className="py-2 px-4">
-                                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                                    <QuickServiceButton
-                                      componentId={component.id}
-                                      componentName={component.name}
-                                      onSuccess={refreshComponents}
-                                    />
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-destructive hover:text-destructive"
-                                      onClick={() => handleDeleteComponent(component.id, component.name)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                    <ComponentsCardsView
+                      components={filteredComponents}
+                      riskById={riskById}
+                      maintenanceStats={maintenanceStats}
+                      workOrderStats={workOrderStats}
+                    />
+                  ) : (
+                    <ComponentsTableView
+                      components={filteredComponents}
+                      riskById={riskById}
+                      maintenanceStats={maintenanceStats}
+                      workOrderStats={workOrderStats}
+                      onDelete={handleDeleteComponent}
+                      onRefresh={refreshComponents}
+                      getStatusColor={getStatusColor}
+                      getStatusText={getStatusText}
+                    />
+                  )}
               </TabsContent>
 
               <TabsContent value="costs">
