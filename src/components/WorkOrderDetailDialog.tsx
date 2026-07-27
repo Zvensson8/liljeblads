@@ -330,11 +330,19 @@ export function WorkOrderDetailDialog({
           workOrderId: workOrder.id,
           finalCost: costToRegister,
         });
+        const riskNote =
+          result.riskAfter != null
+            ? ` Risk efteråt: ${result.riskAfter.riskLevel} (${result.riskAfter.riskScore}).`
+            : "";
+        const closed =
+          result.riskFeedback?.closedSuggestions
+            ? ` ${result.riskFeedback.closedSuggestions} riskförslag stängda.`
+            : "";
         toast.success(
           result.costRegistered != null
-            ? `Slutförd. ${result.costRegistered.toLocaleString("sv-SE")} kr registrerad på komponenten.`
+            ? `Slutförd. ${result.costRegistered.toLocaleString("sv-SE")} kr registrerad på komponenten.${riskNote}${closed}`
             : result.maintenanceHistoryId
-              ? "Slutförd och kopplad till servicehistorik."
+              ? `Slutförd och kopplad till servicehistorik.${riskNote}${closed}`
               : "Slutförd. Koppla en komponent på ordern för att spara kostnad på komponent.",
         );
       }

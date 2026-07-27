@@ -127,13 +127,22 @@ const WorkOrders = () => {
         const { completeWorkOrderWithCost } = await import("@/lib/completeWorkOrder");
         const result = await completeWorkOrderWithCost({ workOrderId: orderId });
         await queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });
+        const riskNote =
+          result.riskAfter != null
+            ? ` Risk efteråt: ${result.riskAfter.riskLevel} (${result.riskAfter.riskScore}).`
+            : "";
+        const closed =
+          result.riskFeedback?.closedSuggestions
+            ? ` ${result.riskFeedback.closedSuggestions} riskförslag stängda.`
+            : "";
         toast.success(
           result.costRegistered != null
-            ? `Slutförd. Kostnad ${result.costRegistered.toLocaleString("sv-SE")} kr registrerad på komponenten.`
+            ? `Slutförd. Kostnad ${result.costRegistered.toLocaleString("sv-SE")} kr på komponenten.${riskNote}${closed}`
             : result.maintenanceHistoryId
-              ? "Slutförd och kopplad till komponentens servicehistorik."
+              ? `Slutförd och kopplad till servicehistorik.${riskNote}${closed}`
               : "Arbetsorder markerad som slutförd (ingen komponent kopplad).",
         );
+        await queryClient.invalidateQueries({ queryKey: ["component-risk-list"] });
       } else {
         await updateMutation.mutateAsync({
           id: orderId,
