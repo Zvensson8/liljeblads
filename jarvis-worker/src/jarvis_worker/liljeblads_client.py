@@ -148,3 +148,45 @@ class LiljebladsClient:
     def create_work_order(self, **kwargs: Any) -> dict[str, Any]:
         payload = {"type": "work_order", **kwargs}
         return self._post(payload)
+
+    def suggest_work_order(self, **kwargs: Any) -> dict[str, Any]:
+        """HITL: create pending ai_suggested_actions instead of a live WO."""
+        payload = {"type": "suggest_work_order", **kwargs}
+        return self._post(payload)
+
+    def list_work_orders(
+        self,
+        *,
+        property_name: str | None = None,
+        property_id: str | None = None,
+        status: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        payload: dict[str, Any] = {"type": "list_work_orders", "limit": limit}
+        if property_name:
+            payload["property_name"] = property_name
+        if property_id:
+            payload["property_id"] = property_id
+        if status:
+            payload["status"] = status
+        data = self._post(payload)
+        return list(data.get("results") or [])
+
+    def list_high_risk_components(
+        self,
+        *,
+        property_name: str | None = None,
+        min_level: str = "high",
+        min_confidence: str = "medium",
+        limit: int = 15,
+    ) -> list[dict[str, Any]]:
+        payload: dict[str, Any] = {
+            "type": "list_high_risk_components",
+            "min_level": min_level,
+            "min_confidence": min_confidence,
+            "limit": limit,
+        }
+        if property_name:
+            payload["property_name"] = property_name
+        data = self._post(payload)
+        return list(data.get("results") or [])

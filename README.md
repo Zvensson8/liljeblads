@@ -250,14 +250,19 @@ Senaste underhållsrelaterade: `supabase/migrations/20260727200000_maintenance_p
 
 ## Jarvis worker
 
+LangGraph-ingest av servicerapporter (inbox/Drive) + CLI-chat med tools
+(fastigheter, komponenter, arbetsordrar, **prediktiv risk**).
+
 ```powershell
 cd jarvis-worker
-# konfigurera .env (webhook, API-key, Drive, Resend, Gemini)
-.\.venv\Scripts\python.exe -m jarvis_worker.cli ingest
+# .env: LILJEBLADS_API_KEY, GOOGLE_API_KEY, MODE=live|hitl|dry_run
+.\.venv\Scripts\python.exe -m jarvis_worker.cli ingest --sync-drive
+.\.venv\Scripts\python.exe -m jarvis_worker.cli ask "Vilka komponenter har högst risk?"
 ```
 
-Schemalagd körning 08:00 / 15:00: `scripts/install-scheduled-tasks.ps1`  
-Detaljer: `docs/JARVIS.md`.
+- **MODE=hitl** → WO som granskningsbara AI-förslag  
+- Schemalagd körning 08:00 / 15:00: `scripts/install-scheduled-tasks.ps1`  
+- Detaljer: `docs/JARVIS.md`
 
 ---
 

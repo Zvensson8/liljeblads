@@ -17,14 +17,16 @@ class Settings(BaseSettings):
     liljeblads_api_key: str = ""
 
     google_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-flash-latest"
 
     inbox_dir: Path = Path("./inbox")
     archive_dir: Path = Path("./inbox/processed")
     failed_dir: Path = Path("./inbox/failed")
 
-    # dry_run | suggest
-    mode: str = "suggest"
+    # dry_run = no writes
+    # live | suggest = create WO + service (default production)
+    # hitl = log service optional; WO → pending ai_suggested_actions for review
+    mode: str = "live"
     auto_log_service: bool = True
     auto_create_work_orders: bool = True
     source_label: str = "jarvis_inbox"

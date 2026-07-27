@@ -46,7 +46,9 @@ const AVAILABLE_PERMISSIONS = [
   { id: "get_pending_actions", label: "Hämta väntande AI-åtgärder" },
   { id: "execute_action", label: "Utföra AI-åtgärder" },
   { id: "list_properties", label: "Lista fastigheter" },
-  { id: "list_components", label: "Lista komponenter" },
+  { id: "list_components", label: "Lista komponenter / risk" },
+  { id: "log_service", label: "Logga service" },
+  { id: "read_components", label: "Läs komponenter (legacy)" },
 ];
 
 // Generate a secure random API key

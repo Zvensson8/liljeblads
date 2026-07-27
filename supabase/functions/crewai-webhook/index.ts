@@ -9,6 +9,12 @@
 // The key must have the "create_todo" permission.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  computeComponentRiskBatch,
+  filterRiskResults,
+  type ComponentRiskInput,
+  type RiskLevel,
+} from "../_shared/componentRisk.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,9 +33,12 @@ interface CrewAIPayload {
   type?:
     | "todo"
     | "work_order"
+    | "suggest_work_order"
     | "search_components"
     | "log_service"
     | "list_services"
+    | "list_work_orders"
+    | "list_high_risk_components"
     | "delete_service"
     | "list_properties"
     | "list_processed_files"
@@ -54,9 +63,13 @@ interface CrewAIPayload {
   // Optional extras for work orders
   contractor?: string;
   quarter?: string;
-  // search_components fields
+  // search_components / list filters
   query?: string;
   limit?: number;
+  status?: string;
+  min_level?: string;
+  min_confidence?: string;
+  reasoning?: string;
   // log_service / list_services / delete_service fields
   component_id?: string;
   serial_number?: string;
@@ -216,6 +229,8 @@ Deno.serve(async (req) => {
     // ============ list_properties (Jarvis) ============
     if (payload.type === "list_properties") {
       if (
+        !permissions.includes("list_properties") &&
+        !permissions.includes("list_components") &&
         !permissions.includes("read_components") &&
         !permissions.includes("create_work_order") &&
         !permissions.includes("create_todo") &&
@@ -440,6 +455,260 @@ Deno.serve(async (req) => {
 
       await supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyRow.id);
       return json({ success: true, type: "list_services", count: results.length, results });
+    }
+
+    // ============ list_work_orders (Jarvis chat / ops) ============
+    if (payload.type === "list_work_orders") {
+      if (
+        !permissions.includes("create_work_order") &&
+        !permissions.includes("list_components") &&
+        !permissions.includes("get_pending_actions") &&
+        !permissions.includes("read_components")
+      ) {
+        return json({ success: false, error: "API key missing work-order read permission" }, 403);
+      }
+
+      const { data: props } = await supabase
+        .from("properties")
+        .select("id, name")
+        .eq("organization_id", keyRow.organization_id);
+      let propIds = (props ?? []).map((p) => p.id as string);
+      const propNameMap = new Map((props ?? []).map((p) => [p.id as string, p.name as string]));
+
+      if (payload.property_id) {
+        if (!propIds.includes(payload.property_id)) {
+          return json({ success: false, error: "property not in organization" }, 403);
+        }
+        propIds = [payload.property_id];
+      } else if (payload.property_name) {
+        const needle = payload.property_name.trim().toLowerCase();
+        propIds = (props ?? [])
+          .filter((p) => (p.name || "").toLowerCase().includes(needle))
+          .map((p) => p.id as string);
+        if (!propIds.length) {
+          return json({ success: true, type: "list_work_orders", count: 0, results: [] });
+        }
+      }
+
+      if (!propIds.length) {
+        return json({ success: true, type: "list_work_orders", count: 0, results: [] });
+      }
+
+      const limit = Math.min(Math.max(payload.limit ?? 50, 1), 200);
+      let wq = supabase
+        .from("work_orders")
+        .select(
+          "id, action, status, priority, price, property_id, component_id, due_date, quarter, contractor, created_at, updated_at",
+        )
+        .in("property_id", propIds)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (payload.status) {
+        wq = wq.eq("status", payload.status);
+      } else {
+        wq = wq.in("status", ["not_started", "awaiting_quote", "ordered"]);
+      }
+
+      const { data: orders, error: woErr } = await wq;
+      if (woErr) {
+        return json({ success: false, error: woErr.message }, 500);
+      }
+
+      const results = (orders ?? []).map((o) => ({
+        ...o,
+        property_name: propNameMap.get(o.property_id as string) ?? null,
+      }));
+
+      await supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyRow.id);
+      return json({
+        success: true,
+        type: "list_work_orders",
+        count: results.length,
+        results,
+      });
+    }
+
+    // ============ list_high_risk_components (Weibull, Jarvis) ============
+    if (payload.type === "list_high_risk_components") {
+      if (
+        !permissions.includes("list_components") &&
+        !permissions.includes("read_components") &&
+        !permissions.includes("create_work_order")
+      ) {
+        return json({ success: false, error: "API key missing list_components permission" }, 403);
+      }
+
+      const { data: props } = await supabase
+        .from("properties")
+        .select("id, name")
+        .eq("organization_id", keyRow.organization_id);
+      let propIds = (props ?? []).map((p) => p.id as string);
+      const propNameMap = new Map((props ?? []).map((p) => [p.id as string, p.name as string]));
+
+      if (payload.property_id) {
+        if (!propIds.includes(payload.property_id)) {
+          return json({ success: false, error: "property not in organization" }, 403);
+        }
+        propIds = [payload.property_id];
+      } else if (payload.property_name) {
+        const needle = payload.property_name.trim().toLowerCase();
+        propIds = (props ?? [])
+          .filter((p) => (p.name || "").toLowerCase().includes(needle))
+          .map((p) => p.id as string);
+      }
+
+      if (!propIds.length) {
+        return json({ success: true, type: "list_high_risk_components", count: 0, results: [] });
+      }
+
+      const { data: components } = await supabase
+        .from("components")
+        .select("id, name, type, installation_year, property_id")
+        .in("property_id", propIds)
+        .neq("status", "decommissioned")
+        .limit(500);
+
+      if (!components?.length) {
+        return json({ success: true, type: "list_high_risk_components", count: 0, results: [] });
+      }
+
+      const ids = components.map((c) => c.id as string);
+      const [purchaseRes, histRes] = await Promise.all([
+        supabase
+          .from("component_purchase_info")
+          .select("component_id, expected_lifespan_years, purchase_date")
+          .in("component_id", ids),
+        supabase
+          .from("maintenance_history")
+          .select("component_id, performed_date, category")
+          .in("component_id", ids),
+      ]);
+
+      const purchaseMap = new Map(
+        (purchaseRes.data ?? []).map((p) => [p.component_id as string, p]),
+      );
+      const histMap = new Map<
+        string,
+        Array<{ performed_date: string; category: string | null }>
+      >();
+      for (const h of histRes.data ?? []) {
+        const cid = h.component_id as string;
+        const list = histMap.get(cid) ?? [];
+        list.push({
+          performed_date: h.performed_date as string,
+          category: (h.category as string | null) ?? null,
+        });
+        histMap.set(cid, list);
+      }
+
+      const inputs: ComponentRiskInput[] = components.map((c) => {
+        const p = purchaseMap.get(c.id as string);
+        return {
+          componentId: c.id as string,
+          name: c.name as string,
+          type: (c.type as string) ?? null,
+          propertyId: c.property_id as string,
+          propertyName: propNameMap.get(c.property_id as string) ?? null,
+          installationYear: (c.installation_year as number | null) ?? null,
+          purchaseDate: (p?.purchase_date as string | null) ?? null,
+          expectedLifespanYears: (p?.expected_lifespan_years as number | null) ?? null,
+          history: histMap.get(c.id as string) ?? [],
+        };
+      });
+
+      const batch = computeComponentRiskBatch(inputs);
+      const minLevel = (payload.min_level as RiskLevel) || "high";
+      const minConf = (payload.min_confidence as "low" | "medium" | "high") || "medium";
+      const limit = Math.min(Math.max(payload.limit ?? 15, 1), 50);
+      const filtered = filterRiskResults(batch, {
+        minLevel,
+        minConfidence: minConf,
+        limit,
+      });
+
+      const results = filtered.map((r) => ({
+        component_id: r.componentId,
+        name: r.name,
+        type: r.type,
+        property_id: r.propertyId,
+        property_name: r.propertyName,
+        risk_level: r.riskLevel,
+        risk_score: r.riskScore,
+        confidence: r.confidence,
+        remaining_b10_years: r.remainingB10Years,
+        recommendation: r.recommendation,
+        age_years: r.ageYears,
+      }));
+
+      await supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyRow.id);
+      return json({
+        success: true,
+        type: "list_high_risk_components",
+        count: results.length,
+        results,
+      });
+    }
+
+    // ============ suggest_work_order (HITL pending action, Jarvis) ============
+    if (payload.type === "suggest_work_order") {
+      if (
+        !permissions.includes("create_work_order") &&
+        !permissions.includes("get_pending_actions")
+      ) {
+        return json(
+          { success: false, error: "API key missing create_work_order permission" },
+          403,
+        );
+      }
+      if (!payload.action_text?.trim()) {
+        return json({ success: false, error: "action_text is required" }, 400);
+      }
+
+      const conf =
+        typeof payload.price_estimate === "string" && payload.price_estimate
+          ? 0.75
+          : 0.8;
+
+      const actionText = payload.action_text.trim().slice(0, 140);
+      const { data: suggestion, error: sugErr } = await supabase
+        .from("ai_suggested_actions")
+        .insert({
+          organization_id: keyRow.organization_id,
+          action_type: "create_work_order",
+          status: "pending",
+          confidence_score: conf,
+          reasoning:
+            payload.reasoning ||
+            `Jarvis ingest-förslag (${payload.source || "jarvis_worker"})`,
+          payload: {
+            action: actionText,
+            property_name: payload.property_name,
+            property_id: payload.property_id,
+            component_id: payload.component_id,
+            component_name: payload.component_system,
+            priority: mapPriority(payload.priority),
+            price: parsePrice(payload.price_estimate),
+            reasoning: payload.raw_context || payload.reasoning || actionText,
+            confidence: conf,
+            source: payload.source || "jarvis_ingest",
+            report_filename: payload.report_filename,
+          },
+          source_document_type: "jarvis_ingest",
+        })
+        .select("id, status, action_type, created_at")
+        .single();
+
+      if (sugErr) {
+        return json({ success: false, error: sugErr.message }, 500);
+      }
+
+      await supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyRow.id);
+      return json({
+        success: true,
+        type: "suggest_work_order",
+        result: suggestion,
+      });
     }
 
     // ============ delete_service (remove maintenance_history + docs) ============

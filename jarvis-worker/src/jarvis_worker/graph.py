@@ -202,13 +202,16 @@ def build_graph(settings: Settings | None = None):
         return {"extracted": batch.model_dump()}
 
     def apply(state: GraphState) -> GraphState:
-        dry = settings.mode.strip().lower() == "dry_run"
+        mode = settings.mode.strip().lower()
+        dry = mode == "dry_run"
+        hitl = mode == "hitl"
         extracted = ExtractBatch.model_validate(state.get("extracted") or {"files": []})
         path_by_id = {f["file_id"]: f for f in (state.get("inbox_files") or [])}
         property_names = state.get("property_names") or []
         results: list[dict[str, Any]] = []
 
         wo_ok = 0
+        suggestions_ok = 0
         service_ok = 0
         failed = 0
 
@@ -250,7 +253,12 @@ def build_graph(settings: Settings | None = None):
                     summary["service_logged"] = True
 
                 work_orders: list[Any] = []
-                if not dry and settings.auto_create_work_orders and report.property_name:
+                suggestions: list[Any] = []
+                if (
+                    not dry
+                    and settings.auto_create_work_orders
+                    and report.property_name
+                ):
                     for action in report.actions:
                         if not (action.action_text or "").strip():
                             continue
@@ -269,10 +277,17 @@ def build_graph(settings: Settings | None = None):
                             wo_kwargs["component_id"] = matched["id"]
                             if matched.get("serial_number"):
                                 wo_kwargs["serial_number"] = matched["serial_number"]
-                        res = client.create_work_order(**wo_kwargs)
-                        work_orders.append(res)
-                        wo_ok += 1
+                        if hitl:
+                            res = client.suggest_work_order(**wo_kwargs)
+                            suggestions.append(res)
+                            suggestions_ok += 1
+                        else:
+                            res = client.create_work_order(**wo_kwargs)
+                            work_orders.append(res)
+                            wo_ok += 1
                 summary["work_orders"] = len(work_orders)
+                summary["suggestions"] = len(suggestions)
+                summary["hitl"] = hitl
 
                 if not dry:
                     keys = [report.file_id]
@@ -339,10 +354,13 @@ def build_graph(settings: Settings | None = None):
         stats.update(
             {
                 "work_orders_created": wo_ok,
+                "suggestions_created": suggestions_ok,
                 "services_logged": service_ok,
                 "files_failed": failed,
                 "files_done": len(results),
                 "dry_run": dry,
+                "hitl": hitl,
+                "mode": mode,
             }
         )
         return {"results": results, "stats": stats}

@@ -39,9 +39,11 @@ def send_ingest_summary(
     """
     files_done = stats.get("files_done") or 0
     wo = stats.get("work_orders_created") or 0
+    sug = stats.get("suggestions_created") or 0
     svc = stats.get("services_logged") or 0
     failed = stats.get("files_failed") or 0
     new_files = stats.get("new_files") or 0
+    mode = stats.get("mode") or ""
 
     if files_done == 0 and failed == 0 and new_files == 0:
         print("[notify] skipped (nothing processed — empty folder check)")
@@ -56,8 +58,8 @@ def send_ingest_summary(
         return None
 
     lines = [
-        f"Jarvis ingest klar.",
-        f"Filer: {files_done} · Service: {svc} · Arbetsordrar: {wo} · Fel: {failed}",
+        f"Jarvis ingest klar ({mode or 'live'}).",
+        f"Filer: {files_done} · Service: {svc} · Arbetsordrar: {wo} · Förslag(HITL): {sug} · Fel: {failed}",
         "",
     ]
     for r in results[:20]:
@@ -66,16 +68,25 @@ def send_ingest_summary(
         summary = r.get("summary") or {}
         lines.append(
             f"- [{status}] {name} · prop={summary.get('property_name') or '-'} "
-            f"· WO={summary.get('work_orders', 0)} · komponent={summary.get('matched_component_name') or '-'}"
+            f"· WO={summary.get('work_orders', 0)} · förslag={summary.get('suggestions', 0)} "
+            f"· komponent={summary.get('matched_component_name') or '-'}"
         )
         if r.get("error"):
             lines.append(f"  fel: {r['error'][:200]}")
 
     body_text = "\n".join(lines)
+    subj_bits = []
+    if wo:
+        subj_bits.append(f"{wo} WO")
+    if sug:
+        subj_bits.append(f"{sug} förslag")
+    if svc:
+        subj_bits.append(f"{svc} service")
+    subj_core = ", ".join(subj_bits) if subj_bits else "ingest"
     payload = {
         "from": settings.resend_from,
         "to": [to_email],
-        "subject": f"Jarvis: {wo} WO, {svc} service ({files_done} filer)",
+        "subject": f"Jarvis: {subj_core} ({files_done} filer)",
         "text": body_text,
     }
     with httpx.Client(timeout=30.0) as client:

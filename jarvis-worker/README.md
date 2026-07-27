@@ -1,74 +1,75 @@
 # Jarvis Worker (LangGraph)
 
-LangGraph-pipeline för **servicerapport-ingest** mot Liljeblads / Supabase.
+LangGraph-pipeline för **servicerapport-ingest** mot Liljeblads / Supabase, plus
+CLI-chat med tools (fastigheter, komponenter, WO, **prediktiv risk**).
 
 ```text
-INBOX PDF/txt
-  → discover
+Drive/inbox PDF
+  → discover (+ Drive sync)
   → parse (pypdf)
-  → extract (Gemini)
+  → extract (Gemini + heuristics)
   → match property/component
-  → log_service + work_order (webhook)
+  → log_service + work_order  ELLER  HITL suggest_work_order
   → mark_processed (DB)
+  → e-postsammanfattning (Resend)
 ```
 
 ## Setup
 
 ```powershell
-cd C:\Users\andre\Documents\liljeblads\jarvis-worker
+cd jarvis-worker
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e .
-
 copy .env.example .env
-# Fyll i LILJEBLADS_API_KEY, GOOGLE_API_KEY
+# LILJEBLADS_API_KEY, GOOGLE_API_KEY, ev. Drive/Resend
 ```
 
 ### API-nyckel i Liljeblads
 
-1. Logga in som founder/admin  
-2. Organisation → API-nycklar  
-3. Skapa nyckel `lbl_...` med behörigheter:  
-   `create_work_order`, `log_service`, `read_components`  
-4. Klistra in i `.env` som `LILJEBLADS_API_KEY`
+Organisation → API-nycklar → `lbl_...` med minst:
 
-Webhook-URL ska peka på:
+- `create_work_order`, `log_service`, `list_components`, `list_properties`
+- För HITL: samma + granska i **AI-förslag** / Pending actions
+
+Webhook:
 
 `https://ojiswgqntenvbwtopxbu.supabase.co/functions/v1/crewai-webhook`
 
-### Inbox
+### MODE
 
-Lägg PDF-rapporter i `./inbox` (skapas automatiskt).  
-Efter lyckad körning flyttas filer till `inbox/processed`, fel till `inbox/failed`.
+| MODE | Beteende |
+|------|----------|
+| `live` | Skapa WO + service (default produktion) |
+| `hitl` | Service kan loggas; åtgärder → **pending** `ai_suggested_actions` |
+| `dry_run` | Extrahera bara, inga skrivningar |
 
 ## Kör
 
 ```powershell
-# Riktig körning (skapar WO + service)
-jarvis-ingest ingest
-
-# Bara lista/extrahera utan skrivning till WO (kräver fortfarande API för properties)
-# Sätt MODE=dry_run i .env eller:
-# (dry-run markerar inte processade i DB i nuvarande version om ni vill — se graph)
-```
-
-Via modul:
-
-```powershell
 python -m jarvis_worker.cli ingest
+python -m jarvis_worker.cli ingest --sync-drive
+python -m jarvis_worker.cli ingest --dry-run
+
+python -m jarvis_worker.cli chat
+python -m jarvis_worker.cli ask "Vilka komponenter har högst risk?"
+python -m jarvis_worker.cli ask "Lista öppna arbetsordrar"
 ```
 
-## Schema (från CrewAI-spec)
+Schema 08:00 / 15:00: `scripts/install-scheduled-tasks.ps1`
 
-Extraherar per fil:
+## Chat-tools (webhook)
 
-- `property_name`, `report_date`, `supplier`
-- `components_mentioned[]` (beteckning, serial_number)
-- `actions[]` (action_text, component_system, priority, price_estimate, raw_context)
+| Tool | Webhook type |
+|------|----------------|
+| list_properties | `list_properties` |
+| search_components | `search_components` |
+| list_services | `list_services` |
+| list_work_orders | `list_work_orders` |
+| list_high_risk_components | `list_high_risk_components` (Weibull) |
 
-## Nästa steg
+Ingest HITL: `suggest_work_order` → pending AI-åtgärd.
 
-- Google Drive-inbox-nod (ersätter lokal mapp)
-- Marker för skannade PDF  
-- Human-in-the-loop (utkast till `ai_suggested_actions` i stället för auto-WO)
-- Chat-orchestrator (LangGraph tools) i samma paket
+## Drive & e-post
+
+Se `docs/JARVIS.md` och `.env.example` (`DRIVE_SYNC_ENABLED`, `RESEND_API_KEY`, `NOTIFY_EMAIL=auto`).
