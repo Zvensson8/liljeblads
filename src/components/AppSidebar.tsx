@@ -1,4 +1,4 @@
-import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown, UserCog, User, FileText, Shield, Bot, type LucideIcon } from "lucide-react";
+import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, DollarSign, Wrench, Briefcase, Building, Crown, UserCog, User, FileText, Shield, Bot, Activity, type LucideIcon } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +32,7 @@ const navigationItems: Array<{ title: string; url: string; icon: LucideIcon; mod
   { title: "Projekthantering", url: "/projects", icon: Briefcase, moduleName: "projects" },
   { title: "Återkommande kostnader", url: "/recurring-costs", icon: DollarSign, moduleName: "recurring-costs" },
   { title: "AI Assistent", url: "/ai-chat", icon: Bot, moduleName: "ai-chat" },
+  { title: "Agent-aktivitet", url: "/agent", icon: Activity, moduleName: "ai-chat" },
   { title: "Rapporter", url: "/reports", icon: FileText, moduleName: "dashboard", adminOnly: true },
   { title: "Säkerhet", url: "/security", icon: Shield, moduleName: "organization", adminOnly: true },
   { title: "Användare", url: "/users", icon: Users, moduleName: "users", adminOnly: true },

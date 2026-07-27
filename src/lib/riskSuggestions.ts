@@ -7,6 +7,11 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import type { ComponentRiskResult } from '@/lib/componentRisk';
 import { riskLevelMeetsMin } from '@/lib/componentRisk';
+import {
+  applyPolicyToRisks,
+  normalizePolicy,
+  type AgentRiskPolicy,
+} from '@/lib/agentPolicy';
 
 const DEDUPE_DAYS = 30;
 const DEFAULT_MAX = 20;
@@ -14,12 +19,14 @@ const DEFAULT_MAX = 20;
 export interface GenerateRiskSuggestionsOptions {
   organizationId: string;
   risks: ComponentRiskResult[];
-  /** Only high/critical by default */
-  minLevel?: 'high' | 'critical';
+  /** Only high/critical by default (overridden by policy when loaded) */
+  minLevel?: 'high' | 'critical' | 'medium';
   /** Skip low-confidence scores (default true) */
   requireMediumConfidence?: boolean;
   maxSuggestions?: number;
   conversationId?: string | null;
+  /** If omitted, loaded from organization_agent_policies */
+  policy?: AgentRiskPolicy | null;
 }
 
 export interface GenerateRiskSuggestionsResult {
@@ -34,21 +41,46 @@ function confidenceScore(c: ComponentRiskResult['confidence']): number {
   return 0.45;
 }
 
+export async function loadAgentPolicy(
+  organizationId: string,
+): Promise<AgentRiskPolicy> {
+  const { data } = await (supabase as any)
+    .from('organization_agent_policies')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+  return normalizePolicy(organizationId, data);
+}
+
 export async function generateRiskSuggestions(
   opts: GenerateRiskSuggestionsOptions,
 ): Promise<GenerateRiskSuggestionsResult> {
-  const minLevel = opts.minLevel ?? 'high';
-  const requireConf = opts.requireMediumConfidence !== false;
-  const max = opts.maxSuggestions ?? DEFAULT_MAX;
+  const policy =
+    opts.policy ?? (await loadAgentPolicy(opts.organizationId));
 
-  let candidates = opts.risks.filter((r) => riskLevelMeetsMin(r.riskLevel, minLevel));
-  if (requireConf) {
+  if (!policy.risk_suggest_enabled) {
+    return { created: 0, skipped: opts.risks.length, ids: [] };
+  }
+
+  const max = opts.maxSuggestions ?? policy.max_suggestions_per_run ?? DEFAULT_MAX;
+
+  // Policy first; optional explicit overrides still raise the bar
+  const { allowed, skippedPolicy } = applyPolicyToRisks(opts.risks, policy);
+  let candidates = allowed;
+  if (opts.minLevel) {
+    candidates = candidates.filter((r) =>
+      riskLevelMeetsMin(r.riskLevel, opts.minLevel),
+    );
+  }
+  if (opts.requireMediumConfidence === false) {
+    // keep policy confidence only
+  } else if (opts.requireMediumConfidence === true) {
     candidates = candidates.filter((r) => r.confidence !== 'low');
   }
-  candidates = candidates.slice(0, max * 2); // extra headroom for dedupe
+  candidates = candidates.slice(0, max * 2);
 
   if (!candidates.length) {
-    return { created: 0, skipped: 0, ids: [] };
+    return { created: 0, skipped: skippedPolicy, ids: [] };
   }
 
   const componentIds = candidates.map((c) => c.componentId);
@@ -149,7 +181,7 @@ export async function generateRiskSuggestions(
 
   return {
     created: data?.length ?? 0,
-    skipped,
+    skipped: skipped + skippedPolicy,
     ids: (data ?? []).map((r) => r.id as string),
   };
 }

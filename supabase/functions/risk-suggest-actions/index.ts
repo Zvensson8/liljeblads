@@ -20,7 +20,16 @@ import {
 
 const corsHeaders = cronCorsHeaders;
 const DEDUPE_DAYS = 30;
-const MAX_PER_ORG = 20;
+const DEFAULT_MAX = 20;
+
+type OrgPolicy = {
+  risk_suggest_enabled: boolean;
+  min_risk_level: "low" | "medium" | "high" | "critical";
+  min_confidence: "low" | "medium" | "high";
+  included_component_types: string[] | null;
+  excluded_component_types: string[] | null;
+  max_suggestions_per_run: number;
+};
 
 function confidenceScore(c: ComponentRiskResult["confidence"]): number {
   if (c === "high") return 0.85;
@@ -28,10 +37,49 @@ function confidenceScore(c: ComponentRiskResult["confidence"]): number {
   return 0.45;
 }
 
+function typeAllowed(
+  t: string | null | undefined,
+  policy: OrgPolicy,
+): boolean {
+  const type = t || "";
+  if ((policy.excluded_component_types || []).includes(type)) return false;
+  if (policy.included_component_types == null) return true;
+  if (policy.included_component_types.length === 0) return false;
+  return policy.included_component_types.includes(type);
+}
+
+async function loadPolicy(
+  supabase: ReturnType<typeof createClient>,
+  orgId: string,
+): Promise<OrgPolicy> {
+  const { data } = await supabase
+    .from("organization_agent_policies")
+    .select("*")
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  return {
+    risk_suggest_enabled: data?.risk_suggest_enabled ?? true,
+    min_risk_level: (data?.min_risk_level as OrgPolicy["min_risk_level"]) ??
+      "high",
+    min_confidence: (data?.min_confidence as OrgPolicy["min_confidence"]) ??
+      "medium",
+    included_component_types: data?.included_component_types ?? null,
+    excluded_component_types: data?.excluded_component_types ?? [],
+    max_suggestions_per_run: data?.max_suggestions_per_run ?? DEFAULT_MAX,
+  };
+}
+
 async function processOrg(
   supabase: ReturnType<typeof createClient>,
   orgId: string,
-): Promise<{ orgId: string; created: number; skipped: number; scanned: number }> {
+): Promise<{ orgId: string; created: number; skipped: number; scanned: number; snapshots: number }> {
+  const policy = await loadPolicy(supabase, orgId);
+  if (!policy.risk_suggest_enabled) {
+    return { orgId, created: 0, skipped: 0, scanned: 0, snapshots: 0 };
+  }
+
+  const maxPerOrg = policy.max_suggestions_per_run || DEFAULT_MAX;
+
   const { data: props } = await supabase
     .from("properties")
     .select("id, name")
@@ -41,7 +89,7 @@ async function processOrg(
     (props ?? []).map((p) => [p.id as string, p.name as string]),
   );
   if (!propIds.length) {
-    return { orgId, created: 0, skipped: 0, scanned: 0 };
+    return { orgId, created: 0, skipped: 0, scanned: 0, snapshots: 0 };
   }
 
   const { data: components } = await supabase
@@ -50,7 +98,7 @@ async function processOrg(
     .in("property_id", propIds)
     .neq("status", "decommissioned");
   if (!components?.length) {
-    return { orgId, created: 0, skipped: 0, scanned: 0 };
+    return { orgId, created: 0, skipped: 0, scanned: 0, snapshots: 0 };
   }
 
   const ids = components.map((c) => c.id as string);
@@ -98,14 +146,50 @@ async function processOrg(
     };
   });
 
-  const risks = filterRiskResults(computeComponentRiskBatch(inputs), {
-    minLevel: "high",
-    minConfidence: "medium",
-    limit: MAX_PER_ORG * 2,
+  const batch = computeComponentRiskBatch(inputs);
+
+  // Snapshots for history (cron point-in-time, top risks only to limit volume)
+  let snapshots = 0;
+  try {
+    const topForSnap = filterRiskResults(batch, {
+      minLevel: "medium",
+      limit: 30,
+    });
+    if (topForSnap.length) {
+      const rows = topForSnap.map((r) => ({
+        component_id: r.componentId,
+        organization_id: orgId,
+        risk_score: r.riskScore,
+        risk_level: r.riskLevel,
+        confidence: r.confidence,
+        recommendation: r.recommendation,
+        trigger_source: "cron",
+        metadata: { age_years: r.ageYears, acute_count: r.acuteCount },
+      }));
+      const { error: snapErr } = await supabase
+        .from("component_risk_snapshots")
+        .insert(rows);
+      if (!snapErr) snapshots = rows.length;
+    }
+  } catch (e) {
+    console.warn("snapshot insert failed", e);
+  }
+
+  let risks = filterRiskResults(batch, {
+    minLevel: policy.min_risk_level,
+    minConfidence: policy.min_confidence,
+    limit: maxPerOrg * 3,
   });
+  risks = risks.filter((r) => typeAllowed(r.type, policy));
 
   if (!risks.length) {
-    return { orgId, created: 0, skipped: 0, scanned: components.length };
+    return {
+      orgId,
+      created: 0,
+      skipped: 0,
+      scanned: components.length,
+      snapshots,
+    };
   }
 
   const componentIds = risks.map((r) => r.componentId);
@@ -147,7 +231,7 @@ async function processOrg(
   const toInsert: Array<Record<string, unknown>> = [];
 
   for (const risk of risks) {
-    if (toInsert.length >= MAX_PER_ORG) break;
+    if (toInsert.length >= maxPerOrg) break;
     if (openWo.has(risk.componentId) || pendingComponents.has(risk.componentId)) {
       skipped += 1;
       continue;
@@ -188,6 +272,7 @@ async function processOrg(
       created: 0,
       skipped,
       scanned: components.length,
+      snapshots,
     };
   }
 
@@ -202,6 +287,7 @@ async function processOrg(
     created: data?.length ?? 0,
     skipped,
     scanned: components.length,
+    snapshots,
   };
 }
 

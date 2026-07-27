@@ -41,6 +41,7 @@ const RecurringCosts = lazy(() => import("./pages/RecurringCosts"));
 const Reports = lazy(() => import("./pages/Reports"));
 const SecurityDashboard = lazy(() => import("./pages/SecurityDashboard"));
 const AIChat = lazy(() => import("./pages/AIChat"));
+const AgentActivity = lazy(() => import("./pages/AgentActivity"));
 
 // Loading component
 const PageLoader = () => (
@@ -88,6 +89,7 @@ const AppContent = () => {
           <Route path="/reports" element={<ProtectedRoute><RequireAdmin><Reports /></RequireAdmin></ProtectedRoute>} />
           <Route path="/security" element={<ProtectedRoute><SecurityDashboard /></ProtectedRoute>} />
           <Route path="/ai-chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />
+          <Route path="/agent" element={<ProtectedRoute><AgentActivity /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><RequireAdmin><Users /></RequireAdmin></ProtectedRoute>} />
           <Route path="/user/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
           <Route path="/organization/settings" element={<ProtectedRoute><OrganizationSettings /></ProtectedRoute>} />
