@@ -10,7 +10,6 @@ import { useNavigate } from "react-router-dom";
 import { useProperties } from "@/hooks/useProperties";
 import { useComponents } from "@/hooks/useComponents";
 import { useUpdateWorkOrder } from "@/hooks/useWorkOrders";
-import { useCreateMaintenanceHistory } from "@/hooks/useMaintenanceHistory";
 import { useCreateProject } from "@/hooks/useProjects";
 import { useCreateWorkOrderFile, useDeleteWorkOrderFile } from "@/hooks/useWorkOrderFiles";
 import {
@@ -29,48 +28,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Upload, FileText, Trash2, Download, Edit2, FolderKanban,
-  Eye, FileArchive, Mail, X, ArrowLeft, RefreshCw, Loader2, Send, Info,
+  Edit2, FolderKanban, FileArchive, Mail, X, ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { sv } from "date-fns/locale";
 import { DocumentPreviewDialog } from "./documents/DocumentPreviewDialog";
 import { exportWorkOrderToZip } from "@/lib/zipExport";
 import {
   workOrderFormSchema,
   type WorkOrderFormData,
 } from "@/lib/workOrderFormSchema";
-import {
-  workOrderPriorityBadge,
-  workOrderStatusLabel,
-} from "@/lib/workOrderLabels";
 import { WorkOrderDetailInfoCard } from "@/components/work-order/WorkOrderDetailInfoCard";
+import { WorkOrderEditForm } from "@/components/work-order/WorkOrderEditForm";
+import { WorkOrderPreviewPanel } from "@/components/work-order/WorkOrderPreviewPanel";
+import { WorkOrderFilesCard } from "@/components/work-order/WorkOrderFilesCard";
 
 type ViewMode = "detail" | "edit" | "preview";
 
@@ -80,7 +54,6 @@ import type {
   CreateProjectInput,
 } from "@/types/domain";
 import type { WorkOrderFile, WorkOrderFileInsert } from "@/services/supabase";
-import type { TablesInsert } from "@/integrations/supabase/types";
 
 interface WorkOrderDetailDialogProps {
   open: boolean;
@@ -127,7 +100,6 @@ export function WorkOrderDetailDialog({
   const watchedPropertyId = form.watch("property_id");
 
   const updateWorkOrder = useUpdateWorkOrder();
-  const createMaintenanceHistory = useCreateMaintenanceHistory();
   const createProject = useCreateProject();
   const createWorkOrderFile = useCreateWorkOrderFile();
   const deleteWorkOrderFile = useDeleteWorkOrderFile();
@@ -482,269 +454,45 @@ export function WorkOrderDetailDialog({
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 py-5">
-              {/* ========== DETAIL VIEW ========== */}
               {viewMode === "detail" && (
                 <div className="space-y-6">
                   <WorkOrderDetailInfoCard workOrder={workOrder} />
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
-                        Filer
-                        <Label htmlFor="file-upload-detail" className="cursor-pointer">
-                          <Button size="sm" disabled={uploading} asChild>
-                            <span><Upload className="h-4 w-4 mr-2" />{uploading ? "Laddar upp..." : "Ladda upp fil"}</span>
-                          </Button>
-                        </Label>
-                        <Input id="file-upload-detail" type="file" className="hidden" onChange={handleFileUpload} disabled={uploading} />
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {files && files.length > 0 ? (
-                        <div className="space-y-2">
-                          {files.map((file) => (
-                            <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
-                              <div className="flex items-center gap-3">
-                                <FileText className="h-5 w-5 text-muted-foreground" />
-                                <div>
-                                  <p className="font-medium">{file.name}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {file.file_size ? `${(file.file_size / 1024).toFixed(1)} KB` : ""}{" · "}
-                                    {format(new Date(file.created_at), "yyyy-MM-dd HH:mm", { locale: sv })}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex gap-2">
-                                <Button variant="ghost" size="icon" onClick={() => setPreviewDocument(file)}><Eye className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" onClick={() => window.open(file.file_url, "_blank")}><Download className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleDeleteFile(file.id, file.file_url)}><Trash2 className="h-4 w-4" /></Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
-                          Inga filer uppladdade än
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <WorkOrderFilesCard
+                    files={files}
+                    uploading={uploading}
+                    onUpload={handleFileUpload}
+                    onPreview={setPreviewDocument}
+                    onDelete={handleDeleteFile}
+                  />
                 </div>
               )}
 
-              {/* ========== EDIT VIEW ========== */}
               {viewMode === "edit" && (
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField control={form.control} name="action" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Åtgärd *</FormLabel>
-                        <FormControl><Input placeholder="t.ex. Byte av cirkulationspump" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField control={form.control} name="property_id" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Fastighet *</FormLabel>
-                          <Select onValueChange={(val) => { field.onChange(val); form.setValue("component_id", ""); }} value={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Välj fastighet" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              {properties?.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={form.control} name="due_date" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Datum</FormLabel>
-                          <FormControl><Input type="date" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
-
-                    {watchedPropertyId && componentsForProperty && componentsForProperty.length > 0 && (
-                      <FormField control={form.control} name="component_id" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Komponent (valfritt)</FormLabel>
-                          <Select onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)} value={field.value || "__none__"}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Välj komponent" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              <SelectItem value="__none__">Ingen komponent</SelectItem>
-                              {componentsForProperty.map((comp) => (
-                                <SelectItem key={comp.id} value={comp.id}>{comp.name} ({comp.type})</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField control={form.control} name="status" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              <SelectItem value="not_started">Ej påbörjad</SelectItem>
-                              <SelectItem value="awaiting_quote">Inväntar offert</SelectItem>
-                              <SelectItem value="ordered">Beställt</SelectItem>
-                              <SelectItem value="completed">Slutförd</SelectItem>
-                              <SelectItem value="archived">Arkiverad</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={form.control} name="priority" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Prioritet</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              <SelectItem value="low">Låg</SelectItem>
-                              <SelectItem value="medium">Medel</SelectItem>
-                              <SelectItem value="high">Hög</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField control={form.control} name="price" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Pris (kr)</FormLabel>
-                          <FormControl><Input type="number" placeholder="t.ex. 15000" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={form.control} name="contractor" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Entreprenör</FormLabel>
-                          <FormControl><Input placeholder="t.ex. Rörmokarn AB" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
-
-                    <FormField control={form.control} name="quarter" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Kvartal</FormLabel>
-                        <FormControl><Input placeholder="t.ex. Q3 2025" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-
-                    <FormField control={form.control} name="comments" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Kommentar</FormLabel>
-                        <FormControl><Textarea placeholder="Ytterligare information..." className="min-h-[100px]" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-
-                    <div className="border-t pt-4 space-y-4">
-                      <h3 className="text-sm font-semibold">E-postpåminnelser</h3>
-                      <FormField control={form.control} name="reminder_enabled" render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Aktivera påminnelser när status är "Beställt"</FormLabel>
-                            <p className="text-sm text-muted-foreground">Få regelbundna påminnelser om att följa upp</p>
-                          </div>
-                        </FormItem>
-                      )} />
-                      {form.watch("reminder_enabled") && (
-                        <>
-                          <FormField control={form.control} name="reminder_frequency" render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Påminnelsefrekvens</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                  <SelectItem value="weekly">Varje vecka</SelectItem>
-                                  <SelectItem value="biweekly">Varannan vecka</SelectItem>
-                                  <SelectItem value="triweekly">Var tredje vecka</SelectItem>
-                                  <SelectItem value="monthly">Varje månad</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
-                          <FormField control={form.control} name="reminder_recipient_email" render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>E-postadress för påminnelser</FormLabel>
-                              <FormControl><Input type="email" placeholder="din.email@exempel.se" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )} />
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2 justify-end pt-4">
-                      <Button type="button" variant="outline" onClick={handleBack}>Avbryt</Button>
-                      <Button type="submit" disabled={submitting}>
-                        {submitting ? "Sparar..." : "Spara ändringar"}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
+                <WorkOrderEditForm
+                  form={form}
+                  properties={properties}
+                  componentsForProperty={componentsForProperty}
+                  watchedPropertyId={watchedPropertyId}
+                  submitting={submitting}
+                  onSubmit={onSubmit}
+                  onCancel={handleBack}
+                />
               )}
 
-              {/* ========== PREVIEW VIEW ========== */}
               {viewMode === "preview" && (
-                <div className="space-y-5">
-                  <div className="flex flex-wrap gap-2">
-                    {workOrder.action && <Badge variant="outline">{workOrder.action}</Badge>}
-                    {workOrder.contractor && <Badge variant="secondary">{workOrder.contractor}</Badge>}
-                    {workOrder.price && (
-                      <Badge variant="secondary">{Number(workOrder.price).toLocaleString("sv-SE")} SEK</Badge>
-                    )}
-                    {workOrder.quarter && <Badge variant="secondary">{workOrder.quarter}</Badge>}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Beställningstext</label>
-                      <Button variant="ghost" size="sm" onClick={handleGenerate} disabled={generating} className="h-7 text-xs">
-                        <RefreshCw className={`mr-1 h-3 w-3 ${generating ? "animate-spin" : ""}`} />Regenerera
-                      </Button>
-                    </div>
-                    {generating && !previewText && (
-                      <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
-                        <Loader2 className="h-5 w-5 animate-spin" /><span className="text-sm">Genererar text...</span>
-                      </div>
-                    )}
-                    <Textarea
-                      value={previewText}
-                      onChange={(e) => setPreviewText(e.target.value)}
-                      placeholder={generating ? "Genererar..." : "Texten visas här..."}
-                      rows={18}
-                      className="text-sm leading-relaxed resize-none"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
-                    <Mail className="h-4 w-4 text-primary" />
-                    <span className="text-foreground">Utkastet skickas till <strong>din e-postadress</strong></span>
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" onClick={handleBack}>Tillbaka</Button>
-                    <Button onClick={handleSendPreview} disabled={sending || generating || !previewText.trim()}>
-                      {sending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
-                      {sending ? "Skickar..." : "Skicka till min e-post"}
-                    </Button>
-                  </div>
-                </div>
+                <WorkOrderPreviewPanel
+                  action={workOrder.action}
+                  contractor={workOrder.contractor}
+                  price={workOrder.price}
+                  quarter={workOrder.quarter}
+                  previewText={previewText}
+                  generating={generating}
+                  sending={sending}
+                  onPreviewTextChange={setPreviewText}
+                  onRegenerate={handleGenerate}
+                  onBack={handleBack}
+                  onSend={handleSendPreview}
+                />
               )}
             </div>
           </SheetPrimitive.Content>

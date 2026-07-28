@@ -25,9 +25,9 @@ class Settings(BaseSettings):
     failed_dir: Path = Path("./inbox/failed")
 
     # dry_run = no writes
-    # live | suggest = create WO + service (default production)
-    # hitl = log service optional; WO → pending ai_suggested_actions for review
-    mode: str = "live"
+    # live = create WO + service (default production)
+    # hitl | suggest = log service optional; WO → pending ai_suggested_actions
+    mode: str = "hitl"
     auto_log_service: bool = True
     auto_create_work_orders: bool = True
     source_label: str = "jarvis_inbox"

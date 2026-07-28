@@ -11,36 +11,16 @@ import {
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Plus, Search, Filter, FolderArchive, Briefcase, Edit, ArrowUpDown, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
+import { Plus, FolderArchive, Briefcase, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
 import { ProjectDashboard } from "@/components/projects/ProjectDashboard";
 import { ProjectProposals } from "@/components/projects/ProjectProposals";
+import { ProjectsFilters } from "@/components/projects/ProjectsFilters";
+import { ProjectsTable } from "@/components/projects/ProjectsTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format } from "date-fns";
-import { sv } from "date-fns/locale";
-import { projectStatusBadge, projectTypeBadge } from "@/lib/projectLabels";
-import {
-  budgetVarianceClass,
-  filterAndSortProjects,
-} from "@/lib/projectsListFilter";
+import { filterAndSortProjects } from "@/lib/projectsListFilter";
 
 type ProjectStatus = Database["public"]["Enums"]["project_status"];
 type ProjectType = Database["public"]["Enums"]["project_type"];
@@ -76,7 +56,7 @@ export default function Projects() {
   const [loading, setLoading] = useState(false);
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -86,10 +66,6 @@ export default function Projects() {
   const [sortField, setSortField] = useState<string>("updated_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [editingCell, setEditingCell] = useState<{ projectId: string; field: string } | null>(null);
-  // tempValue is a polymorphic inline-edit buffer (string, number, or
-  // composite { quarter, year } for quarter editing). Strict typing here
-  // would require narrowing at 14+ call sites — left as `any` until the
-  // inline editor itself is split per field type.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [tempValue, setTempValue] = useState<any>(null);
   const [updating, setUpdating] = useState(false);
@@ -100,9 +76,8 @@ export default function Projects() {
     } else if (user && organization) {
       fetchProjects(activeTab === "archived");
       fetchProperties();
-      
-      // Check if we should open edit dialog from URL
-      const editId = searchParams.get('edit');
+
+      const editId = searchParams.get("edit");
       if (editId && !formDialogOpen) {
         handleEditFromUrl(editId);
       }
@@ -113,10 +88,7 @@ export default function Projects() {
     try {
       const { data, error } = await supabase
         .from("projects")
-        .select(`
-          *,
-          property:properties(name)
-        `)
+        .select(`*, property:properties(name)`)
         .eq("id", projectId)
         .single();
 
@@ -124,8 +96,6 @@ export default function Projects() {
 
       setEditingProject(data as unknown as Project);
       setFormDialogOpen(true);
-
-      // Remove edit parameter from URL
       setSearchParams({});
     } catch {
       toast.error("Kunde inte hämta projekt för redigering");
@@ -134,31 +104,26 @@ export default function Projects() {
 
   const fetchProjects = async (archived = false) => {
     if (!organization) return;
-    
+
     setLoading(true);
     try {
-      // First get all properties for the organization
       const { data: orgProperties, error: propError } = await supabase
         .from("properties")
         .select("id")
         .eq("organization_id", organization.id);
 
       if (propError) throw propError;
-      
-      const propertyIds = orgProperties?.map(p => p.id) || [];
-      
+
+      const propertyIds = orgProperties?.map((p) => p.id) || [];
+
       if (propertyIds.length === 0) {
         setProjects([]);
         return;
       }
 
-      // Then get projects for those properties
       const { data, error } = await supabase
         .from("projects")
-        .select(`
-          *,
-          property:properties(name)
-        `)
+        .select(`*, property:properties(name)`)
         .in("property_id", propertyIds)
         .eq("is_archived", archived)
         .order("updated_at", { ascending: false });
@@ -174,7 +139,7 @@ export default function Projects() {
 
   const fetchProperties = async () => {
     if (!organization) return;
-    
+
     const { data } = await supabase
       .from("properties")
       .select("id, name")
@@ -186,7 +151,10 @@ export default function Projects() {
   const updateProject = async (projectId: string, field: string, value: unknown) => {
     setUpdating(true);
     try {
-      const updateData: Record<string, unknown> = { [field]: value, updated_at: new Date().toISOString() };
+      const updateData: Record<string, unknown> = {
+        [field]: value,
+        updated_at: new Date().toISOString(),
+      };
 
       const { error } = await supabase
         .from("projects")
@@ -195,9 +163,11 @@ export default function Projects() {
 
       if (error) throw error;
 
-      setProjects(projects.map(p =>
-        p.id === projectId ? { ...p, [field]: value } as Project : p
-      ));
+      setProjects(
+        projects.map((p) =>
+          p.id === projectId ? ({ ...p, [field]: value } as Project) : p,
+        ),
+      );
 
       toast.success("Projektet uppdaterades");
     } catch {
@@ -237,15 +207,6 @@ export default function Projects() {
     }
   };
 
-  const getSortIcon = (field: string) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
-    }
-    return sortDirection === "asc" 
-      ? <ArrowUp className="h-4 w-4 ml-1" />
-      : <ArrowDown className="h-4 w-4 ml-1" />;
-  };
-
   const filteredProjects = useMemo(
     () =>
       filterAndSortProjects(projects as Parameters<typeof filterAndSortProjects>[0], {
@@ -258,6 +219,26 @@ export default function Projects() {
       }) as Project[],
     [projects, searchQuery, statusFilter, typeFilter, propertyFilter, sortField, sortDirection],
   );
+
+  const tableProps = {
+    projects: filteredProjects,
+    totalUnfilteredCount: projects.length,
+    sortField,
+    sortDirection,
+    onSort: handleSort,
+    editingCell,
+    tempValue,
+    setTempValue,
+    updating,
+    onStartEditing: startEditing,
+    onUpdateProject: updateProject,
+    onKeyDown: handleKeyDown,
+    onRowClick: (id: string) => navigate(`/projects/${id}`),
+    onEditClick: (project: Project) => {
+      setEditingProject(project);
+      setFormDialogOpen(true);
+    },
+  };
 
   if (authLoading || loading) {
     return (
@@ -282,7 +263,7 @@ export default function Projects() {
 
           <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
             <div className="max-w-7xl mx-auto space-y-6">
-               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                   <TabsList>
                     <TabsTrigger value="overview">Översikt</TabsTrigger>
@@ -293,7 +274,12 @@ export default function Projects() {
                     </TabsTrigger>
                     <TabsTrigger value="archived">Arkiverade</TabsTrigger>
                   </TabsList>
-                  <Button onClick={() => { setEditingProject(null); setFormDialogOpen(true); }}>
+                  <Button
+                    onClick={() => {
+                      setEditingProject(null);
+                      setFormDialogOpen(true);
+                    }}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Nytt projekt
                   </Button>
@@ -308,368 +294,21 @@ export default function Projects() {
                 </TabsContent>
 
                 <TabsContent value="active" className="space-y-6">
-                  {/* Filters */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <Filter className="h-4 w-4" />
-                        Filter & Sökning
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Sök projekt..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Alla status</SelectItem>
-                            <SelectItem value="planerat">Planerat</SelectItem>
-                            <SelectItem value="invantar_offert">Inväntar offert</SelectItem>
-                            <SelectItem value="offert_finns">Offert finns</SelectItem>
-                            <SelectItem value="pagaende">Pågående</SelectItem>
-                            <SelectItem value="pausat">Pausat</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <Select value={typeFilter} onValueChange={setTypeFilter}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Typ" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Alla typer</SelectItem>
-                            <SelectItem value="investering">Investering</SelectItem>
-                            <SelectItem value="underhall">Underhåll</SelectItem>
-                            <SelectItem value="energi">Energi</SelectItem>
-                            <SelectItem value="annat">Annat</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Fastighet" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Alla fastigheter</SelectItem>
-                            {properties.map((prop) => (
-                              <SelectItem key={prop.id} value={prop.id}>
-                                {prop.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Projects Table */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>
-                        Projekt ({filteredProjects.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="overflow-x-auto">
-                      {filteredProjects.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                          <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p className="text-lg mb-2">Inga projekt hittades</p>
-                          <p className="text-sm">
-                            {projects.length === 0
-                              ? "Skapa ditt första projekt för att komma igång"
-                              : "Prova att justera filtren"}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="min-w-[800px]">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead 
-                                  className="cursor-pointer hover:bg-muted/50"
-                                  onClick={() => handleSort("project_number")}
-                                >
-                                  <div className="flex items-center">
-                                    Projektnr
-                                    {getSortIcon("project_number")}
-                                  </div>
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer hover:bg-muted/50"
-                                  onClick={() => handleSort("name")}
-                                >
-                                  <div className="flex items-center">
-                                    Namn
-                                    {getSortIcon("name")}
-                                  </div>
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer hover:bg-muted/50"
-                                  onClick={() => handleSort("property_name")}
-                                >
-                                  <div className="flex items-center">
-                                    Fastighet
-                                    {getSortIcon("property_name")}
-                                  </div>
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer hover:bg-muted/50"
-                                  onClick={() => handleSort("type")}
-                                >
-                                  <div className="flex items-center">
-                                    Typ
-                                    {getSortIcon("type")}
-                                  </div>
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer hover:bg-muted/50"
-                                  onClick={() => handleSort("status")}
-                                >
-                                  <div className="flex items-center">
-                                    Status
-                                    {getSortIcon("status")}
-                                  </div>
-                                </TableHead>
-                                <TableHead 
-                                  className="cursor-pointer hover:bg-muted/50"
-                                  onClick={() => handleSort("quarter")}
-                                >
-                                  <div className="flex items-center">
-                                    Kvartal
-                                    {getSortIcon("quarter")}
-                                  </div>
-                                </TableHead>
-                                <TableHead 
-                                  className="text-right cursor-pointer hover:bg-muted/50"
-                                  onClick={() => handleSort("budget")}
-                                >
-                                  <div className="flex items-center justify-end">
-                                    Budget
-                                    {getSortIcon("budget")}
-                                  </div>
-                                </TableHead>
-                                <TableHead 
-                                  className="text-right cursor-pointer hover:bg-muted/50"
-                                  onClick={() => handleSort("actual_cost")}
-                                >
-                                  <div className="flex items-center justify-end">
-                                    Utfall
-                                    {getSortIcon("actual_cost")}
-                                  </div>
-                                </TableHead>
-                                <TableHead className="text-right">Avvikelse</TableHead>
-                                <TableHead>Åtgärder</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filteredProjects.map((project) => {
-                                const variance = project.budget > 0
-                                  ? ((project.actual_cost - project.budget) / project.budget) * 100
-                                  : 0;
-                                return (
-                                  <TableRow
-                                    key={project.id}
-                                    className="cursor-pointer hover:bg-muted/50"
-                                    onClick={() => navigate(`/projects/${project.id}`)}
-                                  >
-                                    <TableCell 
-                                      className="font-medium group cursor-text hover:bg-muted/30"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        startEditing(project.id, "project_number", project.project_number);
-                                      }}
-                                    >
-                                      {editingCell?.projectId === project.id && editingCell?.field === "project_number" ? (
-                                        <Input
-                                          value={tempValue}
-                                          onChange={(e) => setTempValue(e.target.value)}
-                                          onBlur={() => updateProject(project.id, "project_number", tempValue)}
-                                          onKeyDown={(e) => handleKeyDown(e, project.id, "project_number")}
-                                          className="h-8 w-full"
-                                          autoFocus
-                                          disabled={updating}
-                                        />
-                                      ) : (
-                                        <span className="group-hover:underline">{project.project_number}</span>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>{project.name}</TableCell>
-                                    <TableCell>{project.property.name}</TableCell>
-                                    <TableCell 
-                                      className="group cursor-pointer hover:bg-muted/30"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {editingCell?.projectId === project.id && editingCell?.field === "type" ? (
-                                        <Select
-                                          value={tempValue}
-                                          onValueChange={(value) => {
-                                            setTempValue(value);
-                                            updateProject(project.id, "type", value);
-                                          }}
-                                          disabled={updating}
-                                        >
-                                          <SelectTrigger className="h-8 w-full">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="investering">Investering</SelectItem>
-                                            <SelectItem value="underhall">Underhåll</SelectItem>
-                                            <SelectItem value="energi">Energi</SelectItem>
-                                            <SelectItem value="annat">Annat</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      ) : (
-                                        <div onClick={() => startEditing(project.id, "type", project.type)}>
-                                          {projectTypeBadge(project.type)}
-                                        </div>
-                                      )}
-                                    </TableCell>
-                                    <TableCell 
-                                      className="group cursor-pointer hover:bg-muted/30"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {editingCell?.projectId === project.id && editingCell?.field === "status" ? (
-                                        <Select
-                                          value={tempValue}
-                                          onValueChange={(value) => {
-                                            setTempValue(value);
-                                            updateProject(project.id, "status", value);
-                                          }}
-                                          disabled={updating}
-                                        >
-                                          <SelectTrigger className="h-8 w-full">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="planerat">Planerat</SelectItem>
-                                            <SelectItem value="invantar_offert">Inväntar offert</SelectItem>
-                                            <SelectItem value="offert_finns">Offert finns</SelectItem>
-                                            <SelectItem value="pagaende">Pågående</SelectItem>
-                                            <SelectItem value="pausat">Pausat</SelectItem>
-                                            <SelectItem value="avslutat">Avslutat</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      ) : (
-                                        <div onClick={() => startEditing(project.id, "status", project.status)}>
-                                          {projectStatusBadge(project.status)}
-                                        </div>
-                                      )}
-                                    </TableCell>
-                                    <TableCell 
-                                      className="text-sm text-muted-foreground group cursor-pointer hover:bg-muted/30"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {editingCell?.projectId === project.id && editingCell?.field === "quarter" ? (
-                                        <div className="flex gap-2">
-                                          <Select
-                                            value={tempValue?.quarter?.toString() || ""}
-                                            onValueChange={(value) => {
-                                              const newValue = { 
-                                                quarter: parseInt(value), 
-                                                year: tempValue?.year || project.year 
-                                              };
-                                              setTempValue(newValue);
-                                              updateProject(project.id, "start_quarter", parseInt(value));
-                                            }}
-                                            disabled={updating}
-                                          >
-                                            <SelectTrigger className="h-8 w-20">
-                                              <SelectValue placeholder="Q" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              <SelectItem value="1">Q1</SelectItem>
-                                              <SelectItem value="2">Q2</SelectItem>
-                                              <SelectItem value="3">Q3</SelectItem>
-                                              <SelectItem value="4">Q4</SelectItem>
-                                            </SelectContent>
-                                          </Select>
-                                          <Select
-                                            value={tempValue?.year?.toString() || ""}
-                                            onValueChange={(value) => {
-                                              const newValue = { 
-                                                quarter: tempValue?.quarter || project.start_quarter, 
-                                                year: parseInt(value) 
-                                              };
-                                              setTempValue(newValue);
-                                              updateProject(project.id, "year", parseInt(value));
-                                            }}
-                                            disabled={updating}
-                                          >
-                                            <SelectTrigger className="h-8 w-24">
-                                              <SelectValue placeholder="År" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              {Array.from({ length: 7 }, (_, i) => 2024 + i).map((year) => (
-                                                <SelectItem key={year} value={year.toString()}>
-                                                  {year}
-                                                </SelectItem>
-                                              ))}
-                                            </SelectContent>
-                                          </Select>
-                                        </div>
-                                      ) : (
-                                        <div 
-                                          className="group-hover:underline"
-                                          onClick={() => startEditing(project.id, "quarter", { 
-                                            quarter: project.start_quarter, 
-                                            year: project.year 
-                                          })}
-                                        >
-                                          {project.start_quarter && project.year
-                                            ? `Q${project.start_quarter} ${project.year}`
-                                            : "-"}
-                                        </div>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      {project.budget.toLocaleString("sv-SE")} kr
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      {project.actual_cost.toLocaleString("sv-SE")} kr
-                                    </TableCell>
-                                   <TableCell
-                                      className={`text-right font-medium ${budgetVarianceClass(
-                                        project.budget,
-                                        project.actual_cost
-                                      )}`}
-                                    >
-                                      {variance !== 0 ? `${variance > 0 ? "+" : ""}${variance.toFixed(1)}%` : "-"}
-                                    </TableCell>
-                                    <TableCell onClick={(e) => e.stopPropagation()}>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          setEditingProject(project);
-                                          setFormDialogOpen(true);
-                                        }}
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <ProjectsFilters
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    statusFilter={statusFilter}
+                    onStatusChange={setStatusFilter}
+                    typeFilter={typeFilter}
+                    onTypeChange={setTypeFilter}
+                    propertyFilter={propertyFilter}
+                    onPropertyChange={setPropertyFilter}
+                    properties={properties}
+                  />
+                  <ProjectsTable {...tableProps} />
                 </TabsContent>
 
                 <TabsContent value="archived" className="space-y-6">
-                  {/* Same filters for archived */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-lg">
@@ -677,223 +316,15 @@ export default function Projects() {
                         Arkiverade projekt
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="overflow-x-auto">
-                      {filteredProjects.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                          <FolderArchive className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p className="text-lg mb-2">Inga arkiverade projekt</p>
-                        </div>
-                      ) : (
-                        <div className="min-w-[800px]">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Projektnr</TableHead>
-                                <TableHead>Namn</TableHead>
-                                <TableHead>Fastighet</TableHead>
-                                <TableHead>Typ</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Kvartal</TableHead>
-                                <TableHead className="text-right">Budget</TableHead>
-                                <TableHead className="text-right">Utfall</TableHead>
-                                <TableHead className="text-right">Avvikelse</TableHead>
-                                <TableHead>Åtgärder</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filteredProjects.map((project) => {
-                                const variance = project.budget > 0
-                                  ? ((project.actual_cost - project.budget) / project.budget) * 100
-                                  : 0;
-                                return (
-                                  <TableRow
-                                    key={project.id}
-                                    className="cursor-pointer hover:bg-muted/50"
-                                    onClick={() => navigate(`/projects/${project.id}`)}
-                                  >
-                                    <TableCell 
-                                      className="font-medium group cursor-text hover:bg-muted/30"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        startEditing(project.id, "project_number", project.project_number);
-                                      }}
-                                    >
-                                      {editingCell?.projectId === project.id && editingCell?.field === "project_number" ? (
-                                        <Input
-                                          value={tempValue}
-                                          onChange={(e) => setTempValue(e.target.value)}
-                                          onBlur={() => updateProject(project.id, "project_number", tempValue)}
-                                          onKeyDown={(e) => handleKeyDown(e, project.id, "project_number")}
-                                          className="h-8 w-full"
-                                          autoFocus
-                                          disabled={updating}
-                                        />
-                                      ) : (
-                                        <span className="group-hover:underline">{project.project_number}</span>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>{project.name}</TableCell>
-                                    <TableCell>{project.property.name}</TableCell>
-                                    <TableCell 
-                                      className="group cursor-pointer hover:bg-muted/30"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {editingCell?.projectId === project.id && editingCell?.field === "type" ? (
-                                        <Select
-                                          value={tempValue}
-                                          onValueChange={(value) => {
-                                            setTempValue(value);
-                                            updateProject(project.id, "type", value);
-                                          }}
-                                          disabled={updating}
-                                        >
-                                          <SelectTrigger className="h-8 w-full">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="investering">Investering</SelectItem>
-                                            <SelectItem value="underhall">Underhåll</SelectItem>
-                                            <SelectItem value="energi">Energi</SelectItem>
-                                            <SelectItem value="annat">Annat</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      ) : (
-                                        <div onClick={() => startEditing(project.id, "type", project.type)}>
-                                          {projectTypeBadge(project.type)}
-                                        </div>
-                                      )}
-                                    </TableCell>
-                                    <TableCell 
-                                      className="group cursor-pointer hover:bg-muted/30"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {editingCell?.projectId === project.id && editingCell?.field === "status" ? (
-                                        <Select
-                                          value={tempValue}
-                                          onValueChange={(value) => {
-                                            setTempValue(value);
-                                            updateProject(project.id, "status", value);
-                                          }}
-                                          disabled={updating}
-                                        >
-                                          <SelectTrigger className="h-8 w-full">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="planerat">Planerat</SelectItem>
-                                            <SelectItem value="invantar_offert">Inväntar offert</SelectItem>
-                                            <SelectItem value="offert_finns">Offert finns</SelectItem>
-                                            <SelectItem value="pagaende">Pågående</SelectItem>
-                                            <SelectItem value="pausat">Pausat</SelectItem>
-                                            <SelectItem value="avslutat">Avslutat</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      ) : (
-                                        <div onClick={() => startEditing(project.id, "status", project.status)}>
-                                          {projectStatusBadge(project.status)}
-                                        </div>
-                                      )}
-                                    </TableCell>
-                                    <TableCell 
-                                      className="text-sm text-muted-foreground group cursor-pointer hover:bg-muted/30"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {editingCell?.projectId === project.id && editingCell?.field === "quarter" ? (
-                                        <div className="flex gap-2">
-                                          <Select
-                                            value={tempValue?.quarter?.toString() || ""}
-                                            onValueChange={(value) => {
-                                              const newValue = { 
-                                                quarter: parseInt(value), 
-                                                year: tempValue?.year || project.year 
-                                              };
-                                              setTempValue(newValue);
-                                              updateProject(project.id, "start_quarter", parseInt(value));
-                                            }}
-                                            disabled={updating}
-                                          >
-                                            <SelectTrigger className="h-8 w-20">
-                                              <SelectValue placeholder="Q" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              <SelectItem value="1">Q1</SelectItem>
-                                              <SelectItem value="2">Q2</SelectItem>
-                                              <SelectItem value="3">Q3</SelectItem>
-                                              <SelectItem value="4">Q4</SelectItem>
-                                            </SelectContent>
-                                          </Select>
-                                          <Select
-                                            value={tempValue?.year?.toString() || ""}
-                                            onValueChange={(value) => {
-                                              const newValue = { 
-                                                quarter: tempValue?.quarter || project.start_quarter, 
-                                                year: parseInt(value) 
-                                              };
-                                              setTempValue(newValue);
-                                              updateProject(project.id, "year", parseInt(value));
-                                            }}
-                                            disabled={updating}
-                                          >
-                                            <SelectTrigger className="h-8 w-24">
-                                              <SelectValue placeholder="År" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              {Array.from({ length: 7 }, (_, i) => 2024 + i).map((year) => (
-                                                <SelectItem key={year} value={year.toString()}>
-                                                  {year}
-                                                </SelectItem>
-                                              ))}
-                                            </SelectContent>
-                                          </Select>
-                                        </div>
-                                      ) : (
-                                        <div 
-                                          className="group-hover:underline"
-                                          onClick={() => startEditing(project.id, "quarter", { 
-                                            quarter: project.start_quarter, 
-                                            year: project.year 
-                                          })}
-                                        >
-                                          {project.start_quarter && project.year
-                                            ? `Q${project.start_quarter} ${project.year}`
-                                            : "-"}
-                                        </div>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      {project.budget.toLocaleString("sv-SE")} kr
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      {project.actual_cost.toLocaleString("sv-SE")} kr
-                                    </TableCell>
-                                    <TableCell
-                                      className={`text-right font-medium ${budgetVarianceClass(
-                                        project.budget,
-                                        project.actual_cost
-                                      )}`}
-                                    >
-                                      {variance !== 0 ? `${variance > 0 ? "+" : ""}${variance.toFixed(1)}%` : "-"}
-                                    </TableCell>
-                                    <TableCell onClick={(e) => e.stopPropagation()}>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => navigate(`/projects/${project.id}`)}
-                                      >
-                                        Visa
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      )}
-                    </CardContent>
                   </Card>
+                  <ProjectsTable
+                    {...tableProps}
+                    archived
+                    emptyTitle="Inga arkiverade projekt"
+                    emptyDescription=""
+                    emptyIcon="archive"
+                  />
                 </TabsContent>
-
               </Tabs>
             </div>
           </main>

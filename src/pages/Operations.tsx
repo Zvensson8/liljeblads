@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Copy, Download, ClipboardList, FileSpreadsheet, ChevronLeft, ChevronRight, Calendar, Building2, Zap } from "lucide-react";
+import { Loader2, Copy, Download, ClipboardList, FileSpreadsheet, ChevronLeft, ChevronRight, Calendar, Building2, Zap, CalendarRange } from "lucide-react";
 import { toast } from "sonner";
 import { QuarterCard } from "@/components/operations/QuarterCard";
 import { CategoryDialog } from "@/components/operations/CategoryDialog";
@@ -21,6 +21,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { TaskTemplateLibrary } from "@/components/operations/TaskTemplateLibrary";
 import { ReportGenerator } from "@/components/operations/ReportGenerator";
 import { MultiPropertyReportDialog } from "@/components/operations/MultiPropertyReportDialog";
+import { MultiPropertyMaintenancePlanDialog } from "@/components/operations/MultiPropertyMaintenancePlanDialog";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { exportYearToExcel } from "@/lib/operationsExport";
 import {
@@ -51,6 +52,7 @@ export default function Operations() {
   const [templateLibraryOpen, setTemplateLibraryOpen] = useState(false);
   const [reportGeneratorOpen, setReportGeneratorOpen] = useState(false);
   const [multiPropertyReportOpen, setMultiPropertyReportOpen] = useState(false);
+  const [multiPropertyPlanOpen, setMultiPropertyPlanOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("quarters");
   const quarterRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -248,6 +250,16 @@ export default function Operations() {
                   variant="outline"
                   size="sm"
                   className="h-8"
+                  onClick={() => setMultiPropertyPlanOpen(true)}
+                >
+                  <CalendarRange className="h-4 w-4 mr-1.5" />
+                  <span className="hidden sm:inline">Underhållsplan (multi)</span>
+                  <span className="sm:hidden">UH-plan</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
                   onClick={() => setTemplateLibraryOpen(true)}
                   disabled={!selectedProperty}
                 >
@@ -404,6 +416,11 @@ export default function Operations() {
               <MultiPropertyReportDialog
                 open={multiPropertyReportOpen}
                 onOpenChange={setMultiPropertyReportOpen}
+              />
+
+              <MultiPropertyMaintenancePlanDialog
+                open={multiPropertyPlanOpen}
+                onOpenChange={setMultiPropertyPlanOpen}
               />
             </div>
           </main>

@@ -59,8 +59,8 @@ inbox/*.pdf (+ Drive)
 
 | Värde | WO | Service | Användning |
 |-------|----|---------|------------|
-| `live` | Direkt | Ja (om match) | Produktion |
-| `hitl` | Pending AI | Ja (om match) | Granskning |
+| `live` | Direkt | Ja (om match) | Full automation |
+| `hitl` / `suggest` | Pending AI | Ja (om match) | **Rekommenderat i vardagen** |
 | `dry_run` | Nej | Nej | Test av extract |
 
 ## Webhook-typer (urval)
@@ -76,14 +76,45 @@ inbox/*.pdf (+ Drive)
 | `list_processed_files` / `mark_processed` | Idempotens |
 | `start_agent_run` / `finish_agent_run` | Körlogg |
 
-## Schema Windows
+## Jarvis i vardagen (rekommenderad drift)
+
+| Inställning | Värde | Varför |
+|-------------|-------|--------|
+| `MODE` | `hitl` (eller legacy `suggest`) | WO → pending AI-förslag; service loggas vid match |
+| `DRIVE_SYNC_ENABLED` | `true` | Hämta PDF från Drive-mapp innan lokal inbox |
+| `GOOGLE_DRIVE_FOLDER_ID` | mapp-id | Inbox i Drive |
+| `GOOGLE_APPLICATION_CREDENTIALS` | path till SA JSON | Läsbehörighet på mappen |
+| `NOTIFY_EMAIL` | `auto` | Sammanfattning till nyckelns ägare |
+
+### Schema 08:00 / 15:00 (Windows)
 
 ```powershell
 cd jarvis-worker
 powershell -ExecutionPolicy Bypass -File .\scripts\install-scheduled-tasks.ps1
 ```
 
-Loggar: `jarvis-worker/logs/`
+Det skapar `JarvisIngestMorning` (08:00) och `JarvisIngestAfternoon` (15:00).  
+Skriptet `run-ingest.ps1` kör `python -m jarvis_worker.cli ingest --sync-drive` (Drive + lokal inbox, MODE från `.env`).
+
+Manuell körning nu:
+
+```powershell
+cd jarvis-worker
+.\.venv\Scripts\Activate.ps1
+powershell -File .\scripts\run-ingest.ps1
+# eller:
+python -m jarvis_worker.cli ingest --sync-drive
+```
+
+Granska resultat i appen: **AI-förslag** / Agent-aktivitet / Arbetsordrar.  
+Loggar: `jarvis-worker/logs/ingest_*.log`
+
+### Checklista morgon/eftermiddag
+
+1. Drive-mappen har nya servicerapporter (PDF)
+2. Schemat eller manuell `run-ingest.ps1` har kört utan fel
+3. Pending förslag granskas i Liljeblads
+4. Vid behov: `python -m jarvis_worker.cli ask "Lista öppna arbetsordrar"`
 
 ## Designval
 

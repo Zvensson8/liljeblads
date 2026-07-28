@@ -204,7 +204,8 @@ def build_graph(settings: Settings | None = None):
     def apply(state: GraphState) -> GraphState:
         mode = settings.mode.strip().lower()
         dry = mode == "dry_run"
-        hitl = mode == "hitl"
+        # suggest is a legacy alias for hitl (pending AI proposals)
+        hitl = mode in ("hitl", "suggest")
         extracted = ExtractBatch.model_validate(state.get("extracted") or {"files": []})
         path_by_id = {f["file_id"]: f for f in (state.get("inbox_files") or [])}
         property_names = state.get("property_names") or []

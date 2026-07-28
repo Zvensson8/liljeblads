@@ -14,14 +14,16 @@ function Write-Log($msg) {
   Write-Host $line
 }
 
-Write-Log "Starting Jarvis folder check / ingest"
+Write-Log "Starting Jarvis folder check / ingest (Drive + inbox, MODE from .env)"
 $python = Join-Path $Root ".venv\Scripts\python.exe"
 if (-not (Test-Path $python)) {
   Write-Log "ERROR: venv python not found at $python"
   exit 1
 }
 
-& $python -m jarvis_worker.cli ingest *>> $log
+# --sync-drive forces Drive even if env temporarily disabled; primary
+# toggle is DRIVE_SYNC_ENABLED=true in jarvis-worker/.env
+& $python -m jarvis_worker.cli ingest --sync-drive *>> $log
 $code = $LASTEXITCODE
 Write-Log "Finished with exit code $code"
 exit $code
