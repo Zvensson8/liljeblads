@@ -357,31 +357,7 @@ async function buildContext(
     }
   }
 
-  // 7. Recurring costs (keyword-triggered)
-  if (searchTerms.some(t => ['kostnad','kostnader','löpande','avtal','faktura','budget','pris','hyra','el','vatten','värme','försäkring','driftskostnad'].includes(t.toLowerCase()))) {
-    const { data: costs } = await supabase.from('recurring_costs').select('*, property:properties(name)').in('property_id', propIds).limit(50);
-    if (costs && costs.length > 0) {
-      const byProp = new Map<string, any[]>();
-      for (const c of costs) { const p = c.property_id; if (!byProp.has(p)) byProp.set(p, []); byProp.get(p)!.push(c); }
-      for (const [pid, pc] of byProp) {
-        let info = `💰 LÖPANDE KOSTNADER FÖR ${(propMap.get(pid)||'?').toUpperCase()}:`;
-        let monthly = 0;
-        for (const c of pc) {
-          info += `\n  ${c.description}`;
-          if (c.contractor_name) info += ` (${c.contractor_name})`;
-          info += ` — ${c.amount?.toLocaleString('sv-SE')} kr/${c.payment_interval || 'månad'}`;
-          const iv = c.payment_interval || 'monthly';
-          if (iv === 'monthly') monthly += c.amount || 0;
-          else if (iv === 'quarterly') monthly += (c.amount || 0) / 3;
-          else if (iv === 'yearly') monthly += (c.amount || 0) / 12;
-        }
-        info += `\n  TOTALT: ~${Math.round(monthly).toLocaleString('sv-SE')} kr/mån`;
-        parts.push(info);
-      }
-    }
-  }
-
-  // 8. Todos (keyword-triggered)
+  // 7. Todos (keyword-triggered)
   if (searchTerms.some(t => ['todo','todos','göra','uppgift','uppgifter','checklist','påminnelse','deadline','förfaller','planerat','agenda'].includes(t.toLowerCase()))) {
     const { data: todos } = await supabase.from('property_todos').select('*, property:properties(name)')
       .in('property_id', propIds).eq('completed', false).order('due_date', { ascending: true }).limit(30);

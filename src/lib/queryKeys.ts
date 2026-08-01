@@ -82,8 +82,7 @@ export const queryKeys = {
   // — Newly consolidated entities —
   floors: makeEntityKeys('floors'),
   driftCategories: makeEntityKeys('drift-categories'),
-  recurringCosts: makeEntityKeys('recurring-costs'),
-  recurringCostHistory: makeEntityKeys('recurring-cost-history'),
+
   propertyDocuments: makeEntityKeys('property-documents'),
   propertyContacts: makeEntityKeys('property-contacts'),
   propertyNotes: makeEntityKeys('property-notes'),

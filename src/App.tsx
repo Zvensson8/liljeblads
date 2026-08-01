@@ -37,7 +37,6 @@ const OrganizationSettings = lazy(() => import("./pages/OrganizationSettings"));
 const UserSettings = lazy(() => import("./pages/UserSettings"));
 const FounderAdmin = lazy(() => import("./pages/FounderAdmin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const RecurringCosts = lazy(() => import("./pages/RecurringCosts"));
 const Reports = lazy(() => import("./pages/Reports"));
 const SecurityDashboard = lazy(() => import("./pages/SecurityDashboard"));
 const AIChat = lazy(() => import("./pages/AIChat"));
@@ -85,7 +84,6 @@ const AppContent = () => {
           <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
           <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
           <Route path="/cost-overview" element={<ProtectedRoute><CostOverview /></ProtectedRoute>} />
-          <Route path="/recurring-costs" element={<ProtectedRoute><RecurringCosts /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><RequireAdmin><Reports /></RequireAdmin></ProtectedRoute>} />
           <Route path="/security" element={<ProtectedRoute><SecurityDashboard /></ProtectedRoute>} />
           <Route path="/ai-chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />

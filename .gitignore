@@ -63,3 +63,4 @@ import_staging/*.bak*
 # Worker logs
 jarvis-worker/logs/
 
+.vercel

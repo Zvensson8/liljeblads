@@ -239,13 +239,6 @@ Deno.serve(async (req) => {
         .in('property_id', propertyIds);
       exportData.property_todos = propertyTodos || [];
 
-      // Fetch recurring costs
-      const { data: recurringCosts } = await supabaseClient
-        .from('property_recurring_costs')
-        .select('*')
-        .in('property_id', propertyIds);
-      exportData.recurring_costs = recurringCosts || [];
-
       // Fetch drift categories
       const { data: driftCategories } = await supabaseClient
         .from('drift_categories')
@@ -283,7 +276,6 @@ Deno.serve(async (req) => {
       notes_count: exportData.property_notes?.length || 0,
       todos_count: exportData.property_todos?.length || 0,
       maintenance_count: exportData.maintenance_history?.length || 0,
-      recurring_costs_count: exportData.recurring_costs?.length || 0,
       drift_tasks_count: exportData.drift_tasks?.length || 0,
       documents_count: 
         (exportData.property_documents?.length || 0) + 
@@ -318,7 +310,6 @@ Deno.serve(async (req) => {
 📝 Anteckningar ............... ${exportData.property_notes?.length || 0} st
 ✅ Att göra-uppgifter ......... ${exportData.property_todos?.length || 0} st
 🔨 Underhållshändelser ........ ${exportData.maintenance_history?.length || 0} st
-💰 Återkommande kostnader ..... ${exportData.recurring_costs?.length || 0} st
 📊 Driftuppgifter ............. ${exportData.drift_tasks?.length || 0} st
 📄 Dokument (metadata) ........ ${exportData.summary.documents_count || 0} st
 
@@ -344,11 +335,10 @@ Denna export innehåller följande filer:
 13_project_checklist.txt ............. Projektchecklistor
 14_project_activity.txt .............. Projektaktivitetsloggar
 15_work_orders.txt ................... Arbetsordrar och serviceuppdrag
-16_recurring_costs.txt ............... Återkommande kostnader och prenumerationer
-17_drift_categories.txt .............. Driftkategorier
-18_drift_operations.txt .............. Drift och underhållsuppgifter
-19_drift_task_components.txt ......... Komponenter kopplade till driftuppgifter
-20_documents.txt ..................... Dokumentregister och metadata
+16_drift_categories.txt .............. Driftkategorier
+17_drift_operations.txt .............. Drift och underhållsuppgifter
+18_drift_task_components.txt ......... Komponenter kopplade till driftuppgifter
+19_documents.txt ..................... Dokumentregister och metadata
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ℹ️  VIKTIG INFORMATION
@@ -912,55 +902,6 @@ ${maint.notes}
       zip.file('09_maintenance.txt', maintContent);
     }
 
-    // Recurring Costs
-    if (exportData.recurring_costs && exportData.recurring_costs.length > 0) {
-      let rcContent = `╔═══════════════════════════════════════════════════════════════╗
-║                 ÅTERKOMMANDE KOSTNADER                        ║
-║                   ${exportData.recurring_costs.length} kostnader totalt                          ║
-╚═══════════════════════════════════════════════════════════════╝
-
-`;
-      
-      exportData.recurring_costs.forEach((rc: any, index: number) => {
-        const annualCost = rc.amount && rc.base_interval_months 
-          ? (rc.amount * (12 / rc.base_interval_months)).toFixed(2)
-          : null;
-        
-        rcContent += `
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ ${(index + 1).toString().padStart(3, '0')}. ${(rc.description || 'Namnlös kostnad').substring(0, 50).padEnd(50)} ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-🏠 FASTIGHET
-Fastighet-ID: ${rc.property_id}
-
-💰 EKONOMI
-├─ Belopp per period: ${rc.amount ? `${rc.amount.toLocaleString('sv-SE')} kr` : '0 kr'}
-${annualCost ? `├─ Beräknad årskostnad: ${parseFloat(annualCost).toLocaleString('sv-SE')} kr` : ''}
-└─ Kontonummer: ${rc.account_code_id || 'Inget'}
-
-📅 FREKVENS OCH PERIOD
-├─ Basintervall: ${rc.base_interval_months ? `${rc.base_interval_months} månader` : 'Ej angivet'}
-├─ Variation: ${rc.interval_variation_months ? `±${rc.interval_variation_months} månader` : 'Ingen'}
-├─ Nästa förfallodatum: ${rc.next_due_date || 'Inget'}
-├─ Senaste betalning: ${rc.last_payment_date || 'Ingen'}
-├─ Användarval datum: ${rc.user_selected_date || 'Inget'}
-├─ Kvartal (start): ${rc.calculated_quarter_start || 'Ej beräknat'}
-└─ Kvartal (slut): ${rc.calculated_quarter_end || 'Ej beräknat'}
-
-👥 LEVERANTÖR
-├─ Entreprenör: ${rc.contractor_name || 'Ej angiven'}
-└─ Kontaktperson: ${rc.contact_person || 'Ingen'}
-
-📅 REGISTRERING
-├─ Skapad: ${rc.created_at ? new Date(rc.created_at).toLocaleString('sv-SE') : 'Okänt'}
-└─ Uppdaterad: ${rc.updated_at ? new Date(rc.updated_at).toLocaleString('sv-SE') : 'Okänt'}
-
-`;
-      });
-      zip.file('16_recurring_costs.txt', rcContent);
-    }
-
     // Drift Categories
     if (exportData.drift_categories && exportData.drift_categories.length > 0) {
       let catContent = `╔═══════════════════════════════════════════════════════════════╗
@@ -984,7 +925,7 @@ Uppdaterad: ${cat.updated_at ? new Date(cat.updated_at).toLocaleString('sv-SE') 
 
 `;
       });
-      zip.file('17_drift_categories.txt', catContent);
+      zip.file('16_drift_categories.txt', catContent);
     }
 
     // Drift Operations
@@ -1033,7 +974,7 @@ ${task.description}
 ` : ''}
 `;
       });
-      zip.file('18_drift_operations.txt', driftContent);
+      zip.file('17_drift_operations.txt', driftContent);
     }
 
     // Drift Task Components
@@ -1063,7 +1004,7 @@ Skapad: ${tc.created_at ? new Date(tc.created_at).toLocaleString('sv-SE') : 'Ok�
 
 `;
       });
-      zip.file('19_drift_task_components.txt', taskCompContent);
+      zip.file('18_drift_task_components.txt', taskCompContent);
     }
 
     // Documents summary
@@ -1137,7 +1078,7 @@ ${i + 1}. ${doc.name || 'Namnlöst dokument'}
    i systemet för respektive dokument.
 
 `;
-    zip.file('20_documents.txt', docContent);
+    zip.file('19_documents.txt', docContent);
 
     // Create filename
     const timestamp = new Date().toISOString().split('T')[0];

@@ -17,7 +17,6 @@ const AVAILABLE_MODULES = [
   { name: "work-orders", label: "Arbetsordrar" },
   { name: "operations", label: "Driftuppföljning" },
   { name: "projects", label: "Projekthantering" },
-  { name: "recurring-costs", label: "Återkommande kostnader" },
   { name: "users", label: "Användare" },
   { name: "organization", label: "Organisation" },
   { name: "ai-chat", label: "AI Assistent" },

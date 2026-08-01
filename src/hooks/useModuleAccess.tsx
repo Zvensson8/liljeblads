@@ -9,7 +9,6 @@ export type ModuleName =
   | "work-orders"
   | "operations"
   | "projects"
-  | "recurring-costs"
   | "users"
   | "organization"
   | "ai-chat";
@@ -21,7 +20,6 @@ const ALL_MODULES: ModuleName[] = [
   "work-orders",
   "operations",
   "projects",
-  "recurring-costs",
   "users",
   "organization",
   "ai-chat",
@@ -35,7 +33,6 @@ const DEFAULT_MODULES: ModuleName[] = [
   "work-orders",
   "operations",
   "projects",
-  "recurring-costs",
   "organization",
   "ai-chat",
   // "users" intentionally excluded from default — admin-managed

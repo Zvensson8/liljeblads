@@ -58,7 +58,6 @@ const SECTION_LABELS: Record<string, string> = {
   project_checklist: "Projektchecklista",
   project_activity: "Projektaktivitet",
   work_orders: "Arbetsordrar",
-  recurring_costs: "Återkommande kostnader",
   drift_categories: "Driftkategorier",
   drift_tasks: "Driftuppgifter",
   drift_task_components: "Driftkomponenter",

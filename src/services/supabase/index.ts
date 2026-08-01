@@ -47,19 +47,6 @@ export type {
   DriftTaskComponentFilters,
 } from './driftTaskComponentService';
 
-export {
-  recurringCostService,
-  recurringCostHistoryService,
-} from './recurringCostService';
-export type {
-  RecurringCost,
-  RecurringCostInsert,
-  RecurringCostUpdate,
-  RecurringCostFilters,
-  RecurringCostHistory,
-  RecurringCostHistoryInsert,
-} from './recurringCostService';
-
 export { propertyDocumentService } from './propertyDocumentService';
 export type {
   PropertyDocument,

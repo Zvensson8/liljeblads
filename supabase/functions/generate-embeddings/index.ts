@@ -613,43 +613,6 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
       };
     }
 
-    case 'recurring_costs': {
-      const { data, error } = await supabase
-        .from('recurring_costs')
-        .select(`
-          description, amount, payment_interval, contractor_name, contractor_phone, contractor_email,
-          property:properties(organization_id, name),
-          account_code:account_codes(code, name)
-        `)
-        .eq('id', sourceId)
-        .single();
-      
-      if (error || !data) return null;
-      
-      const intervalLabel = (interval: string) => {
-        if (interval === 'monthly') return 'månadsvis';
-        if (interval === 'quarterly') return 'kvartalsvis';
-        if (interval === 'yearly') return 'årsvis';
-        return interval;
-      };
-      
-      const parts = [
-        `Löpande kostnad: ${data.description}`,
-        data.amount ? `Belopp: ${data.amount} kr` : '',
-        data.payment_interval ? `Intervall: ${intervalLabel(data.payment_interval)}` : '',
-        data.contractor_name ? `Leverantör: ${data.contractor_name}` : '',
-        data.contractor_phone ? `Telefon: ${data.contractor_phone}` : '',
-        data.contractor_email ? `E-post: ${data.contractor_email}` : '',
-        data.account_code ? `Konto: ${data.account_code.code} - ${data.account_code.name}` : '',
-        data.property?.name ? `Fastighet: ${data.property.name}` : ''
-      ].filter(Boolean);
-      
-      return {
-        content: parts.join('. '),
-        organizationId: data.property?.organization_id || null
-      };
-    }
-
     case 'property_contacts': {
       const { data, error } = await supabase
         .from('property_contacts')

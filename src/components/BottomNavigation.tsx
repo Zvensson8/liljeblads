@@ -30,7 +30,6 @@ export const BottomNavigation = () => {
   const allSecondaryNavItems = [
     { path: '/projects', label: 'Projekt', moduleName: 'projects' as ModuleName },
     { path: '/operations', label: 'Drift', moduleName: 'operations' as ModuleName },
-    { path: '/recurring-costs', label: 'Återkommande', moduleName: 'recurring-costs' as ModuleName },
     { path: '/organization/settings', label: 'Inställningar', moduleName: 'organization' as ModuleName },
   ];
 
