@@ -48,12 +48,27 @@ export function useCreateOrganization() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: async (input: Partial<Organization> & { name: string }) => {
-      const { error } = await supabase.from('organizations').insert(input as never);
+      // Atomic: org + caller as owner (no global user_roles.admin)
+      const { data, error } = await supabase.rpc(
+        'create_organization' as never,
+        {
+          p_name: input.name,
+          p_subscription_tier: input.subscription_tier ?? 'small',
+          p_max_properties: input.max_properties ?? 50,
+          p_max_users: input.max_users ?? 10,
+          p_max_components: input.max_components ?? 2500,
+          p_max_work_orders: input.max_work_orders ?? 5000,
+          p_max_projects: input.max_projects ?? 500,
+          p_max_documents: input.max_documents ?? 10000,
+          p_max_storage_mb: input.max_storage_mb ?? 5120,
+        } as never,
+      );
       if (error) throw error;
+      return data as { organization_id: string; name: string; member_role: string };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
-      toast({ title: 'Organisation skapad' });
+      toast({ title: 'Organisation skapad', description: 'Du är ägare i den nya organisationen.' });
     },
     onError: (error: Error) => {
       toast({
