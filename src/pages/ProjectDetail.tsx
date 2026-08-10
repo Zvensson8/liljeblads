@@ -67,9 +67,11 @@ interface Project {
   actors: string[] | null;
   created_at: string;
   updated_at: string;
-  property: {
+  /** Supabase embed from `properties (id, name)` — may be null if RLS/missing FK */
+  properties?: {
+    id?: string;
     name: string;
-  };
+  } | null;
 }
 
 export default function ProjectDetail() {
@@ -185,7 +187,7 @@ export default function ProjectDetail() {
   };
 
   const getStatusBadge = (status: ProjectStatus) => {
-    const statusConfig = {
+    const statusConfig: Record<string, { label: string; className: string }> = {
       planerat: { label: "Planerat", className: "bg-gray-500" },
       invantar_offert: { label: "Inväntar offert", className: "bg-yellow-500" },
       offert_finns: { label: "Offert finns", className: "bg-blue-500" },
@@ -193,20 +195,24 @@ export default function ProjectDetail() {
       pausat: { label: "Pausat", className: "bg-orange-500" },
       avslutat: { label: "Avslutat", className: "bg-gray-700" },
     };
-    const config = statusConfig[status];
+    const config = statusConfig[status] ?? { label: status || "Okänd", className: "bg-gray-500" };
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
   const getTypeBadge = (type: ProjectType) => {
-    const typeConfig = {
+    const typeConfig: Record<string, { label: string; className: string }> = {
       investering: { label: "Investering", className: "bg-purple-500" },
       underhall: { label: "Underhåll", className: "bg-blue-500" },
       energi: { label: "Energi", className: "bg-green-500" },
       annat: { label: "Annat", className: "bg-gray-500" },
     };
-    const config = typeConfig[type];
+    const config = typeConfig[type] ?? { label: type || "Okänd", className: "bg-gray-500" };
     return <Badge variant="outline" className={config.className}>{config.label}</Badge>;
   };
+
+  const propertyName = projectData
+    ? ((projectData as Project).properties?.name ?? "Okänd fastighet")
+    : "Okänd fastighet";
 
   if (authLoading || loading) {
     return (
@@ -242,7 +248,7 @@ export default function ProjectDetail() {
                 <BreadcrumbItem>
                   <BreadcrumbLink href={`/properties/${project.property_id}`} className="flex items-center gap-1">
                     <Building2 className="h-3 w-3" />
-                    {project.property.name}
+                    {propertyName}
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
@@ -418,7 +424,7 @@ export default function ProjectDetail() {
                           <p className="text-sm font-medium text-muted-foreground">
                             Fastighet
                           </p>
-                          <p className="text-base">{project.property.name}</p>
+                          <p className="text-base">{propertyName}</p>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">

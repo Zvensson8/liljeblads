@@ -98,6 +98,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session, signOut]);
 
   useEffect(() => {
+    const clearLocalSession = async () => {
+      try {
+        // Drop stale localStorage tokens without calling the network again
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch {
+        // ignore
+      }
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         // Tab focus/visibility changes cause Supabase to fire TOKEN_REFRESHED
@@ -107,13 +119,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // discarding unsaved form input. Only update state when the user
         // actually changes.
         setLoading(false);
+
+        // Invalid/expired refresh token → Supabase emits SIGNED_OUT with null session
+        if (event === 'SIGNED_OUT' || !newSession) {
+          setUser(null);
+          setSession(null);
+          return;
+        }
+
         setUser((prevUser) => {
-          const nextUser = newSession?.user ?? null;
+          const nextUser = newSession.user ?? null;
           if (prevUser?.id === nextUser?.id) return prevUser;
           return nextUser;
         });
         setSession((prevSession) => {
-          if (!newSession) return null;
           // Same user + same access token: keep reference to avoid remounts
           if (
             prevSession?.user?.id === newSession.user?.id &&
@@ -129,16 +148,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth
       .getSession()
-      .then(({ data: { session } }) => {
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          console.error('Failed to restore session', error);
+          void clearLocalSession();
+          return;
+        }
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
       })
       .catch((err) => {
         console.error('Failed to restore session', err);
-        setSession(null);
-        setUser(null);
-        setLoading(false);
+        void clearLocalSession();
       });
 
     return () => subscription.unsubscribe();

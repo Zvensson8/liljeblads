@@ -17,6 +17,8 @@ export const projectService = createCrudService<
   ProjectListFilters
 >({
   table: 'projects',
+  // Keep table name key `properties` (matches ProjectWithRelations / dashboard widgets).
+  // ProjectDetail must read `project.properties`, not `project.property`.
   select: `
     *,
     properties (id, name)

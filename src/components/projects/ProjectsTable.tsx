@@ -208,7 +208,7 @@ export function ProjectsTable({
                         )}
                       </TableCell>
                       <TableCell>{project.name}</TableCell>
-                      <TableCell>{project.property.name}</TableCell>
+                      <TableCell>{project.property?.name ?? "—"}</TableCell>
                       <TableCell
                         className="group cursor-pointer hover:bg-muted/30"
                         onClick={(e) => e.stopPropagation()}

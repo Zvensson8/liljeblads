@@ -10,7 +10,7 @@ export interface ProjectListItem {
   budget: number;
   actual_cost: number;
   updated_at: string;
-  property: { name: string };
+  property?: { name: string } | null;
 }
 
 export interface ProjectsListFilters {
@@ -33,7 +33,7 @@ export function filterAndSortProjects<T extends ProjectListItem>(
       !q ||
       project.name.toLowerCase().includes(q) ||
       project.project_number.toLowerCase().includes(q) ||
-      project.property.name.toLowerCase().includes(q);
+      (project.property?.name ?? "").toLowerCase().includes(q);
 
     const matchesStatus =
       filters.statusFilter === 'all' || project.status === filters.statusFilter;
@@ -51,8 +51,8 @@ export function filterAndSortProjects<T extends ProjectListItem>(
     let bValue: unknown = (b as Record<string, unknown>)[filters.sortField];
 
     if (filters.sortField === 'property_name') {
-      aValue = a.property.name;
-      bValue = b.property.name;
+      aValue = a.property?.name ?? '';
+      bValue = b.property?.name ?? '';
     }
 
     if (filters.sortField === 'quarter') {

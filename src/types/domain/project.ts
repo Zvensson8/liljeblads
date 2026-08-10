@@ -48,6 +48,8 @@ export type Project = z.infer<typeof projectSchema>;
 
 export type ProjectWithRelations = Project & {
   properties?: { id: string; name: string } | null;
+  /** Alias used by list UI (`property:properties(...)`) */
+  property?: { id: string; name: string } | null;
 };
 
 export type CreateProjectInput =
