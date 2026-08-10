@@ -66,4 +66,6 @@ export interface ComponentListFilters {
   floorId?: string;
   type?: ComponentType;
   status?: ComponentStatus;
+  /** Defense-in-depth: only components on properties in this org */
+  organizationId?: string;
 }

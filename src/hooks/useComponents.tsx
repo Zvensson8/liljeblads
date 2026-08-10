@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrganization } from '@/hooks/useOrganization';
 import { useRealtimeInvalidation } from '@/hooks/internal/useRealtimeInvalidation';
 import { queryKeys } from '@/lib/queryKeys';
 import { componentService } from '@/services/supabase';
@@ -26,13 +27,19 @@ export type {
  */
 export function useComponents(filters: ComponentListFilters = {}) {
   const { session } = useAuth();
+  const { organization } = useOrganization();
+  const orgId = organization?.id;
+  const merged: ComponentListFilters = {
+    ...filters,
+    organizationId: filters.organizationId ?? orgId,
+  };
 
   useRealtimeInvalidation('components', queryKeys.components.all);
 
   return useQuery({
-    queryKey: queryKeys.components.list({ ...filters }),
-    queryFn: () => componentService.list(filters),
-    enabled: !!session,
+    queryKey: queryKeys.components.list({ ...merged }),
+    queryFn: () => componentService.list(merged),
+    enabled: !!session && !!merged.organizationId,
     staleTime: 1000 * 60 * 2,
     gcTime: 1000 * 60 * 30,
   });

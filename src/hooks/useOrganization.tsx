@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -84,14 +84,21 @@ export function useOrganization() {
   const activeMembership =
     memberships.find((m) => m.is_active) ?? memberships[0] ?? null;
 
-  const organization: Organization | null = activeMembership
-    ? {
-        id: activeMembership.organization_id,
-        name: activeMembership.name,
-        logo_url: activeMembership.logo_url,
-        primary_color: activeMembership.primary_color,
-      }
-    : null;
+  // Stable reference — avoid useEffect loops that depend on `organization`
+  const organization: Organization | null = useMemo(() => {
+    if (!activeMembership) return null;
+    return {
+      id: activeMembership.organization_id,
+      name: activeMembership.name,
+      logo_url: activeMembership.logo_url,
+      primary_color: activeMembership.primary_color,
+    };
+  }, [
+    activeMembership?.organization_id,
+    activeMembership?.name,
+    activeMembership?.logo_url,
+    activeMembership?.primary_color,
+  ]);
 
   const setActive = useMutation({
     mutationFn: async (organizationId: string) => {

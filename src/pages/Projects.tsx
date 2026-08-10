@@ -88,20 +88,39 @@ export default function Projects() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [tempValue, setTempValue] = useState<any>(null);
   const [updating, setUpdating] = useState(false);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const orgId = organization?.id;
+  const editId = searchParams.get("edit");
 
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
-    } else if (user && organization) {
-      fetchProjects(activeTab === "archived");
-      fetchProperties();
-
-      const editId = searchParams.get("edit");
-      if (editId && !formDialogOpen) {
-        handleEditFromUrl(editId);
-      }
+      return;
     }
-  }, [user, authLoading, navigate, activeTab, searchParams, organization]);
+    if (!user || !orgId) return;
+
+    let cancelled = false;
+    (async () => {
+      await Promise.all([
+        fetchProjects(activeTab === "archived", { quiet: initialLoadDone }),
+        fetchProperties(),
+      ]);
+      if (!cancelled) setInitialLoadDone(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // organization object identity must not be a dep — use orgId only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading, navigate, activeTab, orgId]);
+
+  useEffect(() => {
+    if (user && orgId && editId && !formDialogOpen) {
+      void handleEditFromUrl(editId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, orgId, editId, formDialogOpen]);
 
   const handleEditFromUrl = async (projectId: string) => {
     try {
@@ -128,10 +147,13 @@ export default function Projects() {
     }
   };
 
-  const fetchProjects = async (archived = false) => {
-    if (!organization) return;
+  const fetchProjects = async (
+    archived = false,
+    opts: { quiet?: boolean } = {},
+  ) => {
+    if (!organization?.id) return;
 
-    setLoading(true);
+    if (!opts.quiet) setLoading(true);
     try {
       const { data: orgProperties, error: propError } = await supabase
         .from("properties")
@@ -164,7 +186,7 @@ export default function Projects() {
   };
 
   const fetchProperties = async () => {
-    if (!organization) return;
+    if (!organization?.id) return;
 
     const { data } = await supabase
       .from("properties")
@@ -267,7 +289,7 @@ export default function Projects() {
     },
   };
 
-  if (authLoading || loading) {
+  if (authLoading || (!initialLoadDone && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
