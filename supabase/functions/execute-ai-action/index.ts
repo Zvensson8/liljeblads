@@ -7,6 +7,55 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/** Parse "Q3 2026" / "kvartal 3 2026" from payload or free text → quarter label + quarter-end due_date */
+function resolveQuarterAndDueDate(
+  payload: Record<string, unknown>,
+  reasoning?: string | null,
+): { quarter: string | null; dueDate: string | null } {
+  const explicitDue =
+    (payload.due_date as string) ||
+    (payload.suggested_date as string) ||
+    null;
+  let quarter =
+    (payload.quarter as string) ||
+    (payload.planned_quarter as string) ||
+    null;
+
+  const blob = [
+    quarter,
+    payload.action,
+    payload.reasoning,
+    reasoning,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  // Q3 2026 | Q3-2026 | q3/2026
+  const qMatch =
+    blob.match(/\bQ\s*([1-4])\s*[-/ ]?\s*(20\d{2})\b/i) ||
+    blob.match(/\bkvartal\s*([1-4])\s*(?:år\s*)?(20\d{2})\b/i);
+
+  if (!quarter && qMatch) {
+    quarter = `Q${qMatch[1]} ${qMatch[2]}`;
+  }
+
+  if (explicitDue) {
+    return { quarter: quarter || null, dueDate: explicitDue.slice(0, 10) };
+  }
+
+  if (qMatch) {
+    const q = Number(qMatch[1]);
+    const year = Number(qMatch[2]);
+    // End of quarter as planning due date
+    const monthEnd = [3, 6, 9, 12][q - 1];
+    const day = [31, 30, 30, 31][q - 1];
+    const dueDate = `${year}-${String(monthEnd).padStart(2, '0')}-${day}`;
+    return { quarter: quarter || `Q${q} ${year}`, dueDate };
+  }
+
+  return { quarter: quarter || null, dueDate: null };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -145,6 +194,18 @@ serve(async (req) => {
             if (comp?.property_id) propertyId = comp.property_id;
           }
 
+          // Resolve component by name on property if only component_name was set
+          if (!componentId && propertyId && payload.component_name) {
+            const { data: byCompName } = await supabase
+              .from('components')
+              .select('id')
+              .eq('property_id', propertyId)
+              .ilike('name', `%${String(payload.component_name)}%`)
+              .limit(1)
+              .maybeSingle();
+            componentId = byCompName?.id ?? null;
+          }
+
           if (!propertyId) {
             const { data: properties } = await supabase
               .from('properties')
@@ -160,20 +221,48 @@ serve(async (req) => {
             throw new Error('Ingen fastighet hittades för att skapa arbetsordern');
           }
 
+          // Map structured fields from AI payload (not only free-text reasoning)
+          const priceRaw =
+            payload.price_estimate ?? payload.price ?? payload.estimated_price;
+          const price =
+            priceRaw != null && !Number.isNaN(Number(priceRaw))
+              ? Number(priceRaw)
+              : null;
+
+          const contractor =
+            (payload.contractor as string) ||
+            (payload.supplier as string) ||
+            (payload.entreprenor as string) ||
+            null;
+
+          const { quarter, dueDate } = resolveQuarterAndDueDate(payload, action.reasoning);
+
+          const reasoning = String(action.reasoning || payload.reasoning || '').trim();
+          const commentsParts = [
+            reasoning ? `AI-motivering: ${reasoning}` : null,
+            payload.component_name && !componentId
+              ? `Komponent (ej matchad): ${payload.component_name}`
+              : null,
+          ].filter(Boolean);
+
           const { data: workOrder, error: woError } = await supabase
             .from('work_orders')
             .insert({
               property_id: propertyId,
               component_id: componentId,
-              action: (payload.action as string) || (payload.title as string) || 'AI-föreslagen åtgärd',
+              action:
+                (payload.action as string) ||
+                (payload.title as string) ||
+                'AI-föreslagen åtgärd',
               priority: (payload.priority as string) || 'medium',
               status: 'not_started',
-              comments: `Skapad via AI-förslag: ${action.reasoning || 'Ingen motivering'}`,
-              due_date: (payload.due_date as string) || null,
-              price:
-                payload.price_estimate != null && !Number.isNaN(Number(payload.price_estimate))
-                  ? Number(payload.price_estimate)
-                  : null,
+              contractor,
+              quarter,
+              comments: commentsParts.length
+                ? commentsParts.join('\n')
+                : 'Skapad via AI-förslag',
+              due_date: dueDate || (payload.due_date as string) || null,
+              price,
             })
             .select()
             .single();
@@ -183,6 +272,10 @@ serve(async (req) => {
             work_order_id: workOrder.id,
             component_id: componentId,
             property_id: propertyId,
+            contractor,
+            quarter,
+            due_date: dueDate,
+            price,
             source: payload.source || null,
           };
           console.log('Created work order:', workOrder.id, 'component:', componentId);

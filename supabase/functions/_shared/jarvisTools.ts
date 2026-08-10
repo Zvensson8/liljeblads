@@ -134,7 +134,7 @@ export const jarvisTools: ChatTool[] = [
     function: {
       name: "suggest_work_order",
       description:
-        "Föreslå ny arbetsorder som utkast (human-in-the-loop). Skapas INTE automatiskt i databasen förrän användaren godkänner i UI.",
+        "Föreslå ny arbetsorder som utkast (human-in-the-loop). Skapas INTE automatiskt i databasen förrän användaren godkänner i UI. Fyll i contractor, quarter (t.ex. 'Q3 2026'), due_date och price_estimate när informationen finns — de mappas till arbetsorderns fält vid godkännande.",
       parameters: {
         type: "object",
         properties: {
@@ -143,7 +143,18 @@ export const jarvisTools: ChatTool[] = [
           component_name: { type: "string" },
           priority: { type: "string", enum: ["low", "medium", "high"] },
           price_estimate: { type: "number" },
-          contractor: { type: "string" },
+          contractor: {
+            type: "string",
+            description: "Entreprenör/leverantör om känd (t.ex. Axcell)",
+          },
+          quarter: {
+            type: "string",
+            description: "Planerat kvartal, t.ex. 'Q3 2026'",
+          },
+          due_date: {
+            type: "string",
+            description: "ISO-datum YYYY-MM-DD om känt",
+          },
           reasoning: { type: "string" },
           confidence: { type: "number" },
         },
