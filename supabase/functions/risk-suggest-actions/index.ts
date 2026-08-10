@@ -17,6 +17,7 @@ import {
   type ComponentRiskInput,
   type ComponentRiskResult,
 } from "../_shared/componentRisk.ts";
+import { getResendClient, resendFrom } from "../_shared/resendClient.ts";
 
 const corsHeaders = cronCorsHeaders;
 const DEDUPE_DAYS = 30;
@@ -69,10 +70,83 @@ async function loadPolicy(
   };
 }
 
+async function notifyOrgAdminsOfSuggestions(
+  supabase: ReturnType<typeof createClient>,
+  orgId: string,
+  created: number,
+  topActions: Array<{ action: string; component?: string; risk?: string }>,
+): Promise<boolean> {
+  if (created <= 0) return false;
+  const resend = getResendClient();
+  if (!resend) return false;
+
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", orgId)
+    .maybeSingle();
+
+  const { data: members } = await supabase
+    .from("organization_members")
+    .select("user_id, role")
+    .eq("organization_id", orgId)
+    .in("role", ["owner", "admin"]);
+  const userIds = (members ?? []).map((m) => m.user_id as string);
+  if (!userIds.length) return false;
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("email")
+    .in("id", userIds);
+  const recipients = [
+    ...new Set(
+      (profiles ?? [])
+        .map((p) => (p.email as string | null) || "")
+        .filter((e) => e.includes("@")),
+    ),
+  ];
+  if (!recipients.length) return false;
+
+  const appUrl = Deno.env.get("PUBLIC_APP_URL") || "https://liljeblads.vercel.app";
+  const orgName = (org?.name as string) || "organisationen";
+  const lines = topActions
+    .slice(0, 8)
+    .map(
+      (a, i) =>
+        `${i + 1}. ${a.action}${a.component ? ` (${a.component})` : ""}${
+          a.risk ? ` — risk ${a.risk}` : ""
+        }`,
+    )
+    .join("\n");
+
+  const html = `
+    <div style="font-family:system-ui,sans-serif;line-height:1.5;max-width:560px">
+      <h2 style="margin:0 0 8px">Nya riskförslag – ${orgName}</h2>
+      <p>Risk-grafen skapade <strong>${created}</strong> förslag som väntar på granskning (HITL).</p>
+      <pre style="background:#f6f6f6;padding:12px;border-radius:8px;white-space:pre-wrap">${lines || "—"}</pre>
+      <p><a href="${appUrl}/agent">Öppna agent-aktivitet</a> eller dashboard för att godkänna/avvisa.</p>
+    </div>`;
+
+  await resend.emails.send({
+    from: resendFrom(),
+    to: recipients,
+    subject: `Liljeblads: ${created} nya riskförslag (${orgName})`,
+    html,
+  });
+  return true;
+}
+
 async function processOrg(
   supabase: ReturnType<typeof createClient>,
   orgId: string,
-): Promise<{ orgId: string; created: number; skipped: number; scanned: number; snapshots: number }> {
+): Promise<{
+  orgId: string;
+  created: number;
+  skipped: number;
+  scanned: number;
+  snapshots: number;
+  notified?: boolean;
+}> {
   const policy = await loadPolicy(supabase, orgId);
   if (!policy.risk_suggest_enabled) {
     return { orgId, created: 0, skipped: 0, scanned: 0, snapshots: 0 };
@@ -282,12 +356,38 @@ async function processOrg(
     .select("id");
   if (error) throw error;
 
+  const created = data?.length ?? 0;
+  let notified = false;
+  try {
+    notified = await notifyOrgAdminsOfSuggestions(
+      supabase,
+      orgId,
+      created,
+      toInsert.map((row) => {
+        const p = row.payload as {
+          action?: string;
+          component_name?: string;
+        };
+        const reasoning = String(row.reasoning || "");
+        const riskMatch = reasoning.match(/risk\s+(\d+)/i);
+        return {
+          action: p.action || "Åtgärd",
+          component: p.component_name,
+          risk: riskMatch?.[1],
+        };
+      }),
+    );
+  } catch (e) {
+    console.warn("risk notify failed", e);
+  }
+
   return {
     orgId,
-    created: data?.length ?? 0,
+    created,
     skipped,
     scanned: components.length,
     snapshots,
+    notified,
   };
 }
 

@@ -595,49 +595,77 @@ serve(async (req) => {
     const rateLimited = rateLimitResponse(rateResult, corsHeaders);
     if (rateLimited) return rateLimited;
 
-    // ── Profile & org ──
+    // ── GUARD NODE: resolve active org + membership ──
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    // Try profile first, then fall back to organization_members
-    const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', userId).single();
-    let orgId = profile?.organization_id;
-    
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('organization_id, active_organization_id')
+      .eq('id', userId)
+      .single();
+
+    let orgId =
+      (profile as { active_organization_id?: string | null } | null)?.active_organization_id ||
+      profile?.organization_id ||
+      null;
+
     if (!orgId) {
-      // Fallback: look up organization via organization_members table
       const { data: membership } = await supabase
         .from('organization_members')
         .select('organization_id')
         .eq('user_id', userId)
         .limit(1)
         .maybeSingle();
-      orgId = membership?.organization_id;
-    }
-    
-    if (!orgId) {
-      return jsonResponse({ error: 'Ingen organisation hittades för din användare. Kontakta administratören.' }, 403);
+      orgId = membership?.organization_id ?? null;
     }
 
-    // ── Build context & knowledge base search in parallel ──
+    if (!orgId) {
+      return jsonResponse({
+        error: 'Ingen organisation hittades för din användare. Kontakta administratören.',
+      }, 403);
+    }
+
+    // Membership must exist for active org (except platform founders handled separately if needed)
+    const { data: memberRow } = await supabase
+      .from('organization_members')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('organization_id', orgId)
+      .maybeSingle();
+
+    if (!memberRow) {
+      // Founders may still chat against an org they "activated" for support
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'founder')
+        .maybeSingle();
+      if (!roles) {
+        return jsonResponse({ error: 'Du är inte medlem i den aktiva organisationen.' }, 403);
+      }
+    }
+
+    // ── CONTEXT NODE (fetch) ──
     const lastUserMsg = messages.filter((m: any) => m.role === 'user').pop();
     let contextInfo = '';
     let knowledgeBaseContext = '';
-
     let propertyDocsContext = '';
+
     if (lastUserMsg?.content) {
       try {
-        console.log(`Building context for org: ${orgId}, msg: "${lastUserMsg.content.substring(0, 50)}"`);
-        
+        console.log(`[guard] org=${orgId} msg="${String(lastUserMsg.content).substring(0, 50)}"`);
+
         const contextPromises: Promise<string>[] = [
           buildContext(supabase, orgId, lastUserMsg.content),
         ];
 
-        // Search knowledge base + property documents if GOOGLE_AI_API_KEY is available
         if (GOOGLE_AI_API_KEY) {
           contextPromises.push(
-            searchKnowledgeBase(supabase, lastUserMsg.content, GOOGLE_AI_API_KEY)
+            searchKnowledgeBase(supabase, lastUserMsg.content, GOOGLE_AI_API_KEY),
           );
           contextPromises.push(
-            searchPropertyDocuments(supabase, orgId, lastUserMsg.content, GOOGLE_AI_API_KEY)
+            searchPropertyDocuments(supabase, orgId, lastUserMsg.content, GOOGLE_AI_API_KEY),
           );
         }
 
@@ -645,25 +673,31 @@ serve(async (req) => {
         contextInfo = results[0] || '';
         knowledgeBaseContext = results[1] || '';
         propertyDocsContext = results[2] || '';
-        
+
         console.log(
-          `Context built (${contextInfo.length} chars), KB (${knowledgeBaseContext.length}), docs (${propertyDocsContext.length})`,
+          `[context] data=${contextInfo.length} kb=${knowledgeBaseContext.length} docs=${propertyDocsContext.length}`,
         );
       } catch (e) {
         console.error('Context build error:', e instanceof Error ? e.message : e);
       }
     }
 
-    const systemPrompt = systemPromptBase + contextInfo + knowledgeBaseContext + propertyDocsContext;
+    const systemPrompt =
+      systemPromptBase +
+      `\n\nAKTIV ORGANISATION (scope): ${orgId}. Använd endast data från denna org.` +
+      contextInfo +
+      knowledgeBaseContext +
+      propertyDocsContext;
 
-    // Streaming: no tools (SSE text only). Non-stream: Jarvis tool loop.
+    // Streaming: text-only path (no tools)
     if (streamRequested) {
       try {
         const aiResult = await chatCompletion({
           messages: [{ role: 'system', content: systemPrompt }, ...messages],
           stream: true,
         });
-        cb.failures = 0; cb.isOpen = false;
+        cb.failures = 0;
+        cb.isOpen = false;
         if (aiResult instanceof Response) {
           return new Response(aiResult.body, {
             headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
@@ -672,7 +706,8 @@ serve(async (req) => {
       } catch (aiErr) {
         const msg = aiErr instanceof Error ? aiErr.message : String(aiErr);
         console.error('LLM stream error:', msg);
-        cb.failures++; cb.lastFailure = Date.now();
+        cb.failures++;
+        cb.lastFailure = Date.now();
         if (cb.failures >= cb.threshold) cb.isOpen = true;
         if (/429|RESOURCE_EXHAUSTED|rate/i.test(msg)) {
           return jsonResponse({ error: 'För många förfrågningar. Försök igen om en stund.' }, 429);
@@ -681,7 +716,10 @@ serve(async (req) => {
       }
     }
 
-    // ── Jarvis multi-turn tool loop ──
+    // ── PLANNER + EXECUTOR LOOP ──
+    // Planner: model chooses tools (tool_choice auto)
+    // Executor: executeJarvisTool with org-scoped supabase + orgId
+    // Guard: orgId injected; tools must not receive cross-org ids from client alone
     const workingMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...messages.map((m: { role: string; content: string }) => ({
@@ -692,11 +730,17 @@ serve(async (req) => {
 
     const suggestedActions: any[] = [];
     const toolsUsed: string[] = [];
+    const graphTrace: Array<{ round: number; phase: string; detail?: string }> = [
+      { round: 0, phase: 'guard', detail: `org=${orgId}` },
+      { round: 0, phase: 'context' },
+    ];
     const MAX_ROUNDS = 4;
     let finalMessage = '';
 
     try {
       for (let round = 0; round < MAX_ROUNDS; round++) {
+        // PLANNER node
+        graphTrace.push({ round, phase: 'planner' });
         const aiResult = await chatCompletion({
           messages: workingMessages,
           stream: false,
@@ -716,16 +760,17 @@ serve(async (req) => {
 
         if (!toolCalls.length) {
           finalMessage = content;
+          graphTrace.push({ round, phase: 'respond' });
           break;
         }
 
-        // Record assistant tool call turn
         workingMessages.push({
           role: 'assistant',
           content: content || null,
           tool_calls: toolCalls,
         });
 
+        // EXECUTOR node(s)
         for (const tc of toolCalls) {
           let args: Record<string, unknown> = {};
           try {
@@ -733,9 +778,14 @@ serve(async (req) => {
           } catch {
             args = {};
           }
+          // Never trust client-supplied org overrides
+          delete args.organization_id;
+          delete args.org_id;
+
           const toolName = tc.function.name;
           toolsUsed.push(toolName);
-          console.log(`Jarvis tool[${round}]: ${toolName}`, JSON.stringify(args).slice(0, 200));
+          graphTrace.push({ round, phase: 'executor', detail: toolName });
+          console.log(`[executor] round=${round} tool=${toolName}`, JSON.stringify(args).slice(0, 200));
 
           const result = await executeJarvisTool(toolName, args, {
             supabase,
@@ -744,7 +794,6 @@ serve(async (req) => {
             conversationId,
           });
 
-          // Collect HITL suggestions for UI
           if (
             (toolName === 'suggest_work_order' || toolName === 'suggest_todo') &&
             result &&
@@ -769,8 +818,8 @@ serve(async (req) => {
           });
         }
 
-        // Last round: force a text answer without more tools
         if (round === MAX_ROUNDS - 1) {
+          graphTrace.push({ round, phase: 'respond_forced' });
           const close = await chatCompletion({
             messages: [
               ...workingMessages,
@@ -789,11 +838,13 @@ serve(async (req) => {
         }
       }
 
-      cb.failures = 0; cb.isOpen = false;
+      cb.failures = 0;
+      cb.isOpen = false;
     } catch (aiErr) {
       const msg = aiErr instanceof Error ? aiErr.message : String(aiErr);
       console.error('LLM tool-loop error:', msg);
-      cb.failures++; cb.lastFailure = Date.now();
+      cb.failures++;
+      cb.lastFailure = Date.now();
       if (cb.failures >= cb.threshold) cb.isOpen = true;
       if (/429|RESOURCE_EXHAUSTED|rate/i.test(msg)) {
         return jsonResponse({ error: 'För många förfrågningar. Försök igen om en stund.' }, 429);
@@ -807,6 +858,7 @@ serve(async (req) => {
         'Jag har hämtat data men kunde inte formulera ett svar. Försök omformulera frågan.',
       suggestedActions,
       toolsUsed,
+      graphTrace,
     });
 
   } catch (error: unknown) {

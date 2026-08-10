@@ -30,6 +30,9 @@ verify_jwt = false
 [functions.risk-suggest-actions]
 verify_jwt = false
 
+[functions.weekly-org-digest]
+verify_jwt = false
+
 [functions.ai-search]
 verify_jwt = false
 

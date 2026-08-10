@@ -149,25 +149,39 @@ serve(async (req) => {
 
         let htmlBody = `<pre style="font-family:system-ui,sans-serif;white-space:pre-wrap">${plain}</pre>`;
 
-        if (isLlmConfigured() && (digest.openWorkOrders + digest.pendingAiActions) > 0) {
+        if (isLlmConfigured() && (digest.openWorkOrders + digest.pendingAiActions + digest.pendingTodos) > 0) {
           try {
             const llm = await chatCompletion({
               messages: [
                 {
                   role: "system",
-                  content:
-                    "Du skriver korta svenska driftssammanfattningar (max 120 ord) för fastighetsförvaltare. Inga påhittade siffror.",
+                  content: [
+                    "Du är driftchef-assistent för svensk fastighetsförvaltning.",
+                    "Skriv en veckosammanfattning på svenska i tre korta sektioner:",
+                    "1) Läget i en mening",
+                    "2) Prioriteringar (max 3 punkter, baserat ENDAST på siffrorna)",
+                    "3) Rekommenderad nästa åtgärd (en mening)",
+                    "Använd ALDRIG siffror som inte finns i indata. Max 100 ord totalt. Ingen hälsningsfras.",
+                  ].join(" "),
                 },
                 {
                   role: "user",
                   content: plain,
                 },
               ],
-              maxTokens: 300,
+              maxTokens: 350,
+              temperature: 0.2,
             });
-            const text = llm.content?.trim();
+            const text = (llm as { content?: string }).content?.trim();
             if (text) {
-              htmlBody = `<div style="font-family:system-ui,sans-serif"><p>${text.replace(/\n/g, "<br/>")}</p><hr/><pre>${plain}</pre></div>`;
+              htmlBody = `<div style="font-family:system-ui,sans-serif;line-height:1.5;max-width:560px">
+                <h2 style="margin:0 0 12px">Drift – ${digest.orgName}</h2>
+                <div style="background:#f8fafc;border-radius:8px;padding:14px;margin-bottom:16px">${
+                  text.replace(/\n/g, "<br/>")
+                }</div>
+                <h3 style="margin:0 0 8px;font-size:14px;color:#64748b">Nyckeltal</h3>
+                <pre style="background:#f1f5f9;padding:12px;border-radius:8px;white-space:pre-wrap;font-size:13px">${plain}</pre>
+              </div>`;
             }
           } catch (e) {
             console.warn("LLM digest failed", e);
