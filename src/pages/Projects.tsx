@@ -62,7 +62,26 @@ export default function Projects() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
-  const [activeTab, setActiveTab] = useState("overview");
+  const PROJECT_TABS = ["overview", "active", "proposals", "archived"] as const;
+  type ProjectTab = (typeof PROJECT_TABS)[number];
+  const tabFromUrl = searchParams.get("tab");
+  const activeTab: ProjectTab =
+    tabFromUrl && (PROJECT_TABS as readonly string[]).includes(tabFromUrl)
+      ? (tabFromUrl as ProjectTab)
+      : "overview";
+
+  const setActiveTab = (tab: string) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tab);
+        // keep unrelated params (e.g. edit) but drop empty noise
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
   const [sortField, setSortField] = useState<string>("updated_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [editingCell, setEditingCell] = useState<{ projectId: string; field: string } | null>(null);
@@ -96,7 +115,14 @@ export default function Projects() {
 
       setEditingProject(data as unknown as Project);
       setFormDialogOpen(true);
-      setSearchParams({});
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete("edit");
+          return next;
+        },
+        { replace: true },
+      );
     } catch {
       toast.error("Kunde inte hämta projekt för redigering");
     }
@@ -233,7 +259,8 @@ export default function Projects() {
     onStartEditing: startEditing,
     onUpdateProject: updateProject,
     onKeyDown: handleKeyDown,
-    onRowClick: (id: string) => navigate(`/projects/${id}`),
+    onRowClick: (id: string) =>
+      navigate(`/projects/${id}`, { state: { fromProjectsTab: activeTab } }),
     onEditClick: (project: Project) => {
       setEditingProject(project);
       setFormDialogOpen(true);

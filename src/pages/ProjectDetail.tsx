@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { getErrorMessage } from "@/lib/utils";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProject, useUpdateProject } from "@/hooks/useProjects";
 import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
@@ -74,10 +74,13 @@ interface Project {
   } | null;
 }
 
+const PROJECT_LIST_TABS = ["overview", "active", "proposals", "archived"] as const;
+
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -87,6 +90,14 @@ export default function ProjectDetail() {
   const isMobile = useIsMobile();
 
   const activeTab = searchParams.get("tab") || "overview";
+
+  // Prefer the tab the user came from (active/archived/…); default to Aktiva projekt
+  const fromProjectsTab = (location.state as { fromProjectsTab?: string } | null)?.fromProjectsTab;
+  const projectsListPath = `/projects?tab=${
+    fromProjectsTab && (PROJECT_LIST_TABS as readonly string[]).includes(fromProjectsTab)
+      ? fromProjectsTab
+      : "active"
+  }`;
 
   const {
     data: projectData,
@@ -109,9 +120,9 @@ export default function ProjectDetail() {
   useEffect(() => {
     if (projectError) {
       toast.error("Kunde inte hämta projekt");
-      navigate("/projects");
+      navigate(projectsListPath);
     }
-  }, [projectError, navigate]);
+  }, [projectError, navigate, projectsListPath]);
 
   useEffect(() => {
     if (project) {
@@ -142,7 +153,7 @@ export default function ProjectDetail() {
         description: "Projekt arkiverat",
       });
       toast.success("Projekt arkiverat");
-      navigate("/projects");
+      navigate("/projects?tab=active");
     } catch (error: unknown) {
       toast.error("Kunde inte arkivera projekt");
     }
@@ -253,7 +264,7 @@ export default function ProjectDetail() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/projects">Projekt</BreadcrumbLink>
+                  <BreadcrumbLink href={projectsListPath}>Projekt</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
@@ -266,7 +277,7 @@ export default function ProjectDetail() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/projects")}
+              onClick={() => navigate(projectsListPath)}
               className="hidden sm:flex"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
