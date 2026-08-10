@@ -1,12 +1,13 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { storageService } from "@/services/supabase";
+import { getErrorMessage } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Upload, Save } from "lucide-react";
+import { Upload, Save, Trash2 } from "lucide-react";
 
 interface OrganizationBrandingProps {
   organization: {
@@ -19,18 +20,27 @@ interface OrganizationBrandingProps {
 
 export function OrganizationBranding({ organization, onUpdate }: OrganizationBrandingProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [primaryColor, setPrimaryColor] = useState(organization.primary_color || "#000000");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(organization.logo_url);
+
+  useEffect(() => {
+    setPreviewUrl(organization.logo_url);
+    setPrimaryColor(organization.primary_color || "#000000");
+  }, [organization.logo_url, organization.primary_color]);
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Always clear so the same file can be re-selected after a failure
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
     if (!file) {
       return;
     }
     if (!file.type.startsWith("image/")) {
-      toast.error("Välj en bildfil");
+      toast.error("Välj en bildfil (PNG, JPG, SVG, WebP …)");
       return;
     }
 
@@ -39,16 +49,29 @@ export function OrganizationBranding({ organization, onUpdate }: OrganizationBra
       return;
     }
 
-    setLogoFile(file);
-    
+    if (!organization.id) {
+      toast.error("Saknar organisations-id – ladda om sidan och försök igen");
+      return;
+    }
+
     try {
       setUploading(true);
-      const fileExt = file.name.split(".").pop();
+      const rawExt = file.name.split(".").pop()?.toLowerCase() || "png";
+      const fileExt = rawExt.replace(/[^a-z0-9]/g, "") || "png";
       const timestamp = Date.now();
+      // Path must start with org UUID — storage RLS uses first folder segment
       const filePath = `${organization.id}/logo-${timestamp}.${fileExt}`;
-      await storageService.upload("organization-logos", filePath, file, { upsert: true });
+
+      await storageService.upload("organization-logos", filePath, file, {
+        upsert: false,
+        contentType: file.type || `image/${fileExt}`,
+        cacheControl: "3600",
+      });
 
       const publicUrl = storageService.getPublicUrl("organization-logos", filePath);
+      // Cache-bust so the new logo shows immediately
+      const publicUrlWithBust = `${publicUrl}${publicUrl.includes("?") ? "&" : "?"}t=${timestamp}`;
+
       const { error: updateError } = await supabase
         .from("organizations")
         .update({ logo_url: publicUrl })
@@ -56,19 +79,41 @@ export function OrganizationBranding({ organization, onUpdate }: OrganizationBra
 
       if (updateError) {
         console.error("Update error:", updateError);
+        // Best-effort cleanup of orphaned object
+        try {
+          await storageService.remove("organization-logos", [filePath]);
+        } catch {
+          /* ignore */
+        }
         throw updateError;
       }
+
+      setPreviewUrl(publicUrlWithBust);
       toast.success("Logotyp uppladdad");
-      
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      
       onUpdate();
     } catch (error: unknown) {
       console.error("Error uploading logo:", error);
-      toast.error("Kunde inte ladda upp logotyp");
+      const msg = getErrorMessage(error);
+      toast.error(msg ? `Kunde inte ladda upp logotyp: ${msg}` : "Kunde inte ladda upp logotyp");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!organization.logo_url) return;
+    try {
+      setUploading(true);
+      const { error } = await supabase
+        .from("organizations")
+        .update({ logo_url: null })
+        .eq("id", organization.id);
+      if (error) throw error;
+      setPreviewUrl(null);
+      toast.success("Logotyp borttagen");
+      onUpdate();
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error) || "Kunde inte ta bort logotyp");
     } finally {
       setUploading(false);
     }
@@ -104,35 +149,48 @@ export function OrganizationBranding({ organization, onUpdate }: OrganizationBra
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {organization.logo_url && (
+          {previewUrl && (
             <div className="border rounded-lg p-4 bg-muted/50">
               <img
-                src={organization.logo_url}
+                src={previewUrl}
                 alt="Organization logo"
                 className="max-h-32 object-contain"
               />
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,image/gif"
               onChange={handleLogoUpload}
-              style={{ display: 'none' }}
+              className="sr-only"
+              id="org-logo-upload"
             />
-            <Button 
-              type="button" 
+            <Button
+              type="button"
               disabled={uploading}
               onClick={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 fileInputRef.current?.click();
               }}
             >
               <Upload className="h-4 w-4 mr-2" />
-              {uploading ? "Laddar upp..." : "Välj logotyp"}
+              {uploading ? "Laddar upp..." : previewUrl ? "Byt logotyp" : "Välj logotyp"}
             </Button>
+            {previewUrl && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={uploading}
+                onClick={handleRemoveLogo}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Ta bort
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
