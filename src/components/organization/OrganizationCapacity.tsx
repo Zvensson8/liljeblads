@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Building, Users, FolderKanban, AlertTriangle } from "lucide-react";
-import { getTierById, formatStorage, SUBSCRIPTION_TIERS } from "@/lib/subscriptionTiers";
+import { getTierById } from "@/lib/subscriptionTiers";
 
 interface OrganizationCapacityProps {
   organization: {
@@ -130,82 +130,6 @@ export function OrganizationCapacity({ organization, onUpgrade }: OrganizationCa
                 </div>
               );
             })}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Prenumerationsnivåer</CardTitle>
-          <CardDescription>Jämför gränser mellan olika nivåer</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 font-medium">Resurs</th>
-                  {SUBSCRIPTION_TIERS.map(t => (
-                    <th 
-                      key={t.id} 
-                      className={`text-center py-2 font-medium ${t.id === organization.subscription_tier ? 'bg-primary/10 rounded' : ''}`}
-                    >
-                      {t.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="py-2">Fastigheter</td>
-                  {SUBSCRIPTION_TIERS.map(t => (
-                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
-                      {t.limits.properties.toLocaleString("sv-SE")}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b">
-                  <td className="py-2">Användare</td>
-                  {SUBSCRIPTION_TIERS.map(t => (
-                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
-                      {t.limits.users.toLocaleString("sv-SE")}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b">
-                  <td className="py-2">Komponenter</td>
-                  {SUBSCRIPTION_TIERS.map(t => (
-                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
-                      {t.limits.components.toLocaleString("sv-SE")}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b">
-                  <td className="py-2">Arbetsordrar</td>
-                  {SUBSCRIPTION_TIERS.map(t => (
-                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
-                      {t.limits.workOrders.toLocaleString("sv-SE")}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b">
-                  <td className="py-2">Projekt</td>
-                  {SUBSCRIPTION_TIERS.map(t => (
-                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
-                      {t.limits.projects.toLocaleString("sv-SE")}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td className="py-2">Lagring</td>
-                  {SUBSCRIPTION_TIERS.map(t => (
-                    <td key={t.id} className={`text-center py-2 ${t.id === organization.subscription_tier ? 'bg-primary/10' : ''}`}>
-                      {formatStorage(t.limits.storageMb)}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
           </div>
         </CardContent>
       </Card>
