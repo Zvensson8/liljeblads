@@ -3,6 +3,11 @@ LangGraph service-report ingest pipeline.
 
 Nodes:
   start_run → discover_files → parse_pdfs → extract → apply → finish_run
+
+Inside apply (logical sub-nodes):
+  match(property, component + quality)
+  → failed_match | hitl_queue | create_work_order
+  → mark_processed → archive/failed
 """
 
 from __future__ import annotations
@@ -18,7 +23,11 @@ from jarvis_worker.config import Settings, get_settings
 from jarvis_worker.drive_inbox import sync_drive_to_inbox
 from jarvis_worker.extract import extract_reports_with_gemini, fallback_empty_report
 from jarvis_worker.liljeblads_client import LiljebladsClient
-from jarvis_worker.matching import match_component, match_property_name
+from jarvis_worker.matching import (
+    match_component_scored,
+    match_property_name_scored,
+    should_force_hitl,
+)
 from jarvis_worker.notify import send_ingest_summary
 from jarvis_worker.pdf_text import extract_text_from_pdf
 from jarvis_worker.schemas import ExtractBatch, ExtractedReport, InboxFile
@@ -215,6 +224,7 @@ def build_graph(settings: Settings | None = None):
         suggestions_ok = 0
         service_ok = 0
         failed = 0
+        failed_match = 0
 
         for report in extracted.files:
             file_meta = path_by_id.get(report.file_id, {})
@@ -222,12 +232,16 @@ def build_graph(settings: Settings | None = None):
             summary: dict[str, Any] = {
                 "actions": len(report.actions),
                 "property_name": report.property_name,
+                "graph_node": "apply",
             }
             try:
-                # Fix property name match
-                prop = match_property_name(report.property_name, property_names)
+                # Node: match property + component with quality scores
+                prop, prop_q = match_property_name_scored(
+                    report.property_name, property_names
+                )
                 if prop:
                     report.property_name = prop
+                summary["property_match_quality"] = prop_q
 
                 components: list[dict[str, Any]] = []
                 if report.property_name and not dry:
@@ -236,9 +250,51 @@ def build_graph(settings: Settings | None = None):
                         property_name=report.property_name,
                         limit=50,
                     )
-                matched = match_component(report.components_mentioned, components)
+                matched, comp_q = match_component_scored(
+                    report.components_mentioned, components
+                )
                 summary["matched_component_id"] = matched.get("id") if matched else None
                 summary["matched_component_name"] = matched.get("name") if matched else None
+                summary["component_match_quality"] = comp_q
+
+                # Node: failed_match — no property → archive as failed, no silent WO
+                if not dry and prop_q == "none":
+                    failed_match += 1
+                    failed += 1
+                    summary["graph_node"] = "failed_match"
+                    summary["error"] = "no_property_match"
+                    keys = [report.file_id]
+                    if report.filename:
+                        keys.append(f"name:{(report.filename or '').strip().lower()}")
+                    drive_id = file_meta.get("drive_id") or ""
+                    if drive_id:
+                        keys.append(f"drive:{drive_id}")
+                    client.mark_processed_keys(
+                        keys=keys,
+                        filename=report.filename,
+                        source=settings.source_label,
+                        status="failed",
+                        summary=summary,
+                        error_message="Kunde inte matcha fastighet — granska manuellt",
+                    )
+                    if path and path.exists():
+                        dest = settings.failed_dir
+                        dest.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(path), str(dest / path.name))
+                    results.append(
+                        {
+                            "file_id": report.file_id,
+                            "filename": report.filename,
+                            "ok": False,
+                            "summary": summary,
+                            "error": "no_property_match",
+                        }
+                    )
+                    continue
+
+                force_hitl = should_force_hitl(prop_q, comp_q, mode_hitl=hitl)
+                summary["force_hitl"] = force_hitl
+                summary["graph_node"] = "hitl_queue" if force_hitl else "create_work_order"
 
                 if not dry and settings.auto_log_service and matched and report.report_date:
                     notes = "; ".join(a.action_text for a in report.actions)[:500]
@@ -278,7 +334,8 @@ def build_graph(settings: Settings | None = None):
                             wo_kwargs["component_id"] = matched["id"]
                             if matched.get("serial_number"):
                                 wo_kwargs["serial_number"] = matched["serial_number"]
-                        if hitl:
+                        # Uncertain match always goes to HITL queue (suggest), never silent live WO
+                        if force_hitl:
                             res = client.suggest_work_order(**wo_kwargs)
                             suggestions.append(res)
                             suggestions_ok += 1
@@ -288,7 +345,7 @@ def build_graph(settings: Settings | None = None):
                             wo_ok += 1
                 summary["work_orders"] = len(work_orders)
                 summary["suggestions"] = len(suggestions)
-                summary["hitl"] = hitl
+                summary["hitl"] = force_hitl
 
                 if not dry:
                     keys = [report.file_id]
@@ -358,6 +415,7 @@ def build_graph(settings: Settings | None = None):
                 "suggestions_created": suggestions_ok,
                 "services_logged": service_ok,
                 "files_failed": failed,
+                "failed_match": failed_match,
                 "files_done": len(results),
                 "dry_run": dry,
                 "hitl": hitl,

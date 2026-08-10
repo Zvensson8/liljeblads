@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrganization } from '@/hooks/useOrganization';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, ArrowRight, Loader2, Check, X, ListChecks } from 'lucide-react';
@@ -14,9 +15,11 @@ import {
 } from '@/hooks/useAISuggestedActions';
 import { useExecuteAIAction } from '@/hooks/useEdgeFunctions';
 import { queryKeys } from '@/lib/queryKeys';
+import { maybeTuneRiskPolicyFromFeedback } from '@/lib/riskPolicyTuning';
 
 export function PendingActionsWidget() {
   const { user } = useAuth();
+  const { organization } = useOrganization();
   const queryClient = useQueryClient();
   const [selectedActions, setSelectedActions] = useState<Set<string>>(new Set());
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -30,6 +33,20 @@ export function PendingActionsWidget() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.aiSuggestedActions.all });
     queryClient.invalidateQueries({ queryKey: ['ai-actions'] });
+  };
+
+  const tunePolicyQuietly = async () => {
+    if (!organization?.id) return;
+    try {
+      const result = await maybeTuneRiskPolicyFromFeedback(organization.id);
+      if (result.adjusted && result.next) {
+        toast.message('Risktrösklar justerade', {
+          description: `${result.previous?.min_risk_level} → ${result.next.min_risk_level} (acceptans ${Math.round((result.acceptRate ?? 0) * 100)}%)`,
+        });
+      }
+    } catch (e) {
+      console.warn('risk policy tuning skipped', e);
+    }
   };
 
   const handleApprove = async (actionId: string) => {
@@ -47,6 +64,7 @@ export function PendingActionsWidget() {
 
       toast.success('Åtgärd utförd!');
       invalidate();
+      void tunePolicyQuietly();
     } catch (error) {
       console.error('Error executing action:', error);
       toast.error('Kunde inte utföra åtgärden');
@@ -66,6 +84,7 @@ export function PendingActionsWidget() {
       });
       toast.success('Förslag avvisat');
       invalidate();
+      void tunePolicyQuietly();
     } catch (error) {
       console.error('Error rejecting action:', error);
       toast.error('Kunde inte avvisa förslaget');

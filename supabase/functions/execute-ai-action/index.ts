@@ -59,15 +59,36 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get user's organization
+    // Guard: prefer active organization (multi-org), fallback organization_id
     const { data: profile } = await supabase
       .from('profiles')
-      .select('organization_id')
+      .select('organization_id, active_organization_id')
       .eq('id', userId)
       .single();
 
-    if (!profile?.organization_id) {
+    const orgId =
+      (profile as { active_organization_id?: string | null; organization_id?: string | null } | null)
+        ?.active_organization_id ||
+      profile?.organization_id ||
+      null;
+
+    if (!orgId) {
       return new Response(JSON.stringify({ error: 'User profile not found' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Membership guard (active org must match action org)
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('organization_id', orgId)
+      .maybeSingle();
+
+    if (!membership) {
+      return new Response(JSON.stringify({ error: 'Not a member of active organization' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -78,7 +99,7 @@ serve(async (req) => {
       .from('ai_suggested_actions')
       .select('*')
       .eq('id', actionId)
-      .eq('organization_id', profile.organization_id)
+      .eq('organization_id', orgId)
       .single();
 
     if (actionError || !action) {
@@ -111,7 +132,7 @@ serve(async (req) => {
             const { data: byName } = await supabase
               .from('properties')
               .select('id')
-              .eq('organization_id', profile.organization_id)
+              .eq('organization_id', orgId)
               .ilike('name', String(payload.property_name))
               .limit(1)
               .maybeSingle();
@@ -131,7 +152,7 @@ serve(async (req) => {
             const { data: properties } = await supabase
               .from('properties')
               .select('id')
-              .eq('organization_id', profile.organization_id)
+              .eq('organization_id', orgId)
               .limit(1);
             if (properties && properties.length > 0) {
               propertyId = properties[0].id;
@@ -178,7 +199,7 @@ serve(async (req) => {
             const { data: properties } = await supabase
               .from('properties')
               .select('id')
-              .eq('organization_id', profile.organization_id)
+              .eq('organization_id', orgId)
               .limit(1);
             
             if (properties && properties.length > 0) {
@@ -213,7 +234,7 @@ serve(async (req) => {
             const { data: properties } = await supabase
               .from('properties')
               .select('id')
-              .eq('organization_id', profile.organization_id)
+              .eq('organization_id', orgId)
               .limit(1);
             
             if (properties && properties.length > 0) {
@@ -247,7 +268,7 @@ serve(async (req) => {
             const { data: properties } = await supabase
               .from('properties')
               .select('id')
-              .eq('organization_id', profile.organization_id)
+              .eq('organization_id', orgId)
               .limit(1);
             
             if (properties && properties.length > 0) {

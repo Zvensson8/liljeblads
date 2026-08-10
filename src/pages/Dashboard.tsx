@@ -27,6 +27,7 @@ import { PropertyMapDialog } from '@/components/maps/PropertyMapDialog';
 import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
 import { EmbeddingStatsWidget } from '@/components/dashboard/EmbeddingStatsWidget';
 import { MyTasksTodayWidget } from '@/components/dashboard/MyTasksTodayWidget';
+import { OrgOnboardingChecklist } from '@/components/dashboard/OrgOnboardingChecklist';
 
 interface RecentWorkOrder {
   id: string;
@@ -213,7 +214,7 @@ const Dashboard = () => {
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-2xl sm:text-3xl font-bold">
-                    Välkommen till {organization?.name || 'NavRitning'}
+                    Välkommen till {organization?.name || 'Liljeblads'}
                   </h2>
                   <p className="text-muted-foreground">
                     Sammanställning av {organization?.name ? 'organisationens' : 'dina'} fastigheter och uppgifter
@@ -235,6 +236,8 @@ const Dashboard = () => {
                   </Select>
                 </div>
               </div>
+
+              <OrgOnboardingChecklist />
 
               <AttentionRequiredSection
                 propertyId={selectedProperty === 'all' ? undefined : selectedProperty}

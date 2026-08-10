@@ -37,8 +37,11 @@ Skapa jobb som anropar edge functions **varje timme** (påminnelser avgör själ
 | `todo-reminders` | `.../functions/v1/send-todo-reminders` | `0 * * * *` |
 | `work-order-reminders` | `.../functions/v1/send-work-order-reminders` | `0 7 * * *` |
 | `maintenance-reminders` | `.../functions/v1/send-maintenance-reminders` | `0 7 * * 1` |
-| `risk-suggest-actions` | `.../functions/v1/risk-suggest-actions` | `0 6 * * *` (dagligen 06:00 UTC) |
+| `risk-suggest-actions` | `.../functions/v1/risk-suggest-actions` | `0 6 * * 1` (måndag 06:00 UTC — risk-graf) eller dagligen `0 6 * * *` |
+| `weekly-org-digest` | `.../functions/v1/weekly-org-digest` | `0 7 * * 1` (måndag 07:00 UTC — drift-sammanfattning) |
 | `generate-embeddings` | `.../functions/v1/generate-embeddings` | `*/15 * * * *` (kö-poll) |
+
+Se även **`docs/AGENT_GRAPHS.md`** för agent-graf-översikt.
 
 **Headers (obligatoriskt):**
 
