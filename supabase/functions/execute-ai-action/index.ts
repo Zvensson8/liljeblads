@@ -59,47 +59,11 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Guard: prefer active organization (multi-org), fallback organization_id
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('organization_id, active_organization_id')
-      .eq('id', userId)
-      .single();
-
-    const orgId =
-      (profile as { active_organization_id?: string | null; organization_id?: string | null } | null)
-        ?.active_organization_id ||
-      profile?.organization_id ||
-      null;
-
-    if (!orgId) {
-      return new Response(JSON.stringify({ error: 'User profile not found' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Membership guard (active org must match action org)
-    const { data: membership } = await supabase
-      .from('organization_members')
-      .select('role')
-      .eq('user_id', userId)
-      .eq('organization_id', orgId)
-      .maybeSingle();
-
-    if (!membership) {
-      return new Response(JSON.stringify({ error: 'Not a member of active organization' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Get the action
+    // Load action first (service role), then verify membership on action.organization_id
     const { data: action, error: actionError } = await supabase
       .from('ai_suggested_actions')
       .select('*')
       .eq('id', actionId)
-      .eq('organization_id', orgId)
       .single();
 
     if (actionError || !action) {
@@ -108,6 +72,39 @@ serve(async (req) => {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    const orgId = action.organization_id as string;
+    if (!orgId) {
+      return new Response(JSON.stringify({ error: 'Action missing organization' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('organization_id', orgId)
+      .maybeSingle();
+
+    if (!membership) {
+      const { data: founderRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'founder')
+        .maybeSingle();
+      if (!founderRole) {
+        return new Response(
+          JSON.stringify({ error: 'Not a member of the action organization' }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        );
+      }
     }
 
     if (action.status !== 'approved') {

@@ -25,8 +25,15 @@ export function PendingActionsWidget() {
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
-  const { data: actions = [], isLoading } = useAISuggestedActions({ status: 'pending' });
-  const pendingActions = useMemo(() => actions.slice(0, 10) as AIAction[], [actions]);
+  const { data: actions = [], isLoading } = useAISuggestedActions({
+    status: 'pending',
+    organizationId: organization?.id,
+  });
+  // Only show actions when we know active org (avoids empty/stale cross-org list)
+  const pendingActions = useMemo(() => {
+    if (!organization?.id) return [];
+    return (actions as AIAction[]).slice(0, 10);
+  }, [actions, organization?.id]);
   const updateAction = useUpdateAISuggestedAction();
   const executeAction = useExecuteAIAction();
 
@@ -65,9 +72,13 @@ export function PendingActionsWidget() {
       toast.success('Åtgärd utförd!');
       invalidate();
       void tunePolicyQuietly();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error executing action:', error);
-      toast.error('Kunde inte utföra åtgärden');
+      const msg =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: string }).message)
+          : 'Kunde inte utföra åtgärden';
+      toast.error(msg);
     }
   };
 
@@ -85,9 +96,13 @@ export function PendingActionsWidget() {
       toast.success('Förslag avvisat');
       invalidate();
       void tunePolicyQuietly();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error rejecting action:', error);
-      toast.error('Kunde inte avvisa förslaget');
+      const msg =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: string }).message)
+          : 'Kunde inte avvisa förslaget';
+      toast.error(msg);
     }
   };
 
@@ -209,7 +224,7 @@ export function PendingActionsWidget() {
             )}
             {pendingActions.length > 0 && !isBatchMode && (
               <Button variant="ghost" size="sm" asChild>
-                <Link to="/ai-chat" className="flex items-center gap-1">
+                <Link to="/agent" className="flex items-center gap-1">
                   Visa alla
                   <ArrowRight className="h-3 w-3" />
                 </Link>

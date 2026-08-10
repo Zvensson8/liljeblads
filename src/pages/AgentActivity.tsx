@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +21,13 @@ import {
   Bot,
 } from 'lucide-react';
 import { useAgentPolicy } from '@/hooks/useAgentPolicy';
+import { AIActionCard, type AIAction } from '@/components/ai-chat/AIActionCard';
+import { useUpdateAISuggestedAction } from '@/hooks/useAISuggestedActions';
+import { useExecuteAIAction } from '@/hooks/useEdgeFunctions';
+import { maybeTuneRiskPolicyFromFeedback } from '@/lib/riskPolicyTuning';
+import { queryKeys } from '@/lib/queryKeys';
+import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/utils';
 
 type ActionRow = {
   id: string;
@@ -32,6 +39,8 @@ type ActionRow = {
   created_at: string;
   executed_at: string | null;
   reviewed_at: string | null;
+  rejection_reason?: string | null;
+  execution_result?: Record<string, unknown> | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -54,19 +63,22 @@ function statusVariant(
 export default function AgentActivity() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { organization } = useOrganization();
   const orgId = organization?.id;
   const { data: policy } = useAgentPolicy(orgId);
+  const updateAction = useUpdateAISuggestedAction();
+  const executeAction = useExecuteAIAction();
 
   const since = useMemo(() => subDays(new Date(), 30).toISOString(), []);
 
-  const { data: actions = [], isLoading } = useQuery({
+  const { data: actions = [], isLoading, refetch } = useQuery({
     queryKey: ['agent-activity', orgId, since],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('ai_suggested_actions')
         .select(
-          'id, action_type, status, confidence_score, reasoning, payload, created_at, executed_at, reviewed_at',
+          'id, action_type, status, confidence_score, reasoning, payload, created_at, executed_at, reviewed_at, rejection_reason, execution_result',
         )
         .eq('organization_id', orgId!)
         .gte('created_at', since)
@@ -78,9 +90,82 @@ export default function AgentActivity() {
     enabled: !!user && !!orgId,
   });
 
+  const invalidate = () => {
+    void refetch();
+    queryClient.invalidateQueries({ queryKey: queryKeys.aiSuggestedActions.all });
+  };
+
+  const tunePolicyQuietly = async () => {
+    if (!orgId) return;
+    try {
+      await maybeTuneRiskPolicyFromFeedback(orgId);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleApprove = async (actionId: string) => {
+    try {
+      await updateAction.mutateAsync({
+        id: actionId,
+        patch: {
+          status: 'approved',
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+        },
+      });
+      await executeAction.mutateAsync({ actionId });
+      toast.success('Åtgärd godkänd och utförd');
+      invalidate();
+      void tunePolicyQuietly();
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error(getErrorMessage(e) || 'Kunde inte godkänna åtgärden');
+    }
+  };
+
+  const handleReject = async (actionId: string, reason?: string) => {
+    try {
+      await updateAction.mutateAsync({
+        id: actionId,
+        patch: {
+          status: 'rejected',
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+          rejection_reason: reason || null,
+        },
+      });
+      toast.success('Förslag avvisat');
+      invalidate();
+      void tunePolicyQuietly();
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error(getErrorMessage(e) || 'Kunde inte avvisa förslaget');
+    }
+  };
+
   if (!authLoading && !user) {
     navigate('/auth');
   }
+
+  const pendingActions = useMemo(
+    () =>
+      actions
+        .filter((a) => a.status === 'pending')
+        .map(
+          (a) =>
+            ({
+              id: a.id,
+              action_type: a.action_type,
+              status: a.status as AIAction['status'],
+              confidence_score: a.confidence_score ?? 0,
+              reasoning: a.reasoning || '',
+              payload: (a.payload || {}) as Record<string, unknown>,
+              created_at: a.created_at,
+            }) as AIAction,
+        ),
+    [actions],
+  );
 
   const stats = useMemo(() => {
     const byStatus: Record<string, number> = {};
@@ -254,10 +339,33 @@ export default function AgentActivity() {
                 </Card>
               </div>
 
+              {pendingActions.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">
+                      Väntar på dig ({pendingActions.length})
+                    </CardTitle>
+                    <CardDescription>
+                      Godkänn skapar arbetsorder / utför åtgärden. Avvisa stänger förslaget.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {pendingActions.map((action) => (
+                      <AIActionCard
+                        key={action.id}
+                        action={action}
+                        onApprove={handleApprove}
+                        onReject={handleReject}
+                      />
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Senaste förslag</CardTitle>
-                  <CardDescription>Senaste 40 av 200 hämtade</CardDescription>
+                  <CardDescription>Senaste 40 av 200 hämtade (historik)</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {isLoading && (

@@ -105,48 +105,72 @@ export function AIActionCard({
     }
   };
 
-  // Mini version for dashboard widget
+  // Mini version for dashboard widget — keep buttons large enough to tap
   if (mini) {
     return (
-      <div className={cn(
-        "flex items-center gap-3 p-3 rounded-lg border-l-4 bg-muted/50",
-        config.colorClass
-      )}>
-        {selectable && action.status === 'pending' && (
-          <Checkbox
-            checked={selected}
-            onCheckedChange={(checked) => onSelectChange?.(action.id, !!checked)}
-            className="flex-shrink-0"
-          />
+      <div
+        className={cn(
+          'flex flex-col gap-2 p-3 rounded-lg border-l-4 bg-muted/50 border',
+          config.colorClass,
         )}
-        <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">
-            {action.payload.action || action.payload.title || config.label}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {confidencePercent}% säker
-          </p>
+      >
+        <div className="flex items-start gap-3">
+          {selectable && action.status === 'pending' && (
+            <Checkbox
+              checked={selected}
+              onCheckedChange={(checked) => onSelectChange?.(action.id, !!checked)}
+              className="flex-shrink-0 mt-0.5"
+            />
+          )}
+          <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium line-clamp-2">
+              {action.payload?.action || action.payload?.title || config.label}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {confidencePercent}% säker
+              {action.payload?.component_name
+                ? ` · ${String(action.payload.component_name)}`
+                : ''}
+            </p>
+          </div>
         </div>
         {action.status === 'pending' && !selectable && (
-          <div className="flex gap-1">
-            <Button 
-              size="icon" 
-              variant="ghost" 
-              className="h-7 w-7"
-              onClick={handleApprove}
-              disabled={isApproving}
+          <div className="flex gap-2 pl-7">
+            <Button
+              size="sm"
+              className="flex-1 h-9"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void handleApprove();
+              }}
+              disabled={isApproving || isRejecting}
             >
-              {isApproving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+              {isApproving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+              ) : (
+                <Check className="h-3.5 w-3.5 mr-1" />
+              )}
+              Godkänn
             </Button>
-            <Button 
-              size="icon" 
-              variant="ghost" 
-              className="h-7 w-7 text-destructive hover:text-destructive"
-              onClick={() => onReject(action.id)}
-              disabled={isRejecting}
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 h-9 text-destructive hover:text-destructive"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void handleReject();
+              }}
+              disabled={isApproving || isRejecting}
             >
-              <X className="h-3 w-3" />
+              {isRejecting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+              ) : (
+                <X className="h-3.5 w-3.5 mr-1" />
+              )}
+              Avvisa
             </Button>
           </div>
         )}
