@@ -15,11 +15,14 @@ export type { Property, CreatePropertyInput } from '@/types/domain/property';
  * table and invalidates the cache on any mutation so the UI stays fresh.
  */
 export function useProperties() {
+  const { organization } = useOrganization();
+  const orgId = organization?.id;
   useRealtimeInvalidation('properties', queryKeys.properties.all);
 
   return useQuery({
-    queryKey: queryKeys.properties.list(),
-    queryFn: () => propertyService.listWithEnergyGrades(),
+    queryKey: queryKeys.properties.list({ organizationId: orgId }),
+    queryFn: () => propertyService.listWithEnergyGrades(orgId),
+    enabled: !!orgId,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 30,
   });

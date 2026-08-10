@@ -63,4 +63,6 @@ export interface ProjectListFilters {
   type?: ProjectType;
   year?: number;
   showArchived?: boolean;
+  /** Defense-in-depth filter via property.organization_id */
+  organizationId?: string;
 }

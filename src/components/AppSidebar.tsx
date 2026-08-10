@@ -21,6 +21,7 @@ import {
 import { Button } from "./ui/button";
 import { NotificationBell } from "./NotificationBell";
 import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
+import { OrganizationSwitcher } from "./organization/OrganizationSwitcher";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
 const navigationItems: Array<{ title: string; url: string; icon: LucideIcon; moduleName: ModuleName; adminOnly?: boolean }> = [
@@ -119,6 +120,8 @@ export function AppSidebar() {
             </div>
           )}
         </div>
+
+        <OrganizationSwitcher collapsed={isCollapsed} />
 
         {/* Navigation */}
         <SidebarGroup>

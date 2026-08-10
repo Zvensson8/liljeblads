@@ -20,6 +20,7 @@ export interface OrganizationInvitation {
   expires_at: string;
   accepted_at: string | null;
   invited_by: string | null;
+  token: string;
 }
 
 export function useOrganizationInvitations(organizationId: string | undefined) {
@@ -54,23 +55,31 @@ export function useCreateOrganizationInvitation() {
       role: string;
     }) => {
       const { data: userData } = await supabase.auth.getUser();
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('organization_invitations')
         .insert({
           organization_id: input.organizationId,
           email: input.email.toLowerCase(),
           role: input.role,
           invited_by: userData.user?.id,
-        });
+        })
+        .select('id, token')
+        .single();
       if (error) throw error;
+      return data as { id: string; token: string };
     },
-    onSuccess: (_d, vars) => {
+    onSuccess: (data, vars) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.organizationInvitations.byOrganization(
           vars.organizationId,
         ),
       });
-      toast({ title: 'Inbjudan skickad' });
+      const link = `${window.location.origin}/invite/${data.token}`;
+      void navigator.clipboard?.writeText(link).catch(() => undefined);
+      toast({
+        title: 'Inbjudan skapad',
+        description: 'Länken kopierades till urklipp – skicka den till personen.',
+      });
     },
     onError: (error: Error & { code?: string }) => {
       if (error.code === '23505') {

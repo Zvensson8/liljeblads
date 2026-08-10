@@ -133,6 +133,8 @@ export const queryKeys = {
       ['organization-members', 'organization', organizationId] as const,
   },
   organizations: makeEntityKeys('organizations'),
+  /** Current user's memberships + active org (list_my_organizations) */
+  myOrganizations: makeEntityKeys('my-organizations'),
   founderStats: makeEntityKeys('founder-stats'),
 } as const;
 

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrganization } from '@/hooks/useOrganization';
 import { useRealtimeInvalidation } from '@/hooks/internal/useRealtimeInvalidation';
 import { queryKeys } from '@/lib/queryKeys';
 import { workOrderService } from '@/services/supabase';
@@ -26,13 +27,19 @@ export type {
  */
 export function useWorkOrders(filters: WorkOrderListFilters = {}) {
   const { session } = useAuth();
+  const { organization } = useOrganization();
+  const orgId = organization?.id;
+  const merged: WorkOrderListFilters = {
+    ...filters,
+    organizationId: filters.organizationId ?? orgId,
+  };
 
   useRealtimeInvalidation('work_orders', queryKeys.workOrders.all);
 
   return useQuery({
-    queryKey: queryKeys.workOrders.list({ ...filters }),
-    queryFn: () => workOrderService.list(filters),
-    enabled: !!session,
+    queryKey: queryKeys.workOrders.list({ ...merged }),
+    queryFn: () => workOrderService.list(merged),
+    enabled: !!session && !!merged.organizationId,
     staleTime: 1000 * 60 * 2,
     gcTime: 1000 * 60 * 30,
   });

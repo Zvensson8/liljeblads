@@ -21,8 +21,29 @@ const base = createCrudService<Property, Partial<Property>, Partial<Property>>({
   defaultOrder: { column: 'created_at', ascending: false },
 });
 
-async function listWithEnergyGrades(): Promise<Property[]> {
-  const rows = await base.list();
+async function listWithEnergyGrades(organizationId?: string): Promise<Property[]> {
+  let query = supabase
+    .from('properties')
+    .select(
+      `
+      *,
+      floors (
+        id,
+        name,
+        level
+      )
+    `,
+    )
+    .order('created_at', { ascending: false });
+
+  // Defense in depth: explicit org filter in addition to RLS
+  if (organizationId) {
+    query = query.eq('organization_id', organizationId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  const rows = (data ?? []) as Property[];
   if (rows.length === 0) return [];
 
   return Promise.all(

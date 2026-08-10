@@ -3,6 +3,7 @@
  * and status filtering. Work orders join exclusively on `property_id`
  * (see project memory).
  */
+import { supabase } from '@/integrations/supabase/client';
 import { createCrudService } from './createCrudService';
 import type {
   CreateWorkOrderInput,
@@ -14,7 +15,7 @@ import type {
 const ACTIVE_STATUSES = ['not_started', 'awaiting_quote', 'ordered'] as const;
 const ARCHIVED_STATUSES = ['completed', 'archived'] as const;
 
-export const workOrderService = createCrudService<
+const base = createCrudService<
   WorkOrderWithRelations,
   CreateWorkOrderInput,
   UpdateWorkOrderInput,
@@ -35,3 +36,34 @@ export const workOrderService = createCrudService<
     return q;
   },
 });
+
+async function listForOrganization(
+  filters: WorkOrderListFilters = {},
+): Promise<WorkOrderWithRelations[]> {
+  const statuses = filters.showArchived ? ARCHIVED_STATUSES : ACTIVE_STATUSES;
+  const useInner = !!filters.organizationId;
+  let query = (supabase as any)
+    .from('work_orders')
+    .select(
+      useInner
+        ? `*, properties!inner (id, name, organization_id), components (id, name, type)`
+        : `*, properties (id, name), components (id, name, type)`,
+    )
+    .in('status', [...statuses])
+    .order('created_at', { ascending: false });
+
+  if (filters.propertyId) query = query.eq('property_id', filters.propertyId);
+  if (filters.projectId) query = query.eq('project_id', filters.projectId);
+  if (filters.organizationId) {
+    query = query.eq('properties.organization_id', filters.organizationId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as WorkOrderWithRelations[];
+}
+
+export const workOrderService = {
+  ...base,
+  list: listForOrganization,
+};

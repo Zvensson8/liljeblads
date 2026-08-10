@@ -60,4 +60,6 @@ export interface WorkOrderListFilters {
   showArchived?: boolean;
   propertyId?: string;
   projectId?: string;
+  /** Defense-in-depth filter via property.organization_id */
+  organizationId?: string;
 }

@@ -41,6 +41,7 @@ const Reports = lazy(() => import("./pages/Reports"));
 const SecurityDashboard = lazy(() => import("./pages/SecurityDashboard"));
 const AIChat = lazy(() => import("./pages/AIChat"));
 const AgentActivity = lazy(() => import("./pages/AgentActivity"));
+const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
 
 // Loading component
 const PageLoader = () => (
@@ -74,6 +75,7 @@ const AppContent = () => {
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/invite/:token" element={<ProtectedRoute><AcceptInvitation /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/properties" element={<ProtectedRoute><Properties /></ProtectedRoute>} />
           <Route path="/property/:id" element={<ProtectedRoute><PropertyDetail /></ProtectedRoute>} />

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrganization } from "@/hooks/useOrganization";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Building } from "lucide-react";
@@ -45,6 +46,12 @@ interface OrganizationMember {
 export default function OrganizationSettings() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const {
+    organization: activeOrg,
+    memberRole,
+    loading: orgLoading,
+    refetch: refetchActiveOrg,
+  } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [userRole, setUserRole] = useState<string>("member");
@@ -60,70 +67,68 @@ export default function OrganizationSettings() {
       navigate("/auth");
       return;
     }
-    fetchOrganizationData();
-  }, [user, navigate]);
+    if (orgLoading) return;
+    void fetchOrganizationData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when active org changes
+  }, [user, navigate, activeOrg?.id, orgLoading]);
 
   const fetchOrganizationData = async () => {
     try {
       setLoading(true);
 
-      // Hämta användarens organisations-medlemskap
-      // Använd organizations_public vy för säkerhet (exkluderar faktureringsinfo för vanliga medlemmar)
-      const { data: memberData, error: memberError } = await supabase
-        .from("organization_members")
-        .select("*, organization:organizations_public(*)")
-        .eq("user_id", user?.id)
-        .single();
-
-      if (memberError) throw memberError;
-
-      if (!memberData?.organization) {
+      if (!activeOrg?.id) {
         toast.error("Du är inte medlem i någon organisation");
         navigate("/");
         return;
       }
 
-      setOrganization(memberData.organization as unknown as Organization);
-      setUserRole(memberData.role);
+      // Full org row for settings (public view for non-sensitive fields)
+      const { data: orgRow, error: orgError } = await supabase
+        .from("organizations_public")
+        .select("*")
+        .eq("id", activeOrg.id)
+        .single();
 
-      // Kolla om användaren är founder/admin i user_roles
+      if (orgError) throw orgError;
+      if (!orgRow) {
+        toast.error("Kunde inte hämta organisation");
+        navigate("/");
+        return;
+      }
+
+      setOrganization(orgRow as unknown as Organization);
+      setUserRole(memberRole || "member");
+
       const { data: systemRoles } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user?.id);
 
-      const isSystemAdmin = systemRoles?.some(
-        (r) => r.role === "admin" || r.role === "founder"
-      ) || false;
+      const isSystemAdmin =
+        systemRoles?.some((r) => r.role === "admin" || r.role === "founder") ||
+        false;
 
-      // isAdmin = true om antingen organization_members har owner/admin
-      // ELLER user_roles har admin/founder
       setIsAdmin(
-        memberData.role === "owner" || 
-        memberData.role === "admin" || 
-        isSystemAdmin
+        memberRole === "owner" ||
+          memberRole === "admin" ||
+          isSystemAdmin,
       );
 
-      // Hämta statistik
-      const [propertiesResult, membersResult, componentsResult] = await Promise.all([
+      const [propertiesResult, membersResult] = await Promise.all([
         supabase
           .from("properties")
           .select("id", { count: "exact", head: true })
-          .eq("organization_id", memberData.organization.id),
+          .eq("organization_id", activeOrg.id),
         supabase
           .from("organization_members")
           .select("id", { count: "exact", head: true })
-          .eq("organization_id", memberData.organization.id),
-        supabase
-          .from("components")
-          .select("id", { count: "exact", head: true })
-          .eq("floor_id", memberData.organization.id),
+          .eq("organization_id", activeOrg.id),
       ]);
 
       setStats({
         propertyCount: propertiesResult.count || 0,
         memberCount: membersResult.count || 0,
-        componentCount: componentsResult.count || 0,
+        componentCount: 0,
       });
     } catch (error: unknown) {
       console.error("Error fetching organization:", error);

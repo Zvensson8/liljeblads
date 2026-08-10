@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Mail, Trash2, CheckCircle } from "lucide-react";
+import { Mail, Trash2, CheckCircle, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   useOrganizationInvitations,
@@ -54,6 +54,16 @@ export function OrganizationInvitations({ organizationId }: OrganizationInvitati
   };
 
   const isExpired = (expiresAt: string) => new Date(expiresAt) < new Date();
+
+  const copyInviteLink = async (token: string) => {
+    const link = `${window.location.origin}/invite/${token}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success("Inbjudningslänk kopierad");
+    } catch {
+      toast.message("Kopiera länken manuellt", { description: link });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -147,7 +157,17 @@ export function OrganizationInvitations({ organizationId }: OrganizationInvitati
                     <TableCell>
                       {new Date(invitation.created_at).toLocaleDateString("sv-SE")}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-1">
+                      {!invitation.accepted_at && !isExpired(invitation.expires_at) && invitation.token && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Kopiera inbjudningslänk"
+                          onClick={() => void copyInviteLink(invitation.token)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      )}
                       {!invitation.accepted_at && (
                         <Button
                           variant="ghost"

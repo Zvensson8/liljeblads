@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getErrorMessage } from "@/lib/utils";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,15 +36,24 @@ const Auth = () => {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+
+  const postAuthPath = (() => {
+    const redirect = searchParams.get('redirect');
+    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+      return redirect;
+    }
+    return '/dashboard';
+  })();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate('/');
+        navigate(postAuthPath, { replace: true });
       }
     });
-  }, [navigate]);
+  }, [navigate, postAuthPath]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +79,7 @@ const Auth = () => {
           title: 'Välkommen!',
           description: 'Du är nu inloggad.',
         });
-        navigate('/');
+        navigate(postAuthPath, { replace: true });
       }
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {

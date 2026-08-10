@@ -1436,6 +1436,7 @@ export type Database = {
           invited_by: string | null
           organization_id: string
           role: string
+          token: string
         }
         Insert: {
           accepted_at?: string | null
@@ -1446,6 +1447,7 @@ export type Database = {
           invited_by?: string | null
           organization_id: string
           role?: string
+          token?: string
         }
         Update: {
           accepted_at?: string | null
@@ -1456,6 +1458,7 @@ export type Database = {
           invited_by?: string | null
           organization_id?: string
           role?: string
+          token?: string
         }
         Relationships: [
           {
@@ -1642,6 +1645,7 @@ export type Database = {
       profiles: {
         Row: {
           approved: boolean
+          active_organization_id: string | null
           created_at: string
           email: string
           full_name: string | null
@@ -1652,6 +1656,7 @@ export type Database = {
         }
         Insert: {
           approved?: boolean
+          active_organization_id?: string | null
           created_at?: string
           email: string
           full_name?: string | null
@@ -1662,6 +1667,7 @@ export type Database = {
         }
         Update: {
           approved?: boolean
+          active_organization_id?: string | null
           created_at?: string
           email?: string
           full_name?: string | null
