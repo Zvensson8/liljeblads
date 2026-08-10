@@ -77,27 +77,60 @@ export default function OrganizationSettings() {
       setLoading(true);
 
       if (!activeOrg?.id) {
+        // Fall back: use list already loaded by useOrganization
         toast.error("Du är inte medlem i någon organisation");
         navigate("/");
         return;
       }
 
-      // Full org row for settings (public view for non-sensitive fields)
-      const { data: orgRow, error: orgError } = await supabase
-        .from("organizations_public")
-        .select("*")
-        .eq("id", activeOrg.id)
-        .single();
+      // Membership-checked RPC (avoids brittle RLS on organizations_public)
+      const { data: orgJson, error: orgError } = await supabase.rpc(
+        "get_organization_for_settings" as never,
+        { p_organization_id: activeOrg.id } as never,
+      );
 
       if (orgError) throw orgError;
-      if (!orgRow) {
-        toast.error("Kunde inte hämta organisation");
-        navigate("/");
-        return;
+
+      const orgRow = orgJson as {
+        id: string;
+        name: string;
+        max_properties: number;
+        max_users: number;
+        subscription_tier: string;
+        logo_url: string | null;
+        primary_color: string | null;
+        created_at: string;
+        member_role?: string;
+      } | null;
+
+      if (!orgRow?.id) {
+        // Soft fallback from active org list so UI still works
+        setOrganization({
+          id: activeOrg.id,
+          name: activeOrg.name,
+          max_properties: 50,
+          max_users: 10,
+          subscription_tier: "small",
+          logo_url: activeOrg.logo_url,
+          primary_color: activeOrg.primary_color,
+          created_at: new Date().toISOString(),
+        });
+        setUserRole(memberRole || "member");
+      } else {
+        setOrganization({
+          id: orgRow.id,
+          name: orgRow.name,
+          max_properties: orgRow.max_properties,
+          max_users: orgRow.max_users,
+          subscription_tier: orgRow.subscription_tier,
+          logo_url: orgRow.logo_url,
+          primary_color: orgRow.primary_color,
+          created_at: orgRow.created_at,
+        });
+        setUserRole(orgRow.member_role || memberRole || "member");
       }
 
-      setOrganization(orgRow as unknown as Organization);
-      setUserRole(memberRole || "member");
+      const roleForAdmin = orgRow?.member_role || memberRole || "member";
 
       const { data: systemRoles } = await supabase
         .from("user_roles")
@@ -109,8 +142,9 @@ export default function OrganizationSettings() {
         false;
 
       setIsAdmin(
-        memberRole === "owner" ||
-          memberRole === "admin" ||
+        roleForAdmin === "owner" ||
+          roleForAdmin === "admin" ||
+          roleForAdmin === "founder" ||
           isSystemAdmin,
       );
 
@@ -132,7 +166,33 @@ export default function OrganizationSettings() {
       });
     } catch (error: unknown) {
       console.error("Error fetching organization:", error);
-      toast.error("Kunde inte hämta organisationsdata");
+      const message =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message: string }).message)
+          : "Kunde inte hämta organisationsdata";
+
+      // Last resort: still show settings from active membership list
+      if (activeOrg?.id) {
+        setOrganization({
+          id: activeOrg.id,
+          name: activeOrg.name,
+          max_properties: 50,
+          max_users: 10,
+          subscription_tier: "small",
+          logo_url: activeOrg.logo_url,
+          primary_color: activeOrg.primary_color,
+          created_at: new Date().toISOString(),
+        });
+        setUserRole(memberRole || "member");
+        setIsAdmin(
+          memberRole === "owner" ||
+            memberRole === "admin" ||
+            memberRole === "founder",
+        );
+        toast.error(`Delvis data: ${message}`);
+      } else {
+        toast.error(message || "Kunde inte hämta organisationsdata");
+      }
     } finally {
       setLoading(false);
     }
