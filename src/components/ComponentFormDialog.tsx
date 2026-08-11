@@ -12,7 +12,6 @@ import { useCreateComponent, useUpdateComponent } from '@/hooks/useComponents';
 import { ComponentTemplate } from '@/hooks/useComponentLibrary';
 import { z } from 'zod';
 import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
-import { ComponentServicePlanSection } from './ComponentServicePlanSection';
 import { getErrorMessage } from '@/lib/utils';
 import type { Tables, TablesInsert, TablesUpdate, Database } from '@/integrations/supabase/types';
 
@@ -451,27 +450,18 @@ export const ComponentFormDialog = ({
             )}
           </div>
 
-          {/* Show service plan section after creating new component OR when editing */}
-          {showServicePlan && newComponentId && propertyId && (
+          {showServicePlan && newComponentId && (
             <div className="pt-4 border-t space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
                 <p className="text-sm text-green-700 font-medium">
-                  ✓ Komponenten har skapats! Du kan nu koppla den till driftuppgifter nedan.
+                  ✓ Komponenten har skapats!
                 </p>
               </div>
-              <ComponentServicePlanSection
-                componentId={newComponentId}
-                propertyId={propertyId}
-              />
             </div>
           )}
 
           {editingComponent && propertyId && (
             <div className="pt-4 border-t space-y-4">
-              <ComponentServicePlanSection
-                componentId={editingComponent.id}
-                propertyId={propertyId}
-              />
               <MaintenanceHistoryDialog
                 componentId={editingComponent.id}
                 componentName={editingComponent.name}

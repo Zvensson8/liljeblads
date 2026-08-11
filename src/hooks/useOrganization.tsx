@@ -118,7 +118,6 @@ export function useOrganization() {
         queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.components.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.todos.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.driftTasks.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboardStats.all }),
         queryClient.invalidateQueries({ queryKey: ['module-access'] }),
         queryClient.invalidateQueries({ queryKey: ['user-roles'] }),

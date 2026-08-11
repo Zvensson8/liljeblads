@@ -98,25 +98,11 @@ export const categorySchema = z.object({
   parent_id: z.string().uuid().optional().nullable(),
 });
 
-// Drift task validation
-export const driftTaskSchema = z.object({
-  name: nameSchema,
-  description: descriptionSchema,
-  planned_count: z.number().int().nonnegative().default(0),
-});
-
-// Drift task component validation
-export const driftTaskComponentSchema = z.object({
-  object_name: z.string().trim().max(100).optional(),
-  series_id: z.string().trim().max(100).optional(),
-  registration_number: z.string().trim().max(100).optional(),
-});
-
-// Floor validation
+// Floor validation (placement / optional label — drawings retired)
 export const floorSchema = z.object({
   name: nameSchema,
   level: z.number().int().optional().nullable(),
-  drawing_url: urlSchema,
+  drawing_url: urlSchema.optional().nullable(),
 });
 
 // Cost budget validation

@@ -20,7 +20,6 @@ export type { InvokeOptions } from './edgeFunctionService';
 export { propertyService } from './propertyService';
 export { workOrderService } from './workOrderService';
 export { componentService } from './componentService';
-export { driftTaskService } from './driftTaskService';
 export { maintenanceHistoryService } from './maintenanceHistoryService';
 export { projectService } from './projectService';
 export { todoService } from './todoService';
@@ -30,22 +29,6 @@ export { energyDeclarationService } from './energyDeclarationService';
 // — Newly consolidated entities —
 export { floorService } from './floorService';
 export type { Floor, FloorInsert, FloorUpdate, FloorListFilters } from './floorService';
-
-export { driftCategoryService } from './driftCategoryService';
-export type {
-  DriftCategory,
-  DriftCategoryInsert,
-  DriftCategoryUpdate,
-  DriftCategoryFilters,
-} from './driftCategoryService';
-
-export { driftTaskComponentService, deleteDriftTasksByIds } from './driftTaskComponentService';
-export type {
-  DriftTaskComponent,
-  DriftTaskComponentInsert,
-  DriftTaskComponentUpdate,
-  DriftTaskComponentFilters,
-} from './driftTaskComponentService';
 
 export { propertyDocumentService } from './propertyDocumentService';
 export type {
@@ -102,14 +85,6 @@ export type {
   MaintenanceDocumentUpdate,
   MaintenanceDocumentFilters,
 } from './maintenanceDocumentService';
-
-export { scheduledReportService } from './scheduledReportService';
-export type {
-  ScheduledReport,
-  ScheduledReportInsert,
-  ScheduledReportUpdate,
-  ScheduledReportFilters,
-} from './scheduledReportService';
 
 export { userConsentService } from './userConsentService';
 export type {

@@ -13,14 +13,11 @@ import { OrganizationInfo } from "@/components/organization/OrganizationInfo";
 import { OrganizationMembers } from "@/components/organization/OrganizationMembers";
 import { OrganizationBranding } from "@/components/organization/OrganizationBranding";
 import { OrganizationInvitations } from "@/components/organization/OrganizationInvitations";
-import { OrganizationAuditLogs } from "@/components/organization/OrganizationAuditLogs";
-import { OrganizationDataExport } from "@/components/organization/OrganizationDataExport";
 import { ProjectTemplates } from "@/components/organization/ProjectTemplates";
 import { OrganizationModuleAccess } from "@/components/organization/OrganizationModuleAccess";
 import { OrganizationApiKeys } from "@/components/organization/OrganizationApiKeys";
 import { AgentRiskPolicySettings } from "@/components/organization/AgentRiskPolicySettings";
 import { OrganizationUnitPrices } from "@/components/organization/OrganizationUnitPrices";
-import { featureFlags } from "@/lib/featureFlags";
 
 
 interface Organization {
@@ -291,12 +288,6 @@ export default function OrganizationSettings() {
                 {isAdmin && <TabsTrigger value="invitations">Inbjudningar</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="branding">Varumärke</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="templates">Projektmallar</TabsTrigger>}
-                {isAdmin && featureFlags.orgAdvancedAdminTabs && (
-                  <TabsTrigger value="audit">Säkerhetslogg</TabsTrigger>
-                )}
-                {isAdmin && featureFlags.orgAdvancedAdminTabs && (
-                  <TabsTrigger value="export">Data Export</TabsTrigger>
-                )}
               </TabsList>
 
               <TabsContent value="info">
@@ -351,12 +342,6 @@ export default function OrganizationSettings() {
                 </TabsContent>
               )}
 
-              {isAdmin && featureFlags.orgAdvancedAdminTabs && (
-                <TabsContent value="audit">
-                  <OrganizationAuditLogs organizationId={organization.id} />
-                </TabsContent>
-              )}
-
               {isAdmin && (
                 <TabsContent value="branding">
                   <OrganizationBranding
@@ -369,12 +354,6 @@ export default function OrganizationSettings() {
               {isAdmin && (
                 <TabsContent value="templates">
                   <ProjectTemplates organizationId={organization.id} />
-                </TabsContent>
-              )}
-
-              {isAdmin && featureFlags.orgAdvancedAdminTabs && (
-                <TabsContent value="export">
-                  <OrganizationDataExport organizationId={organization.id} />
                 </TabsContent>
               )}
             </Tabs>

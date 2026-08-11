@@ -31,7 +31,6 @@ import { useRecentlyVisited } from '@/hooks/useRecentlyVisited';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { featureFlags } from '@/lib/featureFlags';
 import { exportComponentsToExcel, exportWorkOrdersToExcel } from '@/lib/exportUtils';
 import { toast as sonnerToast } from 'sonner';
 
@@ -54,24 +53,14 @@ interface Floor {
   drawing_url: string | null;
 }
 
-/** Slim property tabs — drawings / technical-info / info-categories gated by featureFlags */
 const TAB_ITEMS: Array<{ value: string; label: string }> = [
   { value: 'overview', label: 'Översikt' },
   { value: 'maintenance-plan', label: 'Underhållsplan' },
-  ...(featureFlags.floorCanvasAndDrawings
-    ? [{ value: 'drawings', label: 'Ritningar' }]
-    : []),
   { value: 'notes', label: 'Anteckningar' },
   { value: 'todos', label: 'Att göra' },
   { value: 'contacts', label: 'Kontakter' },
   { value: 'documents', label: 'Dokument' },
   { value: 'activity', label: 'Aktivitet' },
-  ...(featureFlags.propertyInfoCategories
-    ? [
-        { value: 'technical-info', label: 'Teknisk info' },
-        { value: 'info-categories', label: 'Info-kategorier' },
-      ]
-    : []),
 ];
 
 const PropertyDetail = () => {
@@ -139,15 +128,10 @@ const PropertyDetail = () => {
     }
   }, [property, addRecentItem]);
 
-  // Redirect retired property tabs (drawings / technical-info) to overview
+  // Redirect retired property tabs to overview
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (
-      tab &&
-      (tab === 'drawings' || tab === 'technical-info' || tab === 'info-categories') &&
-      !featureFlags.floorCanvasAndDrawings &&
-      !featureFlags.propertyInfoCategories
-    ) {
+    if (tab && (tab === 'drawings' || tab === 'technical-info' || tab === 'info-categories')) {
       setActiveTab('overview');
     }
   }, [searchParams]);

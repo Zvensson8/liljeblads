@@ -73,15 +73,8 @@ export const queryKeys = {
     byProperty: (propertyId: string) =>
       ['todos', 'property', propertyId] as const,
   },
-  driftTasks: {
-    ...makeEntityKeys('drift-tasks'),
-    byProperty: (propertyId: string) =>
-      ['drift-tasks', 'property', propertyId] as const,
-  },
-
   // — Newly consolidated entities —
   floors: makeEntityKeys('floors'),
-  driftCategories: makeEntityKeys('drift-categories'),
 
   propertyDocuments: makeEntityKeys('property-documents'),
   propertyContacts: makeEntityKeys('property-contacts'),
@@ -90,7 +83,6 @@ export const queryKeys = {
   projectDocuments: makeEntityKeys('project-documents'),
   workOrderFiles: makeEntityKeys('work-order-files'),
   maintenanceDocuments: makeEntityKeys('maintenance-history-documents'),
-  scheduledReports: makeEntityKeys('scheduled-reports'),
   userConsents: makeEntityKeys('user-consents'),
   aiSuggestedActions: makeEntityKeys('ai-suggested-actions'),
   aiConversations: makeEntityKeys('ai-conversations'),
@@ -104,13 +96,6 @@ export const queryKeys = {
     ...makeEntityKeys('project-cost-items'),
     byProject: (projectId: string) =>
       ['project-cost-items', 'project', projectId] as const,
-  },
-  driftTaskComponents: {
-    ...makeEntityKeys('drift-task-components'),
-    byTask: (taskId: string) =>
-      ['drift-task-components', 'task', taskId] as const,
-    byTasks: (taskIds: string[]) =>
-      ['drift-task-components', 'tasks', [...taskIds].sort()] as const,
   },
   organizationInvitations: {
     ...makeEntityKeys('organization-invitations'),

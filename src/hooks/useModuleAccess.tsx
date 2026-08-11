@@ -7,13 +7,11 @@ export type ModuleName =
   | "properties"
   | "components"
   | "work-orders"
-  | "operations" // legacy DB value; not in product nav (slim-down)
   | "projects"
   | "users"
   | "organization"
   | "ai-chat";
 
-/** Modules exposed in product UI after slim-down (operations retired) */
 const ALL_MODULES: ModuleName[] = [
   "dashboard",
   "properties",

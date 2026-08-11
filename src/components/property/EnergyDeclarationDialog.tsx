@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEnergyDeclaration } from "@/hooks/useEnergyDeclaration";
-import { usePropertyInfoValues } from "@/hooks/usePropertyInfoValues";
 import { useState, useEffect } from "react";
 import { Loader2, TrendingUp, TrendingDown } from "lucide-react";
 import { calculateEnergyImprovement } from "@/lib/energyUtils";
@@ -24,8 +23,7 @@ export function EnergyDeclarationDialog({
   organizationId 
 }: EnergyDeclarationDialogProps) {
   const { currentValues, previousHistory, updateEnergy } = useEnergyDeclaration(propertyId, organizationId);
-  const { values: propertyInfoValues } = usePropertyInfoValues(propertyId);
-  
+
   const [energyGrade, setEnergyGrade] = useState<string>('');
   const [primaryEnergy, setPrimaryEnergy] = useState<string>('');
   const [specificEnergy, setSpecificEnergy] = useState<string>('');

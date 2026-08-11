@@ -1,10 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useRef } from 'react';
 import { storageService } from '@/services/supabase';
 import { getErrorMessage } from '@/lib/utils';
 import { useCreateMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 import { useCreateMaintenanceDocument } from '@/hooks/useMaintenanceDocuments';
-import { useDriftTasks } from '@/hooks/useDriftTasks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,38 +14,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Wrench, Upload, X, FileText, Loader2, Link2 } from 'lucide-react';
+import { Wrench, Upload, X, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface QuickServiceButtonProps {
   componentId: string;
   componentName: string;
   onSuccess?: () => void;
-}
-
-interface DriftTask {
-  id: string;
-  name: string;
-  planned_count: number;
-  reported_count: number;
-}
-
-function getQuarterFromDate(date: string): { quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4'; year: number } {
-  const d = new Date(date);
-  const month = d.getMonth();
-  const year = d.getFullYear();
-  
-  if (month < 3) return { quarter: 'Q1', year };
-  if (month < 6) return { quarter: 'Q2', year };
-  if (month < 9) return { quarter: 'Q3', year };
-  return { quarter: 'Q4', year };
 }
 
 export const QuickServiceButton = ({
@@ -62,19 +35,7 @@ export const QuickServiceButton = ({
     new Date().toISOString().split('T')[0]
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedDriftTaskId, setSelectedDriftTaskId] = useState<string>('');
-  const [propertyId, setPropertyId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const { quarter, year } = getQuarterFromDate(performedDate);
-
-  const { data: driftTasksData = [], isLoading: loadingTasks } = useDriftTasks(
-    open && propertyId ? { propertyId, quarter, year } : {},
-  );
-
-  const driftTasks = (open && propertyId ? (driftTasksData as DriftTask[]) : []).slice().sort(
-    (a, b) => a.name.localeCompare(b.name),
-  );
 
   const createMaintenance = useCreateMaintenanceHistory();
   const createMaintenanceDoc = useCreateMaintenanceDocument();
@@ -83,26 +44,7 @@ export const QuickServiceButton = ({
     setActionType('Service');
     setPerformedDate(new Date().toISOString().split('T')[0]);
     setSelectedFile(null);
-    setSelectedDriftTaskId('');
   };
-
-  // Resolve component's property_id (single lookup, no list hook needed)
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('components')
-        .select('property_id')
-        .eq('id', componentId)
-        .single();
-      if (!cancelled && !error && data) setPropertyId((data as { property_id: string }).property_id);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, componentId]);
-
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -128,18 +70,13 @@ export const QuickServiceButton = ({
     setLoading(true);
 
     try {
-      // 1. Create the maintenance history record with optional drift_task_id
       const maintenanceRecord = await createMaintenance.mutateAsync({
         component_id: componentId,
         action_type: actionType,
         performed_date: performedDate,
-        drift_task_id: selectedDriftTaskId || null,
+        drift_task_id: null,
       });
 
-
-
-
-      // 2. If a file was selected, upload it
       if (selectedFile && maintenanceRecord) {
         const fileExt = selectedFile.name.split('.').pop();
         const fileName = `${maintenanceRecord.id}/${crypto.randomUUID()}.${fileExt}`;
@@ -152,7 +89,6 @@ export const QuickServiceButton = ({
             description: getErrorMessage(uploadError),
           });
         }
-
 
         try {
           const publicUrl = storageService.getPublicUrl('maintenance-documents', fileName);
@@ -168,12 +104,10 @@ export const QuickServiceButton = ({
         }
       }
 
-
-      const selectedTask = driftTasks.find(t => t.id === selectedDriftTaskId);
       toast.success('Service registrerad', {
-        description: `${actionType} registrerad för ${componentName}${selectedTask ? ` (kopplad till "${selectedTask.name}")` : ''}`,
+        description: `${actionType} registrerad för ${componentName}`,
       });
-      
+
       setOpen(false);
       resetForm();
       onSuccess?.();
@@ -183,7 +117,6 @@ export const QuickServiceButton = ({
       });
     } finally {
       setLoading(false);
-
     }
   };
 
@@ -192,7 +125,6 @@ export const QuickServiceButton = ({
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
-
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -217,7 +149,7 @@ export const QuickServiceButton = ({
             Registrera utförd service för {componentName}
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -242,43 +174,6 @@ export const QuickServiceButton = ({
             </div>
           </div>
 
-          {/* Drift task linking */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-1.5">
-              <Link2 className="h-3.5 w-3.5" />
-              Koppla till driftuppföljning
-            </Label>
-            {loadingTasks ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Laddar uppgifter...
-              </div>
-            ) : driftTasks.length > 0 ? (
-              <Select value={selectedDriftTaskId} onValueChange={setSelectedDriftTaskId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={`Välj uppgift för ${quarter} ${year} (valfritt)`} />
-                </SelectTrigger>
-                <SelectContent>
-                  {driftTasks.map((task) => (
-                    <SelectItem key={task.id} value={task.id}>
-                      <div className="flex items-center justify-between gap-2 w-full">
-                        <span>{task.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({task.reported_count}/{task.planned_count} utförda)
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <p className="text-sm text-muted-foreground py-1">
-                Inga driftuppgifter för {quarter} {year}
-              </p>
-            )}
-          </div>
-
-          {/* Document upload section */}
           <div className="space-y-2">
             <Label>Serviceprotokoll (valfritt)</Label>
             {selectedFile ? (

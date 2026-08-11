@@ -4,14 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { sv } from 'date-fns/locale';
-import { Activity, Package, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Activity, Package, CheckCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useDriftTasks } from '@/hooks/useDriftTasks';
 import { queryKeys } from '@/lib/queryKeys';
 
 interface ActivityItem {
   id: string;
-  type: 'component' | 'maintenance' | 'task';
+  type: 'component' | 'maintenance';
   title: string;
   description: string;
   timestamp: string;
@@ -19,16 +18,9 @@ interface ActivityItem {
 }
 
 /**
- * Dashboard "Senaste aktiviteter" feed.
- *
- * Drift tasks now come from `useDriftTasks`, so completion status reflects
- * optimistic updates from the Operations module immediately. Components
- * and maintenance reads stay co-located via TanStack Query so they share
- * caching with the rest of the dashboard.
+ * Dashboard "Senaste aktiviteter" feed (components + servicehistorik).
  */
 export function ActivityFeed() {
-  const { data: tasks = [], isLoading: tasksLoading } = useDriftTasks();
-
   const { data: components = [], isLoading: componentsLoading } = useQuery({
     queryKey: [...queryKeys.components.all, 'activity-feed'],
     queryFn: async () => {
@@ -36,7 +28,7 @@ export function ActivityFeed() {
         .from('components')
         .select('id, name, created_at, status')
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(5);
       if (error) throw error;
       return data ?? [];
     },
@@ -50,14 +42,14 @@ export function ActivityFeed() {
         .from('maintenance_history')
         .select('id, action_type, performed_date, component_id, components(name)')
         .order('performed_date', { ascending: false })
-        .limit(3);
+        .limit(5);
       if (error) throw error;
       return data ?? [];
     },
     staleTime: 1000 * 60 * 2,
   });
 
-  const loading = tasksLoading || componentsLoading || maintenanceLoading;
+  const loading = componentsLoading || maintenanceLoading;
 
   const activities = useMemo<ActivityItem[]>(() => {
     const list: ActivityItem[] = [];
@@ -90,45 +82,17 @@ export function ActivityFeed() {
       });
     });
 
-    // Latest 3 drift tasks by created_at — derived from cached list so
-    // the feed picks up optimistic updates from Operations instantly.
-    [...tasks]
-      .sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )
-      .slice(0, 3)
-      .forEach((task) => {
-        const completion =
-          task.planned_count > 0
-            ? (task.reported_count / task.planned_count) * 100
-            : 0;
-        list.push({
-          id: task.id,
-          type: 'task',
-          title: task.name,
-          description: `${task.reported_count}/${task.planned_count} objekt rapporterade`,
-          timestamp: task.created_at,
-          status:
-            completion >= 100 ? 'success' : completion > 0 ? 'warning' : 'info',
-        });
-      });
-
     return list
       .sort(
         (a, b) =>
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       )
       .slice(0, 8);
-  }, [components, maintenance, tasks]);
+  }, [components, maintenance]);
 
-  const getIcon = (type: string, status?: string) => {
+  const getIcon = (type: string) => {
     if (type === 'component') return Package;
     if (type === 'maintenance') return CheckCircle;
-    if (type === 'task') {
-      if (status === 'success') return CheckCircle;
-      if (status === 'warning') return AlertTriangle;
-    }
     return Activity;
   };
 
@@ -165,38 +129,37 @@ export function ActivityFeed() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px] pr-4">
-          <div className="space-y-4">
-            {activities.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                Ingen aktivitet än
-              </p>
-            ) : (
-              activities.map((activity) => {
-                const Icon = getIcon(activity.type, activity.status);
+        {activities.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            Inga aktiviteter ännu
+          </p>
+        ) : (
+          <ScrollArea className="h-[280px] pr-3">
+            <ul className="space-y-3">
+              {activities.map((item) => {
+                const Icon = getIcon(item.type);
                 return (
-                  <div
-                    key={activity.id}
-                    className="flex gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className={`p-2 rounded-lg bg-muted ${getIconColor(activity.status)}`}>
-                      <Icon className="h-4 w-4" />
+                  <li key={`${item.type}-${item.id}`} className="flex gap-3">
+                    <div
+                      className={`mt-0.5 rounded-full bg-muted p-1.5 ${getIconColor(item.status)}`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{activity.title}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {activity.description}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium leading-tight">{item.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {item.description}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(activity.timestamp), 'PPp', { locale: sv })}
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {format(new Date(item.timestamp), 'PPp', { locale: sv })}
                       </p>
                     </div>
-                  </div>
+                  </li>
                 );
-              })
-            )}
-          </div>
-        </ScrollArea>
+              })}
+            </ul>
+          </ScrollArea>
+        )}
       </CardContent>
     </Card>
   );
