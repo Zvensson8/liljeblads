@@ -239,7 +239,7 @@ serve(async (req) => {
 
           const reasoning = String(action.reasoning || payload.reasoning || '').trim();
           const commentsParts = [
-            reasoning ? `AI-motivering: ${reasoning}` : null,
+            reasoning ? `Jarvis Motivering: ${reasoning}` : null,
             payload.component_name && !componentId
               ? `Komponent (ej matchad): ${payload.component_name}`
               : null,
@@ -253,14 +253,14 @@ serve(async (req) => {
               action:
                 (payload.action as string) ||
                 (payload.title as string) ||
-                'AI-föreslagen åtgärd',
+                'Jarvis-föreslagen åtgärd',
               priority: (payload.priority as string) || 'medium',
               status: 'not_started',
               contractor,
               quarter,
               comments: commentsParts.length
                 ? commentsParts.join('\n')
-                : 'Skapad via AI-förslag',
+                : 'Skapad via Jarvis-förslag',
               due_date: dueDate || (payload.due_date as string) || null,
               price,
             })
