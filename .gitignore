@@ -67,3 +67,5 @@ jarvis-worker/logs/
 
 .env.vercel*
 
+
+_smoke_*.sql
