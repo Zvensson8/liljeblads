@@ -1024,6 +1024,74 @@ export type Database = {
           },
         ]
       }
+      jarvis_action_log: {
+        Row: {
+          args_summary: Json
+          conversation_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          idempotency_key: string | null
+          link_hint: string | null
+          organization_id: string
+          result_full: Json | null
+          result_summary: Json
+          reverse_payload: Json | null
+          success: boolean
+          tool_name: string
+          undo_of: string | null
+          undone_at: string | null
+          user_id: string
+        }
+        Insert: {
+          args_summary?: Json
+          conversation_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          idempotency_key?: string | null
+          link_hint?: string | null
+          organization_id: string
+          result_full?: Json | null
+          result_summary?: Json
+          reverse_payload?: Json | null
+          success?: boolean
+          tool_name: string
+          undo_of?: string | null
+          undone_at?: string | null
+          user_id: string
+        }
+        Update: {
+          args_summary?: Json
+          conversation_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          idempotency_key?: string | null
+          link_hint?: string | null
+          organization_id?: string
+          result_full?: Json | null
+          result_summary?: Json
+          reverse_payload?: Json | null
+          success?: boolean
+          tool_name?: string
+          undo_of?: string | null
+          undone_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jarvis_action_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_ingest_batches: {
         Row: {
           created_at: string

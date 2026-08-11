@@ -260,7 +260,18 @@ npx supabase functions deploy ai-chat --project-ref ojiswgqntenvbwtopxbu
 2. ~~Fullare CRUD (komponent, service, kontakt) + daily briefing + eval~~ (P1)
 3. ~~Undo, batch-apply, idempotency~~ (P2)
 4. ~~Upload/zip → index~~ (P3)
-5. **Senare** — SharePoint/Drive read connector (gated)
+5. ~~B mer CRUD + C trust (eval, rate limits, logg-UI)~~
+6. **Senare** — SharePoint/Drive read connector (gated)
+
+### B+C (klart): mer CRUD + trust
+
+| Del | |
+|-----|--|
+| **B apply** | `apply_complete_todo`, `apply_add_project_cost`, `apply_add_budget_item`, `apply_complete_checklist_item`, `list_todos`, `list_project_costs` |
+| **C rate limits** | apply 30/min, send_to_me 10/timme (`api_rate_limits`) |
+| **C eval** | `npm run ci:jarvis` + `src/lib/jarvisPolicy.test.ts` |
+| **C logg-UI** | Jarvis → **Logg**-flik (`JarvisRecentActions`) |
+| **Smoke** | `npm run test:smoke:jarvis` (tabeller + P2-kolumner) |
 
 ## Runbook
 

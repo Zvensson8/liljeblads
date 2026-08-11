@@ -522,7 +522,11 @@ A) ANVÄNDAREN BER UTTRYCKLIGEN dig att göra något ("skapa", "ändra status", 
    - apply_work_order_status, apply_project_status
    - apply_create_component, apply_update_component, apply_log_service
    - apply_create_contact, apply_update_contact
+   - apply_create_todo, apply_complete_todo, list_todos
+   - apply_add_project_cost, apply_add_budget_item, list_project_costs
+   - apply_complete_checklist_item
    - send_to_me — e-post ENDAST till inloggad användare (aldrig extern mottagare)
+   - Rate limits: max ~30 apply/min, 10 send_to_me/timme
    - Briefing till dig: get_daily_briefing → send_to_me med plain_text
    - batch_apply_actions — flera apply_* (max 10), t.ex. WO på flera högrisk-komponenter
    - undo_last_action / undo_jarvis_action — ångra inom 5 min (inte e-post)

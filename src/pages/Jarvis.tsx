@@ -1,19 +1,21 @@
 import { useSearchParams } from 'react-router-dom';
-import { Bot, MessageSquare, Sparkles } from 'lucide-react';
+import { Bot, MessageSquare, Sparkles, History } from 'lucide-react';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AIChat from '@/pages/AIChat';
 import AgentActivity from '@/pages/AgentActivity';
+import JarvisRecentActions from '@/components/ai-chat/JarvisRecentActions';
 
 /**
- * Single Jarvis entry: chat + pending actions (HITL).
- * Deep-link: /jarvis?tab=chat | /jarvis?tab=actions
- * Floating bubble also opens chat dialog globally.
+ * Single Jarvis entry: chat + HITL proposals + action log.
+ * Deep-link: /jarvis?tab=chat | actions | log
  */
 export default function Jarvis() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get('tab') === 'actions' ? 'actions' : 'chat';
+  const raw = searchParams.get('tab');
+  const tab =
+    raw === 'actions' || raw === 'log' ? raw : 'chat';
 
   const setTab = (value: string) => {
     setSearchParams(
@@ -38,7 +40,7 @@ export default function Jarvis() {
               <h1 className="text-lg md:text-xl font-semibold">Jarvis</h1>
             </div>
             <p className="hidden sm:block text-sm text-muted-foreground ml-2">
-              Fråga om data, skapa förslag, godkänn åtgärder
+              Fråga, agera, spåra — och godkänn förslag
             </p>
           </header>
 
@@ -59,6 +61,13 @@ export default function Jarvis() {
                   <Sparkles className="h-4 w-4 mr-2" />
                   Förslag
                 </TabsTrigger>
+                <TabsTrigger
+                  value="log"
+                  className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1"
+                >
+                  <History className="h-4 w-4 mr-2" />
+                  Logg
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -67,6 +76,14 @@ export default function Jarvis() {
             </TabsContent>
             <TabsContent value="actions" className="flex-1 m-0 min-h-0 data-[state=inactive]:hidden">
               <AgentActivity embedded />
+            </TabsContent>
+            <TabsContent
+              value="log"
+              className="flex-1 m-0 min-h-0 overflow-y-auto p-4 md:p-6 data-[state=inactive]:hidden"
+            >
+              <div className="max-w-3xl mx-auto">
+                <JarvisRecentActions />
+              </div>
             </TabsContent>
           </Tabs>
         </SidebarInset>

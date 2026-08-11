@@ -23,6 +23,7 @@ import {
   undoLastAction,
   UNDO_WINDOW_MS,
 } from "./jarvisUndo.ts";
+import { checkRateLimit } from "./rateLimit.ts";
 
 export type ToolContext = {
   supabase: SupabaseClient;
@@ -260,6 +261,7 @@ const BATCHABLE_TOOLS = new Set([
   "apply_create_project",
   "apply_property_note",
   "apply_create_todo",
+  "apply_complete_todo",
   "apply_create_component",
   "apply_log_service",
   "apply_create_contact",
@@ -269,6 +271,9 @@ const BATCHABLE_TOOLS = new Set([
   "apply_update_property",
   "apply_update_component",
   "apply_update_contact",
+  "apply_add_project_cost",
+  "apply_add_budget_item",
+  "apply_complete_checklist_item",
 ]);
 
 /** Build deep-link for chat confirmation cards */
@@ -1117,6 +1122,122 @@ export const jarvisTools: ChatTool[] = [
   {
     type: "function",
     function: {
+      name: "apply_complete_todo",
+      description:
+        "Markera en att-göra som klar DIREKT (completed=true). Matcha via todo_id eller title + fastighet.",
+      parameters: {
+        type: "object",
+        properties: {
+          todo_id: { type: "string" },
+          title: { type: "string" },
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          completed: {
+            type: "boolean",
+            description: "Default true. Sätt false för att öppna igen.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_todos",
+      description: "Lista öppna (eller alla) todos för en fastighet.",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          include_completed: { type: "boolean" },
+          limit: { type: "number" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_add_project_cost",
+      description:
+        "Lägg till en faktisk kostnadspost på ett projekt DIREKT (project_cost_items).",
+      parameters: {
+        type: "object",
+        properties: {
+          project_id: { type: "string" },
+          project_number: { type: "string" },
+          name: { type: "string", description: "Projektnamn om id saknas" },
+          property_name: { type: "string" },
+          description: { type: "string" },
+          amount: { type: "number" },
+          cost_date: { type: "string", description: "YYYY-MM-DD default idag" },
+          category: { type: "string" },
+          actor: { type: "string" },
+        },
+        required: ["description", "amount"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_add_budget_item",
+      description: "Lägg till budgetrad på projekt DIREKT (project_budget_items).",
+      parameters: {
+        type: "object",
+        properties: {
+          project_id: { type: "string" },
+          project_number: { type: "string" },
+          name: { type: "string" },
+          property_name: { type: "string" },
+          description: { type: "string" },
+          budgeted_amount: { type: "number" },
+          forecasted_amount: { type: "number" },
+          category: { type: "string" },
+        },
+        required: ["description", "budgeted_amount"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_project_costs",
+      description: "Lista kostnadsposter och budgetrader för ett projekt.",
+      parameters: {
+        type: "object",
+        properties: {
+          project_id: { type: "string" },
+          project_number: { type: "string" },
+          name: { type: "string" },
+          property_name: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_complete_checklist_item",
+      description:
+        "Markera en checklistepunkt på projekt som klar DIREKT (eller öppna igen).",
+      parameters: {
+        type: "object",
+        properties: {
+          checklist_item_id: { type: "string" },
+          title: { type: "string" },
+          project_id: { type: "string" },
+          project_number: { type: "string" },
+          property_name: { type: "string" },
+          completed: { type: "boolean" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "suggest_create_component",
       description: "Föreslå ny komponent (HITL).",
       parameters: {
@@ -1363,6 +1484,64 @@ function generateProjectNumber(propertyNumber?: string | null): string {
   return `${base}-${year}-${suffix}`;
 }
 
+async function resolveOneProject(
+  supabase: SupabaseClient,
+  orgId: string,
+  rawArgs: Record<string, unknown>,
+  pageContext?: ToolContext["pageContext"],
+): Promise<{
+  id: string;
+  name: string;
+  project_number: string | null;
+  property_id: string;
+} | null> {
+  const projectId = String(rawArgs.project_id || pageContext?.project_id || "").trim();
+  const pnum = String(rawArgs.project_number || "").trim();
+  const pname = String(rawArgs.name || rawArgs.project_name || "").trim();
+  const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
+
+  if (projectId) {
+    let q = supabase
+      .from("projects")
+      .select("id, name, project_number, property_id, properties!inner(organization_id)")
+      .eq("id", projectId)
+      .eq("properties.organization_id", orgId)
+      .limit(1);
+    const { data } = await q.maybeSingle();
+    if (!data) return null;
+    return {
+      id: data.id as string,
+      name: data.name as string,
+      project_number: (data.project_number as string) ?? null,
+      property_id: data.property_id as string,
+    };
+  }
+
+  const { ids } = await resolvePropertyIds(
+    supabase,
+    orgId,
+    prop?.name || String(rawArgs.property_name || "") || undefined,
+  );
+  if (!ids.length && !pnum && !pname) return null;
+
+  let q = supabase
+    .from("projects")
+    .select("id, name, project_number, property_id")
+    .limit(5);
+  if (ids.length) q = q.in("property_id", ids);
+  if (pnum) q = q.ilike("project_number", `%${pnum}%`);
+  if (pname) q = q.ilike("name", `%${pname}%`);
+  const { data } = await q;
+  if (!data?.length) return null;
+  const p = data[0];
+  return {
+    id: p.id as string,
+    name: p.name as string,
+    project_number: (p.project_number as string) ?? null,
+    property_id: p.property_id as string,
+  };
+}
+
 export async function executeJarvisTool(
   name: string,
   rawArgs: Record<string, unknown>,
@@ -1380,6 +1559,36 @@ export async function executeJarvisTool(
   // undo_* log themselves; batch logs children
   const shouldLog =
     name.startsWith("apply_") || name === "send_to_me";
+
+  // C: rate limits — apply 30/min, send_to_me 10/hour
+  if (name.startsWith("apply_") || name === "batch_apply_actions") {
+    const rl = await checkRateLimit(ctx.userId, {
+      endpoint: "jarvis-apply",
+      maxRequests: 30,
+      windowSeconds: 60,
+    });
+    if (!rl.allowed) {
+      return {
+        error:
+          `För många skrivåtgärder. Vänta ${rl.retryAfterSeconds ?? 60} s och försök igen.`,
+        rate_limited: true,
+      };
+    }
+  }
+  if (name === "send_to_me") {
+    const rl = await checkRateLimit(ctx.userId, {
+      endpoint: "jarvis-send-to-me",
+      maxRequests: 10,
+      windowSeconds: 3600,
+    });
+    if (!rl.allowed) {
+      return {
+        error:
+          `E-postgräns nådd (max 10/timme). Vänta ${rl.retryAfterSeconds ?? 60} s.`,
+        rate_limited: true,
+      };
+    }
+  }
 
   // P2 idempotency: return prior successful result for same key
   const idemKey =
@@ -3159,6 +3368,254 @@ async function executeJarvisToolInner(
             entity_type: "property",
             entity_id: prop.id,
             path: `/property/${prop.id}`,
+          },
+        );
+      }
+
+      case "list_todos": {
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
+        if (!prop) return { error: "Ange fastighet" };
+        let q = supabase
+          .from("property_todos")
+          .select("id, title, priority, due_date, completed, property_id, created_at")
+          .eq("property_id", prop.id)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        if (rawArgs.include_completed !== true) {
+          q = q.eq("completed", false);
+        }
+        const { data, error } = await q;
+        if (error) return { error: error.message };
+        return {
+          property_name: prop.name,
+          count: data?.length || 0,
+          todos: data || [],
+          link_hint: `/property/${prop.id}`,
+        };
+      }
+
+      case "apply_complete_todo": {
+        const wantCompleted = rawArgs.completed !== false;
+        let todoId = String(rawArgs.todo_id || "").trim();
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
+        if (!todoId) {
+          const title = String(rawArgs.title || "").trim();
+          if (!title) return { error: "todo_id eller title krävs" };
+          let q = supabase
+            .from("property_todos")
+            .select("id, title, completed, property_id, properties!inner(organization_id)")
+            .eq("properties.organization_id", orgId)
+            .ilike("title", `%${title}%`)
+            .limit(1);
+          if (prop) q = q.eq("property_id", prop.id);
+          const { data: found } = await q.maybeSingle();
+          if (!found) return { error: "Todo hittades inte" };
+          todoId = found.id as string;
+        }
+        const { data: existing } = await supabase
+          .from("property_todos")
+          .select("id, title, completed, property_id, properties!inner(organization_id)")
+          .eq("id", todoId)
+          .eq("properties.organization_id", orgId)
+          .maybeSingle();
+        if (!existing) return { error: "Todo tillhör inte organisationen" };
+        const { data: updated, error } = await supabase
+          .from("property_todos")
+          .update({ completed: wantCompleted })
+          .eq("id", todoId)
+          .select("id, title, completed, property_id")
+          .single();
+        if (error) return { error: error.message };
+        return withDeepLink(
+          {
+            applied: true,
+            todo: updated,
+            previous_completed: existing.completed,
+            summary: wantCompleted
+              ? `Todo klar: ${updated.title}`
+              : `Todo öppnad igen: ${updated.title}`,
+          },
+          {
+            entity_type: "property",
+            entity_id: updated.property_id as string,
+            path: `/property/${updated.property_id}`,
+          },
+        );
+      }
+
+      case "apply_add_project_cost": {
+        const desc = String(rawArgs.description || "").trim();
+        const amount = Number(rawArgs.amount);
+        if (!desc) return { error: "description krävs" };
+        if (Number.isNaN(amount)) return { error: "amount krävs (nummer)" };
+        const project = await resolveOneProject(supabase, orgId, rawArgs, pageContext);
+        if (!project) {
+          return { error: "Projekt hittades inte (project_id/number/name + fastighet)" };
+        }
+        const costDate =
+          String(rawArgs.cost_date || "").trim().slice(0, 10) ||
+          new Date().toISOString().slice(0, 10);
+        const { data: cost, error } = await supabase
+          .from("project_cost_items")
+          .insert({
+            project_id: project.id,
+            description: desc,
+            amount,
+            cost_date: costDate,
+            category: (rawArgs.category as string) || null,
+            actor: (rawArgs.actor as string) || null,
+            created_by: userId,
+          })
+          .select("id, description, amount, cost_date, category, project_id")
+          .single();
+        if (error) return { error: error.message };
+        return withDeepLink(
+          {
+            applied: true,
+            cost_item: cost,
+            project_name: project.name,
+            summary: `Kostnad ${amount} kr: ${desc} (${project.name})`,
+          },
+          {
+            entity_type: "project",
+            entity_id: project.id,
+            path: `/projects/${project.id}`,
+          },
+        );
+      }
+
+      case "apply_add_budget_item": {
+        const desc = String(rawArgs.description || "").trim();
+        const budgeted = Number(rawArgs.budgeted_amount);
+        if (!desc) return { error: "description krävs" };
+        if (Number.isNaN(budgeted)) return { error: "budgeted_amount krävs" };
+        const project = await resolveOneProject(supabase, orgId, rawArgs, pageContext);
+        if (!project) return { error: "Projekt hittades inte" };
+        const forecastRaw = rawArgs.forecasted_amount;
+        const { data: item, error } = await supabase
+          .from("project_budget_items")
+          .insert({
+            project_id: project.id,
+            description: desc,
+            budgeted_amount: budgeted,
+            forecasted_amount:
+              forecastRaw != null && !Number.isNaN(Number(forecastRaw))
+                ? Number(forecastRaw)
+                : null,
+            category: (rawArgs.category as string) || null,
+          })
+          .select("id, description, budgeted_amount, forecasted_amount, category, project_id")
+          .single();
+        if (error) return { error: error.message };
+        return withDeepLink(
+          {
+            applied: true,
+            budget_item: item,
+            project_name: project.name,
+            summary: `Budgetrad ${budgeted} kr: ${desc} (${project.name})`,
+          },
+          {
+            entity_type: "project",
+            entity_id: project.id,
+            path: `/projects/${project.id}`,
+          },
+        );
+      }
+
+      case "list_project_costs": {
+        const project = await resolveOneProject(supabase, orgId, rawArgs, pageContext);
+        if (!project) return { error: "Projekt hittades inte" };
+        const [costs, budget] = await Promise.all([
+          supabase
+            .from("project_cost_items")
+            .select("id, description, amount, cost_date, category, actor")
+            .eq("project_id", project.id)
+            .order("cost_date", { ascending: false })
+            .limit(50),
+          supabase
+            .from("project_budget_items")
+            .select("id, description, budgeted_amount, forecasted_amount, category")
+            .eq("project_id", project.id)
+            .limit(50),
+        ]);
+        if (costs.error) return { error: costs.error.message };
+        if (budget.error) return { error: budget.error.message };
+        const costSum = (costs.data || []).reduce(
+          (s, c) => s + (Number(c.amount) || 0),
+          0,
+        );
+        const budgetSum = (budget.data || []).reduce(
+          (s, b) => s + (Number(b.budgeted_amount) || 0),
+          0,
+        );
+        return {
+          project: {
+            id: project.id,
+            name: project.name,
+            project_number: project.project_number,
+          },
+          totals: { costs: costSum, budgeted: budgetSum },
+          costs: costs.data || [],
+          budget_items: budget.data || [],
+          link_hint: `/projects/${project.id}`,
+        };
+      }
+
+      case "apply_complete_checklist_item": {
+        const wantCompleted = rawArgs.completed !== false;
+        let itemId = String(rawArgs.checklist_item_id || "").trim();
+        const project = await resolveOneProject(supabase, orgId, rawArgs, pageContext);
+        if (!itemId) {
+          const title = String(rawArgs.title || "").trim();
+          if (!title || !project) {
+            return { error: "checklist_item_id eller title+projekt krävs" };
+          }
+          const { data: found } = await supabase
+            .from("project_checklist_items")
+            .select("id, title, completed, project_id")
+            .eq("project_id", project.id)
+            .ilike("title", `%${title}%`)
+            .limit(1)
+            .maybeSingle();
+          if (!found) return { error: "Checklistepunkt hittades inte" };
+          itemId = found.id as string;
+        }
+        // Org scope via project
+        const { data: existing } = await supabase
+          .from("project_checklist_items")
+          .select(
+            "id, title, completed, project_id, projects!inner(property_id, properties!inner(organization_id))",
+          )
+          .eq("id", itemId)
+          .eq("projects.properties.organization_id", orgId)
+          .maybeSingle();
+        if (!existing) return { error: "Checklistepunkt tillhör inte organisationen" };
+
+        const patch: Record<string, unknown> = {
+          completed: wantCompleted,
+          completed_at: wantCompleted ? new Date().toISOString() : null,
+          completed_by: wantCompleted ? userId : null,
+        };
+        const { data: updated, error } = await supabase
+          .from("project_checklist_items")
+          .update(patch)
+          .eq("id", itemId)
+          .select("id, title, completed, project_id")
+          .single();
+        if (error) return { error: error.message };
+        return withDeepLink(
+          {
+            applied: true,
+            checklist_item: updated,
+            previous_completed: existing.completed,
+            summary: wantCompleted
+              ? `Checklista klar: ${updated.title}`
+              : `Checklista öppnad: ${updated.title}`,
+          },
+          {
+            entity_type: "project",
+            entity_id: updated.project_id as string,
+            path: `/projects/${updated.project_id}`,
           },
         );
       }

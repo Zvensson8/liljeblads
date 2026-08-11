@@ -23,10 +23,12 @@
     "test:e2e:install": "playwright install chromium",
     "test:smoke:pm": "tsx scripts/smoke-predictive-maintenance.mjs",
     "test:smoke:org": "node scripts/smoke-multi-org-isolation.mjs",
+    "test:smoke:jarvis": "node scripts/smoke-jarvis-tables.mjs",
     "test:isolation:jwt": "node scripts/test-jwt-org-isolation.mjs",
     "sync:edge-risk": "node scripts/sync-edge-risk.mjs",
     "sync:edge-risk:check": "node scripts/sync-edge-risk.mjs --check",
-    "ci:local": "npm run typecheck && npm run test:unit && npm run sync:edge-risk:check && npm run test:smoke:pm && npm run test:smoke:org && npm run test:isolation:jwt && npm run build:vite"
+    "ci:local": "npm run typecheck && npm run test:unit && npm run sync:edge-risk:check && npm run test:smoke:pm && npm run test:smoke:org && npm run test:isolation:jwt && npm run build:vite",
+    "ci:jarvis": "npm run typecheck && npm run test:unit -- src/lib/jarvisPolicy.test.ts src/lib/jarvisActionFromMessage.ts && npm run test:smoke:jarvis"
   },
   "engines": {
     "node": ">=18"

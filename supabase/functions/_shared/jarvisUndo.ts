@@ -38,6 +38,9 @@ const ALLOWED_TABLES = new Set([
   "maintenance_history",
   "property_contacts",
   "property_todos",
+  "project_cost_items",
+  "project_budget_items",
+  "project_checklist_items",
 ]);
 
 /** Build reverse payload from a successful apply_* result. */
@@ -155,6 +158,40 @@ export function extractReversePayload(
       if (!t?.id) return null;
       return { kind: "delete", table: "property_todos", id: String(t.id) };
     }
+    case "apply_complete_todo": {
+      const t = result.todo as { id?: string } | undefined;
+      if (!t?.id || result.previous_completed === undefined) return null;
+      return {
+        kind: "update",
+        table: "property_todos",
+        id: String(t.id),
+        fields: { completed: result.previous_completed },
+      };
+    }
+    case "apply_add_project_cost": {
+      const c = result.cost_item as { id?: string } | undefined;
+      if (!c?.id) return null;
+      return { kind: "delete", table: "project_cost_items", id: String(c.id) };
+    }
+    case "apply_add_budget_item": {
+      const b = result.budget_item as { id?: string } | undefined;
+      if (!b?.id) return null;
+      return { kind: "delete", table: "project_budget_items", id: String(b.id) };
+    }
+    case "apply_complete_checklist_item": {
+      const c = result.checklist_item as { id?: string } | undefined;
+      if (!c?.id || result.previous_completed === undefined) return null;
+      return {
+        kind: "update",
+        table: "project_checklist_items",
+        id: String(c.id),
+        fields: {
+          completed: result.previous_completed,
+          completed_at: null,
+          completed_by: null,
+        },
+      };
+    }
     default:
       return null;
   }
@@ -209,6 +246,22 @@ async function assertEntityInOrg(
       .select("id, properties!inner(organization_id)")
       .eq("id", id)
       .eq("properties.organization_id", orgId)
+      .maybeSingle();
+    return Boolean(data);
+  }
+
+  if (
+    table === "project_cost_items" ||
+    table === "project_budget_items" ||
+    table === "project_checklist_items"
+  ) {
+    const { data } = await supabase
+      .from(table)
+      .select(
+        "id, projects!inner(property_id, properties!inner(organization_id))",
+      )
+      .eq("id", id)
+      .eq("projects.properties.organization_id", orgId)
       .maybeSingle();
     return Boolean(data);
   }

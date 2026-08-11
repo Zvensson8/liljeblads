@@ -111,6 +111,7 @@ export const BATCHABLE_APPLY_TOOLS = [
   'apply_create_project',
   'apply_property_note',
   'apply_create_todo',
+  'apply_complete_todo',
   'apply_create_component',
   'apply_log_service',
   'apply_create_contact',
@@ -120,7 +121,24 @@ export const BATCHABLE_APPLY_TOOLS = [
   'apply_update_property',
   'apply_update_component',
   'apply_update_contact',
+  'apply_add_project_cost',
+  'apply_add_budget_item',
+  'apply_complete_checklist_item',
 ] as const;
+
+/** C: rate limit contract (edge re-implements with api_rate_limits). */
+export const JARVIS_RATE_LIMITS = {
+  applyPerMinute: 30,
+  sendToMePerHour: 10,
+} as const;
+
+export function isApplyRateLimited(countInWindow: number): boolean {
+  return countInWindow >= JARVIS_RATE_LIMITS.applyPerMinute;
+}
+
+export function isSendToMeRateLimited(countInWindow: number): boolean {
+  return countInWindow >= JARVIS_RATE_LIMITS.sendToMePerHour;
+}
 
 export function isBatchableApplyTool(tool: string): boolean {
   return (BATCHABLE_APPLY_TOOLS as readonly string[]).includes(tool);

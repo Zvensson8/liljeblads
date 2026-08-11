@@ -5,12 +5,16 @@ import {
   describeInvoiceAddress,
   findBlockedEmailRecipientField,
   formatBriefingPlainLite,
+  isApplyRateLimited,
   isBatchableApplyTool,
+  isSendToMeRateLimited,
   isWithinJarvisUndoWindow,
   JARVIS_BATCH_MAX,
+  JARVIS_RATE_LIMITS,
   JARVIS_UNDO_WINDOW_MS,
   prefersDirectApply,
 } from './jarvisPolicy';
+import { mergeAppliedActions } from './jarvisActionFromMessage';
 
 describe('jarvisPolicy – send_to_me security', () => {
   it('blocks external recipient fields', () => {
@@ -89,8 +93,34 @@ describe('jarvisPolicy – P2 undo window + batch', () => {
 
   it('only allowlists batchable apply tools', () => {
     expect(isBatchableApplyTool('apply_create_work_order')).toBe(true);
+    expect(isBatchableApplyTool('apply_add_project_cost')).toBe(true);
     expect(isBatchableApplyTool('batch_apply_actions')).toBe(false);
     expect(isBatchableApplyTool('send_to_me')).toBe(false);
     expect(isBatchableApplyTool('undo_last_action')).toBe(false);
+  });
+});
+
+describe('jarvisPolicy – C rate limits', () => {
+  it('apply limit at 30/min', () => {
+    expect(isApplyRateLimited(29)).toBe(false);
+    expect(isApplyRateLimited(JARVIS_RATE_LIMITS.applyPerMinute)).toBe(true);
+  });
+  it('send_to_me limit at 10/hour', () => {
+    expect(isSendToMeRateLimited(9)).toBe(false);
+    expect(isSendToMeRateLimited(JARVIS_RATE_LIMITS.sendToMePerHour)).toBe(true);
+  });
+});
+
+describe('jarvisActionFromMessage – grounding from text', () => {
+  it('infers WO card from Arbetsorder-ID line', () => {
+    const text = `
+Arbetsordern har skapats framgångsrikt.
+Arbetsorder-ID: fcb2d722-cdd4-4b05-afa0-e16d085c3613
+`;
+    const actions = mergeAppliedActions(undefined, text, []);
+    expect(actions.length).toBeGreaterThan(0);
+    expect(actions[0].tool).toBe('apply_create_work_order');
+    expect(actions[0].entity_id).toBe('fcb2d722-cdd4-4b05-afa0-e16d085c3613');
+    expect(actions[0].undoable).toBe(true);
   });
 });
