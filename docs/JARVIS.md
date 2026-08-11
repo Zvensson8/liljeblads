@@ -128,17 +128,52 @@ Loggar: `jarvis-worker/logs/ingest_*.log`
 
 | Kanal | Hur |
 |-------|-----|
-| **App AI-chat** | Tools: `get_property_overview`, dokument-RAG, risk, WO, … |
+| **App AI-chat / bubble** | Tools: `get_property_overview`, dokument-RAG, risk, WO, apply_*, send_to_me … |
 | **Worker CLI** | Samma data via webhook-tools |
 
-`get_property_overview` samlar: grunddata, komponenter, öppna WO/todos, anteckningar, dokumentlista, högrisk, underhållsplan.
+`get_property_overview` samlar: grunddata (inkl. `invoice_address`, LOA, yta), komponenter, öppna WO/todos, anteckningar, dokumentlista, kontakter, högrisk, underhållsplan.
 
 Dokument**innehåll** kräver indexerade embeddings (`search_property_documents` / app-upload).
+
+---
+
+## App-Jarvis (chat): läge, säkerhet, spårbarhet
+
+### apply_* vs suggest_* vs send_to_me
+
+| Läge | När | Effekt |
+|------|-----|--------|
+| **`apply_*`** | Användaren ber **uttryckligen** (skapa, ändra status, uppdatera…) | Skrivs **direkt** i DB |
+| **`suggest_*`** | Jarvis föreslår självmant / osäker | Utkast i **Förslag** (HITL) |
+| **`send_to_me`** | “Skicka till mig” | E-post **endast** till inloggad användare |
+
+### Säkerhet (e-post)
+
+- `send_to_me` ignorerar/blockerar modell-angivna `to` / `recipient` / `email`.
+- Mottagare = alltid sessionens `auth.users.email`.
+- Extern mejl till entreprenör/kund stöds **inte** (avsiktligt).
+
+### Grounding
+
+- Läsverktyg returnerar **kritiska fält** (t.ex. `invoice_address`) med explicita null.
+- Prompt: citera tool-resultat; säg aldrig “saknas” utan att ha läst fältet.
+- **Sidokontext**: bubble/chat skickar `pageContext` (`property_id` / `project_id` från URL) så “denna fastighet” fungerar.
+
+### Action log + UI
+
+| Del | Plats |
+|-----|--------|
+| Audit-tabell | `jarvis_action_log` (org, user, tool, args/result summary, entity, länk) |
+| Chat-bekräftelse | `appliedActions` i ai-chat-svar → kort med deep-link (Öppna WO/projekt/fastighet) |
+
+Migrering: `supabase/migrations/20260811200000_jarvis_action_log.sql`
 
 ### Deploy (krävs efter kodändring)
 
 ```powershell
 npx supabase login
+npx supabase db push
+# eller kör SQL-migreringen i dashboard
 npx supabase functions deploy jarvis-webhook --project-ref ojiswgqntenvbwtopxbu
 npx supabase functions deploy crewai-webhook --project-ref ojiswgqntenvbwtopxbu
 npx supabase functions deploy ai-chat --project-ref ojiswgqntenvbwtopxbu
@@ -151,6 +186,60 @@ node scripts/test-jarvis-webhook.mjs
 cd jarvis-worker
 python -m jarvis_worker.cli ask "Berätta om Automaten 11"
 ```
+
+### P1 (klart i kod): full förvaltare-agent
+
+| Tool | Effekt |
+|------|--------|
+| `apply_create_component` / `apply_update_component` | Komponent direkt |
+| `apply_log_service` | `maintenance_history` på komponent |
+| `apply_create_contact` / `apply_update_contact` | Fastighetskontakt |
+| `apply_create_todo` | Todo på fastighet |
+| `list_contacts` | Läs kontakter |
+| `get_daily_briefing` | Org-status (WO, risk, AI-förslag…) |
+| `suggest_create_component` / `suggest_log_service` / `suggest_create_contact` | HITL-varianter |
+| Edge `jarvis-daily-briefing` | Vardagar cron → mejl till **owner/admin** (egen e-post, en mottagare i taget) |
+
+HITL-godkännande i `execute-ai-action` för: `create_component`, `log_service`, `create_contact`.
+
+Eval (CI/unit): `src/lib/jarvisPolicy.test.ts` — e-postsäkerhet, grounding, deep-links, briefing-format.
+
+```powershell
+npm run test:unit
+# efter deploy:
+npx supabase functions deploy ai-chat --project-ref ojiswgqntenvbwtopxbu
+npx supabase functions deploy execute-ai-action --project-ref ojiswgqntenvbwtopxbu
+npx supabase functions deploy jarvis-daily-briefing --project-ref ojiswgqntenvbwtopxbu
+node scripts/schedule-agent-crons.mjs
+```
+
+### P2 (klart i kod): undo, batch, idempotency
+
+| Del | Hur |
+|-----|-----|
+| **Idempotency** | `idempotency_key` / `client_request_id` på apply_* → samma key returnerar tidigare resultat (ingen dubblett) |
+| **Undo 5 min** | `reverse_payload` i `jarvis_action_log`; tools `undo_last_action` / `undo_jarvis_action`; edge `jarvis-undo`; knappen **Ångra** i chat-kort |
+| **Batch** | `batch_apply_actions` max 10 apply_* (t.ex. WO på högrisk-lista); varje steg loggas; `stop_on_error` default true |
+| **Spår** | `list_recent_jarvis_actions` |
+
+Migrering: `20260811210000_jarvis_p2_undo_idempotency.sql`  
+Ej ångringsbart: `send_to_me` (skickad e-post), utgången fönster, redan ångrat.
+
+```powershell
+# SQL-migrering i dashboard eller:
+npx supabase db push
+npx supabase functions deploy ai-chat --project-ref ojiswgqntenvbwtopxbu
+npx supabase functions deploy jarvis-undo --project-ref ojiswgqntenvbwtopxbu
+npx supabase functions deploy execute-ai-action --project-ref ojiswgqntenvbwtopxbu
+npx supabase functions deploy jarvis-daily-briefing --project-ref ojiswgqntenvbwtopxbu
+```
+
+### Roadmap (inom systemet först)
+
+1. ~~Grounding + action log + sidokontext + bekräftelsekort~~ (sprint 1)
+2. ~~Fullare CRUD (komponent, service, kontakt) + daily briefing + eval~~ (P1)
+3. ~~Undo, batch-apply, idempotency~~ (P2)
+4. **P3** — Upload/zip → index; SharePoint/Drive **läs-only**
 
 ## Runbook
 

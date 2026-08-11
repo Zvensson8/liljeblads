@@ -602,6 +602,121 @@ serve(async (req) => {
           break;
         }
 
+        case 'create_component': {
+          const payload = (action.payload || {}) as Record<string, unknown>;
+          const propertyId = await resolvePropertyId(supabase, orgId, payload);
+          if (!propertyId) throw new Error('Ange fastighet för komponenten');
+          const { data: prop } = await supabase
+            .from('properties')
+            .select('id, organization_id')
+            .eq('id', propertyId)
+            .maybeSingle();
+          if (!prop || prop.organization_id !== orgId) {
+            throw new Error('Fastigheten tillhör inte organisationen');
+          }
+          const name = String(payload.name || '').trim();
+          if (!name) throw new Error('Komponentnamn krävs');
+          const typeRaw = String(payload.type || 'SC4.7').trim();
+          const { data: component, error: cErr } = await supabase
+            .from('components')
+            .insert({
+              property_id: propertyId,
+              name,
+              type: typeRaw || 'SC4.7',
+              status: (payload.status as string) || 'active',
+              manufacturer: (payload.manufacturer as string) || null,
+              model: (payload.model as string) || null,
+              serial_number: (payload.serial_number as string) || null,
+              notes: (payload.notes as string) || action.reasoning || null,
+              installation_year:
+                payload.installation_year != null
+                  ? Number(payload.installation_year)
+                  : null,
+            })
+            .select('id, name, type, property_id')
+            .single();
+          if (cErr) throw cErr;
+          result = { component_id: component.id, property_id: propertyId };
+          break;
+        }
+
+        case 'log_service': {
+          const payload = (action.payload || {}) as Record<string, unknown>;
+          let componentId = (payload.component_id as string) || null;
+          if (!componentId && payload.component_name) {
+            const propertyId = await resolvePropertyId(supabase, orgId, payload);
+            let q = supabase
+              .from('components')
+              .select('id, property_id, properties!inner(organization_id)')
+              .eq('properties.organization_id', orgId)
+              .ilike('name', `%${String(payload.component_name)}%`)
+              .limit(1);
+            if (propertyId) q = q.eq('property_id', propertyId);
+            const { data: comp } = await q.maybeSingle();
+            componentId = comp?.id ?? null;
+          }
+          if (!componentId) throw new Error('Komponent krävs för servicehistorik');
+          const actionType = String(payload.action_type || '').trim();
+          if (!actionType) throw new Error('action_type krävs');
+          const performed =
+            String(payload.performed_date || '').slice(0, 10) ||
+            new Date().toISOString().slice(0, 10);
+          const costRaw = payload.cost;
+          const { data: service, error: sErr } = await supabase
+            .from('maintenance_history')
+            .insert({
+              component_id: componentId,
+              action_type: actionType,
+              performed_date: performed,
+              cost:
+                costRaw != null && !Number.isNaN(Number(costRaw))
+                  ? Number(costRaw)
+                  : null,
+              supplier: (payload.supplier as string) || null,
+              notes:
+                (payload.notes as string) ||
+                (action.reasoning as string) ||
+                'Via Jarvis-förslag',
+              category: (payload.category as string) || null,
+            })
+            .select('id, component_id, action_type')
+            .single();
+          if (sErr) throw sErr;
+          result = { service_id: service.id, component_id: componentId };
+          break;
+        }
+
+        case 'create_contact': {
+          const payload = (action.payload || {}) as Record<string, unknown>;
+          const propertyId = await resolvePropertyId(supabase, orgId, payload);
+          if (!propertyId) throw new Error('Ange fastighet för kontakten');
+          const { data: prop } = await supabase
+            .from('properties')
+            .select('id, organization_id')
+            .eq('id', propertyId)
+            .maybeSingle();
+          if (!prop || prop.organization_id !== orgId) {
+            throw new Error('Fastigheten tillhör inte organisationen');
+          }
+          const name = String(payload.name || '').trim();
+          if (!name) throw new Error('Kontaktnamn krävs');
+          const { data: contact, error: ctErr } = await supabase
+            .from('property_contacts')
+            .insert({
+              property_id: propertyId,
+              name,
+              role: (payload.role as string) || null,
+              company: (payload.company as string) || null,
+              email: (payload.email as string) || null,
+              phone: (payload.phone as string) || null,
+            })
+            .select('id, name, property_id')
+            .single();
+          if (ctErr) throw ctErr;
+          result = { contact_id: contact.id, property_id: propertyId };
+          break;
+        }
+
         case 'send_reminder':
         case 'update_component_status':
           result = { message: 'Denna åtgärdstyp stöds inte ännu' };

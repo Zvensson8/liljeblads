@@ -58,6 +58,19 @@ export function useExecuteAIAction() {
   });
 }
 
+export interface JarvisUndoBody {
+  /** Specific action log id; omit to undo last undoable action (5 min). */
+  action_log_id?: string;
+}
+
+/** P2: undo Jarvis apply within 5 minutes. */
+export function useJarvisUndo() {
+  return useMutation({
+    mutationFn: (body: JarvisUndoBody = {}) =>
+      invokeEdgeFunction('jarvis-undo', body),
+  });
+}
+
 // ---------- Embeddings ----------
 
 export function useGenerateEmbeddings() {

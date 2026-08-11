@@ -13,6 +13,16 @@ import {
   type RiskLevel,
 } from "./componentRisk.ts";
 import { getResendClient, resendFrom } from "./resendClient.ts";
+import { buildDailyBriefing, formatBriefingPlain } from "./jarvisBriefing.ts";
+import {
+  BATCH_MAX_ACTIONS,
+  extractReversePayload,
+  findIdempotentHit,
+  undoActionById,
+  undoDeadline,
+  undoLastAction,
+  UNDO_WINDOW_MS,
+} from "./jarvisUndo.ts";
 
 export type ToolContext = {
   supabase: SupabaseClient;
@@ -21,7 +31,271 @@ export type ToolContext = {
   /** Authenticated user email only — never use model-supplied recipients for send */
   userEmail: string | null;
   conversationId?: string | null;
+  /** Optional UI route context (property/project where user is browsing) */
+  pageContext?: {
+    property_id?: string;
+    project_id?: string;
+    component_id?: string;
+    path?: string;
+  } | null;
 };
+
+/** Critical property columns — always return these so Jarvis cannot claim "saknas" without data */
+const PROPERTY_SELECT =
+  "id, name, address, invoice_address, property_number, property_type, area_sqm, construction_year, loa, description, created_at, updated_at";
+
+const PROJECT_SELECT =
+  "id, name, project_number, status, type, budget, forecast, actual_cost, year, start_quarter, end_quarter, start_date, end_date, description, property_id, actors, created_at";
+
+const WORK_ORDER_SELECT =
+  "id, action, status, priority, price, contractor, due_date, quarter, comments, property_id, component_id, project_id, created_at, updated_at";
+
+function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    if (/email|password|token|secret/i.test(k)) {
+      out[k] = "[redacted]";
+      continue;
+    }
+    if (typeof v === "string" && v.length > 400) {
+      out[k] = v.slice(0, 400) + "…";
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+function summarizeResult(result: unknown): Record<string, unknown> {
+  if (!result || typeof result !== "object") {
+    return { raw: String(result).slice(0, 200) };
+  }
+  const r = result as Record<string, unknown>;
+  const summary: Record<string, unknown> = {};
+  for (const key of [
+    "applied",
+    "sent",
+    "error",
+    "previous_status",
+    "property_name",
+    "link_hint",
+    "to_note",
+  ]) {
+    if (r[key] !== undefined) summary[key] = r[key];
+  }
+  if (r.work_order && typeof r.work_order === "object") {
+    const w = r.work_order as Record<string, unknown>;
+    summary.work_order = { id: w.id, action: w.action, status: w.status };
+  }
+  if (r.project && typeof r.project === "object") {
+    const p = r.project as Record<string, unknown>;
+    summary.project = {
+      id: p.id,
+      name: p.name,
+      project_number: p.project_number,
+      status: p.status,
+    };
+  }
+  if (r.property && typeof r.property === "object") {
+    const p = r.property as Record<string, unknown>;
+    summary.property = { id: p.id, name: p.name };
+  }
+  if (r.error) summary.error = String(r.error).slice(0, 500);
+  return summary;
+}
+
+function extractEntity(
+  toolName: string,
+  r: Record<string, unknown>,
+): { entity_type: string | null; entity_id: string | null } {
+  if (r.work_order && typeof r.work_order === "object") {
+    return {
+      entity_type: "work_order",
+      entity_id: String((r.work_order as { id?: string }).id || "") || null,
+    };
+  }
+  if (r.project && typeof r.project === "object") {
+    return {
+      entity_type: "project",
+      entity_id: String((r.project as { id?: string }).id || "") || null,
+    };
+  }
+  if (r.property && typeof r.property === "object") {
+    return {
+      entity_type: "property",
+      entity_id: String((r.property as { id?: string }).id || "") || null,
+    };
+  }
+  if (r.note && typeof r.note === "object") {
+    return {
+      entity_type: "property_note",
+      entity_id: String((r.note as { id?: string }).id || "") || null,
+    };
+  }
+  if (r.component && typeof r.component === "object") {
+    return {
+      entity_type: "component",
+      entity_id: String((r.component as { id?: string }).id || "") || null,
+    };
+  }
+  if (r.service && typeof r.service === "object") {
+    return {
+      entity_type: "maintenance_history",
+      entity_id: String((r.service as { id?: string }).id || "") || null,
+    };
+  }
+  if (r.contact && typeof r.contact === "object") {
+    return {
+      entity_type: "property_contact",
+      entity_id: String((r.contact as { id?: string }).id || "") || null,
+    };
+  }
+  if (r.todo && typeof r.todo === "object") {
+    return {
+      entity_type: "property_todo",
+      entity_id: String((r.todo as { id?: string }).id || "") || null,
+    };
+  }
+  if (toolName === "send_to_me") return { entity_type: "email", entity_id: null };
+  return { entity_type: null, entity_id: null };
+}
+
+async function logJarvisAction(
+  ctx: ToolContext,
+  toolName: string,
+  rawArgs: Record<string, unknown>,
+  result: unknown,
+): Promise<string | null> {
+  try {
+    const r = (result && typeof result === "object"
+      ? result as Record<string, unknown>
+      : {}) as Record<string, unknown>;
+    // Don't re-log pure idempotent replays as new rows
+    if (r.idempotent_replay === true) return (r.action_log_id as string) || null;
+
+    const success = !r.error &&
+      (r.applied === true || r.sent === true || r.stored === true || r.undone === true);
+    const { entity_type, entity_id } = extractEntity(toolName, r);
+    const reverse = extractReversePayload(toolName, r);
+    const idempotencyKey =
+      String(rawArgs.idempotency_key || rawArgs.client_request_id || "").trim() ||
+      null;
+
+    const resultFull = {
+      ...r,
+      // strip huge fields if any
+    };
+
+    // Only store UUID conversation ids (invalid values abort the whole insert)
+    const convRaw = String(ctx.conversationId || "").trim();
+    const conversationId =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+          .test(convRaw)
+        ? convRaw
+        : null;
+
+    const baseRow: Record<string, unknown> = {
+      organization_id: ctx.orgId,
+      user_id: ctx.userId,
+      conversation_id: conversationId,
+      tool_name: toolName,
+      args_summary: redactArgs(rawArgs),
+      result_summary: summarizeResult(result),
+      success: Boolean(success || (r.sent === true)),
+      entity_type,
+      entity_id,
+      link_hint: (r.link_hint as string) || null,
+    };
+
+    // Prefer P2 columns; fall back if migration not applied yet
+    let insertPayload: Record<string, unknown> = {
+      ...baseRow,
+      result_full: resultFull,
+      reverse_payload: reverse,
+      idempotency_key: idempotencyKey,
+    };
+
+    let { data: inserted, error } = await ctx.supabase
+      .from("jarvis_action_log")
+      .insert(insertPayload)
+      .select("id, created_at")
+      .single();
+
+    if (
+      error &&
+      /result_full|reverse_payload|idempotency_key|column/i.test(error.message)
+    ) {
+      console.warn(
+        "[jarvis_action_log] P2 columns missing — insert without reverse/idempotency. Run migration 20260811210000.",
+      );
+      ({ data: inserted, error } = await ctx.supabase
+        .from("jarvis_action_log")
+        .insert(baseRow)
+        .select("id, created_at")
+        .single());
+    }
+
+    if (error) {
+      // Unique idempotency race: fetch existing
+      if (idempotencyKey && /duplicate|unique/i.test(error.message)) {
+        const hit = await findIdempotentHit(
+          { supabase: ctx.supabase, orgId: ctx.orgId, userId: ctx.userId },
+          idempotencyKey,
+        );
+        return hit?.id ?? null;
+      }
+      console.error("[jarvis_action_log]", error.message);
+      return null;
+    }
+
+    return (inserted?.id as string) || null;
+  } catch (e) {
+    console.error("[jarvis_action_log]", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+const BATCHABLE_TOOLS = new Set([
+  "apply_create_work_order",
+  "apply_create_project",
+  "apply_property_note",
+  "apply_create_todo",
+  "apply_create_component",
+  "apply_log_service",
+  "apply_create_contact",
+  "apply_work_order_status",
+  "apply_project_status",
+  "apply_update_invoice_address",
+  "apply_update_property",
+  "apply_update_component",
+  "apply_update_contact",
+]);
+
+/** Build deep-link for chat confirmation cards */
+function withDeepLink(
+  result: Record<string, unknown>,
+  opts: { entity_type?: string; entity_id?: string; path?: string },
+): Record<string, unknown> {
+  const link =
+    opts.path ||
+    (opts.entity_type === "work_order"
+      ? "/work-orders"
+      : opts.entity_type === "project" && opts.entity_id
+      ? `/projects/${opts.entity_id}`
+      : opts.entity_type === "property" && opts.entity_id
+      ? `/property/${opts.entity_id}`
+      : null);
+  return {
+    ...result,
+    link_hint: link,
+    ui: {
+      entity_type: opts.entity_type ?? null,
+      entity_id: opts.entity_id ?? null,
+      link,
+      confirm: true,
+    },
+  };
+}
 
 const WO_STATUSES = [
   "not_started",
@@ -41,13 +315,65 @@ const PROJECT_STATUSES = [
   "avslutat",
 ] as const;
 
+const COMPONENT_STATUSES = [
+  "active",
+  "inactive",
+  "maintenance",
+  "needs_repair",
+  "decommissioned",
+] as const;
+
+const COMPONENT_TYPES = new Set([
+  "SC1",
+  "SC2.1.1",
+  "SC2.3",
+  "SC2.3.1",
+  "SC2.3.3",
+  "SC2.3.4",
+  "SC2.3.7",
+  "SC2.6.2",
+  "SC4.1.2.5.1",
+  "SC4.1.2.5.3",
+  "SC4.1.6.9",
+  "SC4.2.4.6",
+  "SC4.2.4.7",
+  "SC4.5.1",
+  "SC4.6.2.6",
+  "SC4.6.2.6.1",
+  "SC4.7",
+  "SC5.5",
+  "SC7.1",
+  "SC7.2",
+]);
+
+/** Map common Swedish labels → SC code */
+function normalizeComponentType(raw?: string | null): string | null {
+  if (!raw?.trim()) return null;
+  const t = raw.trim();
+  if (COMPONENT_TYPES.has(t)) return t;
+  const lower = t.toLowerCase();
+  if (lower.includes("värmepump") || lower.includes("varmepump")) return "SC4.6.2.6";
+  if (lower.includes("vent") || lower.includes("luft")) return "SC4.7";
+  if (lower.includes("hiss")) return "SC7.1";
+  if (lower.includes("kyl")) return "SC4.5.1";
+  if (lower.includes("port")) return "SC2.3.3";
+  if (lower.includes("fjärrvärme") || lower.includes("varmvaxel")) return "SC4.1.6.9";
+  // Accept "SC4.7 something"
+  const m = t.match(/\bSC[\d.]+/i);
+  if (m && COMPONENT_TYPES.has(m[0].toUpperCase().replace(/^sc/i, "SC"))) {
+    const code = m[0].toUpperCase().startsWith("SC") ? m[0].replace(/^sc/i, "SC") : m[0];
+    if (COMPONENT_TYPES.has(code)) return code;
+  }
+  return null;
+}
+
 export const jarvisTools: ChatTool[] = [
   {
     type: "function",
     function: {
       name: "list_properties",
       description:
-        "Lista organisationens fastigheter (namn, adress, fakturaadress/invoice_address, id).",
+        "Lista organisationens fastigheter med alla kritiska fält: namn, adress, invoice_address (fakturaadress), property_number, property_type, area_sqm, construction_year, loa, description, id.",
       parameters: {
         type: "object",
         properties: {
@@ -579,6 +905,317 @@ export const jarvisTools: ChatTool[] = [
       },
     },
   },
+  // ── P1: component / service / contact ──
+  {
+    type: "function",
+    function: {
+      name: "list_contacts",
+      description: "Lista kontakter på en fastighet (namn, roll, bolag, e-post, telefon).",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_daily_briefing",
+      description:
+        "Hämta dagens briefing för organisationen: öppna/förfallna WO, projekt, todos, AI-förslag, högrisk. Använd vid 'briefing', 'morgonstatus', 'vad händer idag'. Kombineras med send_to_me om användaren vill ha mejl.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_create_component",
+      description:
+        "Skapa komponent DIREKT på en fastighet. type = SC-kod (t.ex. SC4.6.2.6 värmepump, SC4.7 vent). Kräver name + fastighet.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          type: {
+            type: "string",
+            description: "SC-kod, t.ex. SC4.7, SC4.6.2.6, SC7.1",
+          },
+          status: {
+            type: "string",
+            enum: ["active", "inactive", "maintenance", "needs_repair", "decommissioned"],
+          },
+          manufacturer: { type: "string" },
+          model: { type: "string" },
+          serial_number: { type: "string" },
+          installation_year: { type: "number" },
+          notes: { type: "string" },
+          supplier: { type: "string" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_update_component",
+      description:
+        "Uppdatera befintlig komponent DIREKT (status, tillverkare, modell, m.m.).",
+      parameters: {
+        type: "object",
+        properties: {
+          component_id: { type: "string" },
+          component_name: { type: "string" },
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          name: { type: "string" },
+          type: { type: "string" },
+          status: {
+            type: "string",
+            enum: ["active", "inactive", "maintenance", "needs_repair", "decommissioned"],
+          },
+          manufacturer: { type: "string" },
+          model: { type: "string" },
+          serial_number: { type: "string" },
+          installation_year: { type: "number" },
+          notes: { type: "string" },
+          next_service_date: { type: "string" },
+          supplier: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_log_service",
+      description:
+        "Logga service/underhållshistorik DIREKT på en komponent (maintenance_history).",
+      parameters: {
+        type: "object",
+        properties: {
+          component_id: { type: "string" },
+          component_name: { type: "string" },
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          action_type: {
+            type: "string",
+            description: "t.ex. service, reparation, inspektion, filterbyte",
+          },
+          performed_date: { type: "string", description: "YYYY-MM-DD (default idag)" },
+          cost: { type: "number" },
+          supplier: { type: "string" },
+          notes: { type: "string" },
+          category: { type: "string" },
+          is_warranty: { type: "boolean" },
+        },
+        required: ["action_type"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_create_contact",
+      description: "Lägg till kontakt på en fastighet DIREKT.",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          name: { type: "string" },
+          role: { type: "string" },
+          company: { type: "string" },
+          email: { type: "string" },
+          phone: { type: "string" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_update_contact",
+      description: "Uppdatera befintlig fastighetskontakt DIREKT.",
+      parameters: {
+        type: "object",
+        properties: {
+          contact_id: { type: "string" },
+          contact_name: { type: "string", description: "Hitta kontakt via namn om id saknas" },
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          name: { type: "string" },
+          role: { type: "string" },
+          company: { type: "string" },
+          email: { type: "string" },
+          phone: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_create_todo",
+      description: "Skapa att-göra på fastighet DIREKT.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          due_date: { type: "string" },
+          priority: { type: "string", enum: ["low", "medium", "high"] },
+        },
+        required: ["title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "suggest_create_component",
+      description: "Föreslå ny komponent (HITL).",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          type: { type: "string" },
+          manufacturer: { type: "string" },
+          model: { type: "string" },
+          installation_year: { type: "number" },
+          reasoning: { type: "string" },
+          confidence: { type: "number" },
+        },
+        required: ["name", "reasoning", "confidence"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "suggest_log_service",
+      description: "Föreslå servicehistorik-rad (HITL).",
+      parameters: {
+        type: "object",
+        properties: {
+          component_name: { type: "string" },
+          component_id: { type: "string" },
+          property_name: { type: "string" },
+          action_type: { type: "string" },
+          performed_date: { type: "string" },
+          cost: { type: "number" },
+          supplier: { type: "string" },
+          notes: { type: "string" },
+          reasoning: { type: "string" },
+          confidence: { type: "number" },
+        },
+        required: ["action_type", "reasoning", "confidence"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "suggest_create_contact",
+      description: "Föreslå ny kontakt på fastighet (HITL).",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          name: { type: "string" },
+          role: { type: "string" },
+          company: { type: "string" },
+          email: { type: "string" },
+          phone: { type: "string" },
+          reasoning: { type: "string" },
+          confidence: { type: "number" },
+        },
+        required: ["name", "reasoning", "confidence"],
+      },
+    },
+  },
+  // ── P2: undo / batch / idempotency ──
+  {
+    type: "function",
+    function: {
+      name: "undo_last_action",
+      description:
+        "Ångra senaste ångringsbara Jarvis-åtgärden (inom 5 minuter). Använd när användaren säger ångra/ta tillbaka. E-post kan inte ångras.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "undo_jarvis_action",
+      description:
+        "Ångra en specifik Jarvis-åtgärd via action_log_id (inom 5 min).",
+      parameters: {
+        type: "object",
+        properties: {
+          action_log_id: { type: "string", description: "UUID från action_log_id" },
+        },
+        required: ["action_log_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "batch_apply_actions",
+      description:
+        "Kör flera apply_* i följd (max 10). Använd t.ex. när användaren ber skapa WO på flera högrisk-komponenter. Varje delsteg loggas. stop_on_error default true.",
+      parameters: {
+        type: "object",
+        properties: {
+          actions: {
+            type: "array",
+            description:
+              "Lista { tool: apply_*, args: {...}, idempotency_key?: string }",
+            items: {
+              type: "object",
+              properties: {
+                tool: { type: "string" },
+                args: { type: "object" },
+                idempotency_key: { type: "string" },
+              },
+            },
+          },
+          stop_on_error: { type: "boolean" },
+        },
+        required: ["actions"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_recent_jarvis_actions",
+      description:
+        "Lista dina senaste Jarvis-åtgärder (för spårbarhet / vilken som kan ångras).",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Max 20, default 10" },
+        },
+      },
+    },
+  },
 ];
 
 async function resolvePropertyIds(
@@ -598,29 +1235,93 @@ async function resolvePropertyIds(
   return { ids: [...names.keys()], names };
 }
 
+type ResolvedProperty = {
+  id: string;
+  name: string;
+  invoice_address?: string | null;
+  address?: string | null;
+  property_number?: string | null;
+  property_type?: string | null;
+  area_sqm?: number | null;
+  construction_year?: number | null;
+  loa?: string | null;
+  description?: string | null;
+};
+
 async function resolveOneProperty(
   supabase: SupabaseClient,
   orgId: string,
   rawArgs: Record<string, unknown>,
-): Promise<{ id: string; name: string; invoice_address?: string | null; address?: string | null; property_number?: string | null } | null> {
-  const propId = String(rawArgs.property_id || "").trim();
+  pageContext?: ToolContext["pageContext"],
+): Promise<ResolvedProperty | null> {
+  const propId = String(rawArgs.property_id || pageContext?.property_id || "").trim();
   const propName = String(rawArgs.property_name || "").trim();
   if (!propId && !propName) return null;
   let q = supabase
     .from("properties")
-    .select("id, name, invoice_address, address, property_number")
+    .select(PROPERTY_SELECT)
     .eq("organization_id", orgId)
     .limit(1);
   if (propId) q = q.eq("id", propId);
   else q = q.ilike("name", `%${propName}%`);
   const { data } = await q.maybeSingle();
-  return data as {
-    id: string;
-    name: string;
-    invoice_address?: string | null;
-    address?: string | null;
-    property_number?: string | null;
-  } | null;
+  return data as ResolvedProperty | null;
+}
+
+type ResolvedComponent = {
+  id: string;
+  name: string;
+  type: string | null;
+  status: string | null;
+  property_id: string;
+  property_name?: string | null;
+};
+
+async function resolveOneComponent(
+  supabase: SupabaseClient,
+  orgId: string,
+  rawArgs: Record<string, unknown>,
+  pageContext?: ToolContext["pageContext"],
+): Promise<ResolvedComponent | null> {
+  const compId = String(rawArgs.component_id || pageContext?.component_id || "").trim();
+  const compName = String(rawArgs.component_name || "").trim();
+  if (compId) {
+    const { data } = await supabase
+      .from("components")
+      .select("id, name, type, status, property_id, properties!inner(organization_id, name)")
+      .eq("id", compId)
+      .eq("properties.organization_id", orgId)
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      id: data.id as string,
+      name: data.name as string,
+      type: (data.type as string) ?? null,
+      status: (data.status as string) ?? null,
+      property_id: data.property_id as string,
+      property_name:
+        (data.properties as { name?: string } | null)?.name ?? null,
+    };
+  }
+  if (!compName) return null;
+  const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
+  let q = supabase
+    .from("components")
+    .select("id, name, type, status, property_id, properties!inner(organization_id, name)")
+    .eq("properties.organization_id", orgId)
+    .ilike("name", `%${compName}%`)
+    .limit(1);
+  if (prop) q = q.eq("property_id", prop.id);
+  const { data } = await q.maybeSingle();
+  if (!data) return null;
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    type: (data.type as string) ?? null,
+    status: (data.status as string) ?? null,
+    property_id: data.property_id as string,
+    property_name: (data.properties as { name?: string } | null)?.name ?? null,
+  };
 }
 
 function generateProjectNumber(propertyNumber?: string | null): string {
@@ -635,7 +1336,73 @@ export async function executeJarvisTool(
   rawArgs: Record<string, unknown>,
   ctx: ToolContext,
 ): Promise<unknown> {
-  const { supabase, orgId, userId, userEmail, conversationId } = ctx;
+  // Prefer explicit tool args; fall back to UI page context for property scope
+  const args = { ...rawArgs };
+  if (!args.property_id && ctx.pageContext?.property_id) {
+    args.property_id = ctx.pageContext.property_id;
+  }
+  if (!args.project_id && ctx.pageContext?.project_id) {
+    args.project_id = ctx.pageContext.project_id;
+  }
+
+  // undo_* log themselves; batch logs children
+  const shouldLog =
+    name.startsWith("apply_") || name === "send_to_me";
+
+  // P2 idempotency: return prior successful result for same key
+  const idemKey =
+    String(args.idempotency_key || args.client_request_id || "").trim();
+  if (idemKey && (name.startsWith("apply_") || name === "send_to_me")) {
+    const hit = await findIdempotentHit(
+      { supabase: ctx.supabase, orgId: ctx.orgId, userId: ctx.userId },
+      idemKey,
+    );
+    if (hit?.result_full) {
+      return {
+        ...hit.result_full,
+        idempotent_replay: true,
+        action_log_id: hit.id,
+        summary:
+          String(
+            (hit.result_full as { summary?: string }).summary ||
+              "Idempotent: samma åtgärd redan utförd",
+          ),
+      };
+    }
+  }
+
+  // Prevent nested batch from re-entering with batch tool name
+  const result = await executeJarvisToolInner(name, args, ctx);
+
+  if (shouldLog && name !== "batch_apply_actions") {
+    // batch logs children individually
+    const logId = await logJarvisAction(ctx, name, args, result);
+    if (
+      result &&
+      typeof result === "object" &&
+      !(result as { idempotent_replay?: boolean }).idempotent_replay
+    ) {
+      const r = result as Record<string, unknown>;
+      if (logId) r.action_log_id = logId;
+      // Mark undoable whenever reverse is possible — even if log insert failed
+      // (UI can still call undo_last_action / jarvis-undo without id)
+      if (r.applied === true && extractReversePayload(name, r)) {
+        r.undoable = true;
+        r.undo_window_ms = UNDO_WINDOW_MS;
+        r.undo_until = undoDeadline(new Date().toISOString());
+      }
+    }
+  }
+
+  return result;
+}
+
+async function executeJarvisToolInner(
+  name: string,
+  rawArgs: Record<string, unknown>,
+  ctx: ToolContext,
+): Promise<unknown> {
+  const { supabase, orgId, userId, userEmail, conversationId, pageContext } = ctx;
   const limit = Math.min(Math.max(Number(rawArgs.limit) || 20, 1), 50);
 
   try {
@@ -643,36 +1410,57 @@ export async function executeJarvisTool(
       case "list_properties": {
         let q = supabase
           .from("properties")
-          .select(
-            "id, name, address, invoice_address, property_number, property_type",
-          )
+          .select(PROPERTY_SELECT)
           .eq("organization_id", orgId)
           .order("name")
           .limit(limit);
         const query = String(rawArgs.query || "").trim();
         if (query) {
-          q = q.or(`name.ilike.%${query}%,address.ilike.%${query}%`);
+          q = q.or(
+            `name.ilike.%${query}%,address.ilike.%${query}%,invoice_address.ilike.%${query}%,property_number.ilike.%${query}%`,
+          );
         }
         const { data, error } = await q;
         if (error) return { error: error.message };
-        return { count: data?.length || 0, properties: data || [] };
+        // Explicit nulls so model cannot invent "saknas" when field is empty string vs missing
+        const properties = (data || []).map((p) => ({
+          ...p,
+          invoice_address: p.invoice_address ?? null,
+          address: p.address ?? null,
+          property_number: p.property_number ?? null,
+          loa: p.loa ?? null,
+          field_notes: {
+            invoice_address:
+              p.invoice_address?.trim()
+                ? "finns"
+                : "null i databasen (registrerad tom)",
+          },
+        }));
+        return { count: properties.length, properties };
       }
 
       case "get_project": {
+        const propName = String(rawArgs.property_name || "").trim();
+        const projectId = String(rawArgs.project_id || "").trim();
         const { ids } = await resolvePropertyIds(
           supabase,
           orgId,
-          String(rawArgs.property_name || ""),
+          propName || undefined,
         );
-        if (!ids.length) return { error: "Inga fastigheter i organisationen" };
+        if (!ids.length && !projectId) {
+          return { error: "Inga fastigheter i organisationen" };
+        }
 
         let q = supabase
           .from("projects")
-          .select(
-            "id, name, project_number, status, type, budget, forecast, actual_cost, year, start_date, end_date, description, property_id, property:properties(name)",
-          )
-          .in("property_id", ids)
+          .select(`${PROJECT_SELECT}, property:properties(id, name, invoice_address, address)`)
           .limit(10);
+
+        if (projectId) {
+          q = q.eq("id", projectId);
+        } else {
+          q = q.in("property_id", ids);
+        }
 
         const pnum = String(rawArgs.project_number || "").trim();
         const pname = String(rawArgs.name || "").trim();
@@ -682,23 +1470,45 @@ export async function executeJarvisTool(
         const { data, error } = await q;
         if (error) return { error: error.message };
         if (!data?.length) return { found: false, message: "Inget projekt matchade" };
-        return { found: true, projects: data };
+        return {
+          found: true,
+          projects: data.map((p) => ({
+            ...p,
+            link_hint: `/projects/${p.id}`,
+          })),
+        };
       }
 
       case "list_work_orders": {
         const propName = String(rawArgs.property_name || "").trim();
-        const { ids, names } = await resolvePropertyIds(
-          supabase,
-          orgId,
-          propName || undefined,
-        );
+        const propIdHint = String(rawArgs.property_id || "").trim();
+        let ids: string[] = [];
+        let names = new Map<string, string>();
+        if (propIdHint) {
+          const { data: one } = await supabase
+            .from("properties")
+            .select("id, name")
+            .eq("organization_id", orgId)
+            .eq("id", propIdHint)
+            .maybeSingle();
+          if (one) {
+            ids = [one.id as string];
+            names = new Map([[one.id as string, one.name as string]]);
+          }
+        } else {
+          const resolved = await resolvePropertyIds(
+            supabase,
+            orgId,
+            propName || undefined,
+          );
+          ids = resolved.ids;
+          names = resolved.names;
+        }
         if (!ids.length) return { count: 0, work_orders: [] };
 
         let q = supabase
           .from("work_orders")
-          .select(
-            "id, action, status, priority, price, contractor, due_date, comments, property_id, component_id, created_at",
-          )
+          .select(WORK_ORDER_SELECT)
           .in("property_id", ids)
           .order("created_at", { ascending: false })
           .limit(limit);
@@ -884,7 +1694,10 @@ export async function executeJarvisTool(
       case "suggest_update_invoice_address":
       case "suggest_create_property":
       case "suggest_update_property":
-      case "suggest_todo": {
+      case "suggest_todo":
+      case "suggest_create_component":
+      case "suggest_log_service":
+      case "suggest_create_contact": {
         const confidence = Number(rawArgs.confidence ?? 0.7);
         if (confidence < 0.5) {
           return {
@@ -900,6 +1713,9 @@ export async function executeJarvisTool(
           suggest_create_property: "create_property",
           suggest_update_property: "update_property",
           suggest_todo: "create_todo",
+          suggest_create_component: "create_component",
+          suggest_log_service: "log_service",
+          suggest_create_contact: "create_contact",
         };
         const actionType = actionTypeMap[name];
         if (!actionType) return { error: `Okänt suggest-verktyg: ${name}` };
@@ -934,6 +1750,24 @@ export async function executeJarvisTool(
           !String(rawArgs.property_id || rawArgs.property_name || "").trim()
         ) {
           return { error: "property_id eller property_name krävs" };
+        }
+        if (
+          name === "suggest_create_component" &&
+          !String(rawArgs.name || "").trim()
+        ) {
+          return { error: "name krävs för komponent" };
+        }
+        if (
+          name === "suggest_log_service" &&
+          !String(rawArgs.action_type || "").trim()
+        ) {
+          return { error: "action_type krävs för service" };
+        }
+        if (
+          name === "suggest_create_contact" &&
+          !String(rawArgs.name || "").trim()
+        ) {
+          return { error: "name krävs för kontakt" };
         }
 
         const payload = { ...rawArgs, source: "jarvis_chat" };
@@ -994,7 +1828,7 @@ export async function executeJarvisTool(
           String(rawArgs.subject || "Meddelande från Jarvis").trim() ||
           "Meddelande från Jarvis";
 
-        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
         if (prop) {
           const inv = prop.invoice_address?.trim();
           const addrBlock = [
@@ -1041,6 +1875,8 @@ export async function executeJarvisTool(
           to_note: "Skickat endast till inloggad användare",
           subject,
           resend_id: sendData?.id ?? null,
+          summary: `E-post skickad till dig: ${subject}`,
+          ui: { confirm: true, link: null, entity_type: "email" },
         };
       }
 
@@ -1054,7 +1890,7 @@ export async function executeJarvisTool(
 
         let woId = String(rawArgs.work_order_id || "").trim();
         if (!woId) {
-          const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+          const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
           const actionContains = String(rawArgs.action_contains || "").trim();
           let q = supabase
             .from("work_orders")
@@ -1091,13 +1927,17 @@ export async function executeJarvisTool(
           .select("id, action, status, property_id")
           .single();
         if (error) return { error: error.message };
-        return {
-          applied: true,
-          work_order: updated,
-          previous_status: existing.status,
-          property_name:
-            (existing.properties as { name?: string } | null)?.name ?? null,
-        };
+        return withDeepLink(
+          {
+            applied: true,
+            work_order: updated,
+            previous_status: existing.status,
+            property_name:
+              (existing.properties as { name?: string } | null)?.name ?? null,
+            summary: `Status: ${existing.status} → ${status} (${updated.action})`,
+          },
+          { entity_type: "work_order", entity_id: updated.id as string, path: "/work-orders" },
+        );
       }
 
       case "apply_project_status": {
@@ -1148,33 +1988,53 @@ export async function executeJarvisTool(
           .select("id, name, project_number, status")
           .single();
         if (error) return { error: error.message };
-        return {
-          applied: true,
-          project: updated,
-          previous_status: existing.status,
-        };
+        return withDeepLink(
+          {
+            applied: true,
+            project: updated,
+            previous_status: existing.status,
+            summary: `Projekt ${updated.project_number || updated.name}: ${existing.status} → ${status}`,
+          },
+          {
+            entity_type: "project",
+            entity_id: updated.id as string,
+            path: `/projects/${updated.id}`,
+          },
+        );
       }
 
       case "apply_update_invoice_address": {
         const inv = String(rawArgs.invoice_address || "").trim();
         if (!inv) return { error: "invoice_address krävs" };
-        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
         if (!prop) return { error: "Fastighet hittades inte" };
         const { data: updated, error } = await supabase
           .from("properties")
           .update({ invoice_address: inv })
           .eq("id", prop.id)
           .eq("organization_id", orgId)
-          .select("id, name, invoice_address")
+          .select("id, name, invoice_address, address, property_number")
           .single();
         if (error) return { error: error.message };
-        return { applied: true, property: updated };
+        return withDeepLink(
+          {
+            applied: true,
+            property: updated,
+            previous_invoice_address: prop.invoice_address ?? null,
+            summary: `Fakturaadress uppdaterad för ${updated.name}`,
+          },
+          {
+            entity_type: "property",
+            entity_id: updated.id as string,
+            path: `/property/${updated.id}`,
+          },
+        );
       }
 
       case "apply_create_work_order": {
         const actionText = String(rawArgs.action || "").trim();
         if (!actionText) return { error: "action krävs" };
-        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
         if (!prop) {
           return {
             error: "Ange property_name eller property_id för arbetsordern",
@@ -1216,18 +2076,21 @@ export async function executeJarvisTool(
           .select("id, action, status, property_id, contractor, quarter, due_date")
           .single();
         if (error) return { error: error.message };
-        return {
-          applied: true,
-          work_order: wo,
-          property_name: prop.name,
-          link_hint: `/work-orders`,
-        };
+        return withDeepLink(
+          {
+            applied: true,
+            work_order: wo,
+            property_name: prop.name,
+            summary: `Arbetsorder skapad: ${wo.action} (${prop.name})`,
+          },
+          { entity_type: "work_order", entity_id: wo.id as string, path: "/work-orders" },
+        );
       }
 
       case "apply_create_project": {
         const pname = String(rawArgs.name || "").trim();
         if (!pname) return { error: "name krävs" };
-        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
         if (!prop) {
           return { error: "Ange fastighet (property_name/property_id)" };
         }
@@ -1263,18 +2126,25 @@ export async function executeJarvisTool(
           .select("id, name, project_number, status, type")
           .single();
         if (error) return { error: error.message };
-        return {
-          applied: true,
-          project,
-          property_name: prop.name,
-          link_hint: `/projects/${project.id}`,
-        };
+        return withDeepLink(
+          {
+            applied: true,
+            project,
+            property_name: prop.name,
+            summary: `Projekt ${project.project_number}: ${project.name}`,
+          },
+          {
+            entity_type: "project",
+            entity_id: project.id as string,
+            path: `/projects/${project.id}`,
+          },
+        );
       }
 
       case "apply_property_note": {
         const content = String(rawArgs.content || "").trim();
         if (!content) return { error: "content krävs" };
-        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
         if (!prop) return { error: "Ange fastighet" };
         const { data: note, error } = await supabase
           .from("property_notes")
@@ -1282,11 +2152,19 @@ export async function executeJarvisTool(
           .select("id, property_id, content, created_at")
           .single();
         if (error) return { error: error.message };
-        return {
-          applied: true,
-          note: { ...note, content: content.slice(0, 200) },
-          property_name: prop.name,
-        };
+        return withDeepLink(
+          {
+            applied: true,
+            note: { ...note, content: content.slice(0, 200) },
+            property_name: prop.name,
+            summary: `Anteckning sparad på ${prop.name}`,
+          },
+          {
+            entity_type: "property",
+            entity_id: prop.id,
+            path: `/property/${prop.id}`,
+          },
+        );
       }
 
       case "apply_create_property": {
@@ -1311,18 +2189,25 @@ export async function executeJarvisTool(
         const { data: created, error } = await supabase
           .from("properties")
           .insert(insert)
-          .select("id, name, address, invoice_address")
+          .select(PROPERTY_SELECT)
           .single();
         if (error) return { error: error.message };
-        return {
-          applied: true,
-          property: created,
-          link_hint: `/property/${created.id}`,
-        };
+        return withDeepLink(
+          {
+            applied: true,
+            property: created,
+            summary: `Fastighet skapad: ${created.name}`,
+          },
+          {
+            entity_type: "property",
+            entity_id: created.id as string,
+            path: `/property/${created.id}`,
+          },
+        );
       }
 
       case "apply_update_property": {
-        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
         if (!prop) return { error: "Ange fastighet att uppdatera" };
         const patch: Record<string, unknown> = {};
         for (const key of [
@@ -1346,28 +2231,43 @@ export async function executeJarvisTool(
         if (!Object.keys(patch).length) {
           return { error: "Inga fält att uppdatera" };
         }
+        // Snapshot previous values for undo
+        const previous: Record<string, unknown> = {};
+        for (const key of Object.keys(patch)) {
+          previous[key] = (prop as Record<string, unknown>)[key] ?? null;
+        }
         const { data: updated, error } = await supabase
           .from("properties")
           .update(patch)
           .eq("id", prop.id)
           .eq("organization_id", orgId)
-          .select("id, name, address, invoice_address, property_number")
+          .select(PROPERTY_SELECT)
           .single();
         if (error) return { error: error.message };
-        return { applied: true, property: updated };
+        return withDeepLink(
+          {
+            applied: true,
+            property: updated,
+            previous,
+            summary: `Fastighet uppdaterad: ${updated.name}`,
+          },
+          {
+            entity_type: "property",
+            entity_id: updated.id as string,
+            path: `/property/${updated.id}`,
+          },
+        );
       }
 
       case "get_property_overview": {
         const propName = String(rawArgs.property_name || "").trim();
-        const propIdArg = String(rawArgs.property_id || "").trim();
+        const propIdArg = String(rawArgs.property_id || pageContext?.property_id || "").trim();
         if (!propName && !propIdArg) {
           return { error: "property_name eller property_id krävs" };
         }
         let pq = supabase
           .from("properties")
-          .select(
-            "id, name, address, invoice_address, area_sqm, construction_year, property_type, property_number, description, loa",
-          )
+          .select(PROPERTY_SELECT)
           .eq("organization_id", orgId)
           .limit(1);
         if (propIdArg) pq = pq.eq("id", propIdArg);
@@ -1377,17 +2277,17 @@ export async function executeJarvisTool(
         if (!prop) return { error: "Fastighet hittades inte" };
         const pid = prop.id as string;
 
-        const [comps, wos, todos, notes, docs, plan] = await Promise.all([
+        const [comps, wos, todos, notes, docs, plan, contacts] = await Promise.all([
           supabase
             .from("components")
-            .select("id, name, type, status, installation_year, manufacturer, model")
+            .select("id, name, type, status, installation_year, manufacturer, model, serial_number")
             .eq("property_id", pid)
             .neq("status", "decommissioned")
             .order("name")
             .limit(120),
           supabase
             .from("work_orders")
-            .select("id, action, status, priority, price, due_date")
+            .select(WORK_ORDER_SELECT)
             .eq("property_id", pid)
             .in("status", ["not_started", "awaiting_quote", "ordered"])
             .limit(25),
@@ -1417,6 +2317,11 @@ export async function executeJarvisTool(
             .order("generated_at", { ascending: false })
             .limit(1)
             .maybeSingle(),
+          supabase
+            .from("property_contacts")
+            .select("id, name, role, company, email, phone")
+            .eq("property_id", pid)
+            .limit(20),
         ]);
 
         const components = comps.data ?? [];
@@ -1476,8 +2381,23 @@ export async function executeJarvisTool(
           }));
         }
 
+        const inv = (prop.invoice_address as string | null)?.trim() || null;
+
         return {
-          property: prop,
+          property: {
+            ...prop,
+            invoice_address: inv,
+            // Explicit presence flags — never invent values
+            fields_present: {
+              invoice_address: Boolean(inv),
+              address: Boolean((prop.address as string | null)?.trim()),
+              property_number: Boolean(
+                (prop.property_number as string | null)?.trim(),
+              ),
+              loa: Boolean((prop.loa as string | null)?.trim()),
+            },
+          },
+          link_hint: `/property/${pid}`,
           counts: {
             components: components.length,
             open_work_orders: (wos.data ?? []).length,
@@ -1485,6 +2405,7 @@ export async function executeJarvisTool(
             notes: (notes.data ?? []).length,
             documents: (docs.data ?? []).length,
             high_risk: highRisk.length,
+            contacts: (contacts.data ?? []).length,
           },
           components: components.slice(0, 60),
           open_work_orders: wos.data ?? [],
@@ -1494,6 +2415,7 @@ export async function executeJarvisTool(
             created_at: n.created_at,
           })),
           documents: docs.data ?? [],
+          contacts: contacts.data ?? [],
           high_risk_components: highRisk,
           maintenance_plan: plan.data ?? null,
         };
@@ -1650,6 +2572,498 @@ export async function executeJarvisTool(
             excerpt: (h.content || "").substring(0, 1500),
           })),
         };
+      }
+
+      case "list_contacts": {
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
+        if (!prop) return { error: "Ange property_name eller property_id" };
+        const { data, error } = await supabase
+          .from("property_contacts")
+          .select("id, name, role, company, email, phone, property_id, created_at")
+          .eq("property_id", prop.id)
+          .order("name")
+          .limit(limit);
+        if (error) return { error: error.message };
+        return {
+          count: data?.length || 0,
+          property_name: prop.name,
+          contacts: data || [],
+          link_hint: `/property/${prop.id}`,
+        };
+      }
+
+      case "get_daily_briefing": {
+        const stats = await buildDailyBriefing(supabase, orgId);
+        return {
+          briefing: stats,
+          plain_text: formatBriefingPlain(stats),
+          tip: "Använd send_to_me med subject 'Daglig briefing' och body=plain_text om användaren vill ha mejl.",
+        };
+      }
+
+      case "apply_create_component": {
+        const cname = String(rawArgs.name || "").trim();
+        if (!cname) return { error: "name krävs" };
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
+        if (!prop) {
+          return { error: "Ange fastighet (property_name/property_id)" };
+        }
+        const typeCode =
+          normalizeComponentType(String(rawArgs.type || "")) || "SC4.7";
+        const statusRaw = String(rawArgs.status || "active").trim();
+        const status = COMPONENT_STATUSES.includes(
+          statusRaw as (typeof COMPONENT_STATUSES)[number],
+        )
+          ? statusRaw
+          : "active";
+        const insert: Record<string, unknown> = {
+          property_id: prop.id,
+          name: cname,
+          type: typeCode,
+          status,
+          manufacturer: (rawArgs.manufacturer as string) || null,
+          model: (rawArgs.model as string) || null,
+          serial_number: (rawArgs.serial_number as string) || null,
+          notes: (rawArgs.notes as string) || null,
+          supplier: (rawArgs.supplier as string) || null,
+        };
+        if (rawArgs.installation_year != null) {
+          insert.installation_year = Number(rawArgs.installation_year);
+        }
+        const { data: created, error } = await supabase
+          .from("components")
+          .insert(insert)
+          .select(
+            "id, name, type, status, manufacturer, model, serial_number, installation_year, property_id",
+          )
+          .single();
+        if (error) return { error: error.message };
+        return withDeepLink(
+          {
+            applied: true,
+            component: created,
+            property_name: prop.name,
+            summary: `Komponent skapad: ${created.name} (${created.type}) på ${prop.name}`,
+          },
+          {
+            entity_type: "component",
+            entity_id: created.id as string,
+            path: `/components/${created.id}`,
+          },
+        );
+      }
+
+      case "apply_update_component": {
+        const comp = await resolveOneComponent(
+          supabase,
+          orgId,
+          rawArgs,
+          pageContext,
+        );
+        if (!comp) {
+          return {
+            error:
+              "Komponent hittades inte — ange component_id eller component_name (+ fastighet)",
+          };
+        }
+        const patch: Record<string, unknown> = {};
+        for (const key of [
+          "name",
+          "manufacturer",
+          "model",
+          "serial_number",
+          "notes",
+          "supplier",
+          "next_service_date",
+        ] as const) {
+          if (rawArgs[key] != null && String(rawArgs[key]).trim() !== "") {
+            patch[key] = rawArgs[key];
+          }
+        }
+        if (rawArgs.type != null) {
+          const t = normalizeComponentType(String(rawArgs.type));
+          if (t) patch.type = t;
+        }
+        if (rawArgs.status != null) {
+          const s = String(rawArgs.status).trim();
+          if (COMPONENT_STATUSES.includes(s as (typeof COMPONENT_STATUSES)[number])) {
+            patch.status = s;
+          }
+        }
+        if (rawArgs.installation_year != null) {
+          patch.installation_year = Number(rawArgs.installation_year);
+        }
+        if (!Object.keys(patch).length) {
+          return { error: "Inga fält att uppdatera" };
+        }
+        // Load full row for reverse snapshot
+        const { data: before } = await supabase
+          .from("components")
+          .select(
+            "id, name, type, status, manufacturer, model, serial_number, installation_year, notes, supplier, next_service_date",
+          )
+          .eq("id", comp.id)
+          .maybeSingle();
+        const previous: Record<string, unknown> = {};
+        for (const key of Object.keys(patch)) {
+          previous[key] = (before as Record<string, unknown> | null)?.[key] ??
+            (comp as unknown as Record<string, unknown>)[key] ??
+            null;
+        }
+        const { data: updated, error } = await supabase
+          .from("components")
+          .update(patch)
+          .eq("id", comp.id)
+          .select(
+            "id, name, type, status, manufacturer, model, serial_number, installation_year, property_id, next_service_date",
+          )
+          .single();
+        if (error) return { error: error.message };
+        return withDeepLink(
+          {
+            applied: true,
+            component: updated,
+            previous,
+            summary: `Komponent uppdaterad: ${updated.name}`,
+          },
+          {
+            entity_type: "component",
+            entity_id: updated.id as string,
+            path: `/components/${updated.id}`,
+          },
+        );
+      }
+
+      case "apply_log_service": {
+        const actionType = String(rawArgs.action_type || "").trim();
+        if (!actionType) return { error: "action_type krävs" };
+        const comp = await resolveOneComponent(
+          supabase,
+          orgId,
+          rawArgs,
+          pageContext,
+        );
+        if (!comp) {
+          return {
+            error:
+              "Komponent krävs — ange component_name/component_id (och fastighet vid behov)",
+          };
+        }
+        const performed =
+          String(rawArgs.performed_date || "").trim().slice(0, 10) ||
+          new Date().toISOString().slice(0, 10);
+        const costRaw = rawArgs.cost;
+        const cost =
+          costRaw != null && !Number.isNaN(Number(costRaw))
+            ? Number(costRaw)
+            : null;
+        const { data: service, error } = await supabase
+          .from("maintenance_history")
+          .insert({
+            component_id: comp.id,
+            action_type: actionType,
+            performed_date: performed,
+            cost,
+            supplier: (rawArgs.supplier as string) || null,
+            notes:
+              (rawArgs.notes as string) ||
+              "Loggad via Jarvis (direkt på begäran)",
+            category: (rawArgs.category as string) || null,
+            is_warranty: rawArgs.is_warranty === true,
+          })
+          .select(
+            "id, component_id, action_type, performed_date, cost, supplier, notes, category",
+          )
+          .single();
+        if (error) return { error: error.message };
+        return withDeepLink(
+          {
+            applied: true,
+            service,
+            component_name: comp.name,
+            property_name: comp.property_name,
+            summary: `Service loggad: ${actionType} på ${comp.name} (${performed})`,
+          },
+          {
+            entity_type: "component",
+            entity_id: comp.id,
+            path: `/components/${comp.id}`,
+          },
+        );
+      }
+
+      case "apply_create_contact": {
+        const cname = String(rawArgs.name || "").trim();
+        if (!cname) return { error: "name krävs" };
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
+        if (!prop) return { error: "Ange fastighet för kontakten" };
+        const { data: contact, error } = await supabase
+          .from("property_contacts")
+          .insert({
+            property_id: prop.id,
+            name: cname,
+            role: (rawArgs.role as string) || null,
+            company: (rawArgs.company as string) || null,
+            email: (rawArgs.email as string) || null,
+            phone: (rawArgs.phone as string) || null,
+          })
+          .select("id, name, role, company, email, phone, property_id")
+          .single();
+        if (error) return { error: error.message };
+        return withDeepLink(
+          {
+            applied: true,
+            contact,
+            property_name: prop.name,
+            summary: `Kontakt tillagd: ${contact.name} på ${prop.name}`,
+          },
+          {
+            entity_type: "property",
+            entity_id: prop.id,
+            path: `/property/${prop.id}`,
+          },
+        );
+      }
+
+      case "apply_update_contact": {
+        let contactId = String(rawArgs.contact_id || "").trim();
+        if (!contactId) {
+          const prop = await resolveOneProperty(
+            supabase,
+            orgId,
+            rawArgs,
+            pageContext,
+          );
+          const cname = String(rawArgs.contact_name || rawArgs.name || "").trim();
+          if (!cname) {
+            return { error: "contact_id eller contact_name krävs" };
+          }
+          let q = supabase
+            .from("property_contacts")
+            .select("id, property_id, properties!inner(organization_id)")
+            .eq("properties.organization_id", orgId)
+            .ilike("name", `%${cname}%`)
+            .limit(1);
+          if (prop) q = q.eq("property_id", prop.id);
+          const { data: found } = await q.maybeSingle();
+          if (!found) return { error: "Kontakt hittades inte" };
+          contactId = found.id as string;
+        }
+
+        const { data: existing } = await supabase
+          .from("property_contacts")
+          .select(
+            "id, name, role, company, email, phone, property_id, properties!inner(organization_id, name)",
+          )
+          .eq("id", contactId)
+          .eq("properties.organization_id", orgId)
+          .maybeSingle();
+        if (!existing) {
+          return { error: "Kontakt tillhör inte din organisation" };
+        }
+
+        const patch: Record<string, unknown> = {};
+        for (const key of ["name", "role", "company", "email", "phone"] as const) {
+          if (rawArgs[key] != null && String(rawArgs[key]).trim() !== "") {
+            patch[key] = rawArgs[key];
+          }
+        }
+        if (!Object.keys(patch).length) {
+          return { error: "Inga fält att uppdatera" };
+        }
+        const previous: Record<string, unknown> = {};
+        for (const key of Object.keys(patch)) {
+          previous[key] = (existing as Record<string, unknown>)[key] ?? null;
+        }
+        const { data: updated, error } = await supabase
+          .from("property_contacts")
+          .update(patch)
+          .eq("id", contactId)
+          .select("id, name, role, company, email, phone, property_id")
+          .single();
+        if (error) return { error: error.message };
+        const propId = updated.property_id as string;
+        return withDeepLink(
+          {
+            applied: true,
+            contact: updated,
+            previous,
+            summary: `Kontakt uppdaterad: ${updated.name}`,
+          },
+          {
+            entity_type: "property",
+            entity_id: propId,
+            path: `/property/${propId}`,
+          },
+        );
+      }
+
+      case "undo_last_action": {
+        return undoLastAction({ supabase, orgId, userId });
+      }
+
+      case "undo_jarvis_action": {
+        const id = String(rawArgs.action_log_id || "").trim();
+        if (!id) return { error: "action_log_id krävs" };
+        return undoActionById({ supabase, orgId, userId }, id);
+      }
+
+      case "list_recent_jarvis_actions": {
+        const lim = Math.min(Math.max(Number(rawArgs.limit) || 10, 1), 20);
+        const { data, error } = await supabase
+          .from("jarvis_action_log")
+          .select(
+            "id, tool_name, success, entity_type, entity_id, link_hint, created_at, undone_at, reverse_payload, result_summary",
+          )
+          .eq("organization_id", orgId)
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(lim);
+        if (error) return { error: error.message };
+        const now = Date.now();
+        return {
+          count: data?.length || 0,
+          undo_window_ms: UNDO_WINDOW_MS,
+          actions: (data || []).map((a) => {
+            const created = a.created_at as string;
+            const canUndo =
+              a.success &&
+              !a.undone_at &&
+              a.reverse_payload != null &&
+              now - new Date(created).getTime() <= UNDO_WINDOW_MS;
+            return {
+              action_log_id: a.id,
+              tool: a.tool_name,
+              success: a.success,
+              entity_type: a.entity_type,
+              entity_id: a.entity_id,
+              link: a.link_hint,
+              created_at: created,
+              undone: Boolean(a.undone_at),
+              undoable: canUndo,
+              undo_until: canUndo ? undoDeadline(created) : null,
+              summary: (a.result_summary as { summary?: string } | null)?.summary ||
+                null,
+            };
+          }),
+        };
+      }
+
+      case "batch_apply_actions": {
+        const rawList = Array.isArray(rawArgs.actions) ? rawArgs.actions : [];
+        if (!rawList.length) {
+          return { error: "actions[] krävs (minst en apply_*)" };
+        }
+        const max = BATCH_MAX_ACTIONS;
+        if (rawList.length > max) {
+          return {
+            error: `Max ${max} åtgärder per batch (fick ${rawList.length})`,
+          };
+        }
+        const stopOnError = rawArgs.stop_on_error !== false;
+        const results: Array<Record<string, unknown>> = [];
+        let ok = 0;
+        let failed = 0;
+
+        for (let i = 0; i < rawList.length; i++) {
+          const item = rawList[i] as Record<string, unknown>;
+          const tool = String(item.tool || item.name || "").trim();
+          if (!BATCHABLE_TOOLS.has(tool)) {
+            results.push({
+              index: i,
+              tool,
+              error: `Verktyg tillåts inte i batch: ${tool}`,
+            });
+            failed++;
+            if (stopOnError) break;
+            continue;
+          }
+          const childArgs = {
+            ...((item.args && typeof item.args === "object"
+              ? item.args
+              : item) as Record<string, unknown>),
+          };
+          delete childArgs.tool;
+          delete childArgs.name;
+          delete childArgs.args;
+          if (item.idempotency_key) {
+            childArgs.idempotency_key = item.idempotency_key;
+          } else if (!childArgs.idempotency_key) {
+            // Stable default key for batch step (reduces double-fire risk)
+            childArgs.idempotency_key =
+              `batch:${ctx.conversationId || "x"}:${i}:${tool}:${
+                JSON.stringify(childArgs).slice(0, 80)
+              }`;
+          }
+
+          // Re-enter through outer executeJarvisTool for logging + idempotency
+          const childResult = await executeJarvisTool(tool, childArgs, ctx);
+          const cr = (childResult && typeof childResult === "object"
+            ? childResult
+            : { result: childResult }) as Record<string, unknown>;
+          const success = !cr.error && (cr.applied === true || cr.sent === true);
+          if (success) ok++;
+          else failed++;
+          results.push({
+            index: i,
+            tool,
+            success,
+            summary: cr.summary || cr.error || null,
+            action_log_id: cr.action_log_id || null,
+            link: cr.link_hint || null,
+            entity_type: (cr.ui as { entity_type?: string } | undefined)?.entity_type ||
+              null,
+            entity_id: (cr.ui as { entity_id?: string } | undefined)?.entity_id ||
+              null,
+            undoable: cr.undoable === true,
+            error: cr.error || null,
+          });
+          if (!success && stopOnError) break;
+        }
+
+        return {
+          applied: failed === 0 && ok > 0,
+          batch: true,
+          total: results.length,
+          ok,
+          failed,
+          stop_on_error: stopOnError,
+          results,
+          summary: `Batch: ${ok} lyckades, ${failed} misslyckades av ${results.length}`,
+        };
+      }
+
+      case "apply_create_todo": {
+        const title = String(rawArgs.title || "").trim();
+        if (!title) return { error: "title krävs" };
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
+        if (!prop) return { error: "Ange fastighet för todo" };
+        const { data: todo, error } = await supabase
+          .from("property_todos")
+          .insert({
+            property_id: prop.id,
+            title,
+            description: (rawArgs.description as string) || null,
+            due_date: (rawArgs.due_date as string) || null,
+            priority: String(rawArgs.priority || "medium"),
+            completed: false,
+          })
+          .select("id, title, priority, due_date, completed, property_id")
+          .single();
+        if (error) return { error: error.message };
+        return withDeepLink(
+          {
+            applied: true,
+            todo,
+            property_name: prop.name,
+            summary: `Todo skapad: ${todo.title} (${prop.name})`,
+          },
+          {
+            entity_type: "property",
+            entity_id: prop.id,
+            path: `/property/${prop.id}`,
+          },
+        );
       }
 
       default:

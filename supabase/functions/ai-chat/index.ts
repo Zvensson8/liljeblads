@@ -499,22 +499,38 @@ const systemPromptBase = `Du är Jarvis — AI-assistent för fastighetsförvalt
 
 VERKTYG (använd dem aktivt):
 LÄS:
-- list_properties (inkl. invoice_address), get_project, list_work_orders, list_services, search_components
-- list_high_risk_components, get_property_overview (inkl. fakturaadress, adress, fastighetsnummer), search_property_documents
+- list_properties (alla kritiska fält inkl. invoice_address, loa, area_sqm, construction_year)
+- get_project, list_work_orders, list_services, search_components, list_contacts
+- list_high_risk_components, get_property_overview, search_property_documents
+- get_daily_briefing (morgonstatus / vad behöver göras)
 - draft_work_order_order_text (skickar INTE mail)
 
-FAKTURAADRESS: Fältet heter invoice_address på properties. Det finns ofta i get_property_overview/list_properties — gissa inte att den saknas utan att ha anropat verktyget.
+GROUNDING (sanning från verktyg — non-negotiable):
+- Svara ALDRIG "finns inte" / "saknas" utan att ha anropat rätt verktyg och sett fältet.
+- Om verktyget returnerar ett värde: citera det exakt (inkl. radbrytningar i fakturaadress).
+- Om fältet är null/tomt: säg tydligt "ej registrerad i systemet" (inte generiskt "saknas").
+- Fältet fakturaadress heter invoice_address på properties.
+- Om SIDOKONTEXT anger property_id/project_id: använd det som default (användaren är på den sidan).
 
 SKRIV — VÄLJ RÄTT LÄGE:
-A) ANVÄNDAREN BER UTTRYCKLIGEN dig att göra något ("skapa", "ändra status", "uppdatera", "lägg till", "skicka till mig"):
+A) ANVÄNDAREN BER UTTRYCKLIGEN dig att göra något ("skapa", "ändra status", "uppdatera", "lägg till", "logga service", "skicka till mig"):
    → Använd apply_* eller send_to_me DIREKT (utförs genast i databasen/mejl).
-   - apply_create_work_order, apply_create_project, apply_property_note
+   - apply_create_work_order, apply_create_project, apply_property_note, apply_create_todo
    - apply_update_invoice_address, apply_create_property, apply_update_property
    - apply_work_order_status, apply_project_status
+   - apply_create_component, apply_update_component, apply_log_service
+   - apply_create_contact, apply_update_contact
    - send_to_me — e-post ENDAST till inloggad användare (aldrig extern mottagare)
+   - Briefing till dig: get_daily_briefing → send_to_me med plain_text
+   - batch_apply_actions — flera apply_* (max 10), t.ex. WO på flera högrisk-komponenter
+   - undo_last_action / undo_jarvis_action — ångra inom 5 min (inte e-post)
+   - list_recent_jarvis_actions — spår av vad som gjorts
 
 B) Du föreslår självmant en förbättring / är osäker:
-   → suggest_* (HITL-utkast i Förslag-fliken)
+   → suggest_* (HITL-utkast i Förslag-fliken), inkl. suggest_create_component, suggest_log_service, suggest_create_contact
+
+P2 IDEMPOTENCY:
+- Vid risk för dubbelklick: skicka idempotency_key / client_request_id i apply-args.
 
 E-POSTSÄKERHET:
 - send_to_me skickar BARA till den inloggade användarens e-post.
@@ -528,8 +544,9 @@ VIKTIGA REGLER:
 4. Explicit begäran = apply_* / send_to_me (inte bara text-svar)
 5. Ge alltid siffror vid översikter
 6. suggest_* endast när du själv initierar förslag (confidence >= 0.7)
-7. Efter apply_*/send_to_me: bekräfta tydligt vad som gjordes (id, status, "skickat till dig")
+7. Efter apply_*/send_to_me: bekräfta tydligt vad som gjordes (id, status, "skickat till dig") och nämn länk om link_hint finns
 8. Projektnummer i frågan = exakt referens
+9. Om tool returnerar error: visa felet, hitta inte på data
 
 KÄLLHÄNVISNING:
 - Kunskapsbas: "Enligt ABT 06..."
@@ -553,7 +570,12 @@ serve(async (req) => {
   try {
     checkCircuitBreaker();
 
-    const { messages, stream: streamRequested, conversationId } = await req.json();
+    const {
+      messages,
+      stream: streamRequested,
+      conversationId,
+      pageContext,
+    } = await req.json();
     const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY') || Deno.env.get('GEMINI_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -676,9 +698,33 @@ serve(async (req) => {
       }
     }
 
+    let pageContextBlock = '';
+    if (pageContext && typeof pageContext === 'object') {
+      const pc = pageContext as {
+        property_id?: string;
+        project_id?: string;
+        component_id?: string;
+        path?: string;
+        label?: string;
+      };
+      const parts: string[] = [];
+      if (pc.property_id) parts.push(`property_id=${pc.property_id}`);
+      if (pc.project_id) parts.push(`project_id=${pc.project_id}`);
+      if (pc.component_id) parts.push(`component_id=${pc.component_id}`);
+      if (pc.path) parts.push(`path=${pc.path}`);
+      if (pc.label) parts.push(`vy=${pc.label}`);
+      if (parts.length) {
+        pageContextBlock =
+          `\n\nSIDOKONTEXT (användaren tittar här nu — använd som default om frågan inte anger annan fastighet/projekt):\n` +
+          parts.join(', ') +
+          `\nOm användaren säger "denna fastighet" / "detta projekt" → använd dessa id:n.`;
+      }
+    }
+
     const systemPrompt =
       systemPromptBase +
       `\n\nAKTIV ORGANISATION (scope): ${orgId}. Använd endast data från denna org.` +
+      pageContextBlock +
       contextInfo +
       knowledgeBaseContext +
       propertyDocsContext;
@@ -723,6 +769,15 @@ serve(async (req) => {
     ];
 
     const suggestedActions: any[] = [];
+    const appliedActions: Array<{
+      tool: string;
+      success: boolean;
+      summary?: string;
+      link?: string | null;
+      entity_type?: string | null;
+      entity_id?: string | null;
+      sent?: boolean;
+    }> = [];
     const toolsUsed: string[] = [];
     const graphTrace: Array<{ round: number; phase: string; detail?: string }> = [
       { round: 0, phase: 'guard', detail: `org=${orgId}` },
@@ -730,6 +785,16 @@ serve(async (req) => {
     ];
     const MAX_ROUNDS = 4;
     let finalMessage = '';
+
+    const safePageContext =
+      pageContext && typeof pageContext === 'object'
+        ? {
+            property_id: (pageContext as { property_id?: string }).property_id,
+            project_id: (pageContext as { project_id?: string }).project_id,
+            component_id: (pageContext as { component_id?: string }).component_id,
+            path: (pageContext as { path?: string }).path,
+          }
+        : null;
 
     try {
       for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -787,6 +852,7 @@ serve(async (req) => {
             userId,
             userEmail,
             conversationId,
+            pageContext: safePageContext,
           });
 
           if (
@@ -803,6 +869,91 @@ serve(async (req) => {
               ...args,
               confidence: s.confidence_score ?? args.confidence,
               reasoning: s.reasoning ?? args.reasoning,
+            });
+          }
+
+          if (
+            (toolName.startsWith('apply_') ||
+              toolName === 'send_to_me' ||
+              toolName === 'batch_apply_actions' ||
+              toolName === 'undo_last_action' ||
+              toolName === 'undo_jarvis_action') &&
+            result &&
+            typeof result === 'object'
+          ) {
+            const r = result as Record<string, unknown>;
+            const ui = (r.ui || {}) as {
+              link?: string | null;
+              entity_type?: string | null;
+              entity_id?: string | null;
+            };
+            const entityFromNested = (() => {
+              if (r.work_order && typeof r.work_order === 'object') {
+                return {
+                  entity_type: 'work_order',
+                  entity_id: String((r.work_order as { id?: string }).id || '') || null,
+                };
+              }
+              if (r.project && typeof r.project === 'object') {
+                return {
+                  entity_type: 'project',
+                  entity_id: String((r.project as { id?: string }).id || '') || null,
+                };
+              }
+              if (r.component && typeof r.component === 'object') {
+                return {
+                  entity_type: 'component',
+                  entity_id: String((r.component as { id?: string }).id || '') || null,
+                };
+              }
+              if (r.property && typeof r.property === 'object') {
+                return {
+                  entity_type: 'property',
+                  entity_id: String((r.property as { id?: string }).id || '') || null,
+                };
+              }
+              return { entity_type: ui.entity_type ?? null, entity_id: ui.entity_id ?? null };
+            })();
+
+            const batchResults = Array.isArray(r.results)
+              ? (r.results as Array<Record<string, unknown>>).map((br) => ({
+                  tool: String(br.tool || ''),
+                  success: br.success === true,
+                  summary: String(br.summary || br.error || ''),
+                  link: (br.link as string) || null,
+                  entity_type: (br.entity_type as string) || null,
+                  entity_id: (br.entity_id as string) || null,
+                  action_log_id: (br.action_log_id as string) || null,
+                  undoable: br.undoable === true,
+                }))
+              : undefined;
+
+            const success =
+              !r.error &&
+              (r.applied === true ||
+                r.sent === true ||
+                r.undone === true ||
+                r.batch === true);
+            // Undo for any successful apply_* (backend may omit flag if old deploy / log fail)
+            const undoable =
+              r.undoable === true ||
+              (success &&
+                toolName.startsWith('apply_') &&
+                toolName !== 'apply_create_property'); // property create may fail undo if has comps
+
+            appliedActions.push({
+              tool: toolName,
+              success,
+              summary: String(r.summary || r.error || r.to_note || toolName),
+              link: (r.link_hint as string) || ui.link || null,
+              entity_type: entityFromNested.entity_type,
+              entity_id: entityFromNested.entity_id,
+              sent: r.sent === true,
+              action_log_id: (r.action_log_id as string) || null,
+              undoable,
+              undo_until: (r.undo_until as string) || null,
+              batch: r.batch === true,
+              results: batchResults,
             });
           }
 
@@ -852,6 +1003,7 @@ serve(async (req) => {
         finalMessage ||
         'Jag har hämtat data men kunde inte formulera ett svar. Försök omformulera frågan.',
       suggestedActions,
+      appliedActions,
       toolsUsed,
       graphTrace,
     });

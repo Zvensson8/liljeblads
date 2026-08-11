@@ -15,12 +15,18 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import ReactMarkdown from 'react-markdown';
+import { useJarvisPageContext } from '@/hooks/useJarvisPageContext';
+import JarvisActionCards, {
+  type JarvisAppliedAction,
+} from '@/components/ai-chat/JarvisActionCards';
+import { mergeAppliedActions } from '@/lib/jarvisActionFromMessage';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   created_at?: string;
+  appliedActions?: JarvisAppliedAction[];
 }
 
 interface Conversation {
@@ -42,6 +48,7 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const pageContext = useJarvisPageContext();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -49,6 +56,26 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  /**
+   * Action cards are not stored in ai_messages DB rows.
+   * Keep them keyed by message id (temp UUID + real DB id after insert).
+   * lastApplied always shows the latest actions so cards never "vanish" on refetch.
+   */
+  const appliedByMessageIdRef = useRef<Record<string, JarvisAppliedAction[]>>({});
+  const [appliedByMessageId, setAppliedByMessageId] = useState<
+    Record<string, JarvisAppliedAction[]>
+  >({});
+  const [lastApplied, setLastApplied] = useState<JarvisAppliedAction[] | null>(null);
+
+  const rememberApplied = (messageId: string, actions: JarvisAppliedAction[]) => {
+    if (!actions.length) return;
+    appliedByMessageIdRef.current = {
+      ...appliedByMessageIdRef.current,
+      [messageId]: actions,
+    };
+    setAppliedByMessageId({ ...appliedByMessageIdRef.current });
+    setLastApplied(actions);
+  };
 
   // Fetch conversations
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery({
@@ -81,10 +108,16 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
     staleTime: 0,
   });
 
+  // Sync DB messages → UI, but re-attach action cards (DB has only text)
   useEffect(() => {
-    if (!isLoading) {
-      setMessages(conversationMessages);
-    }
+    if (isLoading) return;
+    const map = appliedByMessageIdRef.current;
+    setMessages(
+      conversationMessages.map((m) => ({
+        ...m,
+        appliedActions: map[m.id] || m.appliedActions,
+      })),
+    );
   }, [conversationMessages, isLoading]);
 
   useEffect(() => {
@@ -119,6 +152,7 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
   const handleNewConversation = () => {
     setSelectedConversationId(null);
     setMessages([]);
+    setLastApplied(null);
     setSidebarOpen(false);
   };
 
@@ -132,7 +166,12 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
   const callJarvisChat = async (
     messagesToSend: { role: string; content: string }[],
     conversationId: string,
-  ): Promise<{ message: string; suggestedActions?: unknown[]; toolsUsed?: string[] }> => {
+  ): Promise<{
+    message: string;
+    suggestedActions?: unknown[];
+    appliedActions?: JarvisAppliedAction[];
+    toolsUsed?: string[];
+  }> => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error('No session');
 
@@ -146,6 +185,13 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
         messages: messagesToSend,
         stream: false,
         conversationId,
+        pageContext: {
+          property_id: pageContext.property_id,
+          project_id: pageContext.project_id,
+          component_id: pageContext.component_id,
+          path: pageContext.path,
+          label: pageContext.label,
+        },
       }),
     });
 
@@ -155,10 +201,18 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
       err.status = response.status;
       throw err;
     }
+    const toolsUsed = (payload.toolsUsed || []) as string[];
+    const message = payload.message || '';
+    const appliedActions = mergeAppliedActions(
+      payload.appliedActions as JarvisAppliedAction[] | undefined,
+      message,
+      toolsUsed,
+    );
     return {
-      message: payload.message || '',
+      message,
       suggestedActions: payload.suggestedActions,
-      toolsUsed: payload.toolsUsed,
+      appliedActions,
+      toolsUsed,
     };
   };
 
@@ -211,15 +265,44 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
       const assistantContent =
         result.message || 'Jag kunde inte generera ett svar just nu.';
 
-      setMessages(prev =>
-        prev.map(m => (m.id === assistantId ? { ...m, content: assistantContent } : m))
+      const applied = result.appliedActions || [];
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: assistantContent, appliedActions: applied }
+            : m,
+        ),
       );
 
-      await supabase.from('ai_messages').insert({
-        conversation_id: conversationId,
-        role: 'assistant',
-        content: assistantContent
-      });
+      if (applied.length) {
+        rememberApplied(assistantId, applied);
+        toast.success(
+          applied.some((a) => a.sent) ? 'Klart — skickat till dig' : 'Åtgärd utförd',
+        );
+      }
+
+      // Persist assistant text and map cards to the real DB message id
+      // (otherwise refetch wipes cards because temp UUID ≠ DB id)
+      const { data: savedAssistant, error: saveErr } = await supabase
+        .from('ai_messages')
+        .insert({
+          conversation_id: conversationId,
+          role: 'assistant',
+          content: assistantContent,
+        })
+        .select('id')
+        .single();
+      if (saveErr) console.error('Save assistant message:', saveErr);
+      if (savedAssistant?.id && applied.length) {
+        rememberApplied(savedAssistant.id, applied);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, id: savedAssistant.id, appliedActions: applied }
+              : m,
+          ),
+        );
+      }
 
       if (result.suggestedActions && (result.suggestedActions as unknown[]).length > 0) {
         toast.success(
@@ -234,6 +317,7 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
         updateTitleMutation.mutate({ id: conversationId, title });
       }
 
+      // Soft invalidate — cards stay via appliedByMessageIdRef merge in useEffect
       await queryClient.invalidateQueries({ queryKey: ['ai-messages', conversationId] });
     } catch (error: unknown) {
       const err = error as { context?: { status?: number }; status?: number } | null;
@@ -431,51 +515,70 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
                         : { mainContent: message.content, suggestions: [] };
 
                       return (
-                        <div
-                          key={message.id}
-                          className={cn("flex gap-3", message.role === 'user' ? "justify-end" : "justify-start")}
-                        >
-                          {message.role === 'assistant' && (
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                              <Bot className="h-3.5 w-3.5 text-primary" />
-                            </div>
-                          )}
-                          <div className={cn(
-                            "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm",
-                            message.role === 'user'
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-card border border-border/50 shadow-sm"
-                          )}>
-                            {message.role === 'assistant' ? (
-                              <>
-                                <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_table]:my-3 [&_th]:bg-muted/70 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_th]:border [&_th]:border-border [&_td]:px-3 [&_td]:py-1.5 [&_td]:border [&_td]:border-border">
-                                  <ReactMarkdown>{mainContent}</ReactMarkdown>
-                                </div>
-                                {suggestions.length > 0 && (
-                                  <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border/50 pt-2">
-                                    {suggestions.map((s, idx) => (
-                                      <button
-                                        key={idx}
-                                        onClick={() => sendMessage(s)}
-                                        disabled={isLoading}
-                                        className="flex items-center gap-1 rounded-lg border bg-card px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted transition-all duration-200 hover:-translate-y-[1px] disabled:opacity-50"
-                                      >
-                                        <Sparkles className="h-2.5 w-2.5 text-primary/50" />
-                                        {s}
-                                      </button>
-                                    ))}
+                        <div key={message.id} className="space-y-2">
+                          <div
+                            className={cn(
+                              'flex gap-3',
+                              message.role === 'user' ? 'justify-end' : 'justify-start',
+                            )}
+                          >
+                            {message.role === 'assistant' && (
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                <Bot className="h-3.5 w-3.5 text-primary" />
+                              </div>
+                            )}
+                            <div
+                              className={cn(
+                                'max-w-[80%] rounded-2xl px-4 py-2.5 text-sm',
+                                message.role === 'user'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-card border border-border/50 shadow-sm',
+                              )}
+                            >
+                              {message.role === 'assistant' ? (
+                                <>
+                                  <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_table]:my-3 [&_th]:bg-muted/70 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_th]:border [&_th]:border-border [&_td]:px-3 [&_td]:py-1.5 [&_td]:border [&_td]:border-border">
+                                    <ReactMarkdown>{mainContent}</ReactMarkdown>
                                   </div>
-                                )}
-                              </>
-                            ) : (
-                              <p>{message.content}</p>
+                                  {suggestions.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border/50 pt-2">
+                                      {suggestions.map((s, idx) => (
+                                        <button
+                                          key={idx}
+                                          onClick={() => sendMessage(s)}
+                                          disabled={isLoading}
+                                          className="flex items-center gap-1 rounded-lg border bg-card px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted transition-all duration-200 hover:-translate-y-[1px] disabled:opacity-50"
+                                        >
+                                          <Sparkles className="h-2.5 w-2.5 text-primary/50" />
+                                          {s}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <p>{message.content}</p>
+                              )}
+                            </div>
+                            {message.role === 'user' && (
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                <User className="h-3.5 w-3.5" />
+                              </div>
                             )}
                           </div>
-                          {message.role === 'user' && (
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                              <User className="h-3.5 w-3.5" />
+                          {/* Action cards outside the bubble so they stay visible */}
+                          {message.role === 'assistant' &&
+                          (message.appliedActions || appliedByMessageId[message.id])?.length ? (
+                            <div className="pl-10 pr-2">
+                              <JarvisActionCards
+                                actions={
+                                  message.appliedActions ||
+                                  appliedByMessageId[message.id] ||
+                                  []
+                                }
+                              />
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       );
                     })}
@@ -496,6 +599,29 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
                   </div>
                 )}
               </div>
+
+              {/* Sticky action panel — always visible after apply (not wiped by message refetch) */}
+              {lastApplied && lastApplied.length > 0 && (
+                <div className="border-t border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
+                  <div className="max-w-3xl mx-auto">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <p className="text-xs font-medium text-emerald-800 dark:text-emerald-200">
+                        Senaste Jarvis-åtgärd
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setLastApplied(null)}
+                      >
+                        Stäng
+                      </Button>
+                    </div>
+                    <JarvisActionCards actions={lastApplied} />
+                  </div>
+                </div>
+              )}
 
               {/* Input */}
               <div className="border-t p-4 bg-background">
