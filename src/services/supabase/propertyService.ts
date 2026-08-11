@@ -10,30 +10,14 @@ import type { Property, CreatePropertyInput } from '@/types/domain/property';
 
 const base = createCrudService<Property, Partial<Property>, Partial<Property>>({
   table: 'properties',
-  select: `
-    *,
-    floors (
-      id,
-      name,
-      level
-    )
-  `,
+  select: `*`,
   defaultOrder: { column: 'created_at', ascending: false },
 });
 
 async function listWithEnergyGrades(organizationId?: string): Promise<Property[]> {
   let query = supabase
     .from('properties')
-    .select(
-      `
-      *,
-      floors (
-        id,
-        name,
-        level
-      )
-    `,
-    )
+    .select(`*`)
     .order('created_at', { ascending: false });
 
   // Defense in depth: explicit org filter in addition to RLS

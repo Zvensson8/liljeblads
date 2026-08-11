@@ -22,7 +22,6 @@ interface Component {
   refrigerant_code: string | null;
   refrigerant_amount_kg: number | null;
   refrigerant_type: string | null;
-  floor_name?: string;
   property_name?: string;
   property_address?: string;
 }
@@ -49,7 +48,6 @@ export const exportComponentsToExcel = async (
     'Typ': comp.type,
     'Status': comp.status,
     'Fastighet': comp.property_name || '-',
-    'Våning': comp.floor_name || '-',
     'Tillverkare': comp.manufacturer || '-',
     'Modell': comp.model || '-',
     'Serie-ID': comp.serial_number || '-',

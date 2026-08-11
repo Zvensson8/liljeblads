@@ -30,7 +30,7 @@ export const maintenanceHistorySchema = z.object({
   category: maintenanceCategorySchema.nullable(),
   is_warranty: z.boolean().nullable(),
   expected_cost: z.number().nullable(),
-  drift_task_id: z.string().uuid().nullable(),
+
   work_order_id: z.string().uuid().nullable(),
   created_at: z.string(),
   updated_at: z.string(),

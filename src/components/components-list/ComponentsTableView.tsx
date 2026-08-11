@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ComponentRiskBadge } from '@/components/ComponentRiskBadge';
-import { FloorSelector } from '@/components/FloorSelector';
 import { LastServiceBadge } from '@/components/LastServiceBadge';
 import { QuickServiceButton } from '@/components/QuickServiceButton';
 import type { ComponentRiskResult } from '@/lib/componentRisk';
@@ -18,7 +17,6 @@ export interface ComponentTableItem {
   room_zone: string | null;
   property_id?: string;
   property_name?: string;
-  floor_id: string;
 }
 
 interface ComponentsTableViewProps {
@@ -58,7 +56,6 @@ export function ComponentsTableView({
                 </th>
                 <th className="text-left py-3 px-4 font-medium">Fastighet</th>
                 <th className="text-left py-3 px-4 font-medium">Risk</th>
-                <th className="text-left py-3 px-4 font-medium">Våning</th>
                 <th className="text-left py-3 px-4 font-medium hidden sm:table-cell">
                   Senaste service
                 </th>
@@ -96,19 +93,6 @@ export function ComponentsTableView({
                     </td>
                     <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                       <ComponentRiskBadge risk={riskById.get(component.id)} compact />
-                    </td>
-                    <td className="py-2 px-4" onClick={(e) => e.stopPropagation()}>
-                      {component.property_id ? (
-                        <FloorSelector
-                          componentId={component.id}
-                          propertyId={component.property_id}
-                          currentFloorId={component.floor_id}
-                          onSuccess={onRefresh}
-                          compact
-                        />
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">-</span>
-                      )}
                     </td>
                     <td
                       className="py-2 px-4 hidden sm:table-cell"

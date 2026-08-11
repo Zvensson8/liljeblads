@@ -74,7 +74,6 @@ export const QuickServiceButton = ({
         component_id: componentId,
         action_type: actionType,
         performed_date: performedDate,
-        drift_task_id: null,
       });
 
       if (selectedFile && maintenanceRecord) {

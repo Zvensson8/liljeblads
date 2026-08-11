@@ -69,7 +69,7 @@ export function useGlobalSearch({ query, enabled = true }: GlobalSearchOptions) 
         );
       }
 
-      // — Components: name (with floor + property joins) —
+      // — Components: name + property —
       const { data: components } = await supabase
         .from('components')
         .select(
@@ -77,11 +77,7 @@ export function useGlobalSearch({ query, enabled = true }: GlobalSearchOptions) 
             id,
             name,
             type,
-            floors:floor_id(
-              property_id,
-              properties(name)
-            ),
-            direct_property:property_id(
+            properties:property_id(
               id,
               name
             )
@@ -94,14 +90,12 @@ export function useGlobalSearch({ query, enabled = true }: GlobalSearchOptions) 
         id: string;
         name: string;
         type: string;
-        floors?: { properties?: { name?: string } | null } | null;
-        direct_property?: { id: string; name: string } | null;
+        properties?: { id: string; name: string } | null;
       };
       if (components) {
         allResults.push(
           ...(components as unknown as ComponentHit[]).map((c) => {
-            const propertyName =
-              c.floors?.properties?.name || c.direct_property?.name || '';
+            const propertyName = c.properties?.name || '';
             return {
               id: c.id,
               type: 'component' as const,

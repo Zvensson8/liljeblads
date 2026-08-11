@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProperty } from '@/hooks/useProperties';
-import { useFloors } from '@/hooks/useFloors';
 import { useComponents } from '@/hooks/useComponents';
 import { useWorkOrders } from '@/hooks/useWorkOrders';
 import { useTodos } from '@/hooks/useTodos';
@@ -46,13 +45,6 @@ interface Property {
   invoice_address: string | null;
 }
 
-interface Floor {
-  id: string;
-  name: string;
-  level: number | null;
-  drawing_url: string | null;
-}
-
 const TAB_ITEMS: Array<{ value: string; label: string }> = [
   { value: 'overview', label: 'Översikt' },
   { value: 'maintenance-plan', label: 'Underhållsplan' },
@@ -82,9 +74,6 @@ const PropertyDetail = () => {
   } = useProperty(id);
   const property = propertyData as Property | null;
 
-  const { data: floorsData = [], isLoading: floorsLoading } = useFloors({ propertyId: id });
-  const floors = floorsData as Floor[];
-
   const { data: componentsViaProperty = [] } = useComponents({ propertyId: id });
   const components = componentsViaProperty;
 
@@ -104,7 +93,7 @@ const PropertyDetail = () => {
     [workOrders],
   );
 
-  const loading = propertyLoading || floorsLoading;
+  const loading = propertyLoading;
 
   useEffect(() => {
     if (propertyError) {
@@ -160,7 +149,6 @@ const PropertyDetail = () => {
           refrigerant_code: c.refrigerant_code,
           refrigerant_amount_kg: c.refrigerant_amount_kg,
           refrigerant_type: c.refrigerant_type,
-          floor_name: c.floors?.name ?? undefined,
           property_name: property.name,
           property_address: property.address,
         }));
@@ -328,7 +316,6 @@ const PropertyDetail = () => {
             property={property}
             components={components}
             workOrders={workOrders}
-            floors={floors}
             overdueTodos={overdueTodos}
             urgentWorkOrders={urgentWorkOrders}
           />

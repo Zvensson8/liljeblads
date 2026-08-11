@@ -11,7 +11,7 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/s
 import { useAuth } from '@/hooks/useAuth';
 import { Package, Plus, Download, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
-import { SelectPropertyFloorDialog } from '@/components/SelectPropertyFloorDialog';
+import { SelectPropertyDialog } from '@/components/SelectPropertyDialog';
 import { ComponentImportDialog } from '@/components/ComponentImportDialog';
 import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -47,9 +47,6 @@ interface Component {
   refrigerant_code: string | null;
   refrigerant_amount_kg: number | null;
   refrigerant_type: string | null;
-  floor_id: string;
-  floor_name?: string;
-  floor_level?: number | null;
   property_id?: string;
   property_name?: string;
   property_address?: string | null;
@@ -63,7 +60,6 @@ const Components = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectPropertyDialogOpen, setSelectPropertyDialogOpen] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
-  const [selectedFloorId, setSelectedFloorId] = useState('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterProperty, setFilterProperty] = useState<string>('all');
@@ -97,8 +93,6 @@ const Components = () => {
     () =>
       rawComponents.map((comp) => ({
         ...comp,
-        floor_name: comp.floors?.name,
-        floor_level: comp.floors?.level,
         property_name: comp.properties?.name,
         property_address: comp.properties?.address,
       })) as Component[],
@@ -292,9 +286,8 @@ const Components = () => {
     setSelectPropertyDialogOpen(true);
   };
 
-  const handlePropertyFloorSelected = (propertyId: string, floorId: string) => {
+  const handlePropertySelected = (propertyId: string) => {
     setSelectedPropertyId(propertyId);
-    setSelectedFloorId(floorId);
     setSelectPropertyDialogOpen(false);
     setDialogOpen(true);
   };
@@ -511,10 +504,10 @@ const Components = () => {
         </SidebarInset>
       </div>
 
-      <SelectPropertyFloorDialog
+      <SelectPropertyDialog
         open={selectPropertyDialogOpen}
         onOpenChange={setSelectPropertyDialogOpen}
-        onSelect={handlePropertyFloorSelected}
+        onSelect={handlePropertySelected}
       />
 
       <ComponentFormDialog
@@ -523,17 +516,14 @@ const Components = () => {
           setDialogOpen(open);
           if (!open) {
             setSelectedComponent(null);
-            setSelectedFloorId('');
             setSelectedPropertyId('');
           }
         }}
-        floorId={selectedComponent?.floor_id || selectedFloorId}
         propertyId={selectedComponent?.property_id || selectedPropertyId}
         editingComponent={selectedComponent}
         onSuccess={() => {
           setDialogOpen(false);
           setSelectedComponent(null);
-          setSelectedFloorId('');
           setSelectedPropertyId('');
           refreshComponents();
         }}

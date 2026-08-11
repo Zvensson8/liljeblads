@@ -1,6 +1,5 @@
 /**
- * Component service — wraps the `components` table with floor + property
- * joins.
+ * Component service — wraps the `components` table with property joins.
  */
 import { supabase } from '@/integrations/supabase/client';
 import { createCrudService } from './createCrudService';
@@ -20,14 +19,12 @@ const base = createCrudService<
   table: 'components',
   select: `
     *,
-    floors (id, name, level),
     properties (id, name, address)
   `,
   defaultOrder: { column: 'created_at', ascending: false },
   applyFilters: (query, filters) => {
     let q = query;
     if (filters.propertyId) q = q.eq('property_id', filters.propertyId);
-    if (filters.floorId) q = q.eq('floor_id', filters.floorId);
     if (filters.type) q = q.eq('type', filters.type);
     if (filters.status) q = q.eq('status', filters.status);
     return q;
@@ -46,13 +43,12 @@ async function listForOrganization(
     .from('components')
     .select(
       useInner
-        ? `*, floors (id, name, level), properties!inner (id, name, address, organization_id)`
-        : `*, floors (id, name, level), properties (id, name, address)`,
+        ? `*, properties!inner (id, name, address, organization_id)`
+        : `*, properties (id, name, address)`,
     )
     .order('created_at', { ascending: false });
 
   if (filters.propertyId) query = query.eq('property_id', filters.propertyId);
-  if (filters.floorId) query = query.eq('floor_id', filters.floorId);
   if (filters.type) query = query.eq('type', filters.type);
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.organizationId) {

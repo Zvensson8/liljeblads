@@ -52,7 +52,7 @@ interface EditingComponent {
 interface ComponentFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  floorId: string;
+
   propertyId?: string;
   selectedTemplate?: ComponentTemplate | null;
   editingComponent?: EditingComponent;
@@ -63,7 +63,6 @@ interface ComponentFormDialogProps {
 export const ComponentFormDialog = ({ 
   open, 
   onOpenChange, 
-  floorId,
   propertyId,
   selectedTemplate,
   editingComponent,
@@ -165,7 +164,6 @@ export const ComponentFormDialog = ({
         refrigerant_amount_kg: refrigerantAmount ? parseFloat(refrigerantAmount) : null,
         refrigerant_type: refrigerantType.trim() || null,
         status: 'active',
-        floor_id: floorId || null,
         property_id: selectedProperty || propertyId || null,
       };
 

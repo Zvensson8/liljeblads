@@ -77,12 +77,6 @@ export default defineConfig(({ mode }) => ({
             url: "/work-orders",
             icons: [{ src: "/placeholder.svg", sizes: "96x96" }],
           },
-          {
-            name: "Drift",
-            short_name: "Drift",
-            url: "/operations",
-            icons: [{ src: "/placeholder.svg", sizes: "96x96" }],
-          },
         ],
       },
       workbox: {

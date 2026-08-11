@@ -36,7 +36,7 @@ import { ComponentDocuments } from "@/components/component/ComponentDocuments";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
-import { FloorSelector } from "@/components/FloorSelector";
+
 import { QuickServiceButton } from "@/components/QuickServiceButton";
 import { ServiceRecordCard } from "@/components/ServiceRecordCard";
 import { ServiceListTab } from "@/components/ServiceListTab";
@@ -59,21 +59,15 @@ interface Component {
   refrigerant_amount_kg: number | null;
   refrigerant_type: string | null;
   notes: string | null;
-  floor_id: string;
+  property_id: string;
   created_at: string;
   updated_at: string;
 }
 
-interface Floor {
+interface PropertyInfo {
   id: string;
   name: string;
-  level: number | null;
-  property_id: string;
-  properties: {
-    id: string;
-    name: string;
-    address: string | null;
-  };
+  address: string | null;
 }
 
 interface MaintenanceRecord {
@@ -94,7 +88,7 @@ export default function ComponentDetail() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [component, setComponent] = useState<Component | null>(null);
-  const [floor, setFloor] = useState<Floor | null>(null);
+  const [property, setProperty] = useState<PropertyInfo | null>(null);
   const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceRecord[]>([]);
   const [componentWorkOrders, setComponentWorkOrders] = useState<Array<{ id: string; action: string; status: string; price: number | null; due_date: string | null; contractor: string | null }>>([]);
   const [loading, setLoading] = useState(true);
@@ -113,7 +107,7 @@ export default function ComponentDetail() {
   }, [user, authLoading, id, navigate]);
 
   useEffect(() => {
-    if (component && floor) {
+    if (component && property) {
       addRecentItem({
         id: component.id,
         type: "component",
@@ -121,7 +115,7 @@ export default function ComponentDetail() {
         path: `/components/${component.id}`,
       });
     }
-  }, [component, floor]);
+  }, [component, property]);
 
   const fetchComponentData = async () => {
     if (!id) return;
@@ -132,18 +126,7 @@ export default function ComponentDetail() {
         .from("components")
         .select(`
           *,
-          floors:floor_id (
-            id,
-            name,
-            level,
-            property_id,
-            properties:property_id (
-              id,
-              name,
-              address
-            )
-          ),
-          direct_property:property_id (
+          properties:property_id (
             id,
             name,
             address
@@ -153,19 +136,9 @@ export default function ComponentDetail() {
         .single();
 
       if (componentError) throw componentError;
-      setComponent(componentData);
-      
-      if (componentData.floors) {
-        setFloor(componentData.floors as unknown as Floor);
-      } else if (componentData.direct_property) {
-        setFloor({
-          id: '',
-          name: 'Ingen våning',
-          level: null,
-          property_id: componentData.direct_property.id,
-          properties: componentData.direct_property
-        } as Floor);
-      }
+      setComponent(componentData as Component);
+      const prop = (componentData as { properties?: PropertyInfo | null }).properties;
+      setProperty(prop ?? null);
 
       const { data: maintenanceData, error: maintenanceError } = await supabase
         .from("maintenance_history")
@@ -242,11 +215,9 @@ export default function ComponentDetail() {
     );
   }
 
-  if (!component || !floor) {
+  if (!component || !property) {
     return null;
   }
-
-  const property = floor.properties;
 
   return (
     <SidebarProvider>
@@ -649,18 +620,9 @@ export default function ComponentDetail() {
                           <p className="text-sm text-muted-foreground">{property.address}</p>
                         )}
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-2">Våningsplan</p>
-                        <FloorSelector
-                          componentId={component.id}
-                          propertyId={property.id}
-                          currentFloorId={component.floor_id}
-                          onSuccess={fetchComponentData}
-                        />
-                      </div>
                       {component.room_zone && (
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">Rum/Zon</p>
+                          <p className="text-sm font-medium text-muted-foreground">Placering (rum/zon)</p>
                           <p className="text-base">{component.room_zone}</p>
                         </div>
                       )}
@@ -693,7 +655,6 @@ export default function ComponentDetail() {
       <ComponentFormDialog
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
-        floorId={component.floor_id}
         propertyId={property.id}
         editingComponent={component}
         onSuccess={() => {

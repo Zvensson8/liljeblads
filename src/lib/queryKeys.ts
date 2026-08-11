@@ -74,8 +74,6 @@ export const queryKeys = {
       ['todos', 'property', propertyId] as const,
   },
   // — Newly consolidated entities —
-  floors: makeEntityKeys('floors'),
-
   propertyDocuments: makeEntityKeys('property-documents'),
   propertyContacts: makeEntityKeys('property-contacts'),
   propertyNotes: makeEntityKeys('property-notes'),

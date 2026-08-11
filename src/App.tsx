@@ -78,13 +78,8 @@ const AppContent = () => {
           <Route path="/components" element={<ProtectedRoute><Components /></ProtectedRoute>} />
           <Route path="/components/:id" element={<ProtectedRoute><ComponentDetail /></ProtectedRoute>} />
           <Route path="/work-orders" element={<ProtectedRoute><WorkOrders /></ProtectedRoute>} />
-          {/* Slim-down: retired modules redirect to dashboard (code kept for Fas 3) */}
-          <Route path="/operations" element={<Navigate to="/dashboard" replace />} />
           <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
           <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
-          <Route path="/cost-overview" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/reports" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/security" element={<Navigate to="/dashboard" replace />} />
           <Route path="/ai-chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />
           <Route path="/agent" element={<ProtectedRoute><AgentActivity /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><RequireAdmin><Users /></RequireAdmin></ProtectedRoute>} />

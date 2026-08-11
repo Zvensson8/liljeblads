@@ -22,7 +22,6 @@ interface PropertyOverviewProps {
   property: Property & { organization_id?: string | null; invoice_address?: string | null };
   components: ComponentLite[];
   workOrders: unknown[];
-  floors: unknown[];
   overdueTodos: number;
   urgentWorkOrders: number;
 }
@@ -31,7 +30,6 @@ export function PropertyOverview({
   property, 
   components, 
   workOrders, 
-  floors,
   overdueTodos,
   urgentWorkOrders 
 }: PropertyOverviewProps) {
@@ -205,10 +203,6 @@ export function PropertyOverview({
             <CardTitle className="text-lg">Snabbstatistik</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground text-sm">Våningar:</span>
-              <span className="font-medium">{floors.length}</span>
-            </div>
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Settings className="h-4 w-4 text-muted-foreground" />

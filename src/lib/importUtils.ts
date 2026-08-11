@@ -131,7 +131,6 @@ const statusMap: Record<string, string> = {
 const componentSchema = z.object({
   name: z.string().min(1, 'Beteckning krävs'),
   type: z.string().min(1, 'Komponenttyp krävs'),
-  floorName: z.string().nullish(),
   propertyName: z.string().min(1, 'Fastighet krävs'),
   room_zone: z.string().min(1, 'Placering krävs'),
   registration_number: z.string().nullish(),
@@ -152,9 +151,7 @@ export interface ValidationResult {
   status: 'valid' | 'warning' | 'error' | 'duplicate';
   message: string;
   data: MappedComponentData | ImportRow;
-  floorId?: string;
   propertyId?: string;
-  floorName: string;
   propertyName?: string;
   duplicateOf?: { name: string; serial_number?: string; registration_number?: string };
   approved?: boolean;
@@ -175,27 +172,11 @@ export const validateAndMatchComponents = async (
 
   const propertyMap = new Map(propertiesData.map((p) => [p.name.toLowerCase(), p.id]));
 
-  // Fetch all floors
-  const { data: floorsData, error: floorsError } = await supabase
-    .from('floors')
-    .select('id, name, property_id');
-
-  if (floorsError || !floorsData) {
-    throw new Error('Kunde inte hämta våningar');
-  }
-
-  const floorMap = new Map(
-    floorsData.map((f) => [`${f.property_id}-${f.name.toLowerCase()}`, f.id])
-  );
-
   // Fetch existing components to check for duplicates
   const { data: existingComponents } = await supabase
     .from('components')
-    .select('name, floor_id, property_id, serial_number, registration_number');
+    .select('name, property_id, serial_number, registration_number');
 
-  const existingNamesByFloor = new Set(
-    existingComponents?.filter(c => c.floor_id).map((c) => `${c.name.toLowerCase()}-${c.floor_id}`) || []
-  );
   const existingNamesByProperty = new Set(
     existingComponents?.map((c) => `${c.name.toLowerCase()}-${c.property_id}`) || []
   );
@@ -229,7 +210,6 @@ export const validateAndMatchComponents = async (
       status: 'valid',
       message: 'Redo för import',
       data: {} as MappedComponentData,
-      floorName: col('Våning', 'Våningsplan', 'Floor'),
       propertyName: col('Fastighet', 'Property') || undefined,
     };
 
@@ -249,17 +229,22 @@ export const validateAndMatchComponents = async (
         }
       }
 
+      // Legacy "Våning" column folds into room_zone if placering is empty
+      const placement =
+        col('Placering', 'Placement', 'Location') ||
+        col('Våning', 'Våningsplan', 'Floor') ||
+        '';
+
       const mappedData: MappedComponentData = {
         name: col('Beteckning', 'Name'),
         type: typeCode,
-        floorName: col('Våning', 'Våningsplan', 'Floor') || undefined,
         propertyName: col('Fastighet', 'Property') || undefined,
         registration_number: col('Reg.nr', 'Regnr', 'Registration number') || null,
         installation_year: installYear,
         manufacturer: col('Tillverkare', 'Manufacturer') || null,
         model: col('Modell', 'Model') || null,
         serial_number: col('Serie-ID', 'Serienummer', 'Serial number') || null,
-        room_zone: col('Placering', 'Placement', 'Location'),
+        room_zone: placement,
         status: statusMap[col('Status').toLowerCase()] || 'active',
         notes: col('Anteckningar', 'Kommentar', 'Notes') || null,
         refrigerant_code: col('Kod', 'Code') || null,
@@ -281,16 +266,6 @@ export const validateAndMatchComponents = async (
           result.data = mappedData;
           results.push(result);
           continue;
-        }
-      }
-
-      // Resolve floor (optional)
-      let floorId: string | undefined;
-      if (mappedData.floorName) {
-        floorId = floorMap.get(`${propId}-${mappedData.floorName.toLowerCase()}`);
-        if (!floorId) {
-          result.status = 'warning';
-          result.message = `Våning "${mappedData.floorName}" finns inte – komponenten importeras utan våning`;
         }
       }
 
@@ -317,18 +292,10 @@ export const validateAndMatchComponents = async (
 
       // Check for name duplicates (warning only)
       if (!isDuplicate) {
-        if (floorId) {
-          const duplicateKey = `${mappedData.name.toLowerCase()}-${floorId}`;
-          if (existingNamesByFloor.has(duplicateKey)) {
-            result.status = 'warning';
-            result.message = 'Komponent med samma beteckning finns redan på denna våning';
-          }
-        } else {
-          const duplicateKey = `${mappedData.name.toLowerCase()}-${propId}`;
-          if (existingNamesByProperty.has(duplicateKey)) {
-            result.status = 'warning';
-            result.message = 'Komponent med samma beteckning finns redan i denna fastighet';
-          }
+        const duplicateKey = `${mappedData.name.toLowerCase()}-${propId}`;
+        if (existingNamesByProperty.has(duplicateKey)) {
+          result.status = 'warning';
+          result.message = 'Komponent med samma beteckning finns redan i denna fastighet';
         }
       }
 
@@ -338,7 +305,6 @@ export const validateAndMatchComponents = async (
       }
 
       result.data = mappedData;
-      result.floorId = floorId;
       result.propertyId = propId;
       results.push(result);
     } catch (error: unknown) {
@@ -370,14 +336,13 @@ export const importComponents = async (
       continue;
     }
 
-    const { data, floorId, propertyId } = component;
+    const { data, propertyId: propId } = component;
     const mapped = data as MappedComponentData;
 
     const insert: ComponentInsert = {
       name: mapped.name,
       type: mapped.type as ComponentInsert['type'],
-      floor_id: floorId || null,
-      property_id: propertyId,
+      property_id: propId,
       registration_number: mapped.registration_number ?? null,
       installation_year: mapped.installation_year ?? null,
       manufacturer: mapped.manufacturer ?? null,

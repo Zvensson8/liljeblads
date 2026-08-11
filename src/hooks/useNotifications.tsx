@@ -76,12 +76,10 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
         id,
         name,
         next_service_date,
-        floors (
-          property_id,
-          properties (
-            id,
-            name
-          )
+        property_id,
+        properties (
+          id,
+          name
         )
       `)
       .not("next_service_date", "is", null)
@@ -92,10 +90,11 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
       type ComponentRow = {
         id: string;
         name: string;
-        floors?: { properties?: { id: string; name: string } | null } | null;
+        property_id: string | null;
+        properties?: { id: string; name: string } | null;
       };
       (components as unknown as ComponentRow[]).forEach((component) => {
-        const property = component.floors?.properties;
+        const property = component.properties;
         if (!property) return;
 
         const notification: Notification = {

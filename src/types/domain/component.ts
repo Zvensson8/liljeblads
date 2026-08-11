@@ -27,7 +27,6 @@ export const componentSchema = z.object({
   type: componentTypeSchema,
   status: componentStatusSchema,
   property_id: z.string().uuid(),
-  floor_id: z.string().uuid().nullable(),
   manufacturer: z.string().nullable(),
   model: z.string().nullable(),
   serial_number: z.string().nullable(),
@@ -52,7 +51,6 @@ export type ComponentType = DbComponentType;
 export type Component = z.infer<typeof componentSchema>;
 
 export type ComponentWithRelations = Component & {
-  floors?: { id: string; name: string; level?: number | null } | null;
   properties?: { id: string; name: string; address?: string | null } | null;
 };
 
@@ -63,7 +61,6 @@ export type UpdateComponentInput =
 
 export interface ComponentListFilters {
   propertyId?: string;
-  floorId?: string;
   type?: ComponentType;
   status?: ComponentStatus;
   /** Defense-in-depth: only components on properties in this org */

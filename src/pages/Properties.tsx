@@ -563,7 +563,7 @@ const Properties = () => {
             <AlertDialogTitle>Ta bort fastighet?</AlertDialogTitle>
             <AlertDialogDescription>
               Är du säker på att du vill ta bort "{propertyToDelete?.name}"? 
-              Detta kommer även ta bort alla våningar, ritningar och komponenter. 
+              Detta kommer även ta bort alla komponenter och kopplad data.
               Åtgärden kan inte ångras.
             </AlertDialogDescription>
           </AlertDialogHeader>

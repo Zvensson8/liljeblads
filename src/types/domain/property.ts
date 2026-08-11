@@ -7,16 +7,10 @@ import { z } from 'zod';
  * `src/integrations/supabase/types.ts`. This schema mirrors the same shape
  * but adds:
  *   - runtime validation via Zod (optional, used at trust boundaries)
- *   - a few enriched fields populated by the data layer (floors, energy_grade)
+ *   - a few enriched fields populated by the data layer (energy_grade)
  *
  * Keep field names in sync with the `properties` table columns.
  */
-export const floorSummarySchema = z.object({
-  id: z.string().uuid(),
-  name: z.string(),
-  level: z.number(),
-});
-
 export const propertySchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
@@ -28,11 +22,9 @@ export const propertySchema = z.object({
   loa: z.string().nullable(),
   property_number: z.string().nullable(),
   invoice_address: z.string().nullable(),
-  floors: z.array(floorSummarySchema).optional(),
   energy_grade: z.string().nullable().optional(),
 });
 
-export type FloorSummary = z.infer<typeof floorSummarySchema>;
 export type Property = z.infer<typeof propertySchema>;
 
 export const createPropertyInputSchema = z.object({

@@ -10,9 +10,9 @@ import type { Property, CreatePropertyInput } from '@/types/domain/property';
 export type { Property, CreatePropertyInput } from '@/types/domain/property';
 
 /**
- * Hook: fetch all properties for the current user with enriched floors +
- * latest energy grade. Subscribes to realtime changes on the `properties`
- * table and invalidates the cache on any mutation so the UI stays fresh.
+ * Hook: fetch all properties for the current user with latest energy grade.
+ * Subscribes to realtime changes on the `properties` table and invalidates
+ * the cache on any mutation so the UI stays fresh.
  */
 export function useProperties() {
   const { organization } = useOrganization();

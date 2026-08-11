@@ -27,7 +27,6 @@ import { PropertyMapDialog } from '@/components/maps/PropertyMapDialog';
 import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
 import { EmbeddingStatsWidget } from '@/components/dashboard/EmbeddingStatsWidget';
 import { MyTasksTodayWidget } from '@/components/dashboard/MyTasksTodayWidget';
-import { OrgOnboardingChecklist } from '@/components/dashboard/OrgOnboardingChecklist';
 
 interface RecentWorkOrder {
   id: string;
@@ -236,8 +235,6 @@ const Dashboard = () => {
                   </Select>
                 </div>
               </div>
-
-              <OrgOnboardingChecklist />
 
               <AttentionRequiredSection
                 propertyId={selectedProperty === 'all' ? undefined : selectedProperty}

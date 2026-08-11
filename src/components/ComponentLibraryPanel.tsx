@@ -20,8 +20,7 @@ interface ExistingComponent {
   name: string;
   type: string;
   manufacturer?: string;
-  floor_id?: string;
-  floors?: { name: string } | null;
+  room_zone?: string | null;
   component_geometry?: { id: string }[];
   isPlacedOnCanvas?: boolean;
 }
@@ -45,12 +44,10 @@ export const ComponentLibraryPanel = ({
   const loadExistingComponents = async () => {
     if (!propertyId) return;
 
-    // Query all components for this property, regardless of floor_id
     const { data, error } = await supabase
       .from('components')
       .select(`
         *,
-        floors (name),
         component_geometry (id)
       `)
       .eq('property_id', propertyId);
@@ -254,9 +251,9 @@ const ComponentButton = ({
         <p className="text-xs text-muted-foreground mt-0.5">
           {component.type}
         </p>
-        {component.floors?.name ? (
+        {component.room_zone ? (
           <p className="text-xs text-muted-foreground">
-            {component.floors.name}
+            {component.room_zone}
           </p>
         ) : (
           <p className="text-xs text-orange-500">

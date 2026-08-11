@@ -37,13 +37,7 @@ export async function getTopCostComponents(limit: number = 10, months: number = 
         id,
         name,
         type,
-        floor_id,
-        floors (
-          property_id,
-          properties (
-            owner_id
-          )
-        )
+        property_id
       )
     `)
     .gte('performed_date', startDate.toISOString().split('T')[0])

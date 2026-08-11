@@ -65,7 +65,6 @@ export const componentSchema = z.object({
   name: nameSchema,
   type: z.string().min(1, { message: "Välj en komponenttyp" }),
   property_id: z.string().uuid({ message: "Fastighet krävs" }),
-  floor_id: z.string().uuid().optional().nullable(),
   manufacturer: z.string().trim().max(100).optional(),
   model: z.string().trim().max(100).optional(),
   serial_number: z.string().trim().max(100).optional(),
@@ -96,13 +95,6 @@ export const maintenanceHistorySchema = z.object({
 export const categorySchema = z.object({
   name: nameSchema,
   parent_id: z.string().uuid().optional().nullable(),
-});
-
-// Floor validation (placement / optional label — drawings retired)
-export const floorSchema = z.object({
-  name: nameSchema,
-  level: z.number().int().optional().nullable(),
-  drawing_url: urlSchema.optional().nullable(),
 });
 
 // Cost budget validation

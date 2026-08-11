@@ -27,9 +27,6 @@ export { dashboardStatsService } from './dashboardStatsService';
 export { energyDeclarationService } from './energyDeclarationService';
 
 // — Newly consolidated entities —
-export { floorService } from './floorService';
-export type { Floor, FloorInsert, FloorUpdate, FloorListFilters } from './floorService';
-
 export { propertyDocumentService } from './propertyDocumentService';
 export type {
   PropertyDocument,

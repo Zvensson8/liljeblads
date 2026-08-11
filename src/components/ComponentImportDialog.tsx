@@ -105,7 +105,6 @@ export const ComponentImportDialog = ({
           'Beteckning',
           'Komponenttyp',
           'Placering',
-          'Våning',
           'Reg.nr',
           'Installationsår',
           'Tillverkare',
@@ -122,7 +121,6 @@ export const ComponentImportDialog = ({
           'Komponenttyp',
           'Fastighet',
           'Placering',
-          'Våning',
           'Reg.nr',
           'Installationsår',
           'Tillverkare',
@@ -320,7 +318,7 @@ export const ComponentImportDialog = ({
                     <TableHead>Beteckning</TableHead>
                     <TableHead>Typ</TableHead>
                     {!propertyId && <TableHead>Fastighet</TableHead>}
-                    <TableHead>Våning</TableHead>
+                    <TableHead>Placering</TableHead>
                     <TableHead>Meddelande</TableHead>
                     <TableHead className="w-24">Åtgärd</TableHead>
                   </TableRow>
@@ -332,7 +330,9 @@ export const ComponentImportDialog = ({
                       <TableCell className="font-medium">{result.data.name}</TableCell>
                       <TableCell>{result.data.type}</TableCell>
                       {!propertyId && <TableCell>{result.propertyName}</TableCell>}
-                      <TableCell>{result.floorName}</TableCell>
+                      <TableCell>
+                        {'room_zone' in result.data ? String(result.data.room_zone || '-') : '-'}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {getStatusBadge(result.status, result.approved)}
