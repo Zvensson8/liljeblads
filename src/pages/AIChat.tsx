@@ -32,10 +32,10 @@ interface Conversation {
 
 const suggestedQuestions = [
   "Ge mig en översikt av alla fastigheter",
-  "Lista öppna arbetsordrar",
-  "Visa projektstatus",
-  "Sök komponent LA1",
-  "Skriv utkast till beställning för senaste arbetsordern",
+  "Lista aktiva arbetsordrar",
+  "Skapa en arbetsorder för service av värmepump",
+  "Lägg till en anteckning på en fastighet",
+  "Uppdatera fakturaadress för en fastighet",
 ];
 
 export default function AIChat({ embedded = false }: { embedded?: boolean }) {

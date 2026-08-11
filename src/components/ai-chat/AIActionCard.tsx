@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, X, Loader2, Wrench, CheckSquare, Calendar, Bell, Settings, FolderKanban } from 'lucide-react';
+import { Check, X, Loader2, Wrench, CheckSquare, Calendar, Bell, Settings, FolderKanban, StickyNote, Building2, MapPin } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +59,26 @@ const actionConfig: Record<string, { icon: typeof Wrench; label: string; colorCl
     icon: FolderKanban, 
     label: 'Skapa projekt', 
     colorClass: 'border-l-pink-500' 
+  },
+  create_property_note: {
+    icon: StickyNote,
+    label: 'Lägg till anteckning',
+    colorClass: 'border-l-amber-500',
+  },
+  update_property_invoice_address: {
+    icon: MapPin,
+    label: 'Uppdatera fakturaadress',
+    colorClass: 'border-l-cyan-500',
+  },
+  create_property: {
+    icon: Building2,
+    label: 'Skapa fastighet',
+    colorClass: 'border-l-indigo-500',
+  },
+  update_property: {
+    icon: Building2,
+    label: 'Uppdatera fastighet',
+    colorClass: 'border-l-slate-500',
   },
 };
 

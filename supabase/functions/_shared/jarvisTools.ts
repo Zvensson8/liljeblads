@@ -134,31 +134,145 @@ export const jarvisTools: ChatTool[] = [
     function: {
       name: "suggest_work_order",
       description:
-        "Föreslå ny arbetsorder som utkast (human-in-the-loop). Skapas INTE automatiskt i databasen förrän användaren godkänner i UI. Fyll i contractor, quarter (t.ex. 'Q3 2026'), due_date och price_estimate när informationen finns — de mappas till arbetsorderns fält vid godkännande.",
+        "Föreslå ny arbetsorder (HITL-utkast). Skapas INTE i DB förrän användaren godkänner. Fyll contractor, quarter (t.ex. Q3 2026), due_date, price_estimate när känt.",
       parameters: {
         type: "object",
         properties: {
-          action: { type: "string" },
+          action: { type: "string", description: "Åtgärd/beskrivning av jobbet" },
           property_name: { type: "string" },
+          property_id: { type: "string" },
           component_name: { type: "string" },
           priority: { type: "string", enum: ["low", "medium", "high"] },
           price_estimate: { type: "number" },
-          contractor: {
-            type: "string",
-            description: "Entreprenör/leverantör om känd (t.ex. Axcell)",
-          },
-          quarter: {
-            type: "string",
-            description: "Planerat kvartal, t.ex. 'Q3 2026'",
-          },
-          due_date: {
-            type: "string",
-            description: "ISO-datum YYYY-MM-DD om känt",
-          },
+          contractor: { type: "string" },
+          quarter: { type: "string" },
+          due_date: { type: "string", description: "YYYY-MM-DD" },
           reasoning: { type: "string" },
           confidence: { type: "number" },
         },
         required: ["action", "reasoning", "confidence"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "suggest_project",
+      description:
+        "Föreslå nytt projekt (HITL). Kräver fastighet. type: investering|underhall|energi|annat.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          description: { type: "string" },
+          type: {
+            type: "string",
+            enum: ["investering", "underhall", "energi", "annat"],
+          },
+          budget: { type: "number" },
+          year: { type: "number" },
+          start_quarter: { type: "number", description: "1-4" },
+          project_number: {
+            type: "string",
+            description: "Valfritt; genereras om tomt",
+          },
+          reasoning: { type: "string" },
+          confidence: { type: "number" },
+        },
+        required: ["name", "reasoning", "confidence"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "suggest_property_note",
+      description:
+        "Föreslå anteckning på en fastighet (HITL). content = anteckningstext.",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          content: { type: "string", description: "Anteckningens text" },
+          reasoning: { type: "string" },
+          confidence: { type: "number" },
+        },
+        required: ["content", "reasoning", "confidence"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "suggest_update_invoice_address",
+      description:
+        "Föreslå uppdatering av fakturaadress på en befintlig fastighet (HITL).",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          invoice_address: {
+            type: "string",
+            description: "Ny fakturaadress (full text)",
+          },
+          reasoning: { type: "string" },
+          confidence: { type: "number" },
+        },
+        required: ["invoice_address", "reasoning", "confidence"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "suggest_create_property",
+      description:
+        "Föreslå ny fastighet i organisationen (HITL). Minst name krävs.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          address: { type: "string" },
+          property_number: { type: "string" },
+          property_type: { type: "string" },
+          invoice_address: { type: "string" },
+          construction_year: { type: "number" },
+          area_sqm: { type: "number" },
+          description: { type: "string" },
+          reasoning: { type: "string" },
+          confidence: { type: "number" },
+        },
+        required: ["name", "reasoning", "confidence"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "suggest_update_property",
+      description:
+        "Föreslå uppdatering av befintlig fastighet (HITL). Endast fält som ska ändras.",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string", description: "Befintlig fastighet att hitta" },
+          property_id: { type: "string" },
+          name: { type: "string" },
+          address: { type: "string" },
+          property_number: { type: "string" },
+          property_type: { type: "string" },
+          invoice_address: { type: "string" },
+          construction_year: { type: "number" },
+          area_sqm: { type: "number" },
+          description: { type: "string" },
+          reasoning: { type: "string" },
+          confidence: { type: "number" },
+        },
+        required: ["reasoning", "confidence"],
       },
     },
   },
@@ -503,6 +617,11 @@ export async function executeJarvisTool(
       }
 
       case "suggest_work_order":
+      case "suggest_project":
+      case "suggest_property_note":
+      case "suggest_update_invoice_address":
+      case "suggest_create_property":
+      case "suggest_update_property":
       case "suggest_todo": {
         const confidence = Number(rawArgs.confidence ?? 0.7);
         if (confidence < 0.5) {
@@ -511,9 +630,51 @@ export async function executeJarvisTool(
             reason: "confidence < 0.5",
           };
         }
-        const actionType =
-          name === "suggest_work_order" ? "create_work_order" : "create_todo";
-        const payload = { ...rawArgs };
+        const actionTypeMap: Record<string, string> = {
+          suggest_work_order: "create_work_order",
+          suggest_project: "create_project",
+          suggest_property_note: "create_property_note",
+          suggest_update_invoice_address: "update_property_invoice_address",
+          suggest_create_property: "create_property",
+          suggest_update_property: "update_property",
+          suggest_todo: "create_todo",
+        };
+        const actionType = actionTypeMap[name];
+        if (!actionType) return { error: `Okänt suggest-verktyg: ${name}` };
+
+        // Light validation before storing HITL draft
+        if (name === "suggest_work_order" && !String(rawArgs.action || "").trim()) {
+          return { error: "action krävs för arbetsorder" };
+        }
+        if (name === "suggest_project" && !String(rawArgs.name || "").trim()) {
+          return { error: "name krävs för projekt" };
+        }
+        if (
+          name === "suggest_property_note" &&
+          !String(rawArgs.content || "").trim()
+        ) {
+          return { error: "content krävs för anteckning" };
+        }
+        if (
+          name === "suggest_update_invoice_address" &&
+          !String(rawArgs.invoice_address || "").trim()
+        ) {
+          return { error: "invoice_address krävs" };
+        }
+        if (
+          name === "suggest_create_property" &&
+          !String(rawArgs.name || "").trim()
+        ) {
+          return { error: "name krävs för ny fastighet" };
+        }
+        if (
+          name === "suggest_update_property" &&
+          !String(rawArgs.property_id || rawArgs.property_name || "").trim()
+        ) {
+          return { error: "property_id eller property_name krävs" };
+        }
+
+        const payload = { ...rawArgs, source: "jarvis_chat" };
         const row: Record<string, unknown> = {
           organization_id: orgId,
           action_type: actionType,
@@ -535,7 +696,7 @@ export async function executeJarvisTool(
           stored: true,
           suggestion: inserted,
           message:
-            "Förslag sparat som utkast. Användaren måste godkänna i AI-inkorgen innan det skapas.",
+            "Förslag sparat som utkast. Användaren måste godkänna i Jarvis → Förslag innan det sparas i systemet.",
         };
       }
 

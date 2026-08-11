@@ -56,6 +56,32 @@ function resolveQuarterAndDueDate(
   return { quarter: quarter || null, dueDate: null };
 }
 
+async function resolvePropertyId(
+  supabase: ReturnType<typeof createClient>,
+  orgId: string,
+  payload: Record<string, unknown>,
+): Promise<string | null> {
+  if (payload.property_id) return String(payload.property_id);
+  if (payload.property_name) {
+    const { data } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('organization_id', orgId)
+      .ilike('name', `%${String(payload.property_name)}%`)
+      .limit(1)
+      .maybeSingle();
+    if (data?.id) return data.id;
+  }
+  return null;
+}
+
+function generateProjectNumber(propertyNumber?: string | null): string {
+  const base = (propertyNumber || 'PRJ').replace(/\s+/g, '-').slice(0, 24);
+  const year = new Date().getFullYear();
+  const suffix = Math.floor(Math.random() * 900 + 100);
+  return `${base}-${year}-${suffix}`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -283,118 +309,301 @@ serve(async (req) => {
         }
 
         case 'create_todo': {
-          let propertyId = action.payload.property_id;
-          
+          const payload = (action.payload || {}) as Record<string, unknown>;
+          let propertyId = await resolvePropertyId(supabase, orgId, payload);
+
           if (!propertyId) {
             const { data: properties } = await supabase
               .from('properties')
               .select('id')
               .eq('organization_id', orgId)
               .limit(1);
-            
-            if (properties && properties.length > 0) {
-              propertyId = properties[0].id;
-            }
+            propertyId = properties?.[0]?.id ?? null;
+          }
+
+          if (!propertyId) {
+            throw new Error('Ingen fastighet hittades för att-göra');
           }
 
           const { data: todo, error: todoError } = await supabase
             .from('property_todos')
             .insert({
               property_id: propertyId,
-              title: action.payload.title || 'AI-föreslagen uppgift',
-              description: action.payload.description || action.reasoning || null,
-              due_date: action.payload.due_date || null,
-              priority: action.payload.priority || 'medium',
+              title: (payload.title as string) || 'Jarvis-föreslagen uppgift',
+              description:
+                (payload.description as string) ||
+                (action.reasoning as string) ||
+                null,
+              due_date: (payload.due_date as string) || null,
+              priority: (payload.priority as string) || 'medium',
               completed: false,
             })
             .select()
             .single();
 
           if (todoError) throw todoError;
-          result = { todo_id: todo.id };
-          console.log('Created todo:', todo.id);
+          result = { todo_id: todo.id, property_id: propertyId };
           break;
         }
 
         case 'schedule_maintenance': {
-          // For now, create a work order for maintenance
-          let propertyId = action.payload.property_id;
-          
+          const payload = (action.payload || {}) as Record<string, unknown>;
+          let propertyId = await resolvePropertyId(supabase, orgId, payload);
           if (!propertyId) {
             const { data: properties } = await supabase
               .from('properties')
               .select('id')
               .eq('organization_id', orgId)
               .limit(1);
-            
-            if (properties && properties.length > 0) {
-              propertyId = properties[0].id;
-            }
+            propertyId = properties?.[0]?.id ?? null;
           }
+          if (!propertyId) throw new Error('Ingen fastighet för underhåll');
 
           const { data: workOrder, error: woError } = await supabase
             .from('work_orders')
             .insert({
               property_id: propertyId,
-              action: `Schemalagt underhåll: ${action.payload.maintenance_type || 'Allmänt underhåll'}`,
+              action: `Schemalagt underhåll: ${payload.maintenance_type || 'Allmänt underhåll'}`,
               priority: 'medium',
               status: 'not_started',
-              comments: `AI-föreslagen underhållsåtgärd: ${action.reasoning || 'Ingen motivering'}`,
-              due_date: action.payload.suggested_date || null,
+              comments: `Jarvis: ${action.reasoning || 'Ingen motivering'}`,
+              due_date: (payload.suggested_date as string) || null,
             })
             .select()
             .single();
 
           if (woError) throw woError;
-          result = { work_order_id: workOrder.id };
-          console.log('Created maintenance work order:', workOrder.id);
+          result = { work_order_id: workOrder.id, property_id: propertyId };
           break;
         }
 
         case 'create_project': {
-          let propertyId = action.payload.property_id;
-          
+          const payload = (action.payload || {}) as Record<string, unknown>;
+          let propertyId = await resolvePropertyId(supabase, orgId, payload);
           if (!propertyId) {
-            const { data: properties } = await supabase
-              .from('properties')
-              .select('id')
-              .eq('organization_id', orgId)
-              .limit(1);
-            
-            if (properties && properties.length > 0) {
-              propertyId = properties[0].id;
-            }
+            throw new Error(
+              'Ange fastighet (property_name/property_id) för att skapa projekt',
+            );
           }
 
-          if (!propertyId) {
-            throw new Error('Ingen fastighet hittades för att skapa projektet');
+          // Ensure property belongs to org
+          const { data: prop } = await supabase
+            .from('properties')
+            .select('id, property_number, organization_id')
+            .eq('id', propertyId)
+            .maybeSingle();
+          if (!prop || prop.organization_id !== orgId) {
+            throw new Error('Fastigheten tillhör inte organisationen');
           }
 
           const currentYear = new Date().getFullYear();
           const currentQuarter = Math.ceil((new Date().getMonth() + 1) / 3);
+          const projectType = (['investering', 'underhall', 'energi', 'annat'] as const).includes(
+            payload.type as 'investering',
+          )
+            ? (payload.type as string)
+            : 'underhall';
+
+          const projectNumber =
+            String(payload.project_number || '').trim() ||
+            generateProjectNumber(prop.property_number);
+
+          const budgetRaw = payload.budget;
+          const budget =
+            budgetRaw != null && !Number.isNaN(Number(budgetRaw))
+              ? Number(budgetRaw)
+              : null;
 
           const { data: project, error: projError } = await supabase
             .from('projects')
             .insert({
               property_id: propertyId,
-              name: action.payload.name || action.payload.title || 'AI-föreslaget projekt',
-              description: action.payload.description || action.reasoning || null,
+              name:
+                (payload.name as string) ||
+                (payload.title as string) ||
+                'Jarvis-föreslaget projekt',
+              description:
+                (payload.description as string) ||
+                (action.reasoning as string) ||
+                null,
               status: 'planerat',
-              year: action.payload.year || currentYear,
-              start_quarter: action.payload.start_quarter || currentQuarter,
+              type: projectType,
+              project_number: projectNumber,
+              year: Number(payload.year) || currentYear,
+              start_quarter: Number(payload.start_quarter) || currentQuarter,
+              budget,
+              created_by: userId,
             })
             .select()
             .single();
 
           if (projError) throw projError;
-          result = { project_id: project.id };
-          console.log('Created project:', project.id);
+          result = {
+            project_id: project.id,
+            project_number: project.project_number,
+            property_id: propertyId,
+          };
+          break;
+        }
+
+        case 'create_property_note': {
+          const payload = (action.payload || {}) as Record<string, unknown>;
+          const propertyId = await resolvePropertyId(supabase, orgId, payload);
+          if (!propertyId) {
+            throw new Error('Ange fastighet för anteckningen');
+          }
+          const content = String(payload.content || '').trim();
+          if (!content) throw new Error('Anteckningstext saknas');
+
+          const { data: prop } = await supabase
+            .from('properties')
+            .select('id, organization_id')
+            .eq('id', propertyId)
+            .maybeSingle();
+          if (!prop || prop.organization_id !== orgId) {
+            throw new Error('Fastigheten tillhör inte organisationen');
+          }
+
+          const { data: note, error: noteError } = await supabase
+            .from('property_notes')
+            .insert({
+              property_id: propertyId,
+              content,
+            })
+            .select()
+            .single();
+
+          if (noteError) throw noteError;
+          result = { note_id: note.id, property_id: propertyId };
+          break;
+        }
+
+        case 'update_property_invoice_address': {
+          const payload = (action.payload || {}) as Record<string, unknown>;
+          const propertyId = await resolvePropertyId(supabase, orgId, payload);
+          if (!propertyId) {
+            throw new Error('Ange fastighet för fakturaadress');
+          }
+          const invoiceAddress = String(payload.invoice_address || '').trim();
+          if (!invoiceAddress) throw new Error('invoice_address saknas');
+
+          const { data: prop } = await supabase
+            .from('properties')
+            .select('id, organization_id, name')
+            .eq('id', propertyId)
+            .maybeSingle();
+          if (!prop || prop.organization_id !== orgId) {
+            throw new Error('Fastigheten tillhör inte organisationen');
+          }
+
+          const { data: updated, error: upErr } = await supabase
+            .from('properties')
+            .update({ invoice_address: invoiceAddress })
+            .eq('id', propertyId)
+            .select('id, name, invoice_address')
+            .single();
+
+          if (upErr) throw upErr;
+          result = {
+            property_id: updated.id,
+            property_name: updated.name,
+            invoice_address: updated.invoice_address,
+          };
+          break;
+        }
+
+        case 'create_property': {
+          const payload = (action.payload || {}) as Record<string, unknown>;
+          const name = String(payload.name || '').trim();
+          if (!name) throw new Error('Fastighetsnamn krävs');
+
+          const insert: Record<string, unknown> = {
+            name,
+            organization_id: orgId,
+            owner_id: userId,
+            address: (payload.address as string) || null,
+            property_number: (payload.property_number as string) || null,
+            property_type: (payload.property_type as string) || null,
+            invoice_address: (payload.invoice_address as string) || null,
+            description: (payload.description as string) || null,
+          };
+          if (payload.construction_year != null) {
+            insert.construction_year = Number(payload.construction_year);
+          }
+          if (payload.area_sqm != null) {
+            insert.area_sqm = Number(payload.area_sqm);
+          }
+
+          const { data: created, error: cErr } = await supabase
+            .from('properties')
+            .insert(insert)
+            .select('id, name, address, invoice_address')
+            .single();
+
+          if (cErr) throw cErr;
+          result = {
+            property_id: created.id,
+            name: created.name,
+            address: created.address,
+            invoice_address: created.invoice_address,
+          };
+          break;
+        }
+
+        case 'update_property': {
+          const payload = (action.payload || {}) as Record<string, unknown>;
+          const propertyId = await resolvePropertyId(supabase, orgId, payload);
+          if (!propertyId) {
+            throw new Error('Ange fastighet att uppdatera');
+          }
+
+          const { data: prop } = await supabase
+            .from('properties')
+            .select('id, organization_id')
+            .eq('id', propertyId)
+            .maybeSingle();
+          if (!prop || prop.organization_id !== orgId) {
+            throw new Error('Fastigheten tillhör inte organisationen');
+          }
+
+          const patch: Record<string, unknown> = {};
+          for (const key of [
+            'name',
+            'address',
+            'property_number',
+            'property_type',
+            'invoice_address',
+            'description',
+          ] as const) {
+            if (payload[key] != null && String(payload[key]).trim() !== '') {
+              patch[key] = payload[key];
+            }
+          }
+          if (payload.construction_year != null) {
+            patch.construction_year = Number(payload.construction_year);
+          }
+          if (payload.area_sqm != null) {
+            patch.area_sqm = Number(payload.area_sqm);
+          }
+
+          if (Object.keys(patch).length === 0) {
+            throw new Error('Inga fält att uppdatera');
+          }
+
+          const { data: updated, error: upErr } = await supabase
+            .from('properties')
+            .update(patch)
+            .eq('id', propertyId)
+            .select('id, name, address, invoice_address, property_number')
+            .single();
+
+          if (upErr) throw upErr;
+          result = { property_id: updated.id, updated: updated };
           break;
         }
 
         case 'send_reminder':
         case 'update_component_status':
-          // These require more complex implementation
           result = { message: 'Denna åtgärdstyp stöds inte ännu' };
           break;
 
