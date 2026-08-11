@@ -30,8 +30,7 @@ export const BottomNavigation = () => {
 
   const allSecondaryNavItems = [
     { path: '/projects', label: 'Projekt', moduleName: 'projects' as ModuleName },
-    { path: '/ai-chat', label: 'AI Assistent', moduleName: 'ai-chat' as ModuleName },
-    { path: '/agent', label: 'Agent-aktivitet', moduleName: 'ai-chat' as ModuleName },
+    { path: '/jarvis', label: 'Jarvis', moduleName: 'ai-chat' as ModuleName },
     { path: '/user/settings', label: 'Mina inställningar', moduleName: 'dashboard' as ModuleName },
   ];
 

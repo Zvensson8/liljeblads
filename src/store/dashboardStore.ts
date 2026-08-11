@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+/**
+ * Slim dashboard: only three KPIs are product-facing.
+ * Store kept for any residual layout prefs; customizer is retired.
+ */
 interface DashboardLayout {
   i: string;
   x: number;
@@ -12,7 +16,7 @@ interface DashboardLayout {
 interface DashboardWidget {
   id: string;
   type: string;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
 }
 
 interface DashboardState {
@@ -28,17 +32,15 @@ interface DashboardState {
 }
 
 const defaultLayout: DashboardLayout[] = [
-  { i: 'kpi-properties', x: 0, y: 0, w: 3, h: 2 },
-  { i: 'kpi-workorders', x: 3, y: 0, w: 3, h: 2 },
-  { i: 'kpi-projects', x: 6, y: 0, w: 3, h: 2 },
-  { i: 'kpi-todos', x: 9, y: 0, w: 3, h: 2 },
+  { i: 'kpi-properties', x: 0, y: 0, w: 4, h: 2 },
+  { i: 'kpi-workorders', x: 4, y: 0, w: 4, h: 2 },
+  { i: 'kpi-projects', x: 8, y: 0, w: 4, h: 2 },
 ];
 
 const defaultWidgets: DashboardWidget[] = [
   { id: 'kpi-properties', type: 'kpi-card', config: { metric: 'properties' } },
   { id: 'kpi-workorders', type: 'kpi-card', config: { metric: 'workorders' } },
   { id: 'kpi-projects', type: 'kpi-card', config: { metric: 'projects' } },
-  { id: 'kpi-todos', type: 'kpi-card', config: { metric: 'todos' } },
 ];
 
 export const useDashboardStore = create<DashboardState>()(
@@ -67,7 +69,7 @@ export const useDashboardStore = create<DashboardState>()(
         set({ layout: defaultLayout, widgets: defaultWidgets }),
     }),
     {
-      name: 'dashboard-storage',
+      name: 'dashboard-storage-v2',
     }
   )
 );

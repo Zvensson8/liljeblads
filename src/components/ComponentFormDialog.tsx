@@ -181,28 +181,13 @@ export const ComponentFormDialog = ({
       } else {
         // Create new component
         const newComponent = await createComponent.mutateAsync(componentData);
-
-        // Save canvas position if provided (no domain service yet for geometry)
-        if (newComponent && canvasPosition) {
-          const { error: geometryError } = await supabase
-            .from('component_geometry')
-            .insert({
-              component_id: newComponent.id,
-              x: canvasPosition.x,
-              y: canvasPosition.y,
-            });
-
-          if (geometryError) {
-            console.error('Error saving geometry:', geometryError);
-          }
-        }
+        void canvasPosition; // canvas placement retired
 
         toast({
           title: 'Komponent skapad!',
-          description: `${designation} har lagts till. Koppla till driftuppgifter nedan.`,
+          description: `${designation} har lagts till.`,
         });
 
-        // Show service plan section for linking to drift tasks
         setNewComponentId(newComponent?.id || null);
         setShowServicePlan(true);
         setLoading(false);

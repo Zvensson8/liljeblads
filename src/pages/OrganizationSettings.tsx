@@ -14,7 +14,6 @@ import { OrganizationMembers } from "@/components/organization/OrganizationMembe
 import { OrganizationBranding } from "@/components/organization/OrganizationBranding";
 import { OrganizationInvitations } from "@/components/organization/OrganizationInvitations";
 import { ProjectTemplates } from "@/components/organization/ProjectTemplates";
-import { OrganizationModuleAccess } from "@/components/organization/OrganizationModuleAccess";
 import { OrganizationApiKeys } from "@/components/organization/OrganizationApiKeys";
 import { AgentRiskPolicySettings } from "@/components/organization/AgentRiskPolicySettings";
 import { OrganizationUnitPrices } from "@/components/organization/OrganizationUnitPrices";
@@ -281,7 +280,6 @@ export default function OrganizationSettings() {
               <TabsList className="flex flex-wrap">
                 <TabsTrigger value="info">Information</TabsTrigger>
                 <TabsTrigger value="members">Medlemmar</TabsTrigger>
-                {isAdmin && <TabsTrigger value="module-access">Modulåtkomst</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="integrations">Integrationer</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="agent">Agent & risk</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="unit-prices">Áprislista</TabsTrigger>}
@@ -305,12 +303,6 @@ export default function OrganizationSettings() {
                   currentUserId={user?.id || ""}
                 />
               </TabsContent>
-
-              {isAdmin && (
-                <TabsContent value="module-access">
-                  <OrganizationModuleAccess />
-                </TabsContent>
-              )}
 
               {isAdmin && (
                 <TabsContent value="integrations">

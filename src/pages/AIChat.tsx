@@ -38,7 +38,7 @@ const suggestedQuestions = [
   "Skriv utkast till beställning för senaste arbetsordern",
 ];
 
-export default function AIChat() {
+export default function AIChat({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -347,12 +347,10 @@ export default function AIChat() {
     </div>
   );
 
-  return (
-    <SidebarProvider>
-      <div className="h-screen flex w-full bg-background overflow-hidden">
-        <AppSidebar />
-        <main className="flex-1 flex flex-col min-h-0">
-          {/* Header */}
+  const chatBody = (
+        <main className={cn("flex-1 flex flex-col min-h-0", embedded && "h-full")}>
+          {/* Header — hidden when embedded in Jarvis shell */}
+          {!embedded && (
           <header className="h-14 border-b flex items-center justify-between px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
@@ -371,12 +369,25 @@ export default function AIChat() {
                   <Bot className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <h1 className="font-semibold">AI Assistent</h1>
-                  <p className="text-xs text-muted-foreground hidden sm:block">Med kunskapsbas (ABT06, branschstandarder)</p>
+                  <h1 className="font-semibold">Jarvis</h1>
+                  <p className="text-xs text-muted-foreground hidden sm:block">Fråga och agera i systemet</p>
                 </div>
               </div>
             </div>
           </header>
+          )}
+          {(embedded || isMobile) && isMobile && (
+            <div className="border-b px-2 py-1 flex items-center">
+              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm"><Menu className="h-4 w-4 mr-2" /> Konversationer</Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-72 p-0">
+                  {conversationListContent}
+                </SheetContent>
+              </Sheet>
+            </div>
+          )}
 
           <div className="flex-1 flex overflow-hidden">
             {/* Desktop conversation sidebar */}
@@ -512,6 +523,17 @@ export default function AIChat() {
             </div>
           </div>
         </main>
+  );
+
+  if (embedded) {
+    return <div className="h-full min-h-[60vh] flex flex-col bg-background">{chatBody}</div>;
+  }
+
+  return (
+    <SidebarProvider>
+      <div className="h-screen flex w-full bg-background overflow-hidden">
+        <AppSidebar />
+        {chatBody}
       </div>
     </SidebarProvider>
   );

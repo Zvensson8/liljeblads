@@ -61,7 +61,7 @@ function statusVariant(
   return 'outline';
 }
 
-export default function AgentActivity() {
+export default function AgentActivity({ embedded = false }: { embedded?: boolean }) {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -191,30 +191,19 @@ export default function AgentActivity() {
 
   const recent = actions.slice(0, 40);
 
-  return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
-        <AppSidebar />
-        <SidebarInset className="flex-1 w-full">
-          <header className="sticky top-0 z-10 flex h-14 md:h-16 items-center gap-2 md:gap-4 border-b border-border bg-background/95 backdrop-blur px-4 md:px-6">
-            <SidebarTrigger className="hidden md:flex" />
-            <div className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              <h1 className="text-lg md:text-xl font-semibold">Agent-aktivitet</h1>
-            </div>
-          </header>
-
-          <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
-            <div className="max-w-6xl mx-auto space-y-6">
+  const body = (
+            <div className="max-w-6xl mx-auto space-y-6 p-4 md:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <p className="text-muted-foreground text-sm">
-                  Översikt senaste 30 dagarna: föreslaget → godkänt → utfört
+                  Jarvis-förslag senaste 30 dagarna: föreslaget → godkänt → utfört
                 </p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => navigate('/ai-chat')}>
-                    <Bot className="h-4 w-4 mr-1" />
-                    AI-chat
-                  </Button>
+                  {!embedded && (
+                    <Button variant="outline" size="sm" onClick={() => navigate('/jarvis?tab=chat')}>
+                      <Bot className="h-4 w-4 mr-1" />
+                      Jarvis-chat
+                    </Button>
+                  )}
                   {isFounder && (
                     <Button
                       variant="outline"
@@ -433,7 +422,25 @@ export default function AgentActivity() {
                 </CardContent>
               </Card>
             </div>
-          </main>
+  );
+
+  if (embedded) {
+    return <div className="h-full overflow-y-auto bg-background">{body}</div>;
+  }
+
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background">
+        <AppSidebar />
+        <SidebarInset className="flex-1 w-full">
+          <header className="sticky top-0 z-10 flex h-14 md:h-16 items-center gap-2 md:gap-4 border-b border-border bg-background/95 backdrop-blur px-4 md:px-6">
+            <SidebarTrigger className="hidden md:flex" />
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              <h1 className="text-lg md:text-xl font-semibold">Jarvis-förslag</h1>
+            </div>
+          </header>
+          <main className="flex-1 pb-20 md:pb-6">{body}</main>
         </SidebarInset>
       </div>
     </SidebarProvider>

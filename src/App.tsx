@@ -35,8 +35,7 @@ const OrganizationSettings = lazy(() => import("./pages/OrganizationSettings"));
 const UserSettings = lazy(() => import("./pages/UserSettings"));
 const FounderAdmin = lazy(() => import("./pages/FounderAdmin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const AIChat = lazy(() => import("./pages/AIChat"));
-const AgentActivity = lazy(() => import("./pages/AgentActivity"));
+const Jarvis = lazy(() => import("./pages/Jarvis"));
 const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
 
 // Loading component
@@ -80,8 +79,9 @@ const AppContent = () => {
           <Route path="/work-orders" element={<ProtectedRoute><WorkOrders /></ProtectedRoute>} />
           <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
           <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
-          <Route path="/ai-chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />
-          <Route path="/agent" element={<ProtectedRoute><AgentActivity /></ProtectedRoute>} />
+          <Route path="/jarvis" element={<ProtectedRoute><Jarvis /></ProtectedRoute>} />
+          <Route path="/ai-chat" element={<Navigate to="/jarvis?tab=chat" replace />} />
+          <Route path="/agent" element={<Navigate to="/jarvis?tab=actions" replace />} />
           <Route path="/users" element={<ProtectedRoute><RequireFounder><Users /></RequireFounder></ProtectedRoute>} />
           <Route path="/user/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
           <Route path="/organization/settings" element={<ProtectedRoute><RequireFounder><OrganizationSettings /></RequireFounder></ProtectedRoute>} />

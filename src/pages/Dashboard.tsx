@@ -11,7 +11,6 @@ import {
   Building2,
   Wrench,
   FolderKanban,
-  CheckSquare,
   Loader2,
   TrendingUp,
   Map as MapIcon,
@@ -21,12 +20,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AttentionRequiredSection } from '@/components/AttentionRequiredSection';
 import { RecentlyVisitedWidget } from '@/components/RecentlyVisitedWidget';
-import { TodoWidget } from '@/components/TodoWidget';
-import { DashboardCustomizer } from '@/components/dashboard/DashboardCustomizer';
 import { PropertyMapDialog } from '@/components/maps/PropertyMapDialog';
-import { DashboardGrid } from '@/components/dashboard/DashboardGrid';
-import { EmbeddingStatsWidget } from '@/components/dashboard/EmbeddingStatsWidget';
-import { MyTasksTodayWidget } from '@/components/dashboard/MyTasksTodayWidget';
+import { KPIWidget } from '@/components/dashboard/widgets/KPIWidget';
 
 interface RecentWorkOrder {
   id: string;
@@ -72,13 +67,10 @@ const Dashboard = () => {
   const stats = useMemo(
     () => ({
       totalProperties: selectedProperty === 'all' ? properties.length : 1,
-      totalWorkOrders: dashboardData?.total_work_orders ?? 0,
+      /** Aktiva WO = pågående (ej slutförda/arkiverade) från RPC */
+      activeWorkOrders: dashboardData?.pending_work_orders ?? 0,
       totalProjects: dashboardData?.total_projects ?? 0,
-      totalTodos: dashboardData?.total_todos ?? 0,
-      pendingTodos: dashboardData?.pending_todos ?? 0,
-      pendingWorkOrders: dashboardData?.pending_work_orders ?? 0,
       activeProjects: dashboardData?.active_projects ?? 0,
-      completedTodos: dashboardData?.completed_todos ?? 0,
     }),
     [dashboardData, properties.length, selectedProperty],
   );
@@ -145,43 +137,29 @@ const Dashboard = () => {
 
   const kpiCards = [
     {
-      id: 'kpi-properties',
       title: 'Fastigheter',
       value: stats.totalProperties,
       icon: Building2,
-      description: selectedProperty === 'all' ? 'Alla fastigheter' : 'Vald fastighet',
+      description: selectedProperty === 'all' ? 'Antal fastigheter' : 'Vald fastighet',
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/10',
     },
     {
-      id: 'kpi-workorders',
-      title: 'Arbetsordrar',
-      value: stats.totalWorkOrders,
-      subtitle: `${stats.pendingWorkOrders} pågående`,
+      title: 'Aktiva arbetsordrar',
+      value: stats.activeWorkOrders,
       icon: Wrench,
-      description: 'Totalt antal arbetsordrar',
+      description: 'Ej slutförda / pågående',
       color: 'text-orange-500',
       bgColor: 'bg-orange-500/10',
     },
     {
-      id: 'kpi-projects',
       title: 'Projekt',
       value: stats.totalProjects,
-      subtitle: `${stats.activeProjects} aktiva`,
+      subtitle: stats.activeProjects > 0 ? `${stats.activeProjects} aktiva` : undefined,
       icon: FolderKanban,
-      description: 'Totalt antal projekt',
+      description: 'Antal projekt',
       color: 'text-purple-500',
       bgColor: 'bg-purple-500/10',
-    },
-    {
-      id: 'kpi-todos',
-      title: 'Att göra',
-      value: stats.pendingTodos,
-      subtitle: `${stats.completedTodos} klara`,
-      icon: CheckSquare,
-      description: 'Öppna uppgifter',
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10',
     },
   ];
 
@@ -204,7 +182,6 @@ const Dashboard = () => {
               <Button variant="outline" size="icon" className="sm:hidden" onClick={() => setMapDialogOpen(true)}>
                 <MapIcon className="h-4 w-4" />
               </Button>
-              <DashboardCustomizer />
             </div>
           </header>
 
@@ -216,7 +193,7 @@ const Dashboard = () => {
                     Välkommen till {organization?.name || 'Liljeblads'}
                   </h2>
                   <p className="text-muted-foreground">
-                    Sammanställning av {organization?.name ? 'organisationens' : 'dina'} fastigheter och uppgifter
+                    Översikt — fastigheter, aktiva arbetsordrar och projekt
                   </p>
                 </div>
                 <div className="w-full sm:w-64">
@@ -240,11 +217,11 @@ const Dashboard = () => {
                 propertyId={selectedProperty === 'all' ? undefined : selectedProperty}
               />
 
-              <DashboardGrid kpiCards={kpiCards} />
-
-              <MyTasksTodayWidget />
-
-              <TodoWidget propertyId={selectedProperty === 'all' ? undefined : selectedProperty} />
+              <div className="grid gap-4 sm:grid-cols-3">
+                {kpiCards.map((kpi) => (
+                  <KPIWidget key={kpi.title} {...kpi} />
+                ))}
+              </div>
 
               <div className="grid gap-6 md:grid-cols-2">
                 <Card className="border-border/50">
@@ -333,7 +310,6 @@ const Dashboard = () => {
                 </Card>
               </div>
 
-              <EmbeddingStatsWidget />
               <RecentlyVisitedWidget />
             </div>
           </main>

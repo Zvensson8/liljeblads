@@ -50,7 +50,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
       { id: 'nav-workorders', label: 'Gå till Arbetsordrar', icon: Wrench, run: () => navigate('/work-orders') },
       { id: 'nav-projects', label: 'Gå till Projekt', icon: FolderKanban, run: () => navigate('/projects') },
       { id: 'nav-components', label: 'Gå till Komponenter', icon: Wrench, run: () => navigate('/components') },
-      { id: 'nav-ai', label: 'Gå till AI Assistent', icon: Bot, run: () => navigate('/ai-chat') },
+      { id: 'nav-ai', label: 'Gå till Jarvis', icon: Bot, run: () => navigate('/jarvis') },
       { id: 'new-property', label: 'Ny fastighet', icon: Plus, run: () => navigate('/properties?new=1') },
       { id: 'new-workorder', label: 'Ny arbetsorder', icon: Plus, run: () => navigate('/work-orders?new=1') },
       { id: 'export-properties', label: 'Exportera fastighetslista (XLSX)', icon: FileDown, run: () => navigate('/properties?export=xlsx') },

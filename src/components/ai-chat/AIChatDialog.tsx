@@ -114,7 +114,7 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
             <Bot className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold text-sm">AI Assistent</h3>
+            <h3 className="font-semibold text-sm">Jarvis</h3>
             <p className="text-xs text-muted-foreground">Fråga mig vad som helst</p>
           </div>
         </div>
