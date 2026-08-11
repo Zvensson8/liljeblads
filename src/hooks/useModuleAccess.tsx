@@ -8,18 +8,15 @@ export type ModuleName =
   | "components"
   | "work-orders"
   | "projects"
-  | "users"
-  | "organization"
   | "ai-chat";
 
+/** Modules exposed in product UI (org/users are founder routes, not modules) */
 const ALL_MODULES: ModuleName[] = [
   "dashboard",
   "properties",
   "components",
   "work-orders",
   "projects",
-  "users",
-  "organization",
   "ai-chat",
 ];
 
@@ -30,9 +27,7 @@ const DEFAULT_MODULES: ModuleName[] = [
   "components",
   "work-orders",
   "projects",
-  "organization",
   "ai-chat",
-  // "users" intentionally excluded from default — admin-managed
 ];
 
 export const useModuleAccess = () => {

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrganization } from '@/hooks/useOrganization';
+import { useIsFounder } from '@/hooks/useUserRoles';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays } from 'date-fns';
 import { sv } from 'date-fns/locale';
@@ -65,6 +66,7 @@ export default function AgentActivity() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { organization } = useOrganization();
+  const { isFounder } = useIsFounder();
   const orgId = organization?.id;
   const { data: policy } = useAgentPolicy(orgId);
   const updateAction = useUpdateAISuggestedAction();
@@ -213,13 +215,15 @@ export default function AgentActivity() {
                     <Bot className="h-4 w-4 mr-1" />
                     AI-chat
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate('/organization/settings')}
-                  >
-                    Policy
-                  </Button>
+                  {isFounder && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate('/organization/settings')}
+                    >
+                      Policy
+                    </Button>
+                  )}
                 </div>
               </div>
 

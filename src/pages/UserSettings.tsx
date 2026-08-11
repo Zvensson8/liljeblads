@@ -8,6 +8,7 @@ import { User } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { NotificationSettings } from "@/components/organization/NotificationSettings";
+import { PrivacySettings } from "@/components/user/PrivacySettings";
 
 export default function UserSettings() {
   const { user } = useAuth();
@@ -65,10 +66,14 @@ export default function UserSettings() {
               <Tabs defaultValue="notifications" className="space-y-4">
                 <TabsList>
                   <TabsTrigger value="notifications">Rapporter & Notifikationer</TabsTrigger>
+                  <TabsTrigger value="privacy">Integritet</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="notifications">
                   <NotificationSettings />
+                </TabsContent>
+                <TabsContent value="privacy">
+                  <PrivacySettings />
                 </TabsContent>
               </Tabs>
             </div>

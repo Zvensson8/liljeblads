@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
 
       let cq = supabase
         .from("components")
-        .select("id, name, type, manufacturer, model, serial_number, registration_number, aff_code, room_zone, property_id, floor_id, status, next_service_date")
+        .select("id, name, type, manufacturer, model, serial_number, registration_number, aff_code, room_zone, property_id, status, next_service_date")
         .in("property_id", propIds)
         .limit(limit);
 

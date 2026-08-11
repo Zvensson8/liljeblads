@@ -1,7 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Building2, Wrench, FolderKanban, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Sheet,
   SheetContent,
@@ -11,12 +10,14 @@ import {
 } from '@/components/ui/sheet';
 import { useState } from 'react';
 import { useModuleAccess, ModuleName } from '@/hooks/useModuleAccess';
+import { useIsFounder } from '@/hooks/useUserRoles';
 
 export const BottomNavigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const { hasModuleAccess } = useModuleAccess();
+  const { isFounder } = useIsFounder();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -31,12 +32,21 @@ export const BottomNavigation = () => {
     { path: '/projects', label: 'Projekt', moduleName: 'projects' as ModuleName },
     { path: '/ai-chat', label: 'AI Assistent', moduleName: 'ai-chat' as ModuleName },
     { path: '/agent', label: 'Agent-aktivitet', moduleName: 'ai-chat' as ModuleName },
-    { path: '/organization/settings', label: 'Inställningar', moduleName: 'organization' as ModuleName },
+    { path: '/user/settings', label: 'Mina inställningar', moduleName: 'dashboard' as ModuleName },
   ];
 
-  // Filter based on module access
-  const primaryNavItems = allPrimaryNavItems.filter(item => hasModuleAccess(item.moduleName));
-  const secondaryNavItems = allSecondaryNavItems.filter(item => hasModuleAccess(item.moduleName));
+  const founderSecondary = [
+    { path: '/organization/settings', label: 'Organisation' },
+    { path: '/users', label: 'Användare' },
+    { path: '/founder/admin', label: 'Admin Panel' },
+  ];
+
+  const primaryNavItems = allPrimaryNavItems.filter((item) =>
+    hasModuleAccess(item.moduleName),
+  );
+  const secondaryNavItems = allSecondaryNavItems.filter((item) =>
+    hasModuleAccess(item.moduleName),
+  );
 
   return (
     <>
@@ -56,7 +66,7 @@ export const BottomNavigation = () => {
               <span className="text-xs font-medium">{item.label}</span>
             </button>
           ))}
-          
+
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
               <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground transition-colors">
@@ -82,12 +92,25 @@ export const BottomNavigation = () => {
                     {item.label}
                   </Button>
                 ))}
+                {isFounder &&
+                  founderSecondary.map((item) => (
+                    <Button
+                      key={item.path}
+                      variant={isActive(item.path) ? 'secondary' : 'ghost'}
+                      className="w-full justify-start h-12"
+                      onClick={() => {
+                        navigate(item.path);
+                        setSheetOpen(false);
+                      }}
+                    >
+                      {item.label}
+                    </Button>
+                  ))}
               </div>
             </SheetContent>
           </Sheet>
         </div>
       </nav>
-      {/* Spacer to prevent content from being hidden behind bottom nav */}
       <div className="h-16 md:hidden" />
     </>
   );

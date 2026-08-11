@@ -58,7 +58,6 @@ export interface AISearchResponse {
     work_orders: AISearchResult[];
     projects: AISearchResult[];
     property_todos: AISearchResult[];
-    drift_tasks: AISearchResult[];
     maintenance_history: AISearchResult[];
   };
 }

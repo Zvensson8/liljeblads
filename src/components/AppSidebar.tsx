@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { useModuleAccess, ModuleName } from "@/hooks/useModuleAccess";
-import { useIsFounder, useIsAdmin } from "@/hooks/useUserRoles";
+import { useIsFounder } from "@/hooks/useUserRoles";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Sidebar,
@@ -24,8 +24,8 @@ import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
 import { OrganizationSwitcher } from "./organization/OrganizationSwitcher";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
-/** Slim MVP nav — operations/reports/security removed (see featureFlags). */
-const navigationItems: Array<{ title: string; url: string; icon: LucideIcon; moduleName: ModuleName; adminOnly?: boolean }> = [
+/** Product nav — Organisation & Användare only under Founder */
+const navigationItems: Array<{ title: string; url: string; icon: LucideIcon; moduleName: ModuleName }> = [
   { title: "Dashboard", url: "/dashboard", icon: Home, moduleName: "dashboard" },
   { title: "Fastigheter", url: "/properties", icon: Building2, moduleName: "properties" },
   { title: "Komponenter", url: "/components", icon: Settings, moduleName: "components" },
@@ -33,8 +33,12 @@ const navigationItems: Array<{ title: string; url: string; icon: LucideIcon; mod
   { title: "Projekthantering", url: "/projects", icon: Briefcase, moduleName: "projects" },
   { title: "AI Assistent", url: "/ai-chat", icon: Bot, moduleName: "ai-chat" },
   { title: "Agent-aktivitet", url: "/agent", icon: Activity, moduleName: "ai-chat" },
-  { title: "Användare", url: "/users", icon: Users, moduleName: "users", adminOnly: true },
-  { title: "Organisation", url: "/organization/settings", icon: Building, moduleName: "organization" },
+];
+
+const founderNavItems: Array<{ title: string; url: string; icon: LucideIcon }> = [
+  { title: "Admin Panel", url: "/founder/admin", icon: Crown },
+  { title: "Organisation", url: "/organization/settings", icon: Building },
+  { title: "Användare", url: "/users", icon: Users },
 ];
 
 export function AppSidebar() {
@@ -42,51 +46,48 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const { signOut } = useAuth();
   const { organization } = useOrganization();
-  const { hasModuleAccess, moduleAccess, isLoading: modulesLoading } = useModuleAccess();
+  const { hasModuleAccess, isLoading: modulesLoading } = useModuleAccess();
   const { isFounder, isLoading: founderLoading } = useIsFounder();
-  const { isAdmin, isLoading: adminLoading } = useIsAdmin();
   const navigate = useNavigate();
   const isCollapsed = state === "collapsed";
-  const rolesLoading = founderLoading || adminLoading || modulesLoading;
 
-  // Filter navigation items based on module access and admin/founder status
-  const visibleNavigationItems = navigationItems.filter(item => {
-    if (item.adminOnly) {
-      // While roles load, hide privileged items (fail closed) — after load, require admin/founder
-      if (rolesLoading) return false;
-      if (!isAdmin) return false;
-    }
-    // While modules load, only show non-privileged items that are always needed
-    if (modulesLoading && item.adminOnly) return false;
+  const visibleNavigationItems = navigationItems.filter((item) => {
+    if (modulesLoading) return false;
     return hasModuleAccess(item.moduleName);
   });
 
-  // Hide sidebar on mobile - use bottom navigation instead
   if (isMobile) {
     return null;
   }
 
-  // Använd organisationens namn eller fallback till NavRitning
   const appName = organization?.name || "Liljeblads";
-  const appDescription = organization?.name ? "Fastighetshantering" : "Fastighetshantering";
+  const appDescription = "Fastighetshantering";
+
+  const founderLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-sidebar-foreground ${
+      isActive
+        ? "bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium shadow-lg"
+        : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+    }`;
 
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        {/* Logo and brand */}
-        <div className={`flex items-center justify-between p-4 border-b border-border ${isCollapsed ? 'flex-col gap-2' : ''}`}>
-          <div className={`flex items-center gap-3 ${isCollapsed ? 'flex-col' : ''}`}>
+        <div
+          className={`flex items-center justify-between p-4 border-b border-border ${
+            isCollapsed ? "flex-col gap-2" : ""
+          }`}
+        >
+          <div className={`flex items-center gap-3 ${isCollapsed ? "flex-col" : ""}`}>
             {organization?.logo_url ? (
-              // Visa organisationens logga
               <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-muted">
-                <img 
-                  src={organization.logo_url} 
+                <img
+                  src={organization.logo_url}
                   alt={`${organization.name} logo`}
                   className="w-full h-full object-contain"
                 />
               </div>
             ) : (
-              // Fallback till standard ikon
               <div className="bg-gradient-to-br from-primary to-primary/70 p-2 rounded-lg">
                 <Compass className="h-6 w-6 text-primary-foreground" />
               </div>
@@ -108,7 +109,7 @@ export function AppSidebar() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="z-50">
-                  <DropdownMenuItem onClick={() => navigate('/user/settings')}>
+                  <DropdownMenuItem onClick={() => navigate("/user/settings")}>
                     <UserCog className="h-4 w-4 mr-2" />
                     Mina inställningar
                   </DropdownMenuItem>
@@ -121,9 +122,12 @@ export function AppSidebar() {
 
         <OrganizationSwitcher collapsed={isCollapsed} />
 
-        {/* Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel className={`text-muted-foreground text-xs uppercase tracking-wider ${isCollapsed ? 'sr-only' : ''}`}>
+          <SidebarGroupLabel
+            className={`text-muted-foreground text-xs uppercase tracking-wider ${
+              isCollapsed ? "sr-only" : ""
+            }`}
+          >
             Navigation
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -137,8 +141,8 @@ export function AppSidebar() {
                       className={({ isActive }) =>
                         `flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-sidebar-foreground ${
                           isActive
-                            ? 'bg-primary text-primary-foreground font-medium shadow-lg'
-                            : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                            ? "bg-primary text-primary-foreground font-medium shadow-lg"
+                            : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         }`
                       }
                     >
@@ -152,44 +156,39 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Founder Admin Section */}
-        {isFounder && (
+        {!founderLoading && isFounder && (
           <SidebarGroup>
-            <SidebarGroupLabel className={`text-muted-foreground text-xs uppercase tracking-wider ${isCollapsed ? 'sr-only' : ''}`}>
+            <SidebarGroupLabel
+              className={`text-muted-foreground text-xs uppercase tracking-wider ${
+                isCollapsed ? "sr-only" : ""
+              }`}
+            >
               Founder
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className="hover:bg-sidebar-accent">
-                    <NavLink
-                      to="/founder/admin"
-                      className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-sidebar-foreground ${
-                          isActive
-                            ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium shadow-lg'
-                            : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                        }`
-                      }
-                    >
-                      <Crown className="h-5 w-5 flex-shrink-0" />
-                      {!isCollapsed && <span>Admin Panel</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                {founderNavItems.map((item) => (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton asChild className="hover:bg-sidebar-accent">
+                      <NavLink to={item.url} className={founderLinkClass}>
+                        <item.icon className="h-5 w-5 flex-shrink-0" />
+                        {!isCollapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         )}
       </SidebarContent>
 
-      {/* Footer with sign out */}
       <SidebarFooter className="border-t border-border p-4 space-y-1">
         <ThemeToggle collapsed={isCollapsed} />
         <Button
           variant="ghost"
           onClick={signOut}
-          className={`w-full ${isCollapsed ? 'px-2' : 'justify-start'}`}
+          className={`w-full ${isCollapsed ? "px-2" : "justify-start"}`}
         >
           <LogOut className="h-5 w-5" />
           {!isCollapsed && <span className="ml-3">Logga ut</span>}

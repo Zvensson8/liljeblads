@@ -16,8 +16,6 @@ const AVAILABLE_MODULES = [
   { name: "components", label: "Komponenter" },
   { name: "work-orders", label: "Arbetsordrar" },
   { name: "projects", label: "Projekthantering" },
-  { name: "users", label: "Användare" },
-  { name: "organization", label: "Organisation" },
   { name: "ai-chat", label: "AI Assistent" },
 ];
 

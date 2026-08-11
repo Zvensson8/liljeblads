@@ -26,7 +26,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { 
-      tables = ['properties', 'components', 'work_orders', 'projects', 'property_todos', 'drift_tasks', 'maintenance_history', 'maintenance_history_documents'],
+      tables = ['properties', 'components', 'work_orders', 'projects', 'property_todos', 'maintenance_history', 'maintenance_history_documents'],
       batchSize = 100,
       organizationId,
       force = false

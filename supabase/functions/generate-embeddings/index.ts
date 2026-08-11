@@ -493,45 +493,15 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
       };
     }
 
-    case 'drift_tasks': {
-      const { data, error } = await supabase
-        .from('drift_tasks')
-        .select(`
-          name, description, quarter, year, planned_count, reported_count,
-          category:drift_categories(name),
-          property:properties(organization_id, name)
-        `)
-        .eq('id', sourceId)
-        .single();
-      
-      if (error || !data) return null;
-      
-      const parts = [
-        `Driftuppgift: ${data.name}`,
-        data.quarter ? `Kvartal: ${data.quarter}` : '',
-        data.year ? `År: ${data.year}` : '',
-        `Planerat: ${data.planned_count || 0}, Rapporterat: ${data.reported_count || 0}`,
-        data.category?.name ? `Kategori: ${data.category.name}` : '',
-        data.description ? `Beskrivning: ${data.description}` : '',
-        data.property?.name ? `Fastighet: ${data.property.name}` : ''
-      ].filter(Boolean);
-      
-      return {
-        content: parts.join('. '),
-        organizationId: data.property?.organization_id || null
-      };
-    }
-
     case 'maintenance_history': {
       const { data, error } = await supabase
         .from('maintenance_history')
         .select(`
-          action_type, notes, performed_date, cost, supplier, category, drift_task_id,
+          action_type, notes, performed_date, cost, supplier, category,
           component:components(
             name, type, registration_number,
             property:properties(organization_id, name)
-          ),
-          drift_task:drift_tasks(name, quarter, year)
+          )
         `)
         .eq('id', sourceId)
         .single();
@@ -548,7 +518,6 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
         data.supplier ? `Utförare/Leverantör: ${data.supplier}` : '',
         data.category ? `Kategori: ${data.category}` : '',
         data.notes ? `Noteringar: ${data.notes}` : '',
-        data.drift_task?.name ? `Kopplad driftuppgift: ${data.drift_task.name} (${data.drift_task.quarter} ${data.drift_task.year})` : '',
         data.component?.property?.name ? `Fastighet: ${data.component.property.name}` : '',
         `OBS: För detaljerade mätvärden och avvikelser, se tillhörande SERVICEPROTOKOLL.`
       ].filter(Boolean);
@@ -565,12 +534,11 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
         .select(`
           file_name, file_url, mime_type,
           maintenance_history:maintenance_history!inner(
-            id, action_type, performed_date, notes, supplier, cost, category, drift_task_id,
+            id, action_type, performed_date, notes, supplier, cost, category,
             component:components!inner(
               name, type, registration_number, manufacturer, model,
               property:properties!inner(organization_id, name)
-            ),
-            drift_task:drift_tasks(name, quarter, year)
+            )
           )
         `)
         .eq('id', sourceId)
@@ -599,7 +567,6 @@ async function getContentForEmbedding(supabase: any, sourceTable: string, source
         mh?.component?.manufacturer ? `Tillverkare: ${mh.component.manufacturer}` : '',
         mh?.component?.model ? `Modell: ${mh.component.model}` : '',
         mh?.supplier ? `Servicetekniker/Företag: ${mh.supplier}` : '',
-        mh?.drift_task?.name ? `Relaterad driftuppgift: ${mh.drift_task.name} (${mh.drift_task.quarter} ${mh.drift_task.year})` : '',
         mh?.component?.property?.name ? `Fastighet: ${mh.component.property.name}` : ''
       ].filter(Boolean);
       

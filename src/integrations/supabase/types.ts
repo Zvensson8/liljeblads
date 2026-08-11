@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -10,11 +10,35 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
-
       admin_settings: {
         Row: {
           created_at: string
@@ -50,6 +74,111 @@ export type Database = {
           },
           {
             foreignKeyName: "admin_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_processed_files: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          external_file_id: string
+          filename: string | null
+          id: string
+          organization_id: string
+          processed_at: string
+          source: string
+          status: string
+          summary: Json
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          external_file_id: string
+          filename?: string | null
+          id?: string
+          organization_id: string
+          processed_at?: string
+          source?: string
+          status?: string
+          summary?: Json
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          external_file_id?: string
+          filename?: string | null
+          id?: string
+          organization_id?: string
+          processed_at?: string
+          source?: string
+          status?: string
+          summary?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_processed_files_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_processed_files_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_runs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          organization_id: string | null
+          run_type: string
+          started_at: string
+          stats: Json
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id?: string | null
+          run_type?: string
+          started_at?: string
+          stats?: Json
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id?: string | null
+          run_type?: string
+          started_at?: string
+          stats?: Json
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_runs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations_public"
@@ -417,8 +546,8 @@ export type Database = {
           component_id: string
           created_at?: string
           id?: string
-          x: number
-          y: number
+          x?: number
+          y?: number
         }
         Update: {
           component_id?: string
@@ -478,6 +607,77 @@ export type Database = {
           },
         ]
       }
+      component_risk_snapshots: {
+        Row: {
+          component_id: string
+          confidence: string
+          created_at: string
+          id: string
+          metadata: Json
+          organization_id: string | null
+          recommendation: string | null
+          risk_level: string
+          risk_score: number
+          trigger_source: string
+          work_order_id: string | null
+        }
+        Insert: {
+          component_id: string
+          confidence: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          organization_id?: string | null
+          recommendation?: string | null
+          risk_level: string
+          risk_score: number
+          trigger_source?: string
+          work_order_id?: string | null
+        }
+        Update: {
+          component_id?: string
+          confidence?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          organization_id?: string | null
+          recommendation?: string | null
+          risk_level?: string
+          risk_score?: number
+          trigger_source?: string
+          work_order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "component_risk_snapshots_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "component_risk_snapshots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "component_risk_snapshots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "component_risk_snapshots_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       component_service_plans: {
         Row: {
           category_id: string
@@ -507,13 +707,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "component_service_plans_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "drift_categories"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "component_service_plans_component_id_fkey"
             columns: ["component_id"]
@@ -568,6 +761,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "component_unit_prices_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       components: {
@@ -575,7 +775,6 @@ export type Database = {
           aff_code: string | null
           cost_center: string | null
           created_at: string
-          floor_id: string | null
           id: string
           installation_year: number | null
           manufacturer: string | null
@@ -600,7 +799,6 @@ export type Database = {
           aff_code?: string | null
           cost_center?: string | null
           created_at?: string
-          floor_id?: string | null
           id?: string
           installation_year?: number | null
           manufacturer?: string | null
@@ -625,7 +823,6 @@ export type Database = {
           aff_code?: string | null
           cost_center?: string | null
           created_at?: string
-          floor_id?: string | null
           id?: string
           installation_year?: number | null
           manufacturer?: string | null
@@ -647,13 +844,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "components_floor_id_fkey"
-            columns: ["floor_id"]
-            isOneToOne: false
-            referencedRelation: "floors"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "components_property_id_fkey"
             columns: ["property_id"]
@@ -783,206 +973,6 @@ export type Database = {
         }
         Relationships: []
       }
-      drift_categories: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          parent_id: string | null
-          property_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          parent_id?: string | null
-          property_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          parent_id?: string | null
-          property_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "drift_categories_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "drift_categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "drift_categories_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      drift_task_components: {
-        Row: {
-          auto_detected_from: string | null
-          component_id: string | null
-          created_at: string
-          id: string
-          is_reported: boolean
-          manually_edited: boolean | null
-          object_name: string | null
-          registration_number: string | null
-          series_id: string | null
-          task_id: string
-        }
-        Insert: {
-          auto_detected_from?: string | null
-          component_id?: string | null
-          created_at?: string
-          id?: string
-          is_reported?: boolean
-          manually_edited?: boolean | null
-          object_name?: string | null
-          registration_number?: string | null
-          series_id?: string | null
-          task_id: string
-        }
-        Update: {
-          auto_detected_from?: string | null
-          component_id?: string | null
-          created_at?: string
-          id?: string
-          is_reported?: boolean
-          manually_edited?: boolean | null
-          object_name?: string | null
-          registration_number?: string | null
-          series_id?: string | null
-          task_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "drift_task_components_component_id_fkey"
-            columns: ["component_id"]
-            isOneToOne: false
-            referencedRelation: "components"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "drift_task_components_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "drift_tasks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      drift_task_templates: {
-        Row: {
-          category_id: string | null
-          created_at: string | null
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          planned_count: number | null
-          quarters: string[] | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          category_id?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          planned_count?: number | null
-          quarters?: string[] | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          category_id?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          planned_count?: number | null
-          quarters?: string[] | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "drift_task_templates_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "drift_categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      drift_tasks: {
-        Row: {
-          category_id: string | null
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          planned_count: number
-          property_id: string
-          quarter: Database["public"]["Enums"]["quarter_type"]
-          reported_count: number
-          updated_at: string
-          year: number
-        }
-        Insert: {
-          category_id?: string | null
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-          planned_count?: number
-          property_id: string
-          quarter: Database["public"]["Enums"]["quarter_type"]
-          reported_count?: number
-          updated_at?: string
-          year: number
-        }
-        Update: {
-          category_id?: string | null
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-          planned_count?: number
-          property_id?: string
-          quarter?: Database["public"]["Enums"]["quarter_type"]
-          reported_count?: number
-          updated_at?: string
-          year?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "drift_tasks_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "drift_categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "drift_tasks_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       embedding_queue: {
         Row: {
           created_at: string
@@ -1094,44 +1084,6 @@ export type Database = {
           },
         ]
       }
-      floors: {
-        Row: {
-          created_at: string
-          drawing_url: string | null
-          id: string
-          level: number | null
-          name: string
-          property_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          drawing_url?: string | null
-          id?: string
-          level?: number | null
-          name: string
-          property_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          drawing_url?: string | null
-          id?: string
-          level?: number | null
-          name?: string
-          property_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "floors_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       knowledge_base_chunks: {
         Row: {
           chunk_index: number
@@ -1178,7 +1130,6 @@ export type Database = {
           component_id: string
           cost: number | null
           created_at: string
-          drift_task_id: string | null
           expected_cost: number | null
           id: string
           is_warranty: boolean | null
@@ -1194,7 +1145,6 @@ export type Database = {
           component_id: string
           cost?: number | null
           created_at?: string
-          drift_task_id?: string | null
           expected_cost?: number | null
           id?: string
           is_warranty?: boolean | null
@@ -1210,7 +1160,6 @@ export type Database = {
           component_id?: string
           cost?: number | null
           created_at?: string
-          drift_task_id?: string | null
           expected_cost?: number | null
           id?: string
           is_warranty?: boolean | null
@@ -1226,13 +1175,6 @@ export type Database = {
             columns: ["component_id"]
             isOneToOne: false
             referencedRelation: "components"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "maintenance_history_drift_task_id_fkey"
-            columns: ["drift_task_id"]
-            isOneToOne: false
-            referencedRelation: "drift_tasks"
             referencedColumns: ["id"]
           },
           {
@@ -1418,10 +1360,71 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "maintenance_plans_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "maintenance_plans_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_agent_policies: {
+        Row: {
+          auto_create_work_orders: boolean
+          created_at: string
+          excluded_component_types: string[]
+          included_component_types: string[] | null
+          max_suggestions_per_run: number
+          min_confidence: string
+          min_risk_level: string
+          organization_id: string
+          risk_suggest_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          auto_create_work_orders?: boolean
+          created_at?: string
+          excluded_component_types?: string[]
+          included_component_types?: string[] | null
+          max_suggestions_per_run?: number
+          min_confidence?: string
+          min_risk_level?: string
+          organization_id: string
+          risk_suggest_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          auto_create_work_orders?: boolean
+          created_at?: string
+          excluded_component_types?: string[]
+          included_component_types?: string[] | null
+          max_suggestions_per_run?: number
+          min_confidence?: string
+          min_risk_level?: string
+          organization_id?: string
+          risk_suggest_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_agent_policies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_agent_policies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations_public"
             referencedColumns: ["id"]
           },
         ]
@@ -1644,8 +1647,8 @@ export type Database = {
       }
       profiles: {
         Row: {
-          approved: boolean
           active_organization_id: string | null
+          approved: boolean
           created_at: string
           email: string
           full_name: string | null
@@ -1655,8 +1658,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          approved?: boolean
           active_organization_id?: string | null
+          approved?: boolean
           created_at?: string
           email: string
           full_name?: string | null
@@ -1666,8 +1669,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          approved?: boolean
           active_organization_id?: string | null
+          approved?: boolean
           created_at?: string
           email?: string
           full_name?: string | null
@@ -1677,6 +1680,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_active_organization_id_fkey"
+            columns: ["active_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_active_organization_id_fkey"
+            columns: ["active_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations_public"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_organization_id_fkey"
             columns: ["organization_id"]
@@ -2635,7 +2652,6 @@ export type Database = {
           },
         ]
       }
-
       property_todos: {
         Row: {
           category: string | null
@@ -2730,70 +2746,6 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-
-      scheduled_reports: {
-        Row: {
-          config: Json
-          created_at: string | null
-          created_by: string | null
-          id: string
-          is_active: boolean | null
-          last_run: string | null
-          name: string
-          next_run: string | null
-          organization_id: string | null
-          recipients: string[]
-          report_type: string
-          schedule: string
-          updated_at: string | null
-        }
-        Insert: {
-          config?: Json
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          is_active?: boolean | null
-          last_run?: string | null
-          name: string
-          next_run?: string | null
-          organization_id?: string | null
-          recipients?: string[]
-          report_type: string
-          schedule: string
-          updated_at?: string | null
-        }
-        Update: {
-          config?: Json
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          is_active?: boolean | null
-          last_run?: string | null
-          name?: string
-          next_run?: string | null
-          organization_id?: string | null
-          recipients?: string[]
-          report_type?: string
-          schedule?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scheduled_reports_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_reports_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations_public"
             referencedColumns: ["id"]
           },
         ]
@@ -3145,8 +3097,40 @@ export type Database = {
       }
     }
     Functions: {
+      accept_organization_invitation: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       calculate_todo_progress: { Args: { todo_id: string }; Returns: Json }
+      can_access_floor_drawing: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
+      create_organization: {
+        Args: {
+          p_max_components?: number
+          p_max_documents?: number
+          p_max_projects?: number
+          p_max_properties?: number
+          p_max_storage_mb?: number
+          p_max_users?: number
+          p_max_work_orders?: number
+          p_name: string
+          p_subscription_tier?: string
+        }
+        Returns: Json
+      }
+      ensure_my_workspace: { Args: { p_org_name?: string }; Returns: Json }
       get_dashboard_stats: { Args: { property_ids: string[] }; Returns: Json }
+      get_invitation_by_token: { Args: { p_token: string }; Returns: Json }
+      get_my_roles: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"][]
+      }
+      get_organization_for_settings: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       get_organization_member_names: {
         Args: { org_id: string }
         Returns: {
@@ -3181,6 +3165,18 @@ export type Database = {
       is_organization_member: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
+      }
+      is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
+      list_my_organizations: {
+        Args: never
+        Returns: {
+          is_active: boolean
+          logo_url: string
+          member_role: string
+          name: string
+          organization_id: string
+          primary_color: string
+        }[]
       }
       match_knowledge_base_chunks: {
         Args: {
@@ -3237,6 +3233,10 @@ export type Database = {
           source_id: string
           source_table: string
         }[]
+      }
+      set_active_organization: {
+        Args: { p_organization_id: string }
+        Returns: Json
       }
       trigger_embedding_processing: { Args: never; Returns: undefined }
       update_embedding_access: {
@@ -3421,6 +3421,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "user", "founder"],

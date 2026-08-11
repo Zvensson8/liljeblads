@@ -16,7 +16,7 @@ import AIChatBubble from "@/components/ai-chat/AIChatBubble";
 import { InstallPWAPrompt } from "@/components/InstallPWAPrompt";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import RouteErrorBoundary from "@/components/RouteErrorBoundary";
-import { RequireAdmin, RequireFounder } from "@/components/RequireRole";
+import { RequireFounder } from "@/components/RequireRole";
 import { WorkspaceBootstrap } from "@/components/WorkspaceBootstrap";
 
 // Lazy load all routes for better performance
@@ -82,9 +82,9 @@ const AppContent = () => {
           <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
           <Route path="/ai-chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />
           <Route path="/agent" element={<ProtectedRoute><AgentActivity /></ProtectedRoute>} />
-          <Route path="/users" element={<ProtectedRoute><RequireAdmin><Users /></RequireAdmin></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute><RequireFounder><Users /></RequireFounder></ProtectedRoute>} />
           <Route path="/user/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
-          <Route path="/organization/settings" element={<ProtectedRoute><OrganizationSettings /></ProtectedRoute>} />
+          <Route path="/organization/settings" element={<ProtectedRoute><RequireFounder><OrganizationSettings /></RequireFounder></ProtectedRoute>} />
           <Route path="/founder/admin" element={<ProtectedRoute><RequireFounder><FounderAdmin /></RequireFounder></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>

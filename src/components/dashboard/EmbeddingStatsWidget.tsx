@@ -150,7 +150,6 @@ export function EmbeddingStatsWidget() {
     work_orders: 'Arbetsordrar',
     projects: 'Projekt',
     property_todos: 'Att göra',
-    drift_tasks: 'Driftuppgifter',
     maintenance_history: 'Servicehistorik',
     maintenance_history_documents: 'Serviceprotokoll'
   };

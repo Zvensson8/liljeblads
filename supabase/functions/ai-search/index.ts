@@ -179,7 +179,6 @@ function formatResponse(query: string, results: SearchResult[]) {
     work_orders: results.filter(r => r.source_table === 'work_orders'),
     projects: results.filter(r => r.source_table === 'projects'),
     property_todos: results.filter(r => r.source_table === 'property_todos'),
-    drift_tasks: results.filter(r => r.source_table === 'drift_tasks'),
     maintenance_history: results.filter(r => r.source_table === 'maintenance_history'),
     property_documents: results.filter(r => r.source_table === 'property_documents'),
   };
@@ -270,18 +269,6 @@ async function getSourceDetails(supabase: any, sourceTable: string, sourceId: st
         .from('property_todos')
         .select(`
           id, title, category, priority, completed, due_date,
-          property:properties(id, name)
-        `)
-        .eq('id', sourceId)
-        .single();
-      return data;
-    }
-
-    case 'drift_tasks': {
-      const { data } = await supabase
-        .from('drift_tasks')
-        .select(`
-          id, name, description, quarter, year, planned_count, reported_count,
           property:properties(id, name)
         `)
         .eq('id', sourceId)

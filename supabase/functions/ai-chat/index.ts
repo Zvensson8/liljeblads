@@ -317,30 +317,7 @@ async function buildContext(
     }
   }
 
-  // 5. Drift tasks by time
-  if ((timeFilter.quarter || timeFilter.year)) {
-    let q = supabase.from('drift_tasks').select('*, property:properties(name), category:drift_categories(name)').in('property_id', propIds);
-    if (timeFilter.quarter) q = q.eq('quarter', timeFilter.quarter);
-    if (timeFilter.year) q = q.eq('year', timeFilter.year);
-    const { data: tasks } = await q.limit(100);
-    if (tasks && tasks.length > 0) {
-      const byProp = new Map<string, any[]>();
-      for (const t of tasks) { const p = t.property_id; if (!byProp.has(p)) byProp.set(p, []); byProp.get(p)!.push(t); }
-      for (const [pid, pt] of byProp) {
-        const done = pt.filter(t => (t.reported_count||0) >= (t.planned_count||0));
-        const missing = pt.filter(t => (t.reported_count||0) === 0);
-        let info = `📊 DRIFTUPPGIFTER FÖR ${(propMap.get(pid)||'?').toUpperCase()} (${timeFilter.quarter?'Q'+timeFilter.quarter:''} ${timeFilter.year||''}):`;
-        info += `\n  Totalt: ${pt.length}, ✅ Klara: ${done.length}, ❌ Ej utförda: ${missing.length}`;
-        if (missing.length > 0 && missing.length <= 10) {
-          info += `\n  Ej utförda:`;
-          for (const t of missing) info += `\n    - ${t.name}${t.category?.name ? ` (${t.category.name})` : ''}`;
-        }
-        parts.push(info);
-      }
-    }
-  }
-
-  // 6. Contacts (keyword-triggered)
+  // 5. Contacts (keyword-triggered)
   if (searchTerms.some(t => ['kontakt','kontakter','telefon','email','ansvarig','leverantör','entreprenör','firma','ring','person'].includes(t.toLowerCase()))) {
     const { data: contacts } = await supabase.from('property_contacts').select('*, property:properties(name)').in('property_id', propIds).limit(50);
     if (contacts && contacts.length > 0) {

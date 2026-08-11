@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { useComponentLibrary, type ComponentTemplate } from '@/hooks/useComponentLibrary';
 import { ScrollArea } from './ui/scroll-area';
 import { AddCustomComponentDialog } from './AddCustomComponentDialog';
-import { Plus, X, Package, MapPin, Search } from 'lucide-react';
+import { Plus, X, Package, Search } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -21,8 +21,6 @@ interface ExistingComponent {
   type: string;
   manufacturer?: string;
   room_zone?: string | null;
-  component_geometry?: { id: string }[];
-  isPlacedOnCanvas?: boolean;
 }
 
 export const ComponentLibraryPanel = ({ 
@@ -46,19 +44,11 @@ export const ComponentLibraryPanel = ({
 
     const { data, error } = await supabase
       .from('components')
-      .select(`
-        *,
-        component_geometry (id)
-      `)
+      .select('id, name, type, manufacturer, room_zone')
       .eq('property_id', propertyId);
 
     if (!error && data) {
-      // Mark components that have geometry as placed
-      const componentsWithPlacementInfo = data.map(comp => ({
-        ...comp,
-        isPlacedOnCanvas: comp.component_geometry && comp.component_geometry.length > 0
-      }));
-      setExistingComponents(componentsWithPlacementInfo);
+      setExistingComponents(data as ExistingComponent[]);
     }
   };
 
@@ -69,16 +59,12 @@ export const ComponentLibraryPanel = ({
     comp.manufacturer?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Separate placed and unplaced components
-  const placedComponents = filteredComponents.filter(c => c.isPlacedOnCanvas);
-  const unplacedComponents = filteredComponents.filter(c => !c.isPlacedOnCanvas);
-
   return (
     <>
       <Card className="w-64 h-full">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Komponenter</CardTitle>
-          <CardDescription>Välj för att placera på ritning</CardDescription>
+          <CardDescription>Mallar och befintliga i fastigheten</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <Tabs defaultValue="templates" className="w-full">
@@ -173,39 +159,13 @@ export const ComponentLibraryPanel = ({
                       Inga komponenter matchar sökningen
                     </div>
                   ) : (
-                    <>
-                      {/* Unplaced components first */}
-                      {unplacedComponents.length > 0 && (
-                        <>
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                            Ej placerade ({unplacedComponents.length})
-                          </p>
-                          {unplacedComponents.map((component) => (
-                            <ComponentButton
-                              key={component.id}
-                              component={component}
-                              onSelect={onSelectExistingComponent}
-                            />
-                          ))}
-                        </>
-                      )}
-                      
-                      {/* Placed components */}
-                      {placedComponents.length > 0 && (
-                        <>
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-4">
-                            Placerade ({placedComponents.length})
-                          </p>
-                          {placedComponents.map((component) => (
-                            <ComponentButton
-                              key={component.id}
-                              component={component}
-                              onSelect={onSelectExistingComponent}
-                            />
-                          ))}
-                        </>
-                      )}
-                    </>
+                    filteredComponents.map((component) => (
+                      <ComponentButton
+                        key={component.id}
+                        component={component}
+                        onSelect={onSelectExistingComponent}
+                      />
+                    ))
                   )}
                 </div>
               </ScrollArea>
@@ -237,14 +197,8 @@ const ComponentButton = ({
     onClick={() => onSelect?.(component)}
   >
     <div className="flex items-start gap-3 w-full">
-      <div className={`p-2 rounded-lg shrink-0 ${
-        component.isPlacedOnCanvas ? 'bg-green-100' : 'bg-primary/10'
-      }`}>
-        {component.isPlacedOnCanvas ? (
-          <MapPin className="h-5 w-5 text-green-600" />
-        ) : (
-          <Package className="h-5 w-5 text-primary" />
-        )}
+      <div className="p-2 rounded-lg shrink-0 bg-primary/10">
+        <Package className="h-5 w-5 text-primary" />
       </div>
       <div className="text-left flex-1 min-w-0">
         <p className="font-medium text-sm">{component.name}</p>
@@ -255,11 +209,7 @@ const ComponentButton = ({
           <p className="text-xs text-muted-foreground">
             {component.room_zone}
           </p>
-        ) : (
-          <p className="text-xs text-orange-500">
-            Ej tilldelad våning
-          </p>
-        )}
+        ) : null}
       </div>
     </div>
   </Button>

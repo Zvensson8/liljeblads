@@ -115,47 +115,33 @@ Deno.serve(async (req) => {
     const propertyIds = properties?.map(p => p.id) || [];
 
     if (propertyIds.length > 0) {
-      // Fetch floors
-      const { data: floors } = await supabaseClient
-        .from('floors')
+      // Fetch components by property
+      const { data: components } = await supabaseClient
+        .from('components')
         .select('*')
         .in('property_id', propertyIds);
-      exportData.floors = floors || [];
+      exportData.components = components || [];
 
-      const floorIds = floors?.map(f => f.id) || [];
+      const componentIds = components?.map((c: { id: string }) => c.id) || [];
 
-      // Fetch components
-      if (floorIds.length > 0) {
-        const { data: components } = await supabaseClient
-          .from('components')
+      if (componentIds.length > 0) {
+        const { data: componentDocs } = await supabaseClient
+          .from('component_documents')
           .select('*')
-          .in('floor_id', floorIds);
-        exportData.components = components || [];
+          .in('component_id', componentIds);
+        exportData.component_documents = componentDocs || [];
 
-        const componentIds = components?.map(c => c.id) || [];
+        const { data: maintenance } = await supabaseClient
+          .from('maintenance_history')
+          .select('*')
+          .in('component_id', componentIds);
+        exportData.maintenance_history = maintenance || [];
 
-        if (componentIds.length > 0) {
-          // Fetch component documents
-          const { data: componentDocs } = await supabaseClient
-            .from('component_documents')
-            .select('*')
-            .in('component_id', componentIds);
-          exportData.component_documents = componentDocs || [];
-
-          // Fetch maintenance history
-          const { data: maintenance } = await supabaseClient
-            .from('maintenance_history')
-            .select('*')
-            .in('component_id', componentIds);
-          exportData.maintenance_history = maintenance || [];
-
-          // Fetch purchase info
-          const { data: purchaseInfo } = await supabaseClient
-            .from('component_purchase_info')
-            .select('*')
-            .in('component_id', componentIds);
-          exportData.component_purchase_info = purchaseInfo || [];
-        }
+        const { data: purchaseInfo } = await supabaseClient
+          .from('component_purchase_info')
+          .select('*')
+          .in('component_id', componentIds);
+        exportData.component_purchase_info = purchaseInfo || [];
       }
 
       // Fetch projects
@@ -239,36 +225,11 @@ Deno.serve(async (req) => {
         .in('property_id', propertyIds);
       exportData.property_todos = propertyTodos || [];
 
-      // Fetch drift categories
-      const { data: driftCategories } = await supabaseClient
-        .from('drift_categories')
-        .select('*')
-        .in('property_id', propertyIds);
-      exportData.drift_categories = driftCategories || [];
-
-      // Fetch drift tasks
-      const { data: driftTasks } = await supabaseClient
-        .from('drift_tasks')
-        .select('*')
-        .in('property_id', propertyIds);
-      exportData.drift_tasks = driftTasks || [];
-
-      const taskIds = driftTasks?.map(t => t.id) || [];
-
-      if (taskIds.length > 0) {
-        // Fetch drift task components
-        const { data: taskComponents } = await supabaseClient
-          .from('drift_task_components')
-          .select('*')
-          .in('task_id', taskIds);
-        exportData.drift_task_components = taskComponents || [];
-      }
     }
 
     // Create summary
     exportData.summary = {
       properties_count: exportData.properties?.length || 0,
-      floors_count: exportData.floors?.length || 0,
       components_count: exportData.components?.length || 0,
       projects_count: exportData.projects?.length || 0,
       work_orders_count: exportData.work_orders?.length || 0,
@@ -276,7 +237,6 @@ Deno.serve(async (req) => {
       notes_count: exportData.property_notes?.length || 0,
       todos_count: exportData.property_todos?.length || 0,
       maintenance_count: exportData.maintenance_history?.length || 0,
-      drift_tasks_count: exportData.drift_tasks?.length || 0,
       documents_count: 
         (exportData.property_documents?.length || 0) + 
         (exportData.project_documents?.length || 0) + 
@@ -302,7 +262,6 @@ Deno.serve(async (req) => {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🏢 Fastigheter ................ ${exportData.properties?.length || 0} st
-🏗️  Våningsplan ................ ${exportData.floors?.length || 0} st
 ⚙️  Komponenter ................ ${exportData.components?.length || 0} st
 📋 Projekt .................... ${exportData.projects?.length || 0} st
 🔧 Arbetsordrar ............... ${exportData.work_orders?.length || 0} st
@@ -310,7 +269,6 @@ Deno.serve(async (req) => {
 📝 Anteckningar ............... ${exportData.property_notes?.length || 0} st
 ✅ Att göra-uppgifter ......... ${exportData.property_todos?.length || 0} st
 🔨 Underhållshändelser ........ ${exportData.maintenance_history?.length || 0} st
-📊 Driftuppgifter ............. ${exportData.drift_tasks?.length || 0} st
 📄 Dokument (metadata) ........ ${exportData.summary.documents_count || 0} st
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -322,7 +280,6 @@ Denna export innehåller följande filer:
 00_README.txt ........................ Denna fil
 01_organization.txt .................. Organisationsinformation och prenumeration
 02_properties.txt .................... Fastighetsregister med adresser och detaljer
-03_floors.txt ........................ Våningsplansregister
 04_contacts.txt ...................... Kontaktpersoner för fastigheter
 05_notes.txt ......................... Anteckningar kopplade till fastigheter
 06_todos.txt ......................... Att göra-listor och påminnelser
@@ -335,9 +292,6 @@ Denna export innehåller följande filer:
 13_project_checklist.txt ............. Projektchecklistor
 14_project_activity.txt .............. Projektaktivitetsloggar
 15_work_orders.txt ................... Arbetsordrar och serviceuppdrag
-16_drift_categories.txt .............. Driftkategorier
-17_drift_operations.txt .............. Drift och underhållsuppgifter
-18_drift_task_components.txt ......... Komponenter kopplade till driftuppgifter
 19_documents.txt ..................... Dokumentregister och metadata
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -444,33 +398,6 @@ ${prop.description}
 ` : ''}`;
       });
       zip.file('02_properties.txt', propContent);
-    }
-
-    // Floors
-    if (exportData.floors && exportData.floors.length > 0) {
-      let floorContent = `╔═══════════════════════════════════════════════════════════════╗
-║                    VÅNINGSPLANSREGISTER                       ║
-║                   ${exportData.floors.length} våningsplan totalt                        ║
-╚═══════════════════════════════════════════════════════════════╝
-
-`;
-      
-      exportData.floors.forEach((floor: any, index: number) => {
-        floorContent += `
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ ${(index + 1).toString().padStart(3, '0')}. ${(floor.name || 'Namnlös våning').substring(0, 50).padEnd(50)} ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-ID: ${floor.id}
-Fastighet-ID: ${floor.property_id}
-Våningsnivå: ${floor.level !== null && floor.level !== undefined ? floor.level : 'Ej angiven'}
-${floor.drawing_url ? `Ritning: ${floor.drawing_url}` : 'Ingen ritning uppladdad'}
-Skapad: ${floor.created_at ? new Date(floor.created_at).toLocaleString('sv-SE') : 'Okänt'}
-Uppdaterad: ${floor.updated_at ? new Date(floor.updated_at).toLocaleString('sv-SE') : 'Okänt'}
-
-`;
-      });
-      zip.file('03_floors.txt', floorContent);
     }
 
     // Contacts
@@ -584,7 +511,7 @@ ${todo.notes}
 ├─ Serienummer: ${comp.serial_number || 'Inget'}
 ├─ Registreringsnummer: ${comp.registration_number || 'Inget'}
 └─ Fastighet-ID: ${comp.property_id || 'Ingen'}
-    Vånings-ID: ${comp.floor_id || 'Ingen'}
+    Placering: ${comp.room_zone || 'Ej angiven'}
 
 📅 LIVSCYKEL
 ├─ Installationsdatum: ${comp.installation_date || 'Okänt'}
@@ -900,111 +827,6 @@ ${maint.notes}
 `;
       });
       zip.file('09_maintenance.txt', maintContent);
-    }
-
-    // Drift Categories
-    if (exportData.drift_categories && exportData.drift_categories.length > 0) {
-      let catContent = `╔═══════════════════════════════════════════════════════════════╗
-║                    DRIFTKATEGORIER                            ║
-║                   ${exportData.drift_categories.length} kategorier totalt                         ║
-╚═══════════════════════════════════════════════════════════════╝
-
-`;
-      
-      exportData.drift_categories.forEach((cat: any, index: number) => {
-        catContent += `
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ ${(index + 1).toString().padStart(3, '0')}. ${(cat.name || 'Namnlös kategori').substring(0, 50).padEnd(50)} ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-ID: ${cat.id}
-Fastighet-ID: ${cat.property_id}
-${cat.parent_id ? `Överordnad kategori: ${cat.parent_id}` : 'Huvudkategori'}
-Skapad: ${cat.created_at ? new Date(cat.created_at).toLocaleString('sv-SE') : 'Okänt'}
-Uppdaterad: ${cat.updated_at ? new Date(cat.updated_at).toLocaleString('sv-SE') : 'Okänt'}
-
-`;
-      });
-      zip.file('16_drift_categories.txt', catContent);
-    }
-
-    // Drift Operations
-    if (exportData.drift_tasks && exportData.drift_tasks.length > 0) {
-      let driftContent = `╔═══════════════════════════════════════════════════════════════╗
-║                  DRIFT OCH UNDERHÅLL                          ║
-║                   ${exportData.drift_tasks.length} driftuppgifter totalt                       ║
-╚═══════════════════════════════════════════════════════════════╝
-
-`;
-      
-      exportData.drift_tasks.forEach((task: any, index: number) => {
-        const completionPercent = task.planned_count > 0 
-          ? ((task.reported_count / task.planned_count) * 100).toFixed(1)
-          : 0;
-        const statusEmoji = task.status === 'completed' ? '✅' : task.status === 'remaining' ? '⏳' : '❌';
-        
-        driftContent += `
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ ${(index + 1).toString().padStart(3, '0')}. ${(task.title || 'Namnlös uppgift').substring(0, 50).padEnd(50)} ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-📋 GRUNDINFORMATION
-├─ ID: ${task.id}
-├─ Fastighet-ID: ${task.property_id}
-├─ Kategori-ID: ${task.category_id || 'Ingen'}
-└─ Prioritet: ${task.priority || 'Normal'}
-
-📅 TIDSPLAN
-├─ År: ${task.year || 'Inget'}
-├─ Kvartal: ${task.quarter || 'Inget'}
-└─ Deadline: ${task.deadline || 'Ingen'}
-
-📊 FRAMSTEG
-├─ Status: ${statusEmoji} ${task.status || 'Okänd'}
-├─ Planerat antal: ${task.planned_count || 0}
-├─ Rapporterat antal: ${task.reported_count || 0}
-└─ Färdigställande: ${completionPercent}%
-
-📅 REGISTRERING
-├─ Skapad: ${task.created_at ? new Date(task.created_at).toLocaleString('sv-SE') : 'Okänt'}
-└─ Uppdaterad: ${task.updated_at ? new Date(task.updated_at).toLocaleString('sv-SE') : 'Okänt'}
-
-${task.description ? `📝 BESKRIVNING:
-${task.description}
-` : ''}
-`;
-      });
-      zip.file('17_drift_operations.txt', driftContent);
-    }
-
-    // Drift Task Components
-    if (exportData.drift_task_components && exportData.drift_task_components.length > 0) {
-      let taskCompContent = `╔═══════════════════════════════════════════════════════════════╗
-║              KOMPONENTER I DRIFTUPPGIFTER                     ║
-║                   ${exportData.drift_task_components.length} kopplade komponenter totalt                ║
-╚═══════════════════════════════════════════════════════════════╝
-
-`;
-      
-      exportData.drift_task_components.forEach((tc: any, index: number) => {
-        taskCompContent += `
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Komponent ${(index + 1).toString().padStart(3, '0')}                                            ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-${tc.is_reported ? '✅ Rapporterad' : '⏳ Ej rapporterad'}
-Uppgift-ID: ${tc.task_id}
-Komponent-ID: ${tc.component_id || 'Ingen (manuell post)'}
-Objektnamn: ${tc.object_name || 'Ej angivet'}
-Serie-ID: ${tc.series_id || 'Inget'}
-Registreringsnummer: ${tc.registration_number || 'Inget'}
-${tc.manually_edited ? '✏️ Manuellt redigerad' : ''}
-${tc.auto_detected_from ? `🤖 Automatiskt detekterad från: ${tc.auto_detected_from}` : ''}
-Skapad: ${tc.created_at ? new Date(tc.created_at).toLocaleString('sv-SE') : 'Okänt'}
-
-`;
-      });
-      zip.file('18_drift_task_components.txt', taskCompContent);
     }
 
     // Documents summary

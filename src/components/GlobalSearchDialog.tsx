@@ -12,12 +12,13 @@ import { Building2, Package, Wrench, Briefcase, Search, Sparkles, CheckSquare, C
 import { useAuth } from "@/hooks/useAuth";
 import { useAISearch, AISearchResult } from "@/hooks/useAISearch";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
+import { useIsFounder } from "@/hooks/useUserRoles";
 import { Toggle } from "@/components/ui/toggle";
 import { Badge } from "@/components/ui/badge";
 
 interface GlobalSearchResult {
   id: string;
-  type: "property" | "component" | "work_order" | "project" | "todo" | "drift_task" | "maintenance";
+  type: "property" | "component" | "work_order" | "project" | "todo" | "maintenance";
   title: string;
   subtitle: string;
   path: string;
@@ -32,6 +33,7 @@ interface GlobalSearchDialogProps {
 export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogProps) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { isFounder } = useIsFounder();
   const [searchQuery, setSearchQuery] = useState("");
   const [useAI, setUseAI] = useState(false);
 
@@ -55,12 +57,17 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
       { id: 'export-workorders', label: 'Exportera arbetsordrar', icon: FileDown, run: () => navigate('/work-orders') },
       { id: 'export-projects', label: 'Exportera projekt', icon: FileDown, run: () => navigate('/projects') },
       { id: 'settings-user', label: 'Mina inställningar', icon: Settings, run: () => navigate('/user/settings') },
-      { id: 'settings-org', label: 'Organisationsinställningar', icon: Settings, run: () => navigate('/organization/settings') },
+      ...(isFounder
+        ? [
+            { id: 'settings-org', label: 'Organisation (Founder)', icon: Settings, run: () => navigate('/organization/settings') },
+            { id: 'nav-users', label: 'Användare (Founder)', icon: Settings, run: () => navigate('/users') },
+          ]
+        : []),
       { id: 'signout', label: 'Logga ut', icon: LogOut, run: () => signOut() },
     ];
     if (!q) return items;
     return items.filter((a) => a.label.toLowerCase().includes(q));
-  }, [searchQuery, navigate, signOut]);
+  }, [searchQuery, navigate, signOut, isFounder]);
 
   
   const { search: aiSearch, isSearching: aiSearching, results: aiResults, error: aiError, clearResults } = useAISearch();
@@ -117,15 +124,6 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
           subtitle = r.details?.property?.name || r.details?.category || "";
           path = `/properties/${r.details?.property?.id}?tab=todos`;
           break;
-        case "drift_tasks":
-          // Operations module retired — land on property overview
-          type = "drift_task";
-          title = r.details?.name || r.content.split('.')[0];
-          subtitle = `${r.details?.quarter || ''} ${r.details?.year || ''} - ${r.details?.property?.name || ''}`;
-          path = r.details?.property?.id
-            ? `/property/${r.details.property.id}`
-            : '/properties';
-          break;
         case "maintenance_history":
           type = "maintenance";
           title = r.details?.action_type || r.content.split('.')[0];
@@ -180,8 +178,6 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
         return <Briefcase className="h-4 w-4" />;
       case "todo":
         return <CheckSquare className="h-4 w-4" />;
-      case "drift_task":
-        return <Calendar className="h-4 w-4" />;
       case "maintenance":
         return <CheckSquare className="h-4 w-4" />;
       default:
@@ -201,8 +197,6 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
         return "Projekt";
       case "todo":
         return "Att göra";
-      case "drift_task":
-        return "Driftuppgift";
       case "maintenance":
         return "Underhåll";
       default:
@@ -216,7 +210,6 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
     work_order: results.filter((r) => r.type === "work_order"),
     project: results.filter((r) => r.type === "project"),
     todo: results.filter((r) => r.type === "todo"),
-    drift_task: results.filter((r) => r.type === "drift_task"),
     maintenance: results.filter((r) => r.type === "maintenance"),
   };
 
@@ -393,29 +386,6 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
         {groupedResults.todo.length > 0 && (
           <CommandGroup heading="Att göra">
             {groupedResults.todo.map((result) => (
-              <CommandItem
-                key={result.id}
-                onSelect={() => handleSelect(result.path)}
-                className="flex items-center gap-3"
-              >
-                {getIcon(result.type)}
-                <div className="flex-1">
-                  <div className="font-medium">{result.title}</div>
-                  <div className="text-xs text-muted-foreground">{result.subtitle}</div>
-                </div>
-                {result.similarity && (
-                  <Badge variant="secondary" className="text-xs">
-                    {Math.round(result.similarity * 100)}%
-                  </Badge>
-                )}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-
-        {groupedResults.drift_task.length > 0 && (
-          <CommandGroup heading="Driftuppgifter">
-            {groupedResults.drift_task.map((result) => (
               <CommandItem
                 key={result.id}
                 onSelect={() => handleSelect(result.path)}
