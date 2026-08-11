@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
@@ -10,21 +11,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Validation schema
+// Validation schema — recipient_email from body is IGNORED (security)
 const propertyInfoSchema = z.object({
   property_name: z.string().trim().min(1).max(200),
   property_number: z.string().trim().max(50).nullable(),
   property_address: z.string().trim().max(500).nullable(),
   invoice_address: z.string().trim().max(1000).nullable(),
-  recipient_email: z.string().email().max(255),
+  recipient_email: z.string().email().max(255).optional(),
   main_contact: z.object({
     name: z.string().trim().max(100).nullable().optional(),
     phone: z.string().trim().max(50).nullable().optional(),
     email: z.union([z.string().email().max(255), z.literal("")]).nullable().optional()
   }).nullable().optional()
 });
-
-type PropertyInfoRequest = z.infer<typeof propertyInfoSchema>;
 
 // HTML escaping function to prevent injection
 function escapeHtml(text: string): string {
@@ -43,6 +42,29 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Auth: only send to the signed-in user's email
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Authorization required" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: userData, error: userError } = await authClient.auth.getUser(token);
+    if (userError || !userData?.user?.email) {
+      return new Response(JSON.stringify({ error: "Session expired or no email on account" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+    const recipient_email = userData.user.email;
+
     // Validate input data
     const rawData = await req.json();
     const validatedData = propertyInfoSchema.parse(rawData);
@@ -53,11 +75,10 @@ const handler = async (req: Request): Promise<Response> => {
       property_address, 
       invoice_address, 
       main_contact,
-      recipient_email 
     } = validatedData;
 
     const maskedEmail = recipient_email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
-    console.log('Sending property info email to:', maskedEmail);
+    console.log('Sending property info email to (self only):', maskedEmail);
 
     // Parse invoice address to get company name and org number (first two lines)
     const invoiceLines = invoice_address ? invoice_address.split('\n').filter(line => line.trim()) : [];

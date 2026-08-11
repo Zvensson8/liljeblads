@@ -1,5 +1,6 @@
 /**
- * Jarvis orchestrator tools — read/query Liljeblads data + HITL write suggestions.
+ * Jarvis orchestrator tools — read/query Liljeblads data + HITL write suggestions
+ * + direct apply_* when user explicitly requests an action.
  * Used by ai-chat multi-turn tool loop.
  */
 
@@ -11,13 +12,34 @@ import {
   type ComponentRiskInput,
   type RiskLevel,
 } from "./componentRisk.ts";
+import { getResendClient, resendFrom } from "./resendClient.ts";
 
 export type ToolContext = {
   supabase: SupabaseClient;
   orgId: string;
   userId: string;
+  /** Authenticated user email only — never use model-supplied recipients for send */
+  userEmail: string | null;
   conversationId?: string | null;
 };
+
+const WO_STATUSES = [
+  "not_started",
+  "awaiting_quote",
+  "ordered",
+  "completed",
+  "archived",
+] as const;
+
+const PROJECT_STATUSES = [
+  "forslag",
+  "planerat",
+  "invantar_offert",
+  "offert_finns",
+  "pagaende",
+  "pausat",
+  "avslutat",
+] as const;
 
 export const jarvisTools: ChatTool[] = [
   {
@@ -352,6 +374,211 @@ export const jarvisTools: ChatTool[] = [
       },
     },
   },
+  // ── DIRECT actions (user explicitly asked — execute now, no HITL inbox) ──
+  {
+    type: "function",
+    function: {
+      name: "send_to_me",
+      description:
+        "Skicka e-post ENDAST till den inloggade användaren (dig själv). Använd när användaren ber dig skicka info, fakturaadress, sammanfattning m.m. till sig. ALDRIG extern mottagare — to/recipient ignoreras och blockeras.",
+      parameters: {
+        type: "object",
+        properties: {
+          subject: { type: "string", description: "Ämnesrad" },
+          body: {
+            type: "string",
+            description: "Meddelandetext (plain text). Inkludera all info användaren vill ha.",
+          },
+          property_name: {
+            type: "string",
+            description:
+              "Valfritt: hämta fakturaadress/adress för fastighet och lägg till i mailet om body inte redan har det",
+          },
+        },
+        required: ["subject", "body"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_work_order_status",
+      description:
+        "Ändra status på en arbetsorder DIREKT (när användaren uttryckligen ber om det). Status: not_started|awaiting_quote|ordered|completed|archived.",
+      parameters: {
+        type: "object",
+        properties: {
+          work_order_id: { type: "string" },
+          action_contains: {
+            type: "string",
+            description: "Om id saknas: matcha WO action",
+          },
+          property_name: { type: "string" },
+          status: {
+            type: "string",
+            enum: ["not_started", "awaiting_quote", "ordered", "completed", "archived"],
+          },
+        },
+        required: ["status"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_project_status",
+      description:
+        "Ändra projektstatus DIREKT. Status: forslag|planerat|invantar_offert|offert_finns|pagaende|pausat|avslutat.",
+      parameters: {
+        type: "object",
+        properties: {
+          project_id: { type: "string" },
+          project_number: { type: "string" },
+          name: { type: "string" },
+          property_name: { type: "string" },
+          status: {
+            type: "string",
+            enum: [
+              "forslag",
+              "planerat",
+              "invantar_offert",
+              "offert_finns",
+              "pagaende",
+              "pausat",
+              "avslutat",
+            ],
+          },
+        },
+        required: ["status"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_update_invoice_address",
+      description:
+        "Uppdatera fakturaadress på fastighet DIREKT (när användaren ber om det).",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          invoice_address: { type: "string" },
+        },
+        required: ["invoice_address"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_create_work_order",
+      description:
+        "Skapa arbetsorder DIREKT i databasen (när användaren uttryckligen ber om att skapa/lägga till WO).",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string" },
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          component_name: { type: "string" },
+          priority: { type: "string", enum: ["low", "medium", "high"] },
+          contractor: { type: "string" },
+          quarter: { type: "string" },
+          due_date: { type: "string" },
+          price: { type: "number" },
+          comments: { type: "string" },
+        },
+        required: ["action"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_create_project",
+      description:
+        "Skapa projekt DIREKT (när användaren ber om det). Kräver fastighet.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          description: { type: "string" },
+          type: {
+            type: "string",
+            enum: ["investering", "underhall", "energi", "annat"],
+          },
+          budget: { type: "number" },
+          year: { type: "number" },
+          start_quarter: { type: "number" },
+          project_number: { type: "string" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_property_note",
+      description: "Lägg till anteckning på fastighet DIREKT.",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          content: { type: "string" },
+        },
+        required: ["content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_create_property",
+      description: "Skapa ny fastighet DIREKT.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          address: { type: "string" },
+          property_number: { type: "string" },
+          property_type: { type: "string" },
+          invoice_address: { type: "string" },
+          construction_year: { type: "number" },
+          area_sqm: { type: "number" },
+          description: { type: "string" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_update_property",
+      description: "Uppdatera fastighetsfält DIREKT (adress, namn, m.m.).",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          name: { type: "string" },
+          address: { type: "string" },
+          property_number: { type: "string" },
+          property_type: { type: "string" },
+          invoice_address: { type: "string" },
+          construction_year: { type: "number" },
+          area_sqm: { type: "number" },
+          description: { type: "string" },
+        },
+      },
+    },
+  },
 ];
 
 async function resolvePropertyIds(
@@ -371,12 +598,44 @@ async function resolvePropertyIds(
   return { ids: [...names.keys()], names };
 }
 
+async function resolveOneProperty(
+  supabase: SupabaseClient,
+  orgId: string,
+  rawArgs: Record<string, unknown>,
+): Promise<{ id: string; name: string; invoice_address?: string | null; address?: string | null; property_number?: string | null } | null> {
+  const propId = String(rawArgs.property_id || "").trim();
+  const propName = String(rawArgs.property_name || "").trim();
+  if (!propId && !propName) return null;
+  let q = supabase
+    .from("properties")
+    .select("id, name, invoice_address, address, property_number")
+    .eq("organization_id", orgId)
+    .limit(1);
+  if (propId) q = q.eq("id", propId);
+  else q = q.ilike("name", `%${propName}%`);
+  const { data } = await q.maybeSingle();
+  return data as {
+    id: string;
+    name: string;
+    invoice_address?: string | null;
+    address?: string | null;
+    property_number?: string | null;
+  } | null;
+}
+
+function generateProjectNumber(propertyNumber?: string | null): string {
+  const base = (propertyNumber || "PRJ").replace(/\s+/g, "-").slice(0, 24);
+  const year = new Date().getFullYear();
+  const suffix = Math.floor(Math.random() * 900 + 100);
+  return `${base}-${year}-${suffix}`;
+}
+
 export async function executeJarvisTool(
   name: string,
   rawArgs: Record<string, unknown>,
   ctx: ToolContext,
 ): Promise<unknown> {
-  const { supabase, orgId, conversationId } = ctx;
+  const { supabase, orgId, userId, userEmail, conversationId } = ctx;
   const limit = Math.min(Math.max(Number(rawArgs.limit) || 20, 1), 50);
 
   try {
@@ -701,6 +960,401 @@ export async function executeJarvisTool(
           message:
             "Förslag sparat som utkast. Användaren måste godkänna i Jarvis → Förslag innan det sparas i systemet.",
         };
+      }
+
+      // ── DIRECT: send only to authenticated user ──
+      case "send_to_me": {
+        // Hard security: never honor model-supplied recipients
+        for (const forbidden of [
+          "to",
+          "recipient",
+          "recipient_email",
+          "email",
+          "cc",
+          "bcc",
+        ]) {
+          if (rawArgs[forbidden] != null && String(rawArgs[forbidden]).trim()) {
+            return {
+              error:
+                "Säkerhet: e-post kan endast skickas till dig (inloggad användare). Extern mottagare är blockerad.",
+              blocked_field: forbidden,
+            };
+          }
+        }
+
+        if (!userEmail || !userEmail.includes("@")) {
+          return {
+            error:
+              "Ingen e-postadress på ditt konto — kan inte skicka. Kontrollera profil/inloggning.",
+          };
+        }
+
+        let body = String(rawArgs.body || "").trim();
+        const subject =
+          String(rawArgs.subject || "Meddelande från Jarvis").trim() ||
+          "Meddelande från Jarvis";
+
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        if (prop) {
+          const inv = prop.invoice_address?.trim();
+          const addrBlock = [
+            `Fastighet: ${prop.name}`,
+            prop.property_number ? `Fastighetsnummer: ${prop.property_number}` : null,
+            prop.address ? `Adress: ${prop.address}` : null,
+            inv
+              ? `Fakturaadress:\n${inv}`
+              : "Fakturaadress: (ej registrerad i systemet)",
+          ]
+            .filter(Boolean)
+            .join("\n");
+          if (!body.includes(prop.name) || (inv && !body.includes(inv.split("\n")[0]))) {
+            body = `${body}\n\n---\n${addrBlock}`;
+          }
+        }
+
+        if (!body) {
+          return { error: "Tomt meddelande — ange body" };
+        }
+
+        const resend = getResendClient();
+        if (!resend) {
+          return {
+            error: "E-post är inte konfigurerad (RESEND_API_KEY saknas).",
+            would_have_sent_to: userEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3"),
+          };
+        }
+
+        const { data: sendData, error: sendErr } = await resend.emails.send({
+          from: resendFrom(),
+          to: [userEmail], // ONLY authenticated user
+          subject: `[Jarvis] ${subject}`,
+          text: body,
+        });
+
+        if (sendErr) {
+          return { error: String(sendErr.message || sendErr), sent: false };
+        }
+
+        return {
+          sent: true,
+          to: userEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3"),
+          to_note: "Skickat endast till inloggad användare",
+          subject,
+          resend_id: sendData?.id ?? null,
+        };
+      }
+
+      case "apply_work_order_status": {
+        const status = String(rawArgs.status || "").trim();
+        if (!WO_STATUSES.includes(status as (typeof WO_STATUSES)[number])) {
+          return {
+            error: `Ogiltig status. Tillåtna: ${WO_STATUSES.join(", ")}`,
+          };
+        }
+
+        let woId = String(rawArgs.work_order_id || "").trim();
+        if (!woId) {
+          const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+          const actionContains = String(rawArgs.action_contains || "").trim();
+          let q = supabase
+            .from("work_orders")
+            .select("id, action, status, property_id, properties!inner(organization_id)")
+            .eq("properties.organization_id", orgId)
+            .order("created_at", { ascending: false })
+            .limit(5);
+          if (prop) q = q.eq("property_id", prop.id);
+          if (actionContains) q = q.ilike("action", `%${actionContains}%`);
+          const { data: found } = await q;
+          if (!found?.length) {
+            return { error: "Ingen arbetsorder matchade" };
+          }
+          woId = found[0].id as string;
+        }
+
+        // Verify org
+        const { data: existing } = await supabase
+          .from("work_orders")
+          .select("id, action, status, property_id, properties!inner(organization_id, name)")
+          .eq("id", woId)
+          .maybeSingle();
+        if (!existing) return { error: "Arbetsorder hittades inte" };
+        const pOrg = (existing.properties as { organization_id?: string } | null)
+          ?.organization_id;
+        if (pOrg !== orgId) {
+          return { error: "Arbetsordern tillhör inte din organisation" };
+        }
+
+        const { data: updated, error } = await supabase
+          .from("work_orders")
+          .update({ status })
+          .eq("id", woId)
+          .select("id, action, status, property_id")
+          .single();
+        if (error) return { error: error.message };
+        return {
+          applied: true,
+          work_order: updated,
+          previous_status: existing.status,
+          property_name:
+            (existing.properties as { name?: string } | null)?.name ?? null,
+        };
+      }
+
+      case "apply_project_status": {
+        const status = String(rawArgs.status || "").trim();
+        if (!PROJECT_STATUSES.includes(status as (typeof PROJECT_STATUSES)[number])) {
+          return {
+            error: `Ogiltig status. Tillåtna: ${PROJECT_STATUSES.join(", ")}`,
+          };
+        }
+
+        const { ids } = await resolvePropertyIds(
+          supabase,
+          orgId,
+          String(rawArgs.property_name || "") || undefined,
+        );
+        if (!ids.length) return { error: "Ingen fastighet i organisationen" };
+
+        let projectId = String(rawArgs.project_id || "").trim();
+        if (!projectId) {
+          let q = supabase
+            .from("projects")
+            .select("id, name, project_number, status, property_id")
+            .in("property_id", ids)
+            .limit(5);
+          const pnum = String(rawArgs.project_number || "").trim();
+          const pname = String(rawArgs.name || "").trim();
+          if (pnum) q = q.ilike("project_number", `%${pnum}%`);
+          if (pname) q = q.ilike("name", `%${pname}%`);
+          const { data: found } = await q;
+          if (!found?.length) return { error: "Inget projekt matchade" };
+          projectId = found[0].id as string;
+        }
+
+        const { data: existing } = await supabase
+          .from("projects")
+          .select("id, name, status, property_id")
+          .eq("id", projectId)
+          .in("property_id", ids)
+          .maybeSingle();
+        if (!existing) {
+          return { error: "Projekt hittades inte i din organisation" };
+        }
+
+        const { data: updated, error } = await supabase
+          .from("projects")
+          .update({ status })
+          .eq("id", projectId)
+          .select("id, name, project_number, status")
+          .single();
+        if (error) return { error: error.message };
+        return {
+          applied: true,
+          project: updated,
+          previous_status: existing.status,
+        };
+      }
+
+      case "apply_update_invoice_address": {
+        const inv = String(rawArgs.invoice_address || "").trim();
+        if (!inv) return { error: "invoice_address krävs" };
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        if (!prop) return { error: "Fastighet hittades inte" };
+        const { data: updated, error } = await supabase
+          .from("properties")
+          .update({ invoice_address: inv })
+          .eq("id", prop.id)
+          .eq("organization_id", orgId)
+          .select("id, name, invoice_address")
+          .single();
+        if (error) return { error: error.message };
+        return { applied: true, property: updated };
+      }
+
+      case "apply_create_work_order": {
+        const actionText = String(rawArgs.action || "").trim();
+        if (!actionText) return { error: "action krävs" };
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        if (!prop) {
+          return {
+            error: "Ange property_name eller property_id för arbetsordern",
+          };
+        }
+        let componentId: string | null = null;
+        const compName = String(rawArgs.component_name || "").trim();
+        if (compName) {
+          const { data: comp } = await supabase
+            .from("components")
+            .select("id")
+            .eq("property_id", prop.id)
+            .ilike("name", `%${compName}%`)
+            .limit(1)
+            .maybeSingle();
+          componentId = comp?.id ?? null;
+        }
+        const priceRaw = rawArgs.price;
+        const price =
+          priceRaw != null && !Number.isNaN(Number(priceRaw))
+            ? Number(priceRaw)
+            : null;
+        const { data: wo, error } = await supabase
+          .from("work_orders")
+          .insert({
+            property_id: prop.id,
+            component_id: componentId,
+            action: actionText,
+            priority: String(rawArgs.priority || "medium"),
+            status: "not_started",
+            contractor: (rawArgs.contractor as string) || null,
+            quarter: (rawArgs.quarter as string) || null,
+            due_date: (rawArgs.due_date as string) || null,
+            price,
+            comments:
+              (rawArgs.comments as string) ||
+              "Skapad via Jarvis (direkt på begäran)",
+          })
+          .select("id, action, status, property_id, contractor, quarter, due_date")
+          .single();
+        if (error) return { error: error.message };
+        return {
+          applied: true,
+          work_order: wo,
+          property_name: prop.name,
+          link_hint: `/work-orders`,
+        };
+      }
+
+      case "apply_create_project": {
+        const pname = String(rawArgs.name || "").trim();
+        if (!pname) return { error: "name krävs" };
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        if (!prop) {
+          return { error: "Ange fastighet (property_name/property_id)" };
+        }
+        const year = Number(rawArgs.year) || new Date().getFullYear();
+        const startQuarter =
+          Number(rawArgs.start_quarter) ||
+          Math.ceil((new Date().getMonth() + 1) / 3);
+        const ptype = (["investering", "underhall", "energi", "annat"] as const)
+          .includes(rawArgs.type as "investering")
+          ? String(rawArgs.type)
+          : "underhall";
+        const projectNumber =
+          String(rawArgs.project_number || "").trim() ||
+          generateProjectNumber(prop.property_number);
+        const budget =
+          rawArgs.budget != null && !Number.isNaN(Number(rawArgs.budget))
+            ? Number(rawArgs.budget)
+            : null;
+        const { data: project, error } = await supabase
+          .from("projects")
+          .insert({
+            property_id: prop.id,
+            name: pname,
+            description: (rawArgs.description as string) || null,
+            status: "planerat",
+            type: ptype,
+            project_number: projectNumber,
+            year,
+            start_quarter: startQuarter,
+            budget,
+            created_by: userId,
+          })
+          .select("id, name, project_number, status, type")
+          .single();
+        if (error) return { error: error.message };
+        return {
+          applied: true,
+          project,
+          property_name: prop.name,
+          link_hint: `/projects/${project.id}`,
+        };
+      }
+
+      case "apply_property_note": {
+        const content = String(rawArgs.content || "").trim();
+        if (!content) return { error: "content krävs" };
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        if (!prop) return { error: "Ange fastighet" };
+        const { data: note, error } = await supabase
+          .from("property_notes")
+          .insert({ property_id: prop.id, content })
+          .select("id, property_id, content, created_at")
+          .single();
+        if (error) return { error: error.message };
+        return {
+          applied: true,
+          note: { ...note, content: content.slice(0, 200) },
+          property_name: prop.name,
+        };
+      }
+
+      case "apply_create_property": {
+        const nameProp = String(rawArgs.name || "").trim();
+        if (!nameProp) return { error: "name krävs" };
+        const insert: Record<string, unknown> = {
+          name: nameProp,
+          organization_id: orgId,
+          owner_id: userId,
+          address: (rawArgs.address as string) || null,
+          property_number: (rawArgs.property_number as string) || null,
+          property_type: (rawArgs.property_type as string) || null,
+          invoice_address: (rawArgs.invoice_address as string) || null,
+          description: (rawArgs.description as string) || null,
+        };
+        if (rawArgs.construction_year != null) {
+          insert.construction_year = Number(rawArgs.construction_year);
+        }
+        if (rawArgs.area_sqm != null) {
+          insert.area_sqm = Number(rawArgs.area_sqm);
+        }
+        const { data: created, error } = await supabase
+          .from("properties")
+          .insert(insert)
+          .select("id, name, address, invoice_address")
+          .single();
+        if (error) return { error: error.message };
+        return {
+          applied: true,
+          property: created,
+          link_hint: `/property/${created.id}`,
+        };
+      }
+
+      case "apply_update_property": {
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs);
+        if (!prop) return { error: "Ange fastighet att uppdatera" };
+        const patch: Record<string, unknown> = {};
+        for (const key of [
+          "name",
+          "address",
+          "property_number",
+          "property_type",
+          "invoice_address",
+          "description",
+        ] as const) {
+          if (rawArgs[key] != null && String(rawArgs[key]).trim() !== "") {
+            patch[key] = rawArgs[key];
+          }
+        }
+        if (rawArgs.construction_year != null) {
+          patch.construction_year = Number(rawArgs.construction_year);
+        }
+        if (rawArgs.area_sqm != null) {
+          patch.area_sqm = Number(rawArgs.area_sqm);
+        }
+        if (!Object.keys(patch).length) {
+          return { error: "Inga fält att uppdatera" };
+        }
+        const { data: updated, error } = await supabase
+          .from("properties")
+          .update(patch)
+          .eq("id", prop.id)
+          .eq("organization_id", orgId)
+          .select("id, name, address, invoice_address, property_number")
+          .single();
+        if (error) return { error: error.message };
+        return { applied: true, property: updated };
       }
 
       case "get_property_overview": {

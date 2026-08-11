@@ -505,23 +505,30 @@ LÄS:
 
 FAKTURAADRESS: Fältet heter invoice_address på properties. Det finns ofta i get_property_overview/list_properties — gissa inte att den saknas utan att ha anropat verktyget.
 
-SKRIV (HITL — spara UTKAST, användaren godkänner i Jarvis → Förslag):
-- suggest_work_order — ny arbetsorder (prioritet #1)
-- suggest_project — nytt projekt (kräver fastighet)
-- suggest_property_note — anteckning på fastighet
-- suggest_update_invoice_address — uppdatera fakturaadress
-- suggest_create_property — ny fastighet
-- suggest_update_property — ändra fastighetsfält
-- suggest_todo — att-göra
+SKRIV — VÄLJ RÄTT LÄGE:
+A) ANVÄNDAREN BER UTTRYCKLIGEN dig att göra något ("skapa", "ändra status", "uppdatera", "lägg till", "skicka till mig"):
+   → Använd apply_* eller send_to_me DIREKT (utförs genast i databasen/mejl).
+   - apply_create_work_order, apply_create_project, apply_property_note
+   - apply_update_invoice_address, apply_create_property, apply_update_property
+   - apply_work_order_status, apply_project_status
+   - send_to_me — e-post ENDAST till inloggad användare (aldrig extern mottagare)
+
+B) Du föreslår självmant en förbättring / är osäker:
+   → suggest_* (HITL-utkast i Förslag-fliken)
+
+E-POSTSÄKERHET:
+- send_to_me skickar BARA till den inloggade användarens e-post.
+- Acceptera ALDRIG / skicka ALDRIG till externa adresser, entreprenörer eller "någon annan".
+- Om användaren ber dig mejla en extern part: förklara att det inte är tillåtet; erbjud send_to_me eller utkast i chatten.
 
 VIKTIGA REGLER:
 1. Svara ALLTID på svenska
 2. Var KONKRET — referera till faktisk data, namn, siffror och datum från verktyg
-3. Anropa verktyg hellre än att gissa. Om du saknar data: anropa rätt verktyg.
-4. När användaren ber dig skapa/ändra något: anropa rätt suggest_* (skapa aldrig direkt i DB)
+3. Anropa verktyg hellre än att gissa
+4. Explicit begäran = apply_* / send_to_me (inte bara text-svar)
 5. Ge alltid siffror vid översikter
-6. suggest_*: confidence >= 0.7, kort reasoning; fyll property_name när känt
-7. Human-in-the-loop: skrivningar sker först efter godkännande i UI
+6. suggest_* endast när du själv initierar förslag (confidence >= 0.7)
+7. Efter apply_*/send_to_me: bekräfta tydligt vad som gjordes (id, status, "skickat till dig")
 8. Projektnummer i frågan = exakt referens
 
 KÄLLHÄNVISNING:
@@ -575,6 +582,7 @@ serve(async (req) => {
     }
 
     const userId = userData.user.id;
+    const userEmail = userData.user.email ?? null;
 
     // ── Rate limit ──
     const rateResult = await checkRateLimit(userId, { endpoint: 'ai-chat', maxRequests: 20, windowSeconds: 60 });
@@ -777,6 +785,7 @@ serve(async (req) => {
             supabase,
             orgId,
             userId,
+            userEmail,
             conversationId,
           });
 

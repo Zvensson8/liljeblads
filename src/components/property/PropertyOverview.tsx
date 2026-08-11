@@ -53,8 +53,6 @@ export function PropertyOverview({
       );
       const mainContact = sortedContacts[0];
 
-      const recipientEmail = preferences?.notification_email || user.email;
-
       const normalizedContact = mainContact
         ? {
             name: mainContact.name ?? null,
@@ -63,16 +61,16 @@ export function PropertyOverview({
           }
         : null;
 
+      // Server always sends only to the signed-in user (ignores any recipient_email)
       await sendPropertyInfo.mutateAsync({
         property_name: property.name,
         property_number: property.property_number ?? null,
         property_address: property.address ?? null,
         invoice_address: property.invoice_address ?? null,
         main_contact: normalizedContact,
-        recipient_email: recipientEmail,
       });
 
-      toast.success('Kontaktinformation skickad till din e-post!');
+      toast.success(`Kontaktinformation skickad till ${user.email}`);
     } catch (error: unknown) {
       console.error('Error sending email:', error);
       toast.error('Kunde inte skicka e-post: ' + getErrorMessage(error));
