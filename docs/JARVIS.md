@@ -234,12 +234,33 @@ npx supabase functions deploy execute-ai-action --project-ref ojiswgqntenvbwtopx
 npx supabase functions deploy jarvis-daily-briefing --project-ref ojiswgqntenvbwtopxbu
 ```
 
+### P3 (klart i kod): zip/mapp in → index (data stannar i systemet)
+
+| Del | Hur |
+|-----|-----|
+| **Zip / mapp-upload** | Fastighet → Dokument: dra zip, multi-filer eller mappväljare |
+| **Expand** | `src/lib/zipDocumentIngest.ts` (JSZip, max 40 filer, allowlist) |
+| **Batch-logg** | `document_ingest_batches` (source zip/folder/upload, ok/fail) |
+| **Index** | Befintlig trigger → `embedding_queue` → `generate-embeddings` / cron |
+| **Jarvis tools** | `list_property_documents`, `list_document_ingest_batches`, `search_property_documents` |
+
+**Policy:** ingen godtycklig filsystem/URL-access.  
+**Nästa (connectors, ej i P3-kod):** SharePoint/OneDrive **läs-only** via OAuth + mapp-picker.
+
+Migrering: `20260811220000_document_ingest_batches.sql`
+
+```powershell
+# SQL i dashboard, sedan:
+npx supabase functions deploy ai-chat --project-ref ojiswgqntenvbwtopxbu
+```
+
 ### Roadmap (inom systemet först)
 
 1. ~~Grounding + action log + sidokontext + bekräftelsekort~~ (sprint 1)
 2. ~~Fullare CRUD (komponent, service, kontakt) + daily briefing + eval~~ (P1)
 3. ~~Undo, batch-apply, idempotency~~ (P2)
-4. **P3** — Upload/zip → index; SharePoint/Drive **läs-only**
+4. ~~Upload/zip → index~~ (P3)
+5. **Senare** — SharePoint/Drive read connector (gated)
 
 ## Runbook
 

@@ -1024,6 +1024,72 @@ export type Database = {
           },
         ]
       }
+      document_ingest_batches: {
+        Row: {
+          created_at: string
+          document_ids: string[]
+          error_summary: string | null
+          files_failed: number
+          files_ok: number
+          files_total: number
+          finished_at: string | null
+          id: string
+          label: string | null
+          organization_id: string
+          property_id: string
+          source: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_ids?: string[]
+          error_summary?: string | null
+          files_failed?: number
+          files_ok?: number
+          files_total?: number
+          finished_at?: string | null
+          id?: string
+          label?: string | null
+          organization_id: string
+          property_id: string
+          source?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          document_ids?: string[]
+          error_summary?: string | null
+          files_failed?: number
+          files_ok?: number
+          files_total?: number
+          finished_at?: string | null
+          id?: string
+          label?: string | null
+          organization_id?: string
+          property_id?: string
+          source?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_ingest_batches_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_ingest_batches_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       embeddings: {
         Row: {
           access_count: number | null

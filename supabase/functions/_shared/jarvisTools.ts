@@ -936,6 +936,38 @@ export const jarvisTools: ChatTool[] = [
   {
     type: "function",
     function: {
+      name: "list_property_documents",
+      description:
+        "Lista uppladdade fastighetsdokument (PDF m.m.) och om de är AI-indexerade. Använd när användaren frågar vilka dokument som finns, zip-uppladdning, protokoll, avtal.",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_document_ingest_batches",
+      description:
+        "Lista senaste zip/mapp/uppladdningsbatcher för en fastighet (P3 ingest).",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "apply_create_component",
       description:
         "Skapa komponent DIREKT på en fastighet. type = SC-kod (t.ex. SC4.6.2.6 värmepump, SC4.7 vent). Kräver name + fastighet.",
@@ -2598,6 +2630,71 @@ async function executeJarvisToolInner(
           briefing: stats,
           plain_text: formatBriefingPlain(stats),
           tip: "Använd send_to_me med subject 'Daglig briefing' och body=plain_text om användaren vill ha mejl.",
+        };
+      }
+
+      case "list_property_documents": {
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
+        if (!prop) return { error: "Ange property_name eller property_id" };
+        const { data: docs, error } = await supabase
+          .from("property_documents")
+          .select("id, name, mime_type, file_size, version, is_latest, created_at, file_url")
+          .eq("property_id", prop.id)
+          .eq("is_latest", true)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        if (error) return { error: error.message };
+        const ids = (docs || []).map((d) => d.id as string);
+        let indexed = new Set<string>();
+        if (ids.length) {
+          const { data: emb } = await supabase
+            .from("embeddings")
+            .select("source_id")
+            .eq("source_table", "property_documents")
+            .in("source_id", ids);
+          indexed = new Set((emb || []).map((e) => e.source_id as string));
+        }
+        return {
+          property_name: prop.name,
+          count: docs?.length || 0,
+          indexed_count: indexed.size,
+          documents: (docs || []).map((d) => ({
+            id: d.id,
+            name: d.name,
+            mime_type: d.mime_type,
+            file_size: d.file_size,
+            version: d.version,
+            created_at: d.created_at,
+            ai_indexed: indexed.has(d.id as string),
+            link_hint: `/property/${prop.id}`,
+          })),
+          tip:
+            "Dokument laddas upp under Fastighet → Dokument (zip/mapp stöds). Index sker via embedding-kö. Sök innehåll med search_property_documents.",
+        };
+      }
+
+      case "list_document_ingest_batches": {
+        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
+        if (!prop) return { error: "Ange property_name eller property_id" };
+        const { data: batches, error } = await supabase
+          .from("document_ingest_batches")
+          .select(
+            "id, source, label, status, files_total, files_ok, files_failed, created_at, finished_at, error_summary",
+          )
+          .eq("property_id", prop.id)
+          .eq("organization_id", orgId)
+          .order("created_at", { ascending: false })
+          .limit(Math.min(limit, 15));
+        if (error) {
+          return {
+            error: error.message,
+            tip: "Kör migrering 20260811220000_document_ingest_batches om tabellen saknas.",
+          };
+        }
+        return {
+          property_name: prop.name,
+          count: batches?.length || 0,
+          batches: batches || [],
         };
       }
 
