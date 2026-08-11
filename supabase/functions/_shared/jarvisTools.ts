@@ -24,7 +24,8 @@ export const jarvisTools: ChatTool[] = [
     type: "function",
     function: {
       name: "list_properties",
-      description: "Lista organisationens fastigheter (namn, adress, id).",
+      description:
+        "Lista organisationens fastigheter (namn, adress, fakturaadress/invoice_address, id).",
       parameters: {
         type: "object",
         properties: {
@@ -341,7 +342,7 @@ export const jarvisTools: ChatTool[] = [
     function: {
       name: "get_property_overview",
       description:
-        "Hämta samlad översikt för en fastighet: grunddata, komponenter, öppna WO, todos, anteckningar, dokument, kontakter, högrisk och aktiv underhållsplan. Använd först vid frågor om en specifik fastighet.",
+        "Hämta samlad översikt för en fastighet: grunddata (inkl. fakturaadress/invoice_address, adress, fastighetsnummer), komponenter, öppna WO, todos, anteckningar, dokument, högrisk och underhållsplan. Använd vid frågor om fakturaadress eller en specifik fastighet.",
       parameters: {
         type: "object",
         properties: {
@@ -383,7 +384,9 @@ export async function executeJarvisTool(
       case "list_properties": {
         let q = supabase
           .from("properties")
-          .select("id, name, address, property_number, property_type")
+          .select(
+            "id, name, address, invoice_address, property_number, property_type",
+          )
           .eq("organization_id", orgId)
           .order("name")
           .limit(limit);
@@ -709,7 +712,7 @@ export async function executeJarvisTool(
         let pq = supabase
           .from("properties")
           .select(
-            "id, name, address, area_sqm, construction_year, property_type, property_number, description",
+            "id, name, address, invoice_address, area_sqm, construction_year, property_type, property_number, description, loa",
           )
           .eq("organization_id", orgId)
           .limit(1);
