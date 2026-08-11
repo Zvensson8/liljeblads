@@ -75,10 +75,10 @@ export const useGlobalShortcuts = (onOpenSearch?: () => void) => {
       description: "Gå till Komponenter",
     },
     {
-      key: "o",
+      key: "j",
       ctrlKey: true,
-      handler: () => navigate("/operations"),
-      description: "Gå till Drift",
+      handler: () => navigate("/projects"),
+      description: "Gå till Projekt",
     },
   ];
 

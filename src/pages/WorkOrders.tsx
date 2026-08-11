@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Archive, LayoutGrid, Table as TableIcon, Wrench, Filter, Building2 } from "lucide-react";
+import { Plus, Search, Archive, LayoutGrid, Table as TableIcon, Wrench, Filter, Building2, Download } from "lucide-react";
 import { WorkOrderDialog } from "@/components/WorkOrderDialog";
 import { WorkOrderDetailDialog } from "@/components/WorkOrderDetailDialog";
 import { WorkOrderKanban } from "@/components/WorkOrderKanban";
@@ -24,6 +24,7 @@ import {
 import type { UpdateWorkOrderInput } from "@/types/domain";
 import { useComponentRiskList } from "@/hooks/useComponentRisk";
 import { ComponentRiskBadge } from "@/components/ComponentRiskBadge";
+import { exportWorkOrdersToExcel } from "@/lib/exportUtils";
 
 type WorkOrderRow = NonNullable<ReturnType<typeof useWorkOrders>["data"]>[number];
 import { queryKeys } from "@/lib/queryKeys";
@@ -118,6 +119,41 @@ const WorkOrders = () => {
     setSelectedProperty("all");
     setSelectedContractor("all");
     setSelectedStatus("all");
+  };
+
+  const [exporting, setExporting] = useState(false);
+
+  /** Export currently filtered work orders (respects search + filters + archive toggle). */
+  const handleExportExcel = async () => {
+    const source = workOrders || [];
+    const rows = filteredOrders(source);
+    if (rows.length === 0) {
+      toast.error("Inga arbetsordrar att exportera med nuvarande filter");
+      return;
+    }
+    setExporting(true);
+    try {
+      await exportWorkOrdersToExcel(
+        rows.map((wo) => ({
+          action: wo.action,
+          status: wo.status,
+          priority: wo.priority,
+          contractor: wo.contractor,
+          price: wo.price,
+          due_date: wo.due_date,
+          quarter: wo.quarter,
+          comments: wo.comments,
+          property_name: wo.properties?.name ?? null,
+          component_name: wo.components?.name ?? null,
+          created_at: wo.created_at,
+        })),
+      );
+      toast.success(`${rows.length} arbetsordrar exporterade`);
+    } catch {
+      toast.error("Kunde inte exportera arbetsordrar");
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Inline editing — status=completed also registers cost on component
@@ -487,6 +523,15 @@ const WorkOrders = () => {
                   >
                     <Archive className="h-4 w-4 mr-2" />
                     {showArchived ? "Aktiva" : "Arkiverade"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size={isMobile ? "sm" : "default"}
+                    onClick={() => void handleExportExcel()}
+                    disabled={exporting}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {exporting ? "Exporterar..." : isMobile ? "Export" : "Exportera XLSX"}
                   </Button>
                   <Button
                     size={isMobile ? "sm" : "default"}

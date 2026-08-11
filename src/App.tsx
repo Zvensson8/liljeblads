@@ -29,16 +29,12 @@ const Components = lazy(() => import("./pages/Components"));
 const ComponentDetail = lazy(() => import("./pages/ComponentDetail"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const Users = lazy(() => import("./pages/Users"));
-const Operations = lazy(() => import("./pages/Operations"));
-const CostOverview = lazy(() => import("./pages/CostOverview"));
 const WorkOrders = lazy(() => import("./pages/WorkOrders"));
 const Projects = lazy(() => import("./pages/Projects"));
 const OrganizationSettings = lazy(() => import("./pages/OrganizationSettings"));
 const UserSettings = lazy(() => import("./pages/UserSettings"));
 const FounderAdmin = lazy(() => import("./pages/FounderAdmin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Reports = lazy(() => import("./pages/Reports"));
-const SecurityDashboard = lazy(() => import("./pages/SecurityDashboard"));
 const AIChat = lazy(() => import("./pages/AIChat"));
 const AgentActivity = lazy(() => import("./pages/AgentActivity"));
 const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
@@ -82,12 +78,13 @@ const AppContent = () => {
           <Route path="/components" element={<ProtectedRoute><Components /></ProtectedRoute>} />
           <Route path="/components/:id" element={<ProtectedRoute><ComponentDetail /></ProtectedRoute>} />
           <Route path="/work-orders" element={<ProtectedRoute><WorkOrders /></ProtectedRoute>} />
-          <Route path="/operations" element={<ProtectedRoute><Operations /></ProtectedRoute>} />
+          {/* Slim-down: retired modules redirect to dashboard (code kept for Fas 3) */}
+          <Route path="/operations" element={<Navigate to="/dashboard" replace />} />
           <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
           <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
-          <Route path="/cost-overview" element={<ProtectedRoute><CostOverview /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><RequireAdmin><Reports /></RequireAdmin></ProtectedRoute>} />
-          <Route path="/security" element={<ProtectedRoute><SecurityDashboard /></ProtectedRoute>} />
+          <Route path="/cost-overview" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/reports" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/security" element={<Navigate to="/dashboard" replace />} />
           <Route path="/ai-chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />
           <Route path="/agent" element={<ProtectedRoute><AgentActivity /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><RequireAdmin><Users /></RequireAdmin></ProtectedRoute>} />

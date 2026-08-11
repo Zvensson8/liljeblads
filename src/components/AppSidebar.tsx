@@ -1,4 +1,4 @@
-import { Building2, Compass, Home, LogOut, Settings, Users, ClipboardList, Wrench, Briefcase, Building, Crown, UserCog, User, FileText, Shield, Bot, Activity, type LucideIcon } from "lucide-react";
+import { Building2, Compass, Home, LogOut, Settings, Users, Wrench, Briefcase, Building, Crown, UserCog, Bot, Activity, type LucideIcon } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,17 +24,15 @@ import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
 import { OrganizationSwitcher } from "./organization/OrganizationSwitcher";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
+/** Slim MVP nav — operations/reports/security removed (see featureFlags). */
 const navigationItems: Array<{ title: string; url: string; icon: LucideIcon; moduleName: ModuleName; adminOnly?: boolean }> = [
   { title: "Dashboard", url: "/dashboard", icon: Home, moduleName: "dashboard" },
   { title: "Fastigheter", url: "/properties", icon: Building2, moduleName: "properties" },
   { title: "Komponenter", url: "/components", icon: Settings, moduleName: "components" },
   { title: "Arbetsordrar", url: "/work-orders", icon: Wrench, moduleName: "work-orders" },
-  { title: "Driftuppföljning", url: "/operations", icon: ClipboardList, moduleName: "operations" },
   { title: "Projekthantering", url: "/projects", icon: Briefcase, moduleName: "projects" },
   { title: "AI Assistent", url: "/ai-chat", icon: Bot, moduleName: "ai-chat" },
   { title: "Agent-aktivitet", url: "/agent", icon: Activity, moduleName: "ai-chat" },
-  { title: "Rapporter", url: "/reports", icon: FileText, moduleName: "dashboard", adminOnly: true },
-  { title: "Säkerhet", url: "/security", icon: Shield, moduleName: "organization", adminOnly: true },
   { title: "Användare", url: "/users", icon: Users, moduleName: "users", adminOnly: true },
   { title: "Organisation", url: "/organization/settings", icon: Building, moduleName: "organization" },
 ];

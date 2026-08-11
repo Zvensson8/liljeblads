@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
-import { Plus, FolderArchive, Briefcase, Sparkles } from "lucide-react";
+import { Plus, FolderArchive, Briefcase, Sparkles, Download } from "lucide-react";
 import { toast } from "sonner";
 import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
 import { ProjectDashboard } from "@/components/projects/ProjectDashboard";
@@ -21,6 +21,7 @@ import { ProjectsTable } from "@/components/projects/ProjectsTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { filterAndSortProjects } from "@/lib/projectsListFilter";
+import { exportProjectsToExcel } from "@/lib/exportUtils";
 
 type ProjectStatus = Database["public"]["Enums"]["project_status"];
 type ProjectType = Database["public"]["Enums"]["project_type"];
@@ -268,6 +269,41 @@ export default function Projects() {
     [projects, searchQuery, statusFilter, typeFilter, propertyFilter, sortField, sortDirection],
   );
 
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportExcel = async () => {
+    const rows = filteredProjects.length > 0 ? filteredProjects : projects;
+    if (rows.length === 0) {
+      toast.error("Inga projekt att exportera");
+      return;
+    }
+    setExporting(true);
+    try {
+      await exportProjectsToExcel(
+        rows.map((p) => ({
+          project_number: p.project_number,
+          name: p.name,
+          type: p.type,
+          status: p.status,
+          property_name: p.property?.name ?? null,
+          year: p.year,
+          start_quarter: p.start_quarter,
+          start_date: p.start_date,
+          end_date: p.end_date,
+          budget: p.budget,
+          forecast: p.forecast,
+          actual_cost: p.actual_cost,
+          description: p.description,
+        })),
+      );
+      toast.success(`${rows.length} projekt exporterade`);
+    } catch {
+      toast.error("Kunde inte exportera projekt");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const tableProps = {
     projects: filteredProjects,
     totalUnfilteredCount: projects.length,
@@ -323,15 +359,25 @@ export default function Projects() {
                     </TabsTrigger>
                     <TabsTrigger value="archived">Arkiverade</TabsTrigger>
                   </TabsList>
-                  <Button
-                    onClick={() => {
-                      setEditingProject(null);
-                      setFormDialogOpen(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nytt projekt
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => void handleExportExcel()}
+                      disabled={exporting}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {exporting ? "Exporterar..." : "Exportera XLSX"}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setEditingProject(null);
+                        setFormDialogOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nytt projekt
+                    </Button>
+                  </div>
                 </div>
 
                 <TabsContent value="overview" className="space-y-6">

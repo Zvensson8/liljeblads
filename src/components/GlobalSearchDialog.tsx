@@ -8,7 +8,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Building2, Package, Wrench, Briefcase, Search, Sparkles, CheckSquare, Calendar, ClipboardList, Plus, FileDown, LogOut, Settings, LayoutDashboard, FolderKanban } from "lucide-react";
+import { Building2, Package, Wrench, Briefcase, Search, Sparkles, CheckSquare, Calendar, Plus, FileDown, LogOut, Settings, LayoutDashboard, FolderKanban, Bot } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAISearch, AISearchResult } from "@/hooks/useAISearch";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
@@ -47,10 +47,13 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
       { id: 'nav-properties', label: 'Gå till Fastigheter', icon: Building2, run: () => navigate('/properties') },
       { id: 'nav-workorders', label: 'Gå till Arbetsordrar', icon: Wrench, run: () => navigate('/work-orders') },
       { id: 'nav-projects', label: 'Gå till Projekt', icon: FolderKanban, run: () => navigate('/projects') },
-      { id: 'nav-operations', label: 'Gå till Drift', icon: ClipboardList, run: () => navigate('/operations') },
+      { id: 'nav-components', label: 'Gå till Komponenter', icon: Wrench, run: () => navigate('/components') },
+      { id: 'nav-ai', label: 'Gå till AI Assistent', icon: Bot, run: () => navigate('/ai-chat') },
       { id: 'new-property', label: 'Ny fastighet', icon: Plus, run: () => navigate('/properties?new=1') },
       { id: 'new-workorder', label: 'Ny arbetsorder', icon: Plus, run: () => navigate('/work-orders?new=1') },
       { id: 'export-properties', label: 'Exportera fastighetslista (XLSX)', icon: FileDown, run: () => navigate('/properties?export=xlsx') },
+      { id: 'export-workorders', label: 'Exportera arbetsordrar', icon: FileDown, run: () => navigate('/work-orders') },
+      { id: 'export-projects', label: 'Exportera projekt', icon: FileDown, run: () => navigate('/projects') },
       { id: 'settings-user', label: 'Mina inställningar', icon: Settings, run: () => navigate('/user/settings') },
       { id: 'settings-org', label: 'Organisationsinställningar', icon: Settings, run: () => navigate('/organization/settings') },
       { id: 'signout', label: 'Logga ut', icon: LogOut, run: () => signOut() },
@@ -115,10 +118,13 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
           path = `/properties/${r.details?.property?.id}?tab=todos`;
           break;
         case "drift_tasks":
+          // Operations module retired — land on property overview
           type = "drift_task";
           title = r.details?.name || r.content.split('.')[0];
           subtitle = `${r.details?.quarter || ''} ${r.details?.year || ''} - ${r.details?.property?.name || ''}`;
-          path = `/operations?property=${r.details?.property?.id}`;
+          path = r.details?.property?.id
+            ? `/property/${r.details.property.id}`
+            : '/properties';
           break;
         case "maintenance_history":
           type = "maintenance";
@@ -177,7 +183,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
       case "drift_task":
         return <Calendar className="h-4 w-4" />;
       case "maintenance":
-        return <ClipboardList className="h-4 w-4" />;
+        return <CheckSquare className="h-4 w-4" />;
       default:
         return <Search className="h-4 w-4" />;
     }

@@ -395,7 +395,7 @@ const Properties = () => {
                     </div>
                     <CardTitle className="mb-2 text-2xl">Inga fastigheter än</CardTitle>
                     <CardDescription className="text-base mb-6 text-center max-w-md">
-                      Kom igång genom att skapa din första fastighet och börja hantera dina ritningar
+                      Kom igång genom att skapa din första fastighet och lägga till komponenter
                     </CardDescription>
                     <Button onClick={() => setDialogOpen(true)} size="lg" className="gap-2">
                       <Plus className="h-5 w-5" />

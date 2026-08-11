@@ -668,7 +668,7 @@ export default function ComponentDetail() {
                         variant="outline"
                         onClick={() => navigate(`/property/${property.id}`)}
                       >
-                        Visa på ritning
+                        Visa fastighet
                       </Button>
                     </CardContent>
                   </Card>

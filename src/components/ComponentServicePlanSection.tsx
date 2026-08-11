@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Wrench, ExternalLink, CheckCircle2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Wrench, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useDriftTasks } from "@/hooks/useDriftTasks";
 import { useComponents } from "@/hooks/useComponents";
@@ -39,7 +38,6 @@ export function ComponentServicePlanSection({
   componentId,
   propertyId,
 }: ComponentServicePlanSectionProps) {
-  const navigate = useNavigate();
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const currentYear = new Date().getFullYear();
@@ -145,10 +143,10 @@ export function ComponentServicePlanSection({
         {Object.keys(groupedTasks).length === 0 ? (
           <div className="text-center py-6 border-2 border-dashed rounded-lg">
             <p className="text-sm text-muted-foreground mb-2">
-              Inga driftuppgifter finns för denna fastighet ännu
+              Inga driftuppgifter kopplade till denna fastighet
             </p>
             <p className="text-xs text-muted-foreground">
-              Skapa driftuppgifter i Driftuppföljning-modulen först
+              Använd arbetsordrar och serviceintervall för planerat underhåll
             </p>
           </div>
         ) : (
@@ -182,15 +180,7 @@ export function ComponentServicePlanSection({
                                 <Label htmlFor={`task-${task.id}`} className="cursor-pointer text-sm font-medium flex-1">
                                   {task.name}
                                 </Label>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => navigate("/operations")}
-                                  className="h-7 px-2"
-                                  title="Öppna i Driftuppföljning"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                </Button>
+
                               </div>
                               
                               <div className="flex items-center gap-3 text-xs text-muted-foreground">

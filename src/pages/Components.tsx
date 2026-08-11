@@ -434,7 +434,7 @@ const Components = () => {
                         </div>
                         <CardTitle className="mb-2 text-xl">Inga komponenter ännu</CardTitle>
                         <CardDescription className="text-base mb-4">
-                          Lägg till komponenter via ritningarna i dina fastigheter
+                          Lägg till komponenter från en fastighet eller med knappen ovan
                         </CardDescription>
                         <Button onClick={() => navigate('/properties')}>
                           Gå till Fastigheter

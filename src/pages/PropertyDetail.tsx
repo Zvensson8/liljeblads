@@ -1,17 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { useProperty } from '@/hooks/useProperties';
-import { useFloors, useCreateFloor, useUpdateFloor, useDeleteFloor } from '@/hooks/useFloors';
+import { useFloors } from '@/hooks/useFloors';
 import { useComponents } from '@/hooks/useComponents';
 import { useWorkOrders } from '@/hooks/useWorkOrders';
 import { useTodos } from '@/hooks/useTodos';
-import { useMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Edit, AlertCircle, Home } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
+import { ArrowLeft, Edit, AlertCircle, Home, Download } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PropertyEditDialog } from '@/components/PropertyEditDialog';
 import { WorkOrderDialog } from '@/components/WorkOrderDialog';
@@ -21,7 +17,6 @@ import { PropertyContacts } from '@/components/property/PropertyContacts';
 import { PropertyDocuments } from '@/components/property/PropertyDocuments';
 import { PropertyOverview } from '@/components/property/PropertyOverview';
 import { RiskMaintenancePlan } from '@/components/property/RiskMaintenancePlan';
-import { PropertyDrawingsTab } from '@/components/property/PropertyDrawingsTab';
 import { ActivityTimeline } from '@/components/ActivityTimeline';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -33,11 +28,12 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { useRecentlyVisited } from '@/hooks/useRecentlyVisited';
-import { PropertyTechnicalInfo } from '@/components/property-info/PropertyTechnicalInfo';
-import { PropertyInfoCategoryManager } from '@/components/property-info/PropertyInfoCategoryManager';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { featureFlags } from '@/lib/featureFlags';
+import { exportComponentsToExcel, exportWorkOrdersToExcel } from '@/lib/exportUtils';
+import { toast as sonnerToast } from 'sonner';
 
 interface Property {
   id: string;
@@ -58,31 +54,33 @@ interface Floor {
   drawing_url: string | null;
 }
 
-const TAB_ITEMS = [
+/** Slim property tabs — drawings / technical-info / info-categories gated by featureFlags */
+const TAB_ITEMS: Array<{ value: string; label: string }> = [
   { value: 'overview', label: 'Översikt' },
   { value: 'maintenance-plan', label: 'Underhållsplan' },
-  { value: 'drawings', label: 'Ritningar' },
+  ...(featureFlags.floorCanvasAndDrawings
+    ? [{ value: 'drawings', label: 'Ritningar' }]
+    : []),
   { value: 'notes', label: 'Anteckningar' },
   { value: 'todos', label: 'Att göra' },
   { value: 'contacts', label: 'Kontakter' },
   { value: 'documents', label: 'Dokument' },
   { value: 'activity', label: 'Aktivitet' },
-  { value: 'technical-info', label: 'Teknisk info' },
-  { value: 'info-categories', label: 'Info-kategorier' },
-] as const;
+  ...(featureFlags.propertyInfoCategories
+    ? [
+        { value: 'technical-info', label: 'Teknisk info' },
+        { value: 'info-categories', label: 'Info-kategorier' },
+      ]
+    : []),
+];
 
 const PropertyDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const { user } = useAuth();
   const isMobile = useIsMobile();
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [floorName, setFloorName] = useState('');
-  const [floorLevel, setFloorLevel] = useState('');
-  const [uploadingFile, setUploadingFile] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [workOrderDialogOpen, setWorkOrderDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
@@ -117,12 +115,6 @@ const PropertyDetail = () => {
     [workOrders],
   );
 
-  const { data: allMaintenance = [] } = useMaintenanceHistory();
-
-  const createFloor = useCreateFloor();
-  const updateFloor = useUpdateFloor();
-  const deleteFloor = useDeleteFloor();
-
   const loading = propertyLoading || floorsLoading;
 
   useEffect(() => {
@@ -147,108 +139,88 @@ const PropertyDetail = () => {
     }
   }, [property, addRecentItem]);
 
-  const fetchPropertyAndFloors = () => {
-    // react-query handles refetching via mutation invalidation + realtime.
-  };
-
-  const handleCreateFloor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id) return;
-    try {
-      await createFloor.mutateAsync({
-        name: floorName,
-        level: floorLevel ? parseInt(floorLevel) : null,
-        property_id: id,
-      });
-      setDialogOpen(false);
-      setFloorName('');
-      setFloorLevel('');
-    } catch {
-      // toast handled by hook
-    }
-  };
-
-  const handleFileUpload = async (floorId: string, file: File) => {
-    setUploadingFile(true);
-    if (!user?.id) {
-      toast({
-        title: 'Ej inloggad',
-        description: 'Logga in igen för att ladda upp ritning.',
-        variant: 'destructive',
-      });
-      setUploadingFile(false);
-      return;
-    }
-
-    const fileExt = file.name.split('.').pop() || 'png';
-    // Store object path only — bucket is private (public URLs do not work)
-    const filePath = `${user.id}/${floorId}/${Date.now()}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('floor-drawings')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: file.type || undefined,
-      });
-
-    if (uploadError) {
-      toast({
-        title: 'Fel vid uppladdning',
-        description: uploadError.message,
-        variant: 'destructive',
-      });
-      setUploadingFile(false);
-      return;
-    }
-
-    try {
-      // Persist storage path (not getPublicUrl) so FloorCanvas can download/sign
-      await updateFloor.mutateAsync({ id: floorId, patch: { drawing_url: filePath } });
-      toast({
-        title: 'Ritning uppladdad!',
-        description: 'Du kan nu märka ut komponenter på ritningen.',
-      });
-    } catch {
-      // toast handled by hook
-    }
-    setUploadingFile(false);
-  };
-
-  const handleDeleteFloor = async (floorId: string) => {
+  // Redirect retired property tabs (drawings / technical-info) to overview
+  useEffect(() => {
+    const tab = searchParams.get('tab');
     if (
-      !confirm(
-        'Är du säker på att du vill ta bort denna våning? Alla komponenter på våningen kommer också att tas bort.',
-      )
+      tab &&
+      (tab === 'drawings' || tab === 'technical-info' || tab === 'info-categories') &&
+      !featureFlags.floorCanvasAndDrawings &&
+      !featureFlags.propertyInfoCategories
     ) {
-      return;
+      setActiveTab('overview');
     }
-    deleteFloor.mutate(floorId);
-  };
+  }, [searchParams]);
 
-  const handleDeleteDrawing = async (floor: Floor) => {
-    if (
-      !confirm(
-        'Är du säker på att du vill ta bort ritningen? Komponenter på våningen kommer att behållas.',
-      )
-    ) {
-      return;
-    }
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportPropertyData = async () => {
+    if (!property) return;
+    setExporting(true);
     try {
-      await updateFloor.mutateAsync({ id: floor.id, patch: { drawing_url: null } });
-      toast({
-        title: 'Ritning borttagen',
-        description: 'Ritningen har tagits bort. Du kan ladda upp en ny.',
-      });
+      const safeName = property.name.replace(/[^\w\-åäöÅÄÖ]+/gi, '_').slice(0, 40);
+      const stamp = new Date().toISOString().split('T')[0];
+
+      if (components.length > 0) {
+        const exportRows = components.map((c) => ({
+          id: c.id,
+          name: c.name,
+          type: c.type,
+          status: c.status,
+          manufacturer: c.manufacturer,
+          model: c.model,
+          serial_number: c.serial_number,
+          room_zone: c.room_zone,
+          installation_year: c.installation_year,
+          registration_number: c.registration_number,
+          refrigerant_code: c.refrigerant_code,
+          refrigerant_amount_kg: c.refrigerant_amount_kg,
+          refrigerant_type: c.refrigerant_type,
+          floor_name: c.floors?.name ?? undefined,
+          property_name: property.name,
+          property_address: property.address,
+        }));
+        await exportComponentsToExcel(
+          exportRows,
+          {},
+          `${safeName}_komponenter_${stamp}.xlsx`,
+        );
+      }
+
+      const activeWOs = workOrders.filter((wo) => wo.status !== 'archived');
+      if (activeWOs.length > 0) {
+        await exportWorkOrdersToExcel(
+          activeWOs.map((wo) => ({
+            action: wo.action,
+            status: wo.status,
+            priority: wo.priority,
+            contractor: wo.contractor,
+            price: wo.price,
+            due_date: wo.due_date,
+            quarter: wo.quarter,
+            comments: wo.comments,
+            property_name: property.name,
+            component_name: wo.components?.name ?? null,
+            created_at: wo.created_at,
+          })),
+          `${safeName}_arbetsordrar_${stamp}.xlsx`,
+        );
+      }
+
+      if (components.length === 0 && activeWOs.length === 0) {
+        sonnerToast.error('Inga komponenter eller arbetsordrar att exportera');
+        return;
+      }
+
+      sonnerToast.success(
+        `Exporterat: ${components.length} komponenter, ${activeWOs.length} arbetsordrar`,
+      );
     } catch {
-      // toast handled by hook
+      sonnerToast.error('Kunde inte exportera fastighetsdata');
+    } finally {
+      setExporting(false);
     }
   };
-
-  // keep export available for future header actions
-  void allMaintenance;
-  void exportComponentsToExcel;
-  void exportComponentsToPDF;
 
   if (loading) {
     return (
@@ -324,11 +296,25 @@ const PropertyDetail = () => {
               </div>
             </div>
           </div>
-          <Button className="gap-2 w-full sm:w-auto" onClick={() => setEditDialogOpen(true)}>
-            <Edit className="h-4 w-4" />
-            <span className="hidden sm:inline">Redigera Fastighet</span>
-            <span className="sm:hidden">Redigera</span>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              className="gap-2 w-full sm:w-auto"
+              onClick={() => void handleExportPropertyData()}
+              disabled={exporting}
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">
+                {exporting ? 'Exporterar...' : 'Exportera XLSX'}
+              </span>
+              <span className="sm:hidden">{exporting ? '...' : 'Export'}</span>
+            </Button>
+            <Button className="gap-2 w-full sm:w-auto" onClick={() => setEditDialogOpen(true)}>
+              <Edit className="h-4 w-4" />
+              <span className="hidden sm:inline">Redigera Fastighet</span>
+              <span className="sm:hidden">Redigera</span>
+            </Button>
+          </div>
         </div>
       </div>
     </header>
@@ -366,24 +352,6 @@ const PropertyDetail = () => {
         <TabsContent value="maintenance-plan">
           <RiskMaintenancePlan propertyId={property.id} propertyName={property.name} />
         </TabsContent>
-        <TabsContent value="drawings">
-          <PropertyDrawingsTab
-            floors={floors}
-            dialogOpen={dialogOpen}
-            onDialogOpenChange={setDialogOpen}
-            floorName={floorName}
-            floorLevel={floorLevel}
-            onFloorNameChange={setFloorName}
-            onFloorLevelChange={setFloorLevel}
-            onCreateFloor={handleCreateFloor}
-            onDeleteFloor={handleDeleteFloor}
-            onDeleteDrawing={handleDeleteDrawing}
-            onUploadDrawing={handleFileUpload}
-            uploadingFile={uploadingFile}
-            onCanvasUpdate={fetchPropertyAndFloors}
-            onBackToOverview={() => setActiveTab('overview')}
-          />
-        </TabsContent>
         <TabsContent value="notes">
           <PropertyNotes propertyId={property.id} />
         </TabsContent>
@@ -399,12 +367,6 @@ const PropertyDetail = () => {
         <TabsContent value="activity">
           <ActivityTimeline propertyId={property.id} />
         </TabsContent>
-        <TabsContent value="technical-info">
-          <PropertyTechnicalInfo propertyId={property.id} />
-        </TabsContent>
-        <TabsContent value="info-categories">
-          <PropertyInfoCategoryManager />
-        </TabsContent>
       </main>
     </Tabs>
   );
@@ -416,7 +378,6 @@ const PropertyDetail = () => {
         onOpenChange={setEditDialogOpen}
         property={property}
         onSuccess={() => {
-          fetchPropertyAndFloors();
           setEditDialogOpen(false);
         }}
       />
@@ -425,7 +386,6 @@ const PropertyDetail = () => {
         onOpenChange={setWorkOrderDialogOpen}
         propertyId={id}
         onSuccess={() => {
-          fetchPropertyAndFloors();
           setWorkOrderDialogOpen(false);
         }}
       />

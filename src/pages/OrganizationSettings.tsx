@@ -15,14 +15,12 @@ import { OrganizationBranding } from "@/components/organization/OrganizationBran
 import { OrganizationInvitations } from "@/components/organization/OrganizationInvitations";
 import { OrganizationAuditLogs } from "@/components/organization/OrganizationAuditLogs";
 import { OrganizationDataExport } from "@/components/organization/OrganizationDataExport";
-import { PropertyInfoCategoryManager } from "@/components/property-info/PropertyInfoCategoryManager";
 import { ProjectTemplates } from "@/components/organization/ProjectTemplates";
-import { NotificationSettings } from "@/components/organization/NotificationSettings";
 import { OrganizationModuleAccess } from "@/components/organization/OrganizationModuleAccess";
-import { OrganizationCapacity } from "@/components/organization/OrganizationCapacity";
 import { OrganizationApiKeys } from "@/components/organization/OrganizationApiKeys";
 import { AgentRiskPolicySettings } from "@/components/organization/AgentRiskPolicySettings";
 import { OrganizationUnitPrices } from "@/components/organization/OrganizationUnitPrices";
+import { featureFlags } from "@/lib/featureFlags";
 
 
 interface Organization {
@@ -286,17 +284,19 @@ export default function OrganizationSettings() {
               <TabsList className="flex flex-wrap">
                 <TabsTrigger value="info">Information</TabsTrigger>
                 <TabsTrigger value="members">Medlemmar</TabsTrigger>
-                {isAdmin && <TabsTrigger value="capacity">Kapacitet</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="module-access">Modulåtkomst</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="integrations">Integrationer</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="agent">Agent & risk</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="unit-prices">Áprislista</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="invitations">Inbjudningar</TabsTrigger>}
-                {isAdmin && <TabsTrigger value="audit">Säkerhetslogg</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="branding">Varumärke</TabsTrigger>}
                 {isAdmin && <TabsTrigger value="templates">Projektmallar</TabsTrigger>}
-                {isAdmin && <TabsTrigger value="property-info">Fastighetsinformation</TabsTrigger>}
-                {isAdmin && <TabsTrigger value="export">Data Export</TabsTrigger>}
+                {isAdmin && featureFlags.orgAdvancedAdminTabs && (
+                  <TabsTrigger value="audit">Säkerhetslogg</TabsTrigger>
+                )}
+                {isAdmin && featureFlags.orgAdvancedAdminTabs && (
+                  <TabsTrigger value="export">Data Export</TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="info">
@@ -314,12 +314,6 @@ export default function OrganizationSettings() {
                   currentUserId={user?.id || ""}
                 />
               </TabsContent>
-
-              {isAdmin && (
-                <TabsContent value="capacity">
-                  <OrganizationCapacity organization={organization as unknown as Parameters<typeof OrganizationCapacity>[0]["organization"]} />
-                </TabsContent>
-              )}
 
               {isAdmin && (
                 <TabsContent value="module-access">
@@ -357,7 +351,7 @@ export default function OrganizationSettings() {
                 </TabsContent>
               )}
 
-              {isAdmin && (
+              {isAdmin && featureFlags.orgAdvancedAdminTabs && (
                 <TabsContent value="audit">
                   <OrganizationAuditLogs organizationId={organization.id} />
                 </TabsContent>
@@ -378,13 +372,7 @@ export default function OrganizationSettings() {
                 </TabsContent>
               )}
 
-              {isAdmin && (
-                <TabsContent value="property-info">
-                  <PropertyInfoCategoryManager />
-                </TabsContent>
-              )}
-
-              {isAdmin && (
+              {isAdmin && featureFlags.orgAdvancedAdminTabs && (
                 <TabsContent value="export">
                   <OrganizationDataExport organizationId={organization.id} />
                 </TabsContent>

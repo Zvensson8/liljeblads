@@ -157,3 +157,117 @@ export const exportComponentsToPDF = (
   
   doc.save(filename);
 };
+
+const WORK_ORDER_STATUS_SV: Record<string, string> = {
+  not_started: 'Ej påbörjad',
+  awaiting_quote: 'Inväntar offert',
+  ordered: 'Beställt',
+  completed: 'Slutförd',
+  archived: 'Arkiverad',
+};
+
+const WORK_ORDER_PRIORITY_SV: Record<string, string> = {
+  low: 'Låg',
+  medium: 'Medel',
+  high: 'Hög',
+};
+
+export interface WorkOrderExportRow {
+  action: string;
+  status: string;
+  priority?: string | null;
+  contractor?: string | null;
+  price?: number | null;
+  due_date?: string | null;
+  quarter?: string | null;
+  comments?: string | null;
+  property_name?: string | null;
+  component_name?: string | null;
+  created_at?: string | null;
+}
+
+/** Export filtered work orders to Excel (replaces global /reports summary). */
+export const exportWorkOrdersToExcel = async (
+  orders: WorkOrderExportRow[],
+  filename?: string
+) => {
+  const wb = createWorkbook();
+  const data = orders.map((wo) => ({
+    Åtgärd: wo.action || '-',
+    Status: WORK_ORDER_STATUS_SV[wo.status] || wo.status,
+    Prioritet: WORK_ORDER_PRIORITY_SV[wo.priority || ''] || wo.priority || '-',
+    Fastighet: wo.property_name || '-',
+    Komponent: wo.component_name || '-',
+    Entreprenör: wo.contractor || '-',
+    'Pris (kr)': wo.price != null ? wo.price : '-',
+    Förfallodatum: wo.due_date
+      ? format(new Date(wo.due_date), 'yyyy-MM-dd')
+      : '-',
+    Kvartal: wo.quarter || '-',
+    Kommentar: wo.comments || '-',
+    Skapad: wo.created_at
+      ? format(new Date(wo.created_at), 'yyyy-MM-dd')
+      : '-',
+  }));
+  addJsonSheet(wb, 'Arbetsordrar', data.length ? data : [{ Åtgärd: '(inga rader)' }]);
+  const name =
+    filename ||
+    `Arbetsordrar_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+  await downloadWorkbook(wb, name);
+};
+
+const PROJECT_STATUS_SV: Record<string, string> = {
+  planned: 'Planerad',
+  active: 'Aktiv',
+  on_hold: 'Pausad',
+  completed: 'Slutförd',
+  cancelled: 'Avbruten',
+  proposal: 'Förslag',
+};
+
+export interface ProjectExportRow {
+  project_number?: string | null;
+  name: string;
+  type?: string | null;
+  status?: string | null;
+  property_name?: string | null;
+  year?: number | null;
+  start_quarter?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  budget?: number | null;
+  forecast?: number | null;
+  actual_cost?: number | null;
+  description?: string | null;
+}
+
+/** Export filtered project list to Excel. */
+export const exportProjectsToExcel = async (
+  projects: ProjectExportRow[],
+  filename?: string
+) => {
+  const wb = createWorkbook();
+  const data = projects.map((p) => ({
+    'Projektnr': p.project_number || '-',
+    Namn: p.name,
+    Typ: p.type || '-',
+    Status: PROJECT_STATUS_SV[p.status || ''] || p.status || '-',
+    Fastighet: p.property_name || '-',
+    År: p.year ?? '-',
+    Kvartal: p.start_quarter != null ? `Q${p.start_quarter}` : '-',
+    Startdatum: p.start_date
+      ? format(new Date(p.start_date), 'yyyy-MM-dd')
+      : '-',
+    Slutdatum: p.end_date
+      ? format(new Date(p.end_date), 'yyyy-MM-dd')
+      : '-',
+    'Budget (kr)': p.budget ?? '-',
+    'Prognos (kr)': p.forecast ?? '-',
+    'Utfall (kr)': p.actual_cost ?? '-',
+    Beskrivning: p.description || '-',
+  }));
+  addJsonSheet(wb, 'Projekt', data.length ? data : [{ Namn: '(inga rader)' }]);
+  const name =
+    filename || `Projekt_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+  await downloadWorkbook(wb, name);
+};
