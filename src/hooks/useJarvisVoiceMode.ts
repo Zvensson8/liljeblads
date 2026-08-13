@@ -53,7 +53,7 @@ export type VoiceModeOptions = {
 export function useJarvisVoiceMode(opts: VoiceModeOptions) {
   const lang = opts.lang || 'sv-SE';
   const silenceMs = opts.silenceMs ?? 1600;
-  const postSpeakMs = opts.postSpeakMs ?? 700;
+  const postSpeakMs = opts.postSpeakMs ?? 900;
   const [supported] = useState(() => Boolean(getRecognitionCtor()));
   const [active, setActive] = useState(false);
   const [phase, setPhase] = useState<VoicePhase>('idle');
@@ -63,8 +63,10 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
   const tts = useTextToSpeech();
   const speakRef = useRef(tts.speak);
   const stopTtsRef = useRef(tts.stop);
+  const unlockTtsRef = useRef(tts.unlock);
   speakRef.current = tts.speak;
   stopTtsRef.current = tts.stop;
+  unlockTtsRef.current = tts.unlock;
 
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const activeRef = useRef(false);
@@ -336,6 +338,7 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
     setActive(true);
     setError(null);
     ignoreUntilRef.current = 0;
+    unlockTtsRef.current();
     startListen({ fresh: true });
   }, [supported, startListen]);
 

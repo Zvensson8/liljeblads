@@ -27,7 +27,7 @@
 
 | | |
 |--|--|
-| **Röstsamtal** | Stor knappen “Röstläge” — lyssna → Jarvis svarar högt → lyssnar igen (som Grok/ChatGPT voice) |
+| **Röstsamtal** | Stor knappen “Röstläge” — lyssna → Jarvis svarar med Grok-röst (Ara) → lyssnar igen |
 | **Diktering** | Lilla mikrofonen — fyller textfältet (manual skicka) |
 | **Offline** | Kan inte skicka till Jarvis offline (apply avstängt) |
 | **Läsare** | Roll “Läsare” får fråga men inte skapa/ändra |
