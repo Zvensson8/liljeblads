@@ -13,6 +13,7 @@ import {
   toolsIncludeWrite,
   INTENT_FORCE_USER_NUDGE,
 } from "../_shared/jarvisIntent.ts";
+import { colleagueSpeak, looksLikeReport } from "../_shared/colleagueSpeak.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -552,37 +553,36 @@ E-POSTSÄKERHET:
 
 VIKTIGA REGLER:
 1. Svara ALLTID på svenska
-2. Var KONKRET — referera till faktisk data, namn, siffror och datum från verktyg
+2. Var KONKRET — namn, belopp, datum från verktyg. Inte UUID, inte URL, inte intern statuskod.
 3. Anropa verktyg hellre än att gissa
 4. Explicit begäran = apply_* / send_to_me (inte bara text-svar)
-5. Ge alltid siffror vid översikter
+5. Nämn bara de siffror som svarar på frågan — rabbla inte budget+forecast+id+länk
 6. suggest_* endast när du själv initierar förslag (confidence >= 0.7)
-7. Efter apply_*/send_to_me: bekräfta tydligt vad som gjordes (id, status, "skickat till dig") och nämn länk om link_hint finns
+7. Efter apply_*/send_to_me: en mening vad som gjordes. Ingen länk/id i texten (korten i UI räcker).
 8. Projektnummer i frågan = exakt referens
 9. Om tool returnerar error: visa felet, hitta inte på data
 
 KÄLLHÄNVISNING:
 - Kunskapsbas: "Enligt ABT 06..."
 - Fastighetsdokument: nämn filnamn
-- Systemdata: nämn fastighet/projekt/WO
+- Systemdata: nämn fastighet/projekt/WO med namn (inte UUID)
 
-SVARSFORMAT:
-📊 SAMMANFATTNING
-🔍 DETALJER
-⚠️ AVVIKELSER & REKOMMENDATIONER (vid behov)
+TON — som en kollega på kontoret (icke förhandlingsbart):
+- Börja med svaret. Vanlig chatt: 2–4 korta meningar. Aldrig rapportmall.
+- FÖRBJUDET: SAMMANFATTNING, DETALJER, AVVIKELSER, emoji-rubriker, 👉, ---, Projekt-ID, Länk: /projects/…
+- Status på svenska: pågår, planerat, klart, arkiverad — aldrig "pagaende" / "not_started".
+- Bra: "Asfalteringen på Hjulet pågår. Budget fyra miljoner, men inget är fakturerat än — start Q3 2026."
+- Dåligt: hela projektkortet med id, länk, forecast och rekommendationer.
+- En följdfråga max, bara om den hjälper. Rapport/lista endast om användaren ber om det.`;
 
-FÖLJDFRÅGOR:
-Avsluta med 2-3 förslag under "---" radvis: "👉 [fråga]".`;
+const voicePromptAddendum = `RÖSTLÄGE — du PRATAR med en kollega (viktigare än allt nedan):
+- 1–2 korta meningar. Stopp.
+- Inga rubriker, listor, id, länkar, forecast, "inga avvikelser".
+- Exempel på frågan "hur ser asfalteringen på Hjulet ut": "Den pågår. Budget fyra miljoner men inget fakturerat än, start Q3 2026."
+- Efter åtgärd: "Klart, den är arkiverad." Inte mer.
+- Arkivera/status: gör det. Fråga inte om lov.
 
-const voicePromptAddendum = `
-
-RÖSTLÄGE (användaren pratar med Ara — svara som i ett samtal):
-- 1–3 korta meningar. Prata, skriv inte en rapport.
-- Inga emoji, inga rubriker (SAMMANFATTNING/DETALJER), inga "👉"-följdfrågor, ingen "---".
-- Efter en åtgärd: en mening. Exempel: "Klart. Arbetsordern på Nolhaga är arkiverad. Säg till om du vill ångra."
-- Arkivera/status: gör det direkt. Fråga inte "är du säker?".
-- Om något saknas: en kort fråga, sedan tyst.
-- Räkna upp högst tre saker högt.`;
+`;
 
 // ── Main handler ─────────────────────────────────────────────
 serve(async (req) => {
@@ -703,7 +703,11 @@ serve(async (req) => {
           buildContext(supabase, orgId, lastUserMsg.content),
         ];
 
-        if (GOOGLE_AI_API_KEY) {
+        const wantsDocs = /dokument|avtal|protokoll|ab[t6]|pdf|ritning|standard|föreskrift/i
+          .test(String(lastUserMsg.content));
+        const isVoice = voice === true || voice === 'true';
+        // Voice + "hur ligger projektet?" — skip slow embedding searches
+        if (GOOGLE_AI_API_KEY && (!isVoice || wantsDocs)) {
           contextPromises.push(
             searchKnowledgeBase(supabase, lastUserMsg.content, GOOGLE_AI_API_KEY),
           );
@@ -748,9 +752,10 @@ serve(async (req) => {
       }
     }
 
+    const isVoiceTurn = voice === true || voice === 'true';
     const systemPrompt =
+      (isVoiceTurn ? voicePromptAddendum : '') +
       systemPromptBase +
-      (voice === true || voice === 'true' ? voicePromptAddendum : '') +
       `\n\nAKTIV ORGANISATION (scope): ${orgId}. Använd endast data från denna org.` +
       pageContextBlock +
       contextInfo +
@@ -811,7 +816,7 @@ serve(async (req) => {
       { round: 0, phase: 'guard', detail: `org=${orgId}` },
       { round: 0, phase: 'context' },
     ];
-    const MAX_ROUNDS = 5;
+    const MAX_ROUNDS = isVoiceTurn ? 3 : 5;
     let finalMessage = '';
     let intentNudgeUsed = false;
 
@@ -863,6 +868,7 @@ serve(async (req) => {
           tools: jarvisTools,
           tool_choice: 'auto',
           temperature: 0.3,
+          max_tokens: isVoiceTurn ? 400 : undefined,
         });
 
         if (aiResult instanceof Response) {
@@ -1041,8 +1047,9 @@ serve(async (req) => {
               ...workingMessages,
               {
                 role: 'user',
-                content:
-                  'Sammanfatta nu ett slutgiltigt svar till användaren baserat på verktygsresultaten. Anropa inte fler verktyg.',
+                content: isVoiceTurn
+                  ? 'Svara nu som en kollega i 1–2 korta meningar. Inga rubriker, UUID, länkar eller listor. Bara det användaren frågade. Anropa inte fler verktyg.'
+                  : 'Svara nu i 2–4 korta meningar som en kollega, baserat på verktygsresultaten. Ingen rapportmall. Anropa inte fler verktyg.',
               },
             ],
             stream: false,
@@ -1068,10 +1075,17 @@ serve(async (req) => {
       return jsonResponse({ error: `AI-fel: ${msg.slice(0, 200)}` }, 502);
     }
 
+    let reply =
+      finalMessage ||
+      'Jag har hämtat data men kunde inte formulera ett svar. Försök omformulera frågan.';
+    if (isVoiceTurn) {
+      reply = colleagueSpeak(reply, 2, 360);
+    } else if (looksLikeReport(reply)) {
+      reply = colleagueSpeak(reply, 4, 720);
+    }
+
     return jsonResponse({
-      message:
-        finalMessage ||
-        'Jag har hämtat data men kunde inte formulera ett svar. Försök omformulera frågan.',
+      message: reply,
       suggestedActions,
       appliedActions,
       toolsUsed,
