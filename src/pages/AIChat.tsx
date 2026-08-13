@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, Bot, User, Plus, Trash2, MessageSquare, Menu, Sparkles, Mic, MicOff, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +23,8 @@ import { mergeAppliedActions } from '@/lib/jarvisActionFromMessage';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useOrgRole } from '@/hooks/useOrgRole';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
+import { useJarvisVoiceMode } from '@/hooks/useJarvisVoiceMode';
+import JarvisVoicePanel from '@/components/ai-chat/JarvisVoicePanel';
 
 interface Message {
   id: string;
@@ -222,13 +224,14 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
     };
   };
 
-  const sendMessage = async (text?: string) => {
+  /** Returns assistant reply text (for voice mode TTS). */
+  const sendMessage = async (text?: string): Promise<string | null> => {
     const messageText = text || input;
-    if (!messageText.trim() || isLoading || !user) return;
+    if (!messageText.trim() || isLoading || !user) return null;
 
     if (!isOnline) {
       toast.warning('Du är offline — Jarvis apply är avstängt tills du är online igen.');
-      return;
+      return null;
     }
 
     const userMessage: Message = {
@@ -330,6 +333,7 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
 
       // Soft invalidate — cards stay via appliedByMessageIdRef merge in useEffect
       await queryClient.invalidateQueries({ queryKey: ['ai-messages', conversationId] });
+      return assistantContent;
     } catch (error: unknown) {
       const err = error as { context?: { status?: number }; status?: number } | null;
       const status = err?.context?.status ?? err?.status;
@@ -337,7 +341,7 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
         toast.error('Sessionen har gått ut. Logga in igen.');
         await supabase.auth.signOut();
         window.location.href = '/auth';
-        return;
+        return null;
       }
       if (status === 429) toast.error('För många förfrågningar. Vänta en stund.');
       else if (status === 402) toast.error('Krediter slut.');
@@ -345,15 +349,31 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
         console.error('AI chat error:', error);
         toast.error('Ett fel uppstod. Försök igen.');
       }
+      const failMsg = 'Ett fel uppstod. Försök igen.';
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: 'Ett fel uppstod. Försök igen.'
+        content: failMsg
       }]);
+      return failMsg;
     } finally {
       setIsLoading(false);
     }
   };
+
+  const onVoiceUtterance = useCallback(
+    async (text: string) => sendMessage(text),
+    // sendMessage closes over latest messages/input/state — recreated each render is ok for voice
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, isLoading, isOnline, selectedConversationId, messages, pageContext],
+  );
+
+  const voice = useJarvisVoiceMode({
+    lang: 'sv-SE',
+    enabled: isOnline,
+    isBusy: isLoading,
+    onUserUtterance: onVoiceUtterance,
+  });
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -636,7 +656,17 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
 
               {/* Input */}
               <div className="border-t p-4 bg-background">
-                <div className="max-w-3xl mx-auto space-y-2">
+                <div className="max-w-3xl mx-auto space-y-3">
+                  {isOnline && (
+                    <JarvisVoicePanel
+                      supported={voice.supported}
+                      active={voice.active}
+                      phase={voice.phase}
+                      liveTranscript={voice.liveTranscript}
+                      error={voice.error}
+                      onToggle={() => (voice.active ? voice.stop() : voice.start())}
+                    />
+                  )}
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     {!isOnline && (
                       <span className="flex items-center gap-1 text-amber-600">

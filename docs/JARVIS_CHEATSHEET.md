@@ -23,14 +23,17 @@
 2. **Mejl går bara till dig** (inloggad adress) — inte till entreprenör.  
 3. **Externa mappar** = zip/mapp-upload in i Liljeblads (inte “läs C:\”).
 
-## Fas 5
+## Fas 5 + röstsamtal
 
 | | |
 |--|--|
-| **Röst** | Mikrofonknappen (Chrome/Edge) — diktera på svenska |
+| **Röstsamtal** | Stor knappen “Röstläge” — lyssna → Jarvis svarar högt → lyssnar igen (som Grok/ChatGPT voice) |
+| **Diktering** | Lilla mikrofonen — fyller textfältet (manual skicka) |
 | **Offline** | Kan inte skicka till Jarvis offline (apply avstängt) |
 | **Läsare** | Roll “Läsare” får fråga men inte skapa/ändra |
 | **Byt org** | Sidebar — din roll visas under org-namnet |
+
+**Tips röstsamtal:** Chrome/Edge, tillåt mikrofon, prata en mening, **pausa ~1,5 s** så skickas det. Tryck stopp för att avsluta.
 
 ## Flikar
 

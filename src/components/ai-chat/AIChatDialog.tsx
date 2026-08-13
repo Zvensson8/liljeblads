@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Send, Loader2, Bot, User, MapPin, Mic, MicOff, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,9 +11,11 @@ import JarvisActionCards, {
 } from '@/components/ai-chat/JarvisActionCards';
 import { mergeAppliedActions } from '@/lib/jarvisActionFromMessage';
 import JarvisRecentActions from '@/components/ai-chat/JarvisRecentActions';
+import JarvisVoicePanel from '@/components/ai-chat/JarvisVoicePanel';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useOrgRole } from '@/hooks/useOrgRole';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
+import { useJarvisVoiceMode } from '@/hooks/useJarvisVoiceMode';
 import { toast } from 'sonner';
 
 interface Message {
@@ -59,20 +61,21 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
     }
   }, [messages, lastApplied]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (overrideText?: string): Promise<string | null> => {
+    const content = (overrideText ?? input).trim();
+    if (!content || isLoading) return null;
 
     if (!isOnline) {
       toast.warning('Du är offline', {
         description: 'Jarvis kan inte köra apply. Vänta tills du är online.',
       });
-      return;
+      return null;
     }
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input.trim(),
+      content,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -125,6 +128,7 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
 
       setMessages((prev) => [...prev, assistantMessage]);
       if (applied.length) setLastApplied(applied);
+      return messageText;
     } catch (error: unknown) {
       const err = error as { context?: { status?: number }; status?: number } | null;
       const status = err?.context?.status ?? err?.status;
@@ -137,22 +141,37 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
             content: 'Din session har gått ut. Logga in igen och försök på nytt.',
           },
         ]);
-        return;
+        return null;
       }
 
       console.error('AI chat error:', error);
+      const fail = 'Ett fel uppstod. Försök igen.';
       setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: 'Ett fel uppstod. Försök igen.',
+          content: fail,
         },
       ]);
+      return fail;
     } finally {
       setIsLoading(false);
     }
   };
+
+  const onVoiceUtterance = useCallback(
+    async (text: string) => sendMessage(text),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [messages, isLoading, isOnline, pageContext, input],
+  );
+
+  const voice = useJarvisVoiceMode({
+    lang: 'sv-SE',
+    enabled: open && isOnline,
+    isBusy: isLoading,
+    onUserUtterance: onVoiceUtterance,
+  });
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -300,7 +319,18 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
       )}
 
       {/* Input */}
-      <div className="border-t p-3 shrink-0">
+      <div className="border-t p-3 shrink-0 space-y-2">
+        {isOnline && (
+          <JarvisVoicePanel
+            compact
+            supported={voice.supported}
+            active={voice.active}
+            phase={voice.phase}
+            liveTranscript={voice.liveTranscript}
+            error={voice.error}
+            onToggle={() => (voice.active ? voice.stop() : voice.start())}
+          />
+        )}
         {!canWrite && (
           <p className="text-[10px] text-muted-foreground mb-1.5">
             Din roll ({roleLabel}) är läs-only — Jarvis apply blockeras i backend/UI.
@@ -360,7 +390,7 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
             Logg
           </Button>
           <Button
-            onClick={sendMessage}
+            onClick={() => void sendMessage()}
             disabled={!input.trim() || isLoading || !isOnline}
             size="icon"
           >
