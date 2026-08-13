@@ -61,6 +61,22 @@ serve(async (req) => {
         recipients: [] as string[],
       };
       try {
+        // Fas 3: respect org setting daily_briefing_enabled (default true if missing)
+        const { data: settings } = await supabase
+          .from("organization_jarvis_settings")
+          .select("daily_briefing_enabled, daily_briefing_roles")
+          .eq("organization_id", orgId)
+          .maybeSingle();
+        if (settings && settings.daily_briefing_enabled === false) {
+          row.skipped = true;
+          row.reason = "briefing_disabled";
+          results.push(row);
+          continue;
+        }
+        const roleFilter =
+          (settings?.daily_briefing_roles as string[] | null) ||
+          ["owner", "admin"];
+
         const stats = await buildDailyBriefing(supabase, orgId);
         row.orgName = stats.orgName;
         row.stats = {
@@ -94,8 +110,7 @@ serve(async (req) => {
           .from("organization_members")
           .select("user_id, role")
           .eq("organization_id", orgId)
-          // owner | admin (same as weekly digest); each gets own email only
-          .in("role", ["owner", "admin"]);
+          .in("role", roleFilter.length ? roleFilter : ["owner", "admin"]);
         const userIds = (members ?? []).map((m) => m.user_id as string);
         let emails: string[] = [];
         if (userIds.length) {

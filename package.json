@@ -28,7 +28,8 @@
     "sync:edge-risk": "node scripts/sync-edge-risk.mjs",
     "sync:edge-risk:check": "node scripts/sync-edge-risk.mjs --check",
     "ci:local": "npm run typecheck && npm run test:unit && npm run sync:edge-risk:check && npm run test:smoke:pm && npm run test:smoke:org && npm run test:isolation:jwt && npm run build:vite",
-    "ci:jarvis": "npm run typecheck && npm run test:unit -- src/lib/jarvisPolicy.test.ts src/lib/jarvisActionFromMessage.ts && npm run test:smoke:jarvis"
+    "ci:jarvis": "npm run typecheck && npm run test:unit -- src/lib/jarvisPolicy.test.ts && node scripts/check-golden-prompts.mjs && npm run test:smoke:jarvis",
+    "check:golden": "node scripts/check-golden-prompts.mjs"
   },
   "engines": {
     "node": ">=18"

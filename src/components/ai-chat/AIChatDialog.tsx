@@ -10,6 +10,7 @@ import JarvisActionCards, {
   type JarvisAppliedAction,
 } from '@/components/ai-chat/JarvisActionCards';
 import { mergeAppliedActions } from '@/lib/jarvisActionFromMessage';
+import JarvisRecentActions from '@/components/ai-chat/JarvisRecentActions';
 
 interface Message {
   id: string;
@@ -28,6 +29,7 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lastApplied, setLastApplied] = useState<JarvisAppliedAction[] | null>(null);
+  const [showLog, setShowLog] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const aiChat = useAIChat();
@@ -268,6 +270,12 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
         </div>
       )}
 
+      {showLog && (
+        <div className="border-t max-h-48 overflow-y-auto px-2 py-2 shrink-0 bg-muted/20">
+          <JarvisRecentActions />
+        </div>
+      )}
+
       {/* Input */}
       <div className="border-t p-3 shrink-0">
         <div className="flex gap-2">
@@ -280,6 +288,16 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
             disabled={isLoading}
             className="flex-1"
           />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0 text-[11px] px-2"
+            onClick={() => setShowLog((v) => !v)}
+            title="Visa senaste åtgärder"
+          >
+            Logg
+          </Button>
           <Button
             onClick={sendMessage}
             disabled={!input.trim() || isLoading}

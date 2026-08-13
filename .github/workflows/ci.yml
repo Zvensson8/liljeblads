@@ -29,6 +29,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Jarvis policy unit tests (Fas 0)
+        run: npm run test:unit -- src/lib/jarvisPolicy.test.ts
+
+      - name: Golden prompts fixture (Fas 0)
+        run: node scripts/check-golden-prompts.mjs
+
       - name: Lint
         run: npm run lint
         continue-on-error: true

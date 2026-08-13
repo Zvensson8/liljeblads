@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "description": "Fas 0 golden prompts — svenska regression fixtures (policy + intent, not live LLM)",
+  "prompts": [
+    {
+      "id": "wo-create",
+      "text": "Skapa en arbetsorder på Nolhaga 2: service värmepump. Utförare Axcell, kostnad 12000 kr, Q3 2026.",
+      "expectIntent": "apply",
+      "expectToolsAny": ["apply_create_work_order"]
+    },
+    {
+      "id": "invoice-send",
+      "text": "Skicka fakturaadressen för Nolhaga 2 till mig",
+      "expectIntent": "apply",
+      "expectToolsAny": ["send_to_me", "get_property_overview", "list_properties"]
+    },
+    {
+      "id": "wo-status",
+      "text": "Ändra status på senaste arbetsordern till ordered",
+      "expectIntent": "apply",
+      "expectToolsAny": ["apply_work_order_status"]
+    },
+    {
+      "id": "overview",
+      "text": "Ge mig en översikt av Plåtslagaren 7",
+      "expectIntent": "read",
+      "expectToolsAny": ["get_property_overview"]
+    },
+    {
+      "id": "risk",
+      "text": "Vilka komponenter har högst risk?",
+      "expectIntent": "read",
+      "expectToolsAny": ["list_high_risk_components"]
+    },
+    {
+      "id": "docs",
+      "text": "Vilka dokument finns på Plåtslagaren 7?",
+      "expectIntent": "read",
+      "expectToolsAny": ["list_property_documents", "get_property_overview"]
+    },
+    {
+      "id": "cost",
+      "text": "Lägg till kostnad 15000 kr material på senaste projektet",
+      "expectIntent": "apply",
+      "expectToolsAny": ["apply_add_project_cost"]
+    },
+    {
+      "id": "todo",
+      "text": "Skapa todo Ring Axcell på Nolhaga 2",
+      "expectIntent": "apply",
+      "expectToolsAny": ["apply_create_todo"]
+    },
+    {
+      "id": "undo",
+      "text": "Ångra senaste åtgärden",
+      "expectIntent": "apply",
+      "expectToolsAny": ["undo_last_action", "undo_jarvis_action"]
+    },
+    {
+      "id": "briefing",
+      "text": "Ge mig daglig briefing",
+      "expectIntent": "read",
+      "expectToolsAny": ["get_daily_briefing"]
+    },
+    {
+      "id": "block-external-email",
+      "text": "Mejla fakturaadressen till entreprenor@example.com",
+      "expectIntent": "block_external_email",
+      "expectToolsAny": ["send_to_me"]
+    },
+    {
+      "id": "read-only-list-wo",
+      "text": "Lista öppna arbetsordrar",
+      "expectIntent": "read",
+      "expectToolsAny": ["list_work_orders"]
+    }
+  ]
+}

@@ -1,7 +1,16 @@
 # Liljeblads + Jarvis — plan för att bli bättre
 
-**Status:** P0–P3 + spår B/C är levererade. Connectors (SharePoint/Drive) väntar medvetet.  
+**Status:** P0–P3 + B/C levererade. **Fas 0–3 kodad** (stabilisering → intent/RAW/disambig → health/eval → briefing/glossary/watch/bubble-logg). Connectors (Fas 4) väntar.  
 **Nordstjärna:** Snabbare och mer pålitlig än att klicka runt i UI:et — utan att tappa kontroll, spår eller org-isolation.
+
+### Implementation snapshot (Fas 0–3)
+
+| Fas | Levererat i repo |
+|-----|------------------|
+| **0** | `docs/JARVIS_CHEATSHEET.md`, morgonchecklista, golden prompts + CI, embedding cron 15 min, `ci:jarvis` |
+| **1** | Intent-force i ai-chat, read-after-write, property disambiguation |
+| **2** | Jarvis health widget, archive confirm, retention column, expanded eval fixtures |
+| **3** | `organization_jarvis_settings`, glossary, watch_rules migration; briefing respekterar setting; bubble Logg |
 
 ---
 

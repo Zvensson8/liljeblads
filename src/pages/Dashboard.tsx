@@ -22,6 +22,7 @@ import { AttentionRequiredSection } from '@/components/AttentionRequiredSection'
 import { RecentlyVisitedWidget } from '@/components/RecentlyVisitedWidget';
 import { PropertyMapDialog } from '@/components/maps/PropertyMapDialog';
 import { KPIWidget } from '@/components/dashboard/widgets/KPIWidget';
+import { JarvisHealthWidget } from '@/components/dashboard/JarvisHealthWidget';
 
 interface RecentWorkOrder {
   id: string;
@@ -221,6 +222,12 @@ const Dashboard = () => {
                 {kpiCards.map((kpi) => (
                   <KPIWidget key={kpi.title} {...kpi} />
                 ))}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="md:col-span-1">
+                  <JarvisHealthWidget />
+                </div>
               </div>
 
               <div className="grid gap-6 md:grid-cols-2">

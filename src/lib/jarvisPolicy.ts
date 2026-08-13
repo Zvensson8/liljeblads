@@ -74,7 +74,8 @@ export function deepLinkForEntity(
 /** Explicit vs proactive tool mode from user intent keywords (Swedish). */
 export function prefersDirectApply(userMessage: string): boolean {
   const m = userMessage.toLowerCase();
-  return /\b(skapa|lägg till|uppdatera|ändra|sätt|logga|skicka till mig|mejl[a]? mig|spara|registrera)\b/.test(
+  // No \b — JS word boundary is ASCII-only and breaks on Swedish letters
+  return /(skapa|lägg till|uppdatera|ändra|sätt|logga|skicka|mejla|maila|spara|registrera|markera|ångra)/.test(
     m,
   );
 }

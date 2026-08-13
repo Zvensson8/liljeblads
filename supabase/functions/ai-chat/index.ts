@@ -8,6 +8,11 @@ import {
   type ChatCompletionResponse,
 } from "../_shared/llmClient.ts";
 import { executeJarvisTool, jarvisTools } from "../_shared/jarvisTools.ts";
+import {
+  hasExplicitWriteIntent,
+  toolsIncludeWrite,
+  INTENT_FORCE_USER_NUDGE,
+} from "../_shared/jarvisIntent.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -789,8 +794,15 @@ serve(async (req) => {
       { round: 0, phase: 'guard', detail: `org=${orgId}` },
       { round: 0, phase: 'context' },
     ];
-    const MAX_ROUNDS = 4;
+    const MAX_ROUNDS = 5;
     let finalMessage = '';
+    let intentNudgeUsed = false;
+
+    const lastUserText = String(
+      [...messages].reverse().find((m: { role?: string }) => m.role === 'user')
+        ?.content || '',
+    );
+    const needsWrite = hasExplicitWriteIntent(lastUserText);
 
     const safePageContext =
       pageContext && typeof pageContext === 'object'
@@ -801,6 +813,28 @@ serve(async (req) => {
             path: (pageContext as { path?: string }).path,
           }
         : null;
+
+    // Fas 3: org glossary into system prompt
+    try {
+      const { data: gloss } = await supabase
+        .from('organization_glossary')
+        .select('term, meaning')
+        .eq('organization_id', orgId)
+        .limit(40);
+      if (gloss?.length) {
+        const lines = gloss
+          .map((g) => `- ${g.term}: ${g.meaning}`)
+          .join('\n');
+        workingMessages[0] = {
+          role: 'system',
+          content:
+            String((workingMessages[0] as { content?: string }).content || '') +
+            `\n\nORG-GLOSSARIUM (använd dessa termer):\n${lines}`,
+        };
+      }
+    } catch {
+      /* table may not exist yet */
+    }
 
     try {
       for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -824,6 +858,16 @@ serve(async (req) => {
         const content = choice?.message?.content || '';
 
         if (!toolCalls.length) {
+          // Fas 1A: write intent but no tools → force one more planner round
+          if (needsWrite && !toolsIncludeWrite(toolsUsed) && !intentNudgeUsed) {
+            intentNudgeUsed = true;
+            graphTrace.push({ round, phase: 'intent_force' });
+            workingMessages.push({
+              role: 'user',
+              content: INTENT_FORCE_USER_NUDGE,
+            });
+            continue;
+          }
           finalMessage = content;
           graphTrace.push({ round, phase: 'respond' });
           break;

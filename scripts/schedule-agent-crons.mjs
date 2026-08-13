@@ -68,8 +68,10 @@ const sql = [
   scheduleJob('risk-suggest-actions-daily', '0 6 * * *', 'risk-suggest-actions'),
   // Jarvis daily briefing to org owners/admins (weekdays 06:15 UTC)
   scheduleJob('jarvis-daily-briefing-weekdays', '15 6 * * 1-5', 'jarvis-daily-briefing'),
+  // Fas 0: process embedding queue often so PDF become AI-indexed quickly
+  scheduleJob('generate-embeddings-quarter-hourly', '*/15 * * * *', 'generate-embeddings'),
   scheduleJob('weekly-org-digest-monday', '0 7 * * 1', 'weekly-org-digest'),
-  `SELECT jobid, jobname, schedule FROM cron.job WHERE jobname IN ('risk-suggest-actions-daily','jarvis-daily-briefing-weekdays','weekly-org-digest-monday','generate-embeddings-quarter-hourly','process-embedding-queue') ORDER BY jobname;`,
+  `SELECT jobid, jobname, schedule FROM cron.job WHERE jobname IN ('risk-suggest-actions-daily','jarvis-daily-briefing-weekdays','generate-embeddings-quarter-hourly','weekly-org-digest-monday','process-embedding-queue') ORDER BY jobname;`,
 ].join('\n');
 
 const tmp = resolve(process.cwd(), '_schedule_crons.sql');

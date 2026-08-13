@@ -1401,24 +1401,81 @@ type ResolvedProperty = {
   description?: string | null;
 };
 
+type PropertyResolve =
+  | { ok: true; property: ResolvedProperty }
+  | { ok: false; error: string; candidates?: Array<{ id: string; name: string }> };
+
+/** Fas 1C: never silently pick among multiple name matches */
+async function resolveOnePropertyDetailed(
+  supabase: SupabaseClient,
+  orgId: string,
+  rawArgs: Record<string, unknown>,
+  pageContext?: ToolContext["pageContext"],
+): Promise<PropertyResolve> {
+  const propId = String(rawArgs.property_id || pageContext?.property_id || "").trim();
+  const propName = String(rawArgs.property_name || "").trim();
+  if (!propId && !propName) {
+    return { ok: false, error: "Ange property_name eller property_id" };
+  }
+  if (propId) {
+    const { data } = await supabase
+      .from("properties")
+      .select(PROPERTY_SELECT)
+      .eq("organization_id", orgId)
+      .eq("id", propId)
+      .maybeSingle();
+    if (!data) return { ok: false, error: "Fastighet hittades inte" };
+    return { ok: true, property: data as ResolvedProperty };
+  }
+
+  const { data } = await supabase
+    .from("properties")
+    .select(PROPERTY_SELECT)
+    .eq("organization_id", orgId)
+    .ilike("name", `%${propName}%`)
+    .order("name")
+    .limit(8);
+
+  const rows = (data || []) as ResolvedProperty[];
+  if (!rows.length) return { ok: false, error: `Ingen fastighet matchade "${propName}"` };
+
+  const exact = rows.filter(
+    (p) => (p.name || "").toLowerCase() === propName.toLowerCase(),
+  );
+  if (exact.length === 1) return { ok: true, property: exact[0] };
+  if (rows.length === 1) return { ok: true, property: rows[0] };
+
+  const candidates = rows.map((p) => ({ id: p.id, name: p.name }));
+  return {
+    ok: false,
+    error:
+      `Flera fastigheter matchade "${propName}". Menade du: ` +
+      candidates.map((c) => c.name).join(" | ") +
+      `? Ange exakt namn eller property_id.`,
+    candidates,
+  };
+}
+
 async function resolveOneProperty(
   supabase: SupabaseClient,
   orgId: string,
   rawArgs: Record<string, unknown>,
   pageContext?: ToolContext["pageContext"],
 ): Promise<ResolvedProperty | null> {
-  const propId = String(rawArgs.property_id || pageContext?.property_id || "").trim();
-  const propName = String(rawArgs.property_name || "").trim();
-  if (!propId && !propName) return null;
-  let q = supabase
-    .from("properties")
-    .select(PROPERTY_SELECT)
-    .eq("organization_id", orgId)
-    .limit(1);
-  if (propId) q = q.eq("id", propId);
-  else q = q.ilike("name", `%${propName}%`);
-  const { data } = await q.maybeSingle();
-  return data as ResolvedProperty | null;
+  const r = await resolveOnePropertyDetailed(supabase, orgId, rawArgs, pageContext);
+  return r.ok ? r.property : null;
+}
+
+/** Prefer detailed resolve and surface ambiguity to the model/user */
+async function requireProperty(
+  supabase: SupabaseClient,
+  orgId: string,
+  rawArgs: Record<string, unknown>,
+  pageContext?: ToolContext["pageContext"],
+): Promise<ResolvedProperty | { error: string; candidates?: Array<{ id: string; name: string }> }> {
+  const r = await resolveOnePropertyDetailed(supabase, orgId, rawArgs, pageContext);
+  if (r.ok) return r.property;
+  return { error: r.error, candidates: r.candidates };
 }
 
 type ResolvedComponent = {
@@ -1616,26 +1673,128 @@ export async function executeJarvisTool(
   const result = await executeJarvisToolInner(name, args, ctx);
 
   if (shouldLog && name !== "batch_apply_actions") {
-    // batch logs children individually
-    const logId = await logJarvisAction(ctx, name, args, result);
+    // Fas 1B: read-after-write verification
+    let verifiedResult = result;
     if (
       result &&
       typeof result === "object" &&
-      !(result as { idempotent_replay?: boolean }).idempotent_replay
+      (result as { applied?: boolean }).applied === true
     ) {
-      const r = result as Record<string, unknown>;
+      verifiedResult = await attachReadAfterWrite(
+        ctx.supabase,
+        ctx.orgId,
+        name,
+        result as Record<string, unknown>,
+      );
+    }
+
+    const logId = await logJarvisAction(ctx, name, args, verifiedResult);
+    if (
+      verifiedResult &&
+      typeof verifiedResult === "object" &&
+      !(verifiedResult as { idempotent_replay?: boolean }).idempotent_replay
+    ) {
+      const r = verifiedResult as Record<string, unknown>;
       if (logId) r.action_log_id = logId;
-      // Mark undoable whenever reverse is possible — even if log insert failed
-      // (UI can still call undo_last_action / jarvis-undo without id)
       if (r.applied === true && extractReversePayload(name, r)) {
         r.undoable = true;
         r.undo_window_ms = UNDO_WINDOW_MS;
         r.undo_until = undoDeadline(new Date().toISOString());
       }
     }
+    return verifiedResult;
   }
 
   return result;
+}
+
+/** Fas 1B: re-read entity after apply so UI/model show DB truth */
+async function attachReadAfterWrite(
+  supabase: SupabaseClient,
+  orgId: string,
+  toolName: string,
+  result: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  try {
+    if (result.work_order && typeof result.work_order === "object") {
+      const id = (result.work_order as { id?: string }).id;
+      if (id) {
+        const { data } = await supabase
+          .from("work_orders")
+          .select(WORK_ORDER_SELECT)
+          .eq("id", id)
+          .maybeSingle();
+        if (data) {
+          return {
+            ...result,
+            work_order: data,
+            verified: true,
+            verified_at: new Date().toISOString(),
+          };
+        }
+      }
+    }
+    if (result.project && typeof result.project === "object") {
+      const id = (result.project as { id?: string }).id;
+      if (id) {
+        const { data } = await supabase
+          .from("projects")
+          .select(PROJECT_SELECT)
+          .eq("id", id)
+          .maybeSingle();
+        if (data) {
+          return {
+            ...result,
+            project: data,
+            verified: true,
+            verified_at: new Date().toISOString(),
+          };
+        }
+      }
+    }
+    if (result.property && typeof result.property === "object") {
+      const id = (result.property as { id?: string }).id;
+      if (id) {
+        const { data } = await supabase
+          .from("properties")
+          .select(PROPERTY_SELECT)
+          .eq("id", id)
+          .eq("organization_id", orgId)
+          .maybeSingle();
+        if (data) {
+          return {
+            ...result,
+            property: data,
+            verified: true,
+            verified_at: new Date().toISOString(),
+          };
+        }
+      }
+    }
+    if (result.component && typeof result.component === "object") {
+      const id = (result.component as { id?: string }).id;
+      if (id) {
+        const { data } = await supabase
+          .from("components")
+          .select(
+            "id, name, type, status, manufacturer, model, serial_number, property_id",
+          )
+          .eq("id", id)
+          .maybeSingle();
+        if (data) {
+          return {
+            ...result,
+            component: data,
+            verified: true,
+            verified_at: new Date().toISOString(),
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[read-after-write]", e instanceof Error ? e.message : e);
+  }
+  return { ...result, verified: false };
 }
 
 async function executeJarvisToolInner(
@@ -2128,6 +2287,14 @@ async function executeJarvisToolInner(
             error: `Ogiltig status. Tillåtna: ${WO_STATUSES.join(", ")}`,
           };
         }
+        // Fas 2: destructive archive requires explicit confirm
+        if (status === "archived" && rawArgs.confirm !== true) {
+          return {
+            error:
+              "Arkivering kräver confirm: true (destructiv åtgärd). Bekräfta med användaren först.",
+            requires_confirm: true,
+          };
+        }
 
         let woId = String(rawArgs.work_order_id || "").trim();
         if (!woId) {
@@ -2247,8 +2414,9 @@ async function executeJarvisToolInner(
       case "apply_update_invoice_address": {
         const inv = String(rawArgs.invoice_address || "").trim();
         if (!inv) return { error: "invoice_address krävs" };
-        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
-        if (!prop) return { error: "Fastighet hittades inte" };
+        const propRes = await requireProperty(supabase, orgId, rawArgs, pageContext);
+        if ("error" in propRes) return propRes;
+        const prop = propRes;
         const { data: updated, error } = await supabase
           .from("properties")
           .update({ invoice_address: inv })
@@ -2275,12 +2443,9 @@ async function executeJarvisToolInner(
       case "apply_create_work_order": {
         const actionText = String(rawArgs.action || "").trim();
         if (!actionText) return { error: "action krävs" };
-        const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
-        if (!prop) {
-          return {
-            error: "Ange property_name eller property_id för arbetsordern",
-          };
-        }
+        const propRes = await requireProperty(supabase, orgId, rawArgs, pageContext);
+        if ("error" in propRes) return propRes;
+        const prop = propRes;
         let componentId: string | null = null;
         const compName = String(rawArgs.component_name || "").trim();
         if (compName) {
