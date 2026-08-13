@@ -81,7 +81,7 @@
 | Dashboard “Jarvis health”: apply success %, undo rate, send_to_me fail, pending HITL | |
 | PII-redaction i loggar (delvis finns) + retention-policy | |
 | Founder break-glass-logg när man hoppar org | |
-| Destructive (radera/arkivera) alltid `confirm: true` + HITL | |
+| Permanent radering: finns inte via Jarvis. Arkivering/status körs direkt (ångra 5 min) | |
 
 **Kill metrics (följ varje månad)**  
 1. Tid till sparad WO (Jarvis vs manuell)  

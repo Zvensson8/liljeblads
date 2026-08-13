@@ -61,7 +61,10 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
     }
   }, [messages, lastApplied]);
 
-  const sendMessage = async (overrideText?: string): Promise<string | null> => {
+  const sendMessage = async (
+    overrideText?: string,
+    opts?: { voice?: boolean },
+  ): Promise<string | null> => {
     const content = (overrideText ?? input).trim();
     if (!content || isLoading) return null;
 
@@ -96,6 +99,7 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
           path: pageContext.path,
           label: pageContext.label,
         },
+        voice: opts?.voice === true,
       });
 
       // supabase.functions.invoke sometimes nests body; unwrap common shapes
@@ -161,7 +165,7 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
   };
 
   const onVoiceUtterance = useCallback(
-    async (text: string) => sendMessage(text),
+    async (text: string) => sendMessage(text, { voice: true }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [messages, isLoading, isOnline, pageContext, input],
   );

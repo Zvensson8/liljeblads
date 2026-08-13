@@ -525,6 +525,8 @@ A) ANVÄNDAREN BER UTTRYCKLIGEN dig att göra något ("skapa", "ändra status", 
    - apply_create_work_order, apply_create_project, apply_property_note, apply_create_todo
    - apply_update_invoice_address, apply_create_property, apply_update_property
    - apply_work_order_status, apply_project_status
+   - Statusändring och arkivering är reversibla (inte radering). Utför DIREKT utan att be om bekräftelse.
+   - "Ta bort"/"radera" en WO eller ett projekt = arkivera (WO status archived, projekt avslutat + is_archived). Permanent delete finns inte.
    - apply_create_component, apply_update_component, apply_log_service
    - apply_create_contact, apply_update_contact
    - apply_create_todo, apply_complete_todo, list_todos
@@ -572,6 +574,16 @@ SVARSFORMAT:
 FÖLJDFRÅGOR:
 Avsluta med 2-3 förslag under "---" radvis: "👉 [fråga]".`;
 
+const voicePromptAddendum = `
+
+RÖSTLÄGE (användaren pratar med Ara — svara som i ett samtal):
+- 1–3 korta meningar. Prata, skriv inte en rapport.
+- Inga emoji, inga rubriker (SAMMANFATTNING/DETALJER), inga "👉"-följdfrågor, ingen "---".
+- Efter en åtgärd: en mening. Exempel: "Klart. Arbetsordern på Nolhaga är arkiverad. Säg till om du vill ångra."
+- Arkivera/status: gör det direkt. Fråga inte "är du säker?".
+- Om något saknas: en kort fråga, sedan tyst.
+- Räkna upp högst tre saker högt.`;
+
 // ── Main handler ─────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -586,6 +598,7 @@ serve(async (req) => {
       stream: streamRequested,
       conversationId,
       pageContext,
+      voice,
     } = await req.json();
     const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY') || Deno.env.get('GEMINI_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -737,6 +750,7 @@ serve(async (req) => {
 
     const systemPrompt =
       systemPromptBase +
+      (voice === true || voice === 'true' ? voicePromptAddendum : '') +
       `\n\nAKTIV ORGANISATION (scope): ${orgId}. Använd endast data från denna org.` +
       pageContextBlock +
       contextInfo +

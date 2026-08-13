@@ -75,7 +75,18 @@ export function deepLinkForEntity(
 export function prefersDirectApply(userMessage: string): boolean {
   const m = userMessage.toLowerCase();
   // No \b — JS word boundary is ASCII-only and breaks on Swedish letters
-  return /(skapa|lägg till|uppdatera|ändra|sätt|logga|skicka|mejla|maila|spara|registrera|markera|ångra)/.test(
+  return /(skapa|lägg till|uppdatera|ändra|sätt|logga|skicka|mejla|maila|spara|registrera|markera|ångra|arkivera|stäng|avsluta|ta bort|radera)/.test(
+    m,
+  );
+}
+
+/**
+ * Soft/reversible writes: status change + archive. Not permanent delete.
+ * These should apply immediately (no extra confirm / HITL).
+ */
+export function isReversibleWriteIntent(userMessage: string): boolean {
+  const m = (userMessage || '').toLowerCase();
+  return /(arkivera|stäng|avsluta|ändra status|sätt status|markera|ta bort|radera|lägg ner|avbryt)/.test(
     m,
   );
 }

@@ -16,7 +16,7 @@ if (!data.prompts?.length || data.prompts.length < 10) {
 
 // Keep in sync with jarvisIntent.ts / jarvisPolicy.ts (no \b — Swedish letters)
 const APPLY_RE =
-  /(skapa|lägg till|uppdatera|ändra|sätt|logga|skicka|mejla|maila|spara|registrera|markera|boka|beställ|ångra|ta bort|radera|arkivera)/i;
+  /(skapa|lägg till|uppdatera|ändra|sätt|logga|skicka|mejla|maila|spara|registrera|markera|boka|beställ|ångra|ta bort|radera|arkivera|stäng|avsluta)/i;
 
 let failed = 0;
 const ids = new Set();

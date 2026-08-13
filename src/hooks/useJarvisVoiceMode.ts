@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
+import { textForSpeech } from '@/lib/textForSpeech';
 import {
+  looksLikeTtsEcho,
   mergeCommittedAndInterim,
   transcriptFromSpeechResults,
   type SpeechResultRow,
@@ -41,19 +43,21 @@ export type VoiceModeOptions = {
   silenceMs?: number;
   /** Pause after TTS before mic opens again (avoid hearing own voice) */
   postSpeakMs?: number;
-  /** Called with user utterance — should send chat and return assistant text */
   onUserUtterance: (text: string) => Promise<string | null>;
   enabled: boolean;
   isBusy?: boolean;
 };
 
+type ListenMode = 'turn' | 'barge';
+
 /**
- * Conversational voice loop: listen → auto-send → speak reply → listen again.
+ * Conversational voice loop with barge-in:
+ * listen → auto-send → speak → (user can interrupt) → listen.
  */
 export function useJarvisVoiceMode(opts: VoiceModeOptions) {
   const lang = opts.lang || 'sv-SE';
-  const silenceMs = opts.silenceMs ?? 1600;
-  const postSpeakMs = opts.postSpeakMs ?? 900;
+  const silenceMs = opts.silenceMs ?? 1100;
+  const postSpeakMs = opts.postSpeakMs ?? 450;
   const [supported] = useState(() => Boolean(getRecognitionCtor()));
   const [active, setActive] = useState(false);
   const [phase, setPhase] = useState<VoicePhase>('idle');
@@ -71,21 +75,21 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const activeRef = useRef(false);
   const phaseRef = useRef<VoicePhase>('idle');
-  /** Text from previous recognition sessions in this turn (Chrome onend restarts). */
+  const listenModeRef = useRef<ListenMode>('turn');
   const carryRef = useRef('');
-  /** Last stable/full transcript for this turn (committed + interim). */
   const lastFullRef = useRef('');
+  const lastSpokenRef = useRef('');
+  const audioStartedRef = useRef(false);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const postSpeakTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sendingRef = useRef(false);
-  /** Ignore recognition briefly after TTS (echo / barge noise). */
   const ignoreUntilRef = useRef(0);
   const onUtteranceRef = useRef(opts.onUserUtterance);
   const busyRef = useRef(opts.isBusy);
-  const startListenRef = useRef<((opts?: { fresh?: boolean }) => void) | null>(
-    null,
-  );
+  const startListenRef = useRef<
+    ((opts?: { fresh?: boolean; mode?: ListenMode }) => void) | null
+  >(null);
 
   useEffect(() => {
     onUtteranceRef.current = opts.onUserUtterance;
@@ -140,8 +144,11 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
     setLiveTranscript('');
     carryRef.current = '';
     lastFullRef.current = '';
+    lastSpokenRef.current = '';
+    audioStartedRef.current = false;
     sendingRef.current = false;
     ignoreUntilRef.current = 0;
+    listenModeRef.current = 'turn';
     setPhaseBoth('idle');
   }, [abortRec, clearPostSpeakTimer, setPhaseBoth]);
 
@@ -157,6 +164,8 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
       setLiveTranscript('');
       carryRef.current = '';
       lastFullRef.current = '';
+      lastSpokenRef.current = '';
+      audioStartedRef.current = false;
       setPhaseBoth('thinking');
 
       try {
@@ -164,31 +173,77 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
         if (!activeRef.current) return;
 
         if (reply?.trim()) {
+          sendingRef.current = false;
+          const spoken = textForSpeech(reply);
+          lastSpokenRef.current = spoken;
+          audioStartedRef.current = false;
           setPhaseBoth('speaking');
-          speakRef.current(reply, () => {
-            if (!activeRef.current) return;
-            // Cooldown so TTS echo is not transcribed as user speech
-            ignoreUntilRef.current = Date.now() + postSpeakMs + 400;
-            clearPostSpeakTimer();
-            postSpeakTimerRef.current = setTimeout(() => {
-              if (activeRef.current && !busyRef.current && !sendingRef.current) {
-                startListenRef.current?.({ fresh: true });
-              }
-            }, postSpeakMs);
+          speakRef.current(reply, {
+            onStart: () => {
+              audioStartedRef.current = true;
+            },
+            onEnd: () => {
+              if (!activeRef.current) return;
+              if (phaseRef.current !== 'speaking') return;
+              lastSpokenRef.current = '';
+              audioStartedRef.current = false;
+              ignoreUntilRef.current = Date.now() + postSpeakMs + 250;
+              clearPostSpeakTimer();
+              postSpeakTimerRef.current = setTimeout(() => {
+                if (
+                  activeRef.current &&
+                  !busyRef.current &&
+                  !sendingRef.current &&
+                  phaseRef.current === 'speaking'
+                ) {
+                  startListenRef.current?.({ fresh: true, mode: 'turn' });
+                }
+              }, postSpeakMs);
+            },
           });
+          // Mic stays open so the user can interrupt (even while TTS loads)
+          startListenRef.current?.({ fresh: true, mode: 'barge' });
         } else {
-          startListenRef.current?.({ fresh: true });
+          startListenRef.current?.({ fresh: true, mode: 'turn' });
         }
       } catch {
         if (activeRef.current) {
           setError('Kunde inte få svar från Jarvis.');
-          startListenRef.current?.({ fresh: true });
+          startListenRef.current?.({ fresh: true, mode: 'turn' });
         }
       } finally {
         sendingRef.current = false;
       }
     },
     [abortRec, clearPostSpeakTimer, postSpeakMs, setPhaseBoth],
+  );
+
+  const bargeIn = useCallback(
+    (heard: string) => {
+      const clean = heard.replace(/\s+/g, ' ').trim();
+      if (!clean) return;
+      listenModeRef.current = 'turn';
+      setPhaseBoth('listening');
+      stopTtsRef.current();
+      clearPostSpeakTimer();
+      lastSpokenRef.current = '';
+      audioStartedRef.current = false;
+      ignoreUntilRef.current = 0;
+      carryRef.current = clean;
+      lastFullRef.current = clean;
+      setLiveTranscript(clean);
+      // Let them finish the interrupting sentence
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+      }
+      silenceTimerRef.current = setTimeout(() => {
+        if (!activeRef.current || phaseRef.current !== 'listening') return;
+        if (sendingRef.current) return;
+        const text = lastFullRef.current.trim();
+        if (text.length >= 2) void submitUtterance(text);
+      }, Math.min(silenceMs, 900));
+    },
+    [clearPostSpeakTimer, setPhaseBoth, silenceMs, submitUtterance],
   );
 
   const armSilenceTimer = useCallback(() => {
@@ -205,10 +260,17 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
   }, [clearSilenceTimer, silenceMs, submitUtterance]);
 
   const startListen = useCallback(
-    (listenOpts?: { fresh?: boolean }) => {
+    (listenOpts?: { fresh?: boolean; mode?: ListenMode }) => {
       if (!activeRef.current) return;
-      if (busyRef.current || sendingRef.current) return;
-      if (phaseRef.current === 'speaking') stopTtsRef.current();
+      if (sendingRef.current) return;
+      const mode: ListenMode = listenOpts?.mode || 'turn';
+      // isLoading lags one render after the reply — still allow barge-in
+      if (busyRef.current && mode !== 'barge') return;
+      listenModeRef.current = mode;
+
+      if (phaseRef.current === 'speaking' && mode !== 'barge') {
+        stopTtsRef.current();
+      }
 
       const Ctor = getRecognitionCtor();
       if (!Ctor) {
@@ -217,22 +279,23 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
         return;
       }
 
-      // Preserve partial utterance when Chrome drops the session mid-phrase
       if (listenOpts?.fresh) {
         carryRef.current = '';
         lastFullRef.current = '';
         setLiveTranscript('');
       } else if (lastFullRef.current) {
-        // Keep what we already heard (includes last interim)
         carryRef.current = lastFullRef.current;
       }
 
       abortRec();
       setError(null);
-      setPhaseBoth('listening');
+      if (mode === 'turn') setPhaseBoth('listening');
 
-      // Re-arm silence after session restart so partial text still auto-sends
-      if (!listenOpts?.fresh && lastFullRef.current.trim().length >= 2) {
+      if (
+        mode === 'turn' &&
+        !listenOpts?.fresh &&
+        lastFullRef.current.trim().length >= 2
+      ) {
         armSilenceTimer();
       }
 
@@ -243,23 +306,36 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
       rec.maxAlternatives = 1;
 
       rec.onresult = (ev) => {
-        if (!activeRef.current || phaseRef.current !== 'listening') return;
+        if (!activeRef.current) return;
         if (Date.now() < ignoreUntilRef.current) return;
 
         const { full: sessionFull } = transcriptFromSpeechResults(
           ev.results,
           ev.resultIndex,
         );
-        // Collapse progressive re-hypothesis across session restarts (not naive join)
         const display = mergeCommittedAndInterim(
           carryRef.current,
           sessionFull,
         );
         if (!display) return;
 
+        const barging =
+          listenModeRef.current === 'barge' || phaseRef.current === 'speaking';
+        if (barging) {
+          const compact = display.replace(/\s+/g, '');
+          if (!audioStartedRef.current) {
+            if (compact.length >= 4) bargeIn(display);
+            return;
+          }
+          if (looksLikeTtsEcho(display, lastSpokenRef.current)) return;
+          if (compact.length < 5) return;
+          bargeIn(display);
+          return;
+        }
+
+        if (phaseRef.current !== 'listening') return;
         lastFullRef.current = display;
         setLiveTranscript(display);
-        // Any speech activity (interim or final) resets silence → then auto-send
         armSilenceTimer();
       };
 
@@ -278,37 +354,43 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
 
       rec.onend = () => {
         recRef.current = null;
+        if (!activeRef.current || sendingRef.current) return;
         if (
-          activeRef.current &&
-          phaseRef.current === 'listening' &&
-          !sendingRef.current
+          phaseRef.current !== 'listening' &&
+          listenModeRef.current !== 'barge'
         ) {
-          clearRestartTimer();
-          restartTimerRef.current = setTimeout(() => {
-            if (
-              activeRef.current &&
-              phaseRef.current === 'listening' &&
-              !recRef.current &&
-              !sendingRef.current
-            ) {
-              // Restart without wiping partial phrase
-              startListenRef.current?.({ fresh: false });
-            }
-          }, 280);
+          return;
         }
+        clearRestartTimer();
+        restartTimerRef.current = setTimeout(() => {
+          if (
+            activeRef.current &&
+            !recRef.current &&
+            !sendingRef.current &&
+            (phaseRef.current === 'listening' ||
+              phaseRef.current === 'speaking')
+          ) {
+            startListenRef.current?.({
+              fresh: false,
+              mode: listenModeRef.current,
+            });
+          }
+        }, 280);
       };
 
       recRef.current = rec;
       try {
         rec.start();
       } catch (e) {
-        // InvalidStateError if already started — ignore and retry once
         const msg = e instanceof Error ? e.message : String(e);
         if (/invalid state|already started/i.test(msg)) {
           clearRestartTimer();
           restartTimerRef.current = setTimeout(() => {
-            if (activeRef.current && phaseRef.current === 'listening') {
-              startListenRef.current?.({ fresh: listenOpts?.fresh ?? false });
+            if (activeRef.current) {
+              startListenRef.current?.({
+                fresh: listenOpts?.fresh ?? false,
+                mode,
+              });
             }
           }, 350);
           return;
@@ -320,6 +402,7 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
     [
       abortRec,
       armSilenceTimer,
+      bargeIn,
       clearRestartTimer,
       lang,
       setPhaseBoth,
@@ -339,19 +422,17 @@ export function useJarvisVoiceMode(opts: VoiceModeOptions) {
     setError(null);
     ignoreUntilRef.current = 0;
     unlockTtsRef.current();
-    startListen({ fresh: true });
+    startListen({ fresh: true, mode: 'turn' });
   }, [supported, startListen]);
 
   const stop = useCallback(() => {
     stopAll();
   }, [stopAll]);
 
-  // External disable (offline / dialog closed)
   useEffect(() => {
     if (!opts.enabled && activeRef.current) stopAll();
   }, [opts.enabled, stopAll]);
 
-  // Mount cleanup only — stopAll is stable enough via refs; do not re-run on each render
   useEffect(() => {
     return () => {
       activeRef.current = false;

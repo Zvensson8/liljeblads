@@ -174,6 +174,7 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
   const callJarvisChat = async (
     messagesToSend: { role: string; content: string }[],
     conversationId: string,
+    opts?: { voice?: boolean },
   ): Promise<{
     message: string;
     suggestedActions?: unknown[];
@@ -200,6 +201,7 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
           path: pageContext.path,
           label: pageContext.label,
         },
+        voice: opts?.voice === true,
       }),
     });
 
@@ -225,7 +227,10 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
   };
 
   /** Returns assistant reply text (for voice mode TTS). */
-  const sendMessage = async (text?: string): Promise<string | null> => {
+  const sendMessage = async (
+    text?: string,
+    opts?: { voice?: boolean },
+  ): Promise<string | null> => {
     const messageText = text || input;
     if (!messageText.trim() || isLoading || !user) return null;
 
@@ -275,7 +280,7 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
       const assistantId = crypto.randomUUID();
       setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '…' }]);
 
-      const result = await callJarvisChat(messagesToSend, conversationId);
+      const result = await callJarvisChat(messagesToSend, conversationId, opts);
       const assistantContent =
         result.message || 'Jag kunde inte generera ett svar just nu.';
 
@@ -362,7 +367,7 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
   };
 
   const onVoiceUtterance = useCallback(
-    async (text: string) => sendMessage(text),
+    async (text: string) => sendMessage(text, { voice: true }),
     // sendMessage closes over latest messages/input/state — recreated each render is ok for voice
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, isLoading, isOnline, selectedConversationId, messages, pageContext],

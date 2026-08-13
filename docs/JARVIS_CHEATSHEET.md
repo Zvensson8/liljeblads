@@ -27,13 +27,13 @@
 
 | | |
 |--|--|
-| **Röstsamtal** | Stor knappen “Röstläge” — lyssna → Jarvis svarar med Grok-röst (Ara) → lyssnar igen |
+| **Röstsamtal** | Stor knappen “Röstläge” — prata, pausa kort, avbryt Ara när som helst genom att prata |
 | **Diktering** | Lilla mikrofonen — fyller textfältet (manual skicka) |
 | **Offline** | Kan inte skicka till Jarvis offline (apply avstängt) |
 | **Läsare** | Roll “Läsare” får fråga men inte skapa/ändra |
 | **Byt org** | Sidebar — din roll visas under org-namnet |
 
-**Tips röstsamtal:** Chrome/Edge, tillåt mikrofon, prata en mening, **pausa ~1,5 s** så skickas det. Tryck stopp för att avsluta.
+**Tips röstsamtal:** Chrome/Edge, tillåt mikrofon, prata, **pausa ~1 s**. Prata över Ara för att avbryta. Arkivera/status körs direkt (ångra 5 min).
 
 ## Flikar
 

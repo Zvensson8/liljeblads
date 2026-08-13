@@ -13,9 +13,9 @@ const phaseLabel: Record<VoicePhase, string> = {
 const phaseHint: Record<VoicePhase, string> = {
   idle: 'Tryck för samtal. Säg t.ex. “Skicka fakturaadressen till Nolhaga”.',
   listening:
-    'Prata klart och pausa ca 1,5 s — då skickas det automatiskt. Tryck stopp för att avbryta.',
+    'Prata — pausa kort så skickas det. Tryck stopp för att avsluta samtalet.',
   thinking: 'Hämtar data och kör verktyg…',
-  speaking: 'Svaret läses upp. Tryck stopp för att avbryta.',
+  speaking: 'Prata när som helst för att avbryta. Tryck stopp för att avsluta.',
 };
 
 export default function JarvisVoicePanel({
@@ -93,7 +93,7 @@ export default function JarvisVoicePanel({
         </div>
       </div>
 
-      {liveTranscript && phase === 'listening' && (
+      {liveTranscript && (phase === 'listening' || phase === 'speaking') && (
         <p
           className="mt-3 text-sm rounded-lg bg-muted/80 px-3 py-2 border border-border/50"
           data-testid="jarvis-voice-transcript"

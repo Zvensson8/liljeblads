@@ -5,6 +5,18 @@ import { textForSpeech } from '@/lib/textForSpeech';
 
 export { textForSpeech };
 
+export type SpeakCallbacks = {
+  onStart?: () => void;
+  onEnd?: () => void;
+};
+
+function speakCbs(
+  onEndOrOpts?: (() => void) | SpeakCallbacks,
+): SpeakCallbacks {
+  if (typeof onEndOrOpts === 'function') return { onEnd: onEndOrOpts };
+  return onEndOrOpts || {};
+}
+
 function pickSwedishVoice(): SpeechSynthesisVoice | null {
   if (typeof speechSynthesis === 'undefined') return null;
   const voices = speechSynthesis.getVoices();
@@ -55,6 +67,7 @@ export function useTextToSpeech() {
 
   const genRef = useRef(0);
   const onEndRef = useRef<(() => void) | null>(null);
+  const onStartRef = useRef<(() => void) | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -125,7 +138,11 @@ export function useTextToSpeech() {
       const voice = pickSwedishVoice();
       if (voice) u.voice = voice;
       u.onstart = () => {
-        if (gen === genRef.current) setSpeaking(true);
+        if (gen !== genRef.current) return;
+        setSpeaking(true);
+        const cb = onStartRef.current;
+        onStartRef.current = null;
+        cb?.();
       };
       u.onend = () => finish(gen);
       u.onerror = () => finish(gen);
@@ -163,18 +180,20 @@ export function useTextToSpeech() {
   }, []);
 
   const speak = useCallback(
-    (text: string, onEnd?: () => void) => {
+    (text: string, onEndOrOpts?: (() => void) | SpeakCallbacks) => {
+      const cbs = speakCbs(onEndOrOpts);
       const gen = ++genRef.current;
       cleanupMedia();
       setSpeaking(false);
 
       const clean = textForSpeech(text);
       if (!clean) {
-        onEnd?.();
+        cbs.onEnd?.();
         return;
       }
 
-      onEndRef.current = onEnd || null;
+      onEndRef.current = cbs.onEnd || null;
+      onStartRef.current = cbs.onStart || null;
       setSpeaking(true);
 
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -212,6 +231,10 @@ export function useTextToSpeech() {
 
           try {
             await audio.play();
+            if (gen !== genRef.current) return;
+            const startCb = onStartRef.current;
+            onStartRef.current = null;
+            startCb?.();
           } catch {
             if (gen !== genRef.current) return;
             speakBrowser(clean, gen);

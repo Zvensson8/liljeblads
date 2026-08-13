@@ -737,7 +737,7 @@ export const jarvisTools: ChatTool[] = [
     function: {
       name: "apply_work_order_status",
       description:
-        "Ändra status på en arbetsorder DIREKT (när användaren uttryckligen ber om det). Status: not_started|awaiting_quote|ordered|completed|archived.",
+        "Ändra status på en arbetsorder DIREKT när användaren ber om det. Inkluderar arkivering (status archived) — det är INTE permanent radering, ingen extra bekräftelse. 'Ta bort'/'radera' en WO = archived. Status: not_started|awaiting_quote|ordered|completed|archived.",
       parameters: {
         type: "object",
         properties: {
@@ -761,7 +761,7 @@ export const jarvisTools: ChatTool[] = [
     function: {
       name: "apply_project_status",
       description:
-        "Ändra projektstatus DIREKT. Status: forslag|planerat|invantar_offert|offert_finns|pagaende|pausat|avslutat.",
+        "Ändra projektstatus DIREKT, ingen extra bekräftelse. 'Arkivera'/'ta bort' projekt = status avslutat + is_archived (reversibelt). Status: forslag|planerat|invantar_offert|offert_finns|pagaende|pausat|avslutat|archived.",
       parameters: {
         type: "object",
         properties: {
@@ -779,6 +779,7 @@ export const jarvisTools: ChatTool[] = [
               "pagaende",
               "pausat",
               "avslutat",
+              "archived",
             ],
           },
         },
@@ -2305,15 +2306,6 @@ async function executeJarvisToolInner(
             error: `Ogiltig status. Tillåtna: ${WO_STATUSES.join(", ")}`,
           };
         }
-        // Fas 2: destructive archive requires explicit confirm
-        if (status === "archived" && rawArgs.confirm !== true) {
-          return {
-            error:
-              "Arkivering kräver confirm: true (destructiv åtgärd). Bekräfta med användaren först.",
-            requires_confirm: true,
-          };
-        }
-
         let woId = String(rawArgs.work_order_id || "").trim();
         if (!woId) {
           const prop = await resolveOneProperty(supabase, orgId, rawArgs, pageContext);
@@ -2367,10 +2359,13 @@ async function executeJarvisToolInner(
       }
 
       case "apply_project_status": {
-        const status = String(rawArgs.status || "").trim();
+        const rawStatus = String(rawArgs.status || "").trim();
+        const archive =
+          rawStatus === "archived" || rawStatus === "avslutat";
+        const status = rawStatus === "archived" ? "avslutat" : rawStatus;
         if (!PROJECT_STATUSES.includes(status as (typeof PROJECT_STATUSES)[number])) {
           return {
-            error: `Ogiltig status. Tillåtna: ${PROJECT_STATUSES.join(", ")}`,
+            error: `Ogiltig status. Tillåtna: ${PROJECT_STATUSES.join(", ")}, archived`,
           };
         }
 
@@ -2399,7 +2394,7 @@ async function executeJarvisToolInner(
 
         const { data: existing } = await supabase
           .from("projects")
-          .select("id, name, status, property_id")
+          .select("id, name, status, property_id, is_archived")
           .eq("id", projectId)
           .in("property_id", ids)
           .maybeSingle();
@@ -2407,11 +2402,15 @@ async function executeJarvisToolInner(
           return { error: "Projekt hittades inte i din organisation" };
         }
 
+        const patch: Record<string, unknown> = { status };
+        if (archive) patch.is_archived = true;
+        else if (existing.is_archived) patch.is_archived = false;
+
         const { data: updated, error } = await supabase
           .from("projects")
-          .update({ status })
+          .update(patch)
           .eq("id", projectId)
-          .select("id, name, project_number, status")
+          .select("id, name, project_number, status, is_archived")
           .single();
         if (error) return { error: error.message };
         return withDeepLink(
@@ -2419,7 +2418,8 @@ async function executeJarvisToolInner(
             applied: true,
             project: updated,
             previous_status: existing.status,
-            summary: `Projekt ${updated.project_number || updated.name}: ${existing.status} → ${status}`,
+            previous_is_archived: existing.is_archived ?? false,
+            summary: `Projekt ${updated.project_number || updated.name}: ${existing.status} → ${status}${archive ? " (arkiverat)" : ""}`,
           },
           {
             entity_type: "project",

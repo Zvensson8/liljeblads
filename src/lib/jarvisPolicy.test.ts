@@ -12,6 +12,7 @@ import {
   JARVIS_BATCH_MAX,
   JARVIS_RATE_LIMITS,
   JARVIS_UNDO_WINDOW_MS,
+  isReversibleWriteIntent,
   prefersDirectApply,
 } from './jarvisPolicy';
 import { mergeAppliedActions } from './jarvisActionFromMessage';
@@ -72,7 +73,17 @@ describe('jarvisPolicy – briefing + intent', () => {
   it('detects explicit Swedish apply intents', () => {
     expect(prefersDirectApply('Skapa en arbetsorder för pumpen')).toBe(true);
     expect(prefersDirectApply('Skicka till mig fakturaadressen')).toBe(true);
+    expect(prefersDirectApply('Arkivera arbetsordern på Nolhaga')).toBe(true);
     expect(prefersDirectApply('Vilka WO är öppna?')).toBe(false);
+  });
+});
+
+describe('jarvisPolicy – reversible writes', () => {
+  it('treats archive/status as reversible (execute now)', () => {
+    expect(isReversibleWriteIntent('Arkivera arbetsordern')).toBe(true);
+    expect(isReversibleWriteIntent('Sätt status till completed')).toBe(true);
+    expect(isReversibleWriteIntent('Ta bort den WO:n')).toBe(true);
+    expect(isReversibleWriteIntent('Vad är öppet?')).toBe(false);
   });
 });
 

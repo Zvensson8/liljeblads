@@ -68,6 +68,28 @@ export function collapseProgressivePhrases(segments: string[]): string {
   return acc;
 }
 
+/**
+ * True when heard speech is likely the TTS echo, not a user barge-in.
+ * Used so Ara can keep talking unless the user actually interrupts.
+ */
+export function looksLikeTtsEcho(heard: string, spoken: string): boolean {
+  const a = normKey(heard);
+  const b = normKey(spoken);
+  if (!a) return true;
+  if (!b) return false;
+  if (a.length < 4) return true;
+  if (b.includes(a) || a.includes(b.slice(0, Math.min(48, b.length)))) {
+    return true;
+  }
+  if (isProgressiveRespeak(b, a) || isProgressiveRespeak(a, b)) return true;
+
+  const aw = a.split(' ').filter((w) => w.length > 2);
+  const bw = new Set(b.split(' ').filter((w) => w.length > 2));
+  if (!aw.length) return true;
+  const overlap = aw.filter((w) => bw.has(w)).length / aw.length;
+  return overlap >= 0.65;
+}
+
 export function mergeCommittedAndInterim(
   committed: string,
   interim: string,

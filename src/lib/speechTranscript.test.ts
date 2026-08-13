@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   collapseProgressivePhrases,
+  looksLikeTtsEcho,
   mergeCommittedAndInterim,
   transcriptFromSpeechResults,
 } from './speechTranscript';
@@ -67,6 +68,16 @@ describe('speechTranscript', () => {
     const { full, interim } = transcriptFromSpeechResults(results, 1);
     expect(interim).toBe('skicka faktura adressen');
     expect(full).toBe('skicka faktura adressen');
+  });
+
+  it('detects TTS echo vs real barge-in', () => {
+    const spoken =
+      'klart. arbetsordern på nolhaga är arkiverad. du kan ångra inom fem minuter.';
+    expect(looksLikeTtsEcho('klart arbetsordern på nolhaga', spoken)).toBe(true);
+    expect(looksLikeTtsEcho('vänta arkivera den andra också', spoken)).toBe(
+      false,
+    );
+    expect(looksLikeTtsEcho('mm', spoken)).toBe(true);
   });
 
   it('merges interim progressive over committed', () => {

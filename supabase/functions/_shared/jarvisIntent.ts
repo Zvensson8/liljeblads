@@ -4,7 +4,7 @@
 
 // No \b — JS word boundary is ASCII-only and breaks on Swedish letters
 const APPLY_VERBS =
-  /(skapa|lägg till|uppdatera|ändra|sätt|logga|skicka|mejla|maila|spara|registrera|markera|boka|beställ|ångra|ta bort|radera|arkivera)/i;
+  /(skapa|lägg till|uppdatera|ändra|sätt|logga|skicka|mejla|maila|spara|registrera|markera|boka|beställ|ångra|ta bort|radera|arkivera|stäng|avsluta)/i;
 
 const READ_ONLY =
   /\b(lista|visa|berätta|översikt|vilka|vad är|hur många|sök|hämta information)\b/i;

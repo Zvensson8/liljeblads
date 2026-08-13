@@ -66,11 +66,15 @@ export function extractReversePayload(
       const p = result.project as { id?: string } | undefined;
       const prev = result.previous_status;
       if (!p?.id || prev == null) return null;
+      const fields: Record<string, unknown> = { status: prev };
+      if (typeof result.previous_is_archived === "boolean") {
+        fields.is_archived = result.previous_is_archived;
+      }
       return {
         kind: "update",
         table: "projects",
         id: String(p.id),
-        fields: { status: prev },
+        fields,
       };
     }
     case "apply_update_invoice_address": {
