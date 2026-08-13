@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  transcriptFromSpeechResults,
+  type SpeechResultRow,
+} from '@/lib/speechTranscript';
 
 /** Minimal typings for Web Speech API (Chrome/Edge). */
-type SpeechRecognitionResultLike = {
-  isFinal: boolean;
-  0: { transcript: string };
-};
-
 type SpeechRecognitionEventLike = {
   resultIndex: number;
-  results: ArrayLike<SpeechRecognitionResultLike> & { length: number };
+  results: ArrayLike<SpeechResultRow> & { length: number };
 };
 
 type SpeechRecognitionLike = {
@@ -42,11 +41,10 @@ function joinParts(...parts: string[]): string {
 }
 
 /**
- * Browser speech → text for Jarvis.
+ * Browser speech → text for Jarvis (mic button dictation).
  *
- * Important: interim results must *replace* the live draft, not append.
- * Callers pass the current field value as baseText; onUpdate always gets
- * the full field value (base + this session).
+ * Interim/progressive hypotheses *replace* the draft — never stack.
+ * Full field value = baseText (when mic started) + this session.
  */
 export function useSpeechToText(opts?: { lang?: string }) {
   const lang = opts?.lang || 'sv-SE';
@@ -54,12 +52,13 @@ export function useSpeechToText(opts?: { lang?: string }) {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
-  const committedRef = useRef('');
   const baseRef = useRef('');
   const onUpdateRef = useRef<(text: string) => void>(() => {});
+  const listeningRef = useRef(false);
 
   useEffect(() => {
     return () => {
+      listeningRef.current = false;
       try {
         recRef.current?.abort();
       } catch {
@@ -82,7 +81,6 @@ export function useSpeechToText(opts?: { lang?: string }) {
         return;
       }
 
-      // Stop previous session if any
       try {
         recRef.current?.abort();
       } catch {
@@ -91,42 +89,30 @@ export function useSpeechToText(opts?: { lang?: string }) {
 
       setError(null);
       baseRef.current = baseText.trim();
-      committedRef.current = '';
       onUpdateRef.current = onUpdate;
+      listeningRef.current = true;
 
       const rec = new Ctor();
       rec.lang = lang;
-      // continuous = true so longer Swedish phrases work; user stops with mic button
+      // continuous=true for multi-word Swedish; progressive finals are collapsed
       rec.continuous = true;
       rec.interimResults = true;
       rec.maxAlternatives = 1;
 
       rec.onresult = (ev) => {
-        let interim = '';
-        // Only process from resultIndex (new results); rebuild committed from all finals
-        let committed = '';
-        for (let i = 0; i < ev.results.length; i++) {
-          const row = ev.results[i];
-          const t = (row?.[0]?.transcript || '').trim();
-          if (!t) continue;
-          if (row.isFinal) {
-            committed = joinParts(committed, t);
-          } else if (i >= ev.resultIndex) {
-            // Latest interim only (last non-final chunk)
-            interim = t;
-          }
-        }
-        // Prefer full rebuild of finals from all results for stability
-        committedRef.current = committed;
-
-        const full = joinParts(baseRef.current, committed, interim);
+        if (!listeningRef.current) return;
+        const { full: session } = transcriptFromSpeechResults(
+          ev.results,
+          ev.resultIndex,
+        );
+        const full = joinParts(baseRef.current, session);
         onUpdateRef.current(full);
       };
 
       rec.onerror = (ev) => {
         const code = ev.error || '';
-        // Benign: user stopped, or silence
         if (code === 'aborted' || code === 'no-speech') {
+          listeningRef.current = false;
           setListening(false);
           return;
         }
@@ -137,12 +123,14 @@ export function useSpeechToText(opts?: { lang?: string }) {
         } else {
           setError(`Röstfel: ${code}`);
         }
+        listeningRef.current = false;
         setListening(false);
       };
 
       rec.onend = () => {
-        // If continuous session ended unexpectedly while still "listening", don't restart
-        // (avoids loops). User can press mic again.
+        // Keep last transcript in the field; just end listening state.
+        // (Do not restart — avoids double sessions stacking into the field.)
+        listeningRef.current = false;
         setListening(false);
         recRef.current = null;
       };
@@ -153,6 +141,7 @@ export function useSpeechToText(opts?: { lang?: string }) {
         setListening(true);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Kunde inte starta mikrofon');
+        listeningRef.current = false;
         setListening(false);
         recRef.current = null;
       }
@@ -161,7 +150,9 @@ export function useSpeechToText(opts?: { lang?: string }) {
   );
 
   const stop = useCallback(() => {
+    listeningRef.current = false;
     try {
+      // stop() flushes a final result; abort() can drop the last words
       recRef.current?.stop();
     } catch {
       /* ignore */

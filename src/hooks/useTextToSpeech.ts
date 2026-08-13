@@ -14,7 +14,7 @@ export function textForSpeech(raw: string): string {
     .replace(/#{1,6}\s*/g, '')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/👉/g, '')
-    .replace(/[📊🔍⚠️✅❌]/gu, '')
+    .replace(/📊|🔍|⚠\uFE0F?|✅|❌|ℹ\uFE0F?/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
   // Cap length for browser TTS
@@ -38,10 +38,13 @@ export function useTextToSpeech() {
   );
   const [speaking, setSpeaking] = useState(false);
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const onEndRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     // Chrome loads voices async
-    const load = () => speechSynthesis.getVoices();
+    const load = () => {
+      speechSynthesis.getVoices();
+    };
     load();
     speechSynthesis.addEventListener?.('voiceschanged', load);
     return () => {
@@ -51,6 +54,7 @@ export function useTextToSpeech() {
   }, []);
 
   const stop = useCallback(() => {
+    onEndRef.current = null;
     try {
       speechSynthesis.cancel();
     } catch {
@@ -66,33 +70,59 @@ export function useTextToSpeech() {
         onEnd?.();
         return;
       }
-      stop();
+      // Cancel previous without clearing the new onEnd
+      try {
+        speechSynthesis.cancel();
+      } catch {
+        /* ignore */
+      }
+      utterRef.current = null;
+      setSpeaking(false);
+
       const clean = textForSpeech(text);
       if (!clean) {
         onEnd?.();
         return;
       }
+
+      onEndRef.current = onEnd || null;
       const u = new SpeechSynthesisUtterance(clean);
       u.lang = 'sv-SE';
       u.rate = 1.05;
       u.pitch = 1;
       const voice = pickSwedishVoice();
       if (voice) u.voice = voice;
+
       u.onstart = () => setSpeaking(true);
       u.onend = () => {
         setSpeaking(false);
         utterRef.current = null;
-        onEnd?.();
+        const cb = onEndRef.current;
+        onEndRef.current = null;
+        cb?.();
       };
       u.onerror = () => {
         setSpeaking(false);
         utterRef.current = null;
-        onEnd?.();
+        const cb = onEndRef.current;
+        onEndRef.current = null;
+        cb?.();
       };
       utterRef.current = u;
-      speechSynthesis.speak(u);
+
+      // Chrome bug: speak() right after cancel() can be silent — small defer
+      window.setTimeout(() => {
+        try {
+          speechSynthesis.speak(u);
+        } catch {
+          setSpeaking(false);
+          const cb = onEndRef.current;
+          onEndRef.current = null;
+          cb?.();
+        }
+      }, 40);
     },
-    [supported, stop],
+    [supported],
   );
 
   return { supported, speaking, speak, stop };

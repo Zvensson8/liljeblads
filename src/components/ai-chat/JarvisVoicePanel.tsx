@@ -11,8 +11,9 @@ const phaseLabel: Record<VoicePhase, string> = {
 };
 
 const phaseHint: Record<VoicePhase, string> = {
-  idle: 'Tryck för samtal — som ChatGPT/Grok voice. Säg t.ex. “Skicka fakturaadressen för Nolhaga till mig”.',
-  listening: 'Pausa kort när du är klar — då skickas det automatiskt.',
+  idle: 'Tryck för samtal. Säg t.ex. “Skicka fakturaadressen till Nolhaga”.',
+  listening:
+    'Prata klart och pausa ca 1,5 s — då skickas det automatiskt. Tryck stopp för att avbryta.',
   thinking: 'Hämtar data och kör verktyg…',
   speaking: 'Svaret läses upp. Tryck stopp för att avbryta.',
 };
@@ -48,6 +49,9 @@ export default function JarvisVoicePanel({
         'rounded-xl border bg-gradient-to-b from-primary/10 to-background',
         compact ? 'p-3' : 'p-4',
       )}
+      data-testid="jarvis-voice-panel"
+      data-phase={phase}
+      data-active={active ? 'true' : 'false'}
     >
       <div className="flex items-center gap-3">
         <Button
@@ -61,6 +65,9 @@ export default function JarvisVoicePanel({
             phase === 'thinking' && 'opacity-90',
           )}
           onClick={onToggle}
+          aria-label={
+            active ? 'Avsluta röstsamtal' : 'Starta röstsamtal med Jarvis'
+          }
           title={active ? 'Avsluta röstsamtal' : 'Starta röstsamtal med Jarvis'}
         >
           {phase === 'thinking' ? (
@@ -80,19 +87,28 @@ export default function JarvisVoicePanel({
             )}
             {phaseLabel[phase]}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">{phaseHint[phase]}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {phaseHint[phase]}
+          </p>
         </div>
       </div>
 
       {liveTranscript && phase === 'listening' && (
-        <p className="mt-3 text-sm rounded-lg bg-muted/80 px-3 py-2 border border-border/50">
-          <span className="text-muted-foreground text-xs block mb-0.5">Du säger</span>
+        <p
+          className="mt-3 text-sm rounded-lg bg-muted/80 px-3 py-2 border border-border/50"
+          data-testid="jarvis-voice-transcript"
+        >
+          <span className="text-muted-foreground text-xs block mb-0.5">
+            Du säger
+          </span>
           {liveTranscript}
         </p>
       )}
 
       {error && (
-        <p className="mt-2 text-xs text-destructive">{error}</p>
+        <p className="mt-2 text-xs text-destructive" role="alert">
+          {error}
+        </p>
       )}
     </div>
   );
