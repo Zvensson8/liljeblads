@@ -338,9 +338,8 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
                   speech.stop();
                   return;
                 }
-                speech.start((text) => {
-                  setInput((prev) => (prev ? `${prev} ${text}` : text).trim());
-                });
+                // Pass current input as base; updates replace interim (no stacking)
+                speech.start(input, (text) => setInput(text));
               }}
             >
               {speech.listening ? (

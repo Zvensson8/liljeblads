@@ -680,9 +680,8 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
                             speech.stop();
                             return;
                           }
-                          speech.start((t) => {
-                            setInput((prev) => (prev ? `${prev} ${t}` : t).trim());
-                          });
+                          // Pass current input as base; updates replace interim (no stacking)
+                          speech.start(input, (t) => setInput(t));
                         }}
                       >
                         {speech.listening ? (
