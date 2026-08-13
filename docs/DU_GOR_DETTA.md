@@ -86,12 +86,32 @@ npx supabase secrets set RESEND_API_KEY=re_DIN_NYCKEL
 
 Sedan: skapa cron-jobb i Dashboard med header `x-cron-secret` (värde i `.secrets.local`).
 
-Övriga secrets (valfritt):
+### AI / Grok (rekommenderat)
+
+Jarvis chat använder **xAI Grok** när `XAI_API_KEY` finns (standardmodell `grok-4.3` — stark tool-calling, ~$1.25/$2.50 per 1M tokens, inte flagship $2/$6).
+
+1. Skapa nyckel: https://console.x.ai → API keys (lägg till credits, t.ex. $10–20).
+2. Sätt secrets:
+
+```powershell
+npx supabase secrets set XAI_API_KEY=xai-din-nyckel
+npx supabase secrets set LLM_PROVIDER=xai
+npx supabase secrets set XAI_MODEL=grok-4.3
+# valfria tak mot hög faktura:
+npx supabase secrets set LLM_MAX_TOKENS=2048
+npx supabase secrets set LLM_MAX_HISTORY_MESSAGES=24
+```
+
+3. Deploy om: `npx supabase functions deploy ai-chat`
+
+**Kostnad:** lätt/måttlig användning (ca 20–50 meddelanden/dag med tools) ligger typiskt i **$5–40/mån** med `grok-4.3`. Undvik `grok-4.6` om du inte vill riskera högre räkning. Sätt spending limit i xAI console.
+
+Gemini (fallback / embeddings):
 
 ```powershell
 npx supabase secrets set GOOGLE_AI_API_KEY=xxx
 npx supabase secrets set GEMINI_MODEL=gemini-flash-latest
-npx supabase secrets set LLM_PROVIDER=gemini
+# tvinga Gemini trots XAI-nyckel: LLM_PROVIDER=gemini
 ```
 
 | Secret | Status |
@@ -99,9 +119,10 @@ npx supabase secrets set LLM_PROVIDER=gemini
 | `CRON_SECRET` | ✅ satt |
 | `ALLOWED_ORIGINS` | ✅ satt (localhost) |
 | `RESEND_API_KEY` | ❌ du sätter |
-| `GOOGLE_AI_API_KEY` | ✅ chat + embeddings (Gemini) |
-| `GEMINI_MODEL` | ✅ t.ex. `gemini-flash-latest` |
-| `LLM_PROVIDER` | ✅ `gemini` (eller `xai`) |
+| `XAI_API_KEY` | ❌ du sätter (Grok chat) |
+| `LLM_PROVIDER` | `xai` (rekommenderat) eller `gemini` |
+| `XAI_MODEL` | `grok-4.3` (standard, kostnadseffektiv) |
+| `GOOGLE_AI_API_KEY` | valfritt (Gemini fallback / embeddings) |
 
 ---
 

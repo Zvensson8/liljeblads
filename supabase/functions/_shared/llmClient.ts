@@ -1,13 +1,22 @@
 /**
  * Shared LLM client for edge functions.
- * Providers: gemini (default) | xai
- * Returns OpenAI-style chat.completion JSON (Gemini default, optional xAI).
+ *
+ * Default: xAI Grok when XAI_API_KEY is set (user goal: Grok for Jarvis).
+ * Fallback: Gemini when only Google keys exist.
+ *
+ * Cost control (avoid ~$100/mo):
+ * - Default model grok-4.3 (~$1.25 in / $2.50 out per 1M) — strong tools, not flagship
+ * - Do NOT default to grok-4.5/4.6 ($2/$6) unless XAI_MODEL is set explicitly
+ * - Cap max_tokens + trim history
+ * - Low reasoning_effort when supported (cheaper / fewer thinking tokens)
+ * - Log usage when API returns it
  */
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool" | string;
   content: string | null;
   tool_calls?: ToolCall[];
+  tool_call_id?: string;
   name?: string;
 };
 
@@ -33,6 +42,7 @@ export type ChatCompletionRequest = {
   tool_choice?: "auto" | "none" | "required" | string;
   stream?: boolean;
   temperature?: number;
+  max_tokens?: number;
 };
 
 export type ChatCompletionResponse = {
@@ -47,6 +57,11 @@ export type ChatCompletionResponse = {
     };
     finish_reason: string;
   }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
   provider?: string;
   model?: string;
 };
@@ -55,23 +70,72 @@ function env(name: string, fallback = ""): string {
   return (Deno.env.get(name) || fallback).trim();
 }
 
+/**
+ * Prefer xAI when key present (user goal: Grok).
+ * Explicit LLM_PROVIDER=gemini forces Gemini even with both keys.
+ */
 export function getLlmProvider(): "gemini" | "xai" {
-  const p = env("LLM_PROVIDER", "gemini").toLowerCase();
-  return p === "xai" || p === "grok" ? "xai" : "gemini";
+  const forced = env("LLM_PROVIDER", "").toLowerCase();
+  if (forced === "gemini" || forced === "google") return "gemini";
+  if (forced === "xai" || forced === "grok") return "xai";
+  if (env("XAI_API_KEY")) return "xai";
+  return "gemini";
 }
 
+/**
+ * Cost-efficient default: grok-4.3 (strong tool calling, ~$1.25/$2.50 per 1M).
+ * ~5–10× cheaper than flagship grok-4.6 ($2/$6). Fast models (4-1-fast) retired → 4.3.
+ * Override with XAI_MODEL=grok-4.6 only if you need max intelligence and accept higher spend.
+ */
 export function getDefaultModel(): string {
   const provider = getLlmProvider();
   if (provider === "xai") {
-    return env("XAI_MODEL", "grok-3-mini");
+    return normalizeModelId(env("XAI_MODEL", "grok-4.3") || "grok-4.3");
   }
   return env("GEMINI_MODEL", "gemini-flash-latest");
 }
 
+/** Soft cap on completion size to control spend */
+export function getDefaultMaxTokens(): number {
+  const n = Number(env("LLM_MAX_TOKENS", "2048"));
+  if (!Number.isFinite(n) || n < 256) return 2048;
+  return Math.min(Math.floor(n), 8192);
+}
+
+/** Keep last N user/assistant turns (+ tools) to control context cost */
+export function trimMessagesForCost(
+  messages: ChatMessage[],
+  maxMessages = Number(env("LLM_MAX_HISTORY_MESSAGES", "24")),
+): ChatMessage[] {
+  if (messages.length <= maxMessages) return messages;
+  const system = messages.filter((m) => m.role === "system");
+  const rest = messages.filter((m) => m.role !== "system");
+  const kept = rest.slice(-Math.max(8, maxMessages - system.length));
+  // Ensure we don't start mid-tool chain awkwardly
+  while (
+    kept.length &&
+    (kept[0].role === "tool" ||
+      (kept[0].role === "assistant" && kept[0].tool_calls?.length))
+  ) {
+    kept.shift();
+  }
+  return [...system, ...kept];
+}
+
 function normalizeModelId(model: string): string {
-  // Legacy gateway-style ids: "google/gemini-…" → env default
   if (model.startsWith("google/")) {
     return getDefaultModel();
+  }
+  // Retired fast slugs → current cost-efficient model
+  if (
+    model === "grok-4-1-fast" ||
+    model === "grok-4-1-fast-reasoning" ||
+    model === "grok-4-1-fast-non-reasoning" ||
+    model === "grok-4-fast" ||
+    model === "grok-4-fast-reasoning" ||
+    model === "grok-4-fast-non-reasoning"
+  ) {
+    return "grok-4.3";
   }
   return model;
 }
@@ -80,7 +144,7 @@ function ensureConfigured(): void {
   const provider = getLlmProvider();
   if (provider === "xai") {
     if (!env("XAI_API_KEY")) {
-      throw new Error("XAI_API_KEY is not configured (LLM_PROVIDER=xai)");
+      throw new Error("XAI_API_KEY is not configured (LLM_PROVIDER=xai / Grok)");
     }
   } else {
     if (!env("GOOGLE_AI_API_KEY") && !env("GEMINI_API_KEY")) {
@@ -117,7 +181,6 @@ function toGeminiContents(messages: ChatMessage[]): unknown[] {
   for (const m of messages) {
     if (m.role === "system") continue;
 
-    // Tool / function results → user turn with JSON (compatible multi-turn)
     if (m.role === "tool" || m.role === "function") {
       const label = m.name ? `Verktyg ${m.name}` : "Verktygsresultat";
       contents.push({
@@ -141,7 +204,10 @@ function toGeminiContents(messages: ChatMessage[]): unknown[] {
           functionCall: { name: tc.function.name, args },
         });
       }
-      contents.push({ role: "model", parts: parts.length ? parts : [{ text: "(tool call)" }] });
+      contents.push({
+        role: "model",
+        parts: parts.length ? parts : [{ text: "(tool call)" }],
+      });
       continue;
     }
 
@@ -153,11 +219,9 @@ function toGeminiContents(messages: ChatMessage[]): unknown[] {
       parts: [{ text }],
     });
   }
-  // Gemini needs at least one user turn
   if (contents.length === 0) {
     contents.push({ role: "user", parts: [{ text: "Hej" }] });
   }
-  // Ensure first content is user
   const first = contents[0] as { role?: string };
   if (first?.role === "model") {
     contents.unshift({ role: "user", parts: [{ text: "(fortsätt)" }] });
@@ -174,7 +238,10 @@ function toolsToGemini(tools?: ChatTool[]): unknown[] | undefined {
   }));
 }
 
-function parseGeminiResponse(data: Record<string, unknown>, model: string): ChatCompletionResponse {
+function parseGeminiResponse(
+  data: Record<string, unknown>,
+  model: string,
+): ChatCompletionResponse {
   const candidates = (data.candidates as Array<Record<string, unknown>>) || [];
   const cand = candidates[0] || {};
   const content = (cand.content as Record<string, unknown>) || {};
@@ -237,6 +304,7 @@ async function geminiChat(
     contents,
     generationConfig: {
       temperature: req.temperature ?? 0.4,
+      maxOutputTokens: req.max_tokens ?? getDefaultMaxTokens(),
     },
   };
   if (system) {
@@ -244,7 +312,6 @@ async function geminiChat(
   }
   if (fnDecls?.length) {
     body.tools = [{ functionDeclarations: fnDecls }];
-    // Auto function calling when tools present
     body.toolConfig = {
       functionCallingConfig: {
         mode: req.tool_choice === "none" ? "NONE" : "AUTO",
@@ -264,7 +331,6 @@ async function geminiChat(
       const errText = await resp.text();
       throw new Error(`Gemini stream ${resp.status}: ${errText.slice(0, 500)}`);
     }
-    // Convert Gemini SSE → OpenAI-style SSE chunks (text only)
     const reader = resp.body?.getReader();
     if (!reader) {
       throw new Error("Gemini stream has no body");
@@ -347,25 +413,78 @@ async function geminiChat(
   return parseGeminiResponse(data, model);
 }
 
+/** Map our messages to OpenAI/xAI chat format including tool rounds */
+function toXaiMessages(messages: ChatMessage[]): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  for (const m of messages) {
+    if (m.role === "tool") {
+      out.push({
+        role: "tool",
+        tool_call_id: m.tool_call_id || m.name || "tool",
+        content: m.content ?? "",
+        ...(m.name ? { name: m.name } : {}),
+      });
+      continue;
+    }
+    if (m.role === "assistant" && m.tool_calls?.length) {
+      out.push({
+        role: "assistant",
+        content: m.content,
+        tool_calls: m.tool_calls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: {
+            name: tc.function.name,
+            arguments: tc.function.arguments || "{}",
+          },
+        })),
+      });
+      continue;
+    }
+    out.push({
+      role: m.role,
+      content: m.content,
+    });
+  }
+  return out;
+}
+
+function logUsage(
+  provider: string,
+  model: string,
+  usage?: ChatCompletionResponse["usage"],
+): void {
+  if (!usage) return;
+  console.log(
+    `[llm] provider=${provider} model=${model} prompt=${usage.prompt_tokens ?? "?"} completion=${usage.completion_tokens ?? "?"} total=${usage.total_tokens ?? "?"}`,
+  );
+}
+
 async function xaiChat(
   req: ChatCompletionRequest,
 ): Promise<ChatCompletionResponse | Response> {
-  const model = req.model && !req.model.startsWith("google/")
-    ? req.model
-    : getDefaultModel();
+  const model =
+    req.model && !req.model.startsWith("google/")
+      ? normalizeModelId(req.model)
+      : getDefaultModel();
   const key = env("XAI_API_KEY");
+  const messages = trimMessagesForCost(req.messages);
+
   const body: Record<string, unknown> = {
     model,
-    messages: req.messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    })),
+    messages: toXaiMessages(messages),
     stream: !!req.stream,
-    temperature: req.temperature ?? 0.4,
+    temperature: req.temperature ?? 0.3,
+    max_tokens: req.max_tokens ?? getDefaultMaxTokens(),
   };
   if (req.tools?.length) {
     body.tools = req.tools;
     body.tool_choice = req.tool_choice || "auto";
+  }
+  // Flagship models default to high reasoning (expensive). Prefer low for agentic chat.
+  if (/^grok-4\.(5|6)/.test(model)) {
+    const effort = env("XAI_REASONING_EFFORT", "low");
+    if (effort) body.reasoning_effort = effort;
   }
 
   const resp = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -379,7 +498,12 @@ async function xaiChat(
 
   if (!resp.ok) {
     const errText = await resp.text();
-    const err = new Error(`xAI ${resp.status}: ${errText.slice(0, 800)}`);
+    const hint = /model/i.test(errText)
+      ? " Kontrollera XAI_MODEL (rekommenderat: grok-4.3; flagship: grok-4.6)."
+      : "";
+    const err = new Error(
+      `xAI ${resp.status}: ${errText.slice(0, 800)}${hint}`,
+    );
     (err as Error & { status?: number }).status = resp.status;
     throw err;
   }
@@ -395,6 +519,7 @@ async function xaiChat(
   }
 
   const data = await resp.json();
+  logUsage("xai", model, data.usage);
   return {
     ...data,
     provider: "xai",
@@ -439,5 +564,22 @@ export function isLlmConfigured(): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+export function getLlmStatus(): {
+  provider: string;
+  model: string;
+  configured: boolean;
+} {
+  try {
+    ensureConfigured();
+    return {
+      provider: getLlmProvider(),
+      model: getDefaultModel(),
+      configured: true,
+    };
+  } catch {
+    return { provider: "none", model: "", configured: false };
   }
 }

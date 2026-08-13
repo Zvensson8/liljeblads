@@ -594,7 +594,7 @@ serve(async (req) => {
 
     if (!isLlmConfigured()) {
       return jsonResponse({
-        error: 'AI är inte konfigurerad. Sätt GOOGLE_AI_API_KEY (Gemini) eller XAI_API_KEY.',
+        error: 'AI är inte konfigurerad. Sätt XAI_API_KEY (Grok, rekommenderat) eller GOOGLE_AI_API_KEY (Gemini).',
       }, 500);
     }
 
@@ -1011,9 +1011,11 @@ serve(async (req) => {
             });
           }
 
+          // xAI/OpenAI require tool_call_id linking tool results to the assistant tool_calls
           workingMessages.push({
             role: 'tool',
             name: toolName,
+            tool_call_id: tc.id || `call_${toolName}_${round}`,
             content: JSON.stringify(result).slice(0, 12000),
           });
         }

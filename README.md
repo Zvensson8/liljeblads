@@ -93,8 +93,8 @@ från Google Drive och skapar arbetsordrar via **Jarvis webhook** (LangGraph-wor
 - Storage + Supabase Auth
 
 **AI**
-- Google Gemini (`GOOGLE_AI_API_KEY`, modell t.ex. `gemini-flash-latest`) via delad `llmClient`
-- Valfritt xAI/Grok via `LLM_PROVIDER=xai` + `XAI_API_KEY`
+- xAI Grok (rekommenderat): `XAI_API_KEY` + `LLM_PROVIDER=xai`, default `grok-4.3` (kostnadseffektiv, stark tool-calling)
+- Fallback Gemini: `GOOGLE_AI_API_KEY` / `GEMINI_API_KEY` via delad `llmClient`
 - Jarvis LangGraph-worker (Python) för rapport-ingest
 
 ---
@@ -180,9 +180,11 @@ VITE_SUPABASE_PROJECT_ID=...
 **Supabase secrets** (edge functions / AI) – sätts i Dashboard eller CLI:
 
 ```powershell
-npx supabase secrets set GOOGLE_AI_API_KEY=...
-npx supabase secrets set GEMINI_MODEL=gemini-flash-latest
-npx supabase secrets set LLM_PROVIDER=gemini
+npx supabase secrets set XAI_API_KEY=xai-...
+npx supabase secrets set LLM_PROVIDER=xai
+npx supabase secrets set XAI_MODEL=grok-4.3
+# valfritt Gemini-fallback / embeddings:
+# npx supabase secrets set GOOGLE_AI_API_KEY=...
 npx supabase secrets set RESEND_API_KEY=...
 npx supabase secrets set CRON_SECRET=...
 ```

@@ -20,9 +20,11 @@
 2. **Secrets** (`npx supabase secrets set ...`)
    ```text
    CRON_SECRET=<minst-32-slumpmässiga-tecken>
-   GOOGLE_AI_API_KEY=...          # embeddings + chat (Gemini)
-   GEMINI_MODEL=gemini-flash-latest
-   LLM_PROVIDER=gemini            # eller xai + XAI_API_KEY
+   XAI_API_KEY=xai-...            # Grok chat (rekommenderat)
+   LLM_PROVIDER=xai
+   XAI_MODEL=grok-4.3             # kostnadseffektiv; undvik 4.6 om budget
+   LLM_MAX_TOKENS=2048            # valfritt tak
+   GOOGLE_AI_API_KEY=...          # valfritt Gemini fallback / embeddings
    RESEND_API_KEY=...             # e-post (om används)
    ```
 
