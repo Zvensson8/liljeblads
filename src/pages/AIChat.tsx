@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, Bot, User, Plus, Trash2, MessageSquare, Menu, Sparkles, Mic, MicOff, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,7 +23,7 @@ import { mergeAppliedActions } from '@/lib/jarvisActionFromMessage';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useOrgRole } from '@/hooks/useOrgRole';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
-import { useJarvisVoiceMode } from '@/hooks/useJarvisVoiceMode';
+import { useGrokVoiceAgent } from '@/hooks/useGrokVoiceAgent';
 import JarvisVoicePanel from '@/components/ai-chat/JarvisVoicePanel';
 
 interface Message {
@@ -366,18 +366,21 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
     }
   };
 
-  const onVoiceUtterance = useCallback(
-    async (text: string) => sendMessage(text, { voice: true }),
-    // sendMessage closes over latest messages/input/state — recreated each render is ok for voice
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, isLoading, isOnline, selectedConversationId, messages, pageContext],
-  );
-
-  const voice = useJarvisVoiceMode({
-    lang: 'sv-SE',
+  const voice = useGrokVoiceAgent({
     enabled: isOnline,
-    isBusy: isLoading,
-    onUserUtterance: onVoiceUtterance,
+    pageLabel: pageContext.label,
+    pageContext: {
+      property_id: pageContext.property_id,
+      project_id: pageContext.project_id,
+      component_id: pageContext.component_id,
+      path: pageContext.path,
+    },
+    onTurn: ({ role, text }) => {
+      setMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), role, content: text },
+      ]);
+    },
   });
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

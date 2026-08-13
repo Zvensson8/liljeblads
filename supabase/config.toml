@@ -62,3 +62,9 @@ verify_jwt = false
 
 [functions.jarvis-tts]
 verify_jwt = false
+
+[functions.jarvis-voice-session]
+verify_jwt = false
+
+[functions.jarvis-voice-tool]
+verify_jwt = false

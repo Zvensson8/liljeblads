@@ -11,11 +11,10 @@ const phaseLabel: Record<VoicePhase, string> = {
 };
 
 const phaseHint: Record<VoicePhase, string> = {
-  idle: 'Tryck för samtal. Säg t.ex. “Skicka fakturaadressen till Nolhaga”.',
-  listening:
-    'Prata — pausa kort så skickas det. Tryck stopp för att avsluta samtalet.',
-  thinking: 'Hämtar data och kör verktyg…',
-  speaking: 'Prata när som helst för att avbryta. Tryck stopp för att avsluta.',
+  idle: 'Tryck för samtal med Ara (Grok Voice). Säg t.ex. “Hur ligger asfalteringen på Hjulet?”',
+  listening: 'Lyssnar live — prata normalt. Pausa så svarar hon. Tryck stopp för att lägga på.',
+  thinking: 'Kollar i systemet…',
+  speaking: 'Prata när som helst för att avbryta.',
 };
 
 export default function JarvisVoicePanel({

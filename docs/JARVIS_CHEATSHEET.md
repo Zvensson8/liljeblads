@@ -27,7 +27,7 @@
 
 | | |
 |--|--|
-| **Röstsamtal** | Stor knappen “Röstläge” — prata, pausa kort, avbryt Ara när som helst genom att prata |
+| **Röstsamtal** | Grok Voice Agent (tal-till-tal). Prata naturligt — hon avbryts när du pratar |
 | **Diktering** | Lilla mikrofonen — fyller textfältet (manual skicka) |
 | **Offline** | Kan inte skicka till Jarvis offline (apply avstängt) |
 | **Läsare** | Roll “Läsare” får fråga men inte skapa/ändra |

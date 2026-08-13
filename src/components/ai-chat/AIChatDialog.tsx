@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { X, Send, Loader2, Bot, User, MapPin, Mic, MicOff, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ import JarvisVoicePanel from '@/components/ai-chat/JarvisVoicePanel';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useOrgRole } from '@/hooks/useOrgRole';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
-import { useJarvisVoiceMode } from '@/hooks/useJarvisVoiceMode';
+import { useGrokVoiceAgent } from '@/hooks/useGrokVoiceAgent';
 import { toast } from 'sonner';
 
 interface Message {
@@ -164,17 +164,21 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
     }
   };
 
-  const onVoiceUtterance = useCallback(
-    async (text: string) => sendMessage(text, { voice: true }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [messages, isLoading, isOnline, pageContext, input],
-  );
-
-  const voice = useJarvisVoiceMode({
-    lang: 'sv-SE',
+  const voice = useGrokVoiceAgent({
     enabled: open && isOnline,
-    isBusy: isLoading,
-    onUserUtterance: onVoiceUtterance,
+    pageLabel: pageContext.label,
+    pageContext: {
+      property_id: pageContext.property_id,
+      project_id: pageContext.project_id,
+      component_id: pageContext.component_id,
+      path: pageContext.path,
+    },
+    onTurn: ({ role, text }) => {
+      setMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), role, content: text },
+      ]);
+    },
   });
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
