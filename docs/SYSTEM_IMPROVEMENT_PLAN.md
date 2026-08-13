@@ -118,15 +118,15 @@
 
 ---
 
-### Fas 5 — Skala & plattform (senare)
+### Fas 5 — Skala & plattform (**kodad**)
 
-| Område | |
-|--------|--|
-| Multi-tenant performance (index, RLS, cold start) | |
-| Roller: förvaltare vs read-only vs founder (tydligare i UI) | |
-| Offline/PWA: köa läs, blockera apply offline | |
-| Voice → samma tools (kontorsläge) | |
-| White-label / fler org utan founder-stöd | |
+| Område | Leverans |
+|--------|----------|
+| Multi-tenant performance | Migrering `20260812120000_fas5_performance_indexes.sql` |
+| Roller | `orgRoles` + UI: Ägare/Admin/Förvaltare/**Läsare**; viewer blockeras från apply |
+| Offline/PWA | Jarvis blockerar sändning offline (`useOnlineStatus`) |
+| Voice | Mikrofon i chat + bubble (Web Speech API, sv-SE) |
+| Multi-org | Mer cache-invalidering vid org-byte; roll i switcher; `OrgTheme` primary_color |
 
 ---
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Bot, User, Plus, Trash2, MessageSquare, Menu, Sparkles } from 'lucide-react';
+import { Send, Loader2, Bot, User, Plus, Trash2, MessageSquare, Menu, Sparkles, Mic, MicOff, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -20,6 +20,9 @@ import JarvisActionCards, {
   type JarvisAppliedAction,
 } from '@/components/ai-chat/JarvisActionCards';
 import { mergeAppliedActions } from '@/lib/jarvisActionFromMessage';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useOrgRole } from '@/hooks/useOrgRole';
+import { useSpeechToText } from '@/hooks/useSpeechToText';
 
 interface Message {
   id: string;
@@ -49,6 +52,9 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const pageContext = useJarvisPageContext();
+  const isOnline = useOnlineStatus();
+  const { canWrite, isViewer, roleLabel } = useOrgRole();
+  const speech = useSpeechToText({ lang: 'sv-SE' });
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -219,6 +225,11 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
   const sendMessage = async (text?: string) => {
     const messageText = text || input;
     if (!messageText.trim() || isLoading || !user) return;
+
+    if (!isOnline) {
+      toast.warning('Du är offline — Jarvis apply är avstängt tills du är online igen.');
+      return;
+    }
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -625,25 +636,75 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
 
               {/* Input */}
               <div className="border-t p-4 bg-background">
-                <div className="max-w-3xl mx-auto flex gap-3">
-                  <Textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Skriv ett meddelande..."
-                    disabled={isLoading}
-                    className="min-h-[52px] max-h-32 resize-none"
-                    rows={1}
-                  />
-                  <Button
-                    onClick={() => sendMessage()}
-                    disabled={!input.trim() || isLoading}
-                    size="icon"
-                    className="h-[52px] w-[52px] shrink-0"
-                  >
-                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                  </Button>
+                <div className="max-w-3xl mx-auto space-y-2">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {!isOnline && (
+                      <span className="flex items-center gap-1 text-amber-600">
+                        <WifiOff className="h-3.5 w-3.5" /> Offline — inga apply
+                      </span>
+                    )}
+                    {isViewer && (
+                      <span>Roll: {roleLabel} (läs-only)</span>
+                    )}
+                    {canWrite && !isViewer && roleLabel && (
+                      <span className="hidden sm:inline">Roll: {roleLabel}</span>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    <Textarea
+                      ref={textareaRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={
+                        speech.listening
+                          ? 'Lyssnar…'
+                          : !isOnline
+                            ? 'Offline…'
+                            : 'Skriv eller diktera till Jarvis…'
+                      }
+                      disabled={isLoading}
+                      className="min-h-[52px] max-h-32 resize-none"
+                      rows={1}
+                    />
+                    {speech.supported && (
+                      <Button
+                        type="button"
+                        variant={speech.listening ? 'default' : 'outline'}
+                        size="icon"
+                        className="h-[52px] w-[52px] shrink-0"
+                        disabled={isLoading}
+                        title="Röstinmatning (svenska)"
+                        onClick={() => {
+                          if (speech.listening) {
+                            speech.stop();
+                            return;
+                          }
+                          speech.start((t) => {
+                            setInput((prev) => (prev ? `${prev} ${t}` : t).trim());
+                          });
+                        }}
+                      >
+                        {speech.listening ? (
+                          <MicOff className="h-5 w-5" />
+                        ) : (
+                          <Mic className="h-5 w-5" />
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() => sendMessage()}
+                      disabled={!input.trim() || isLoading || !isOnline}
+                      size="icon"
+                      className="h-[52px] w-[52px] shrink-0"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Send className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

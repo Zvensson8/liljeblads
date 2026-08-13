@@ -96,7 +96,8 @@ export function OrganizationInvitations({ organizationId }: OrganizationInvitati
                 <SelectContent>
                   <SelectItem value="owner">Ägare</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="member">Medlem</SelectItem>
+                  <SelectItem value="member">Förvaltare</SelectItem>
+                  <SelectItem value="viewer">Läsare (endast läs)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -139,7 +140,13 @@ export function OrganizationInvitations({ organizationId }: OrganizationInvitati
                     <TableCell className="font-medium">{invitation.email}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {invitation.role === "owner" ? "Ägare" : invitation.role === "admin" ? "Admin" : "Medlem"}
+                        {invitation.role === "owner"
+                          ? "Ägare"
+                          : invitation.role === "admin"
+                            ? "Admin"
+                            : invitation.role === "viewer" || invitation.role === "reader"
+                              ? "Läsare"
+                              : "Förvaltare"}
                       </Badge>
                     </TableCell>
                     <TableCell>

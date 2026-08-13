@@ -660,6 +660,8 @@ serve(async (req) => {
       .eq('organization_id', orgId)
       .maybeSingle();
 
+    let memberRole: string | null = (memberRow?.role as string) || null;
+
     if (!memberRow) {
       // Founders may still chat against an org they "activated" for support
       const { data: roles } = await supabase
@@ -671,6 +673,7 @@ serve(async (req) => {
       if (!roles) {
         return jsonResponse({ error: 'Du är inte medlem i den aktiva organisationen.' }, 403);
       }
+      memberRole = 'founder';
     }
 
     // ── CONTEXT NODE (fetch) ──
@@ -902,6 +905,7 @@ serve(async (req) => {
             userId,
             userEmail,
             conversationId,
+            memberRole,
             pageContext: safePageContext,
           });
 

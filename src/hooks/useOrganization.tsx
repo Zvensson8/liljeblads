@@ -110,7 +110,7 @@ export function useOrganization() {
       return data as { organization_id: string; member_role: string };
     },
     onSuccess: async () => {
-      // Drop cached entity data so the next screens load the new org's rows
+      // Fas 5: drop all org-scoped caches so multi-org never shows stale rows
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.myOrganizations.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.properties.all }),
@@ -122,8 +122,14 @@ export function useOrganization() {
         queryClient.invalidateQueries({ queryKey: ['module-access'] }),
         queryClient.invalidateQueries({ queryKey: ['user-roles'] }),
         queryClient.invalidateQueries({ queryKey: ['session'] }),
+        queryClient.invalidateQueries({ queryKey: ['jarvis-action-log'] }),
+        queryClient.invalidateQueries({ queryKey: ['jarvis-health'] }),
+        queryClient.invalidateQueries({ queryKey: ['ai-suggested-actions'] }),
+        queryClient.invalidateQueries({ queryKey: ['agent-activity'] }),
+        queryClient.invalidateQueries({ queryKey: ['property-documents'] }),
+        queryClient.invalidateQueries({ queryKey: ['document-ingest-batches'] }),
       ]);
-      toast.success('Organisation bytt');
+      toast.success('Organisation bytt — data omladdad');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Kunde inte byta organisation');

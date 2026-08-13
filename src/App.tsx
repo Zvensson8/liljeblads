@@ -18,6 +18,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import RouteErrorBoundary from "@/components/RouteErrorBoundary";
 import { RequireFounder } from "@/components/RequireRole";
 import { WorkspaceBootstrap } from "@/components/WorkspaceBootstrap";
+import { OrgTheme } from "@/components/organization/OrgTheme";
 
 // Lazy load all routes for better performance
 const Index = lazy(() => import("./pages/Index"));
@@ -109,6 +110,7 @@ const App = () => (
           <BrowserRouter>
             <AuthProvider>
               <NotificationsProvider>
+                <OrgTheme />
                 <AppContent />
               </NotificationsProvider>
             </AuthProvider>

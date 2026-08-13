@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Send, Loader2, Bot, User, MapPin } from 'lucide-react';
+import { X, Send, Loader2, Bot, User, MapPin, Mic, MicOff, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -11,6 +11,10 @@ import JarvisActionCards, {
 } from '@/components/ai-chat/JarvisActionCards';
 import { mergeAppliedActions } from '@/lib/jarvisActionFromMessage';
 import JarvisRecentActions from '@/components/ai-chat/JarvisRecentActions';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useOrgRole } from '@/hooks/useOrgRole';
+import { useSpeechToText } from '@/hooks/useSpeechToText';
+import { toast } from 'sonner';
 
 interface Message {
   id: string;
@@ -34,6 +38,9 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
   const inputRef = useRef<HTMLInputElement>(null);
   const aiChat = useAIChat();
   const pageContext = useJarvisPageContext();
+  const isOnline = useOnlineStatus();
+  const { canWrite, isViewer, roleLabel } = useOrgRole();
+  const speech = useSpeechToText({ lang: 'sv-SE' });
 
   const hasPageEntity =
     Boolean(pageContext.property_id) ||
@@ -54,6 +61,13 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
+
+    if (!isOnline) {
+      toast.warning('Du är offline', {
+        description: 'Jarvis kan inte köra apply. Vänta tills du är online.',
+      });
+      return;
+    }
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -165,18 +179,27 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
                 Ser {pageContext.label || 'sidan'}
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground">Fråga mig vad som helst</p>
+              <p className="text-xs text-muted-foreground">
+                {isViewer ? `Läge: ${roleLabel} (endast läs)` : 'Fråga mig vad som helst'}
+              </p>
             )}
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0"
-          onClick={() => onOpenChange(false)}
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {!isOnline && (
+            <span className="text-[10px] text-amber-600 flex items-center gap-0.5 mr-1">
+              <WifiOff className="h-3 w-3" /> Offline
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={() => onOpenChange(false)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -278,16 +301,55 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
 
       {/* Input */}
       <div className="border-t p-3 shrink-0">
+        {!canWrite && (
+          <p className="text-[10px] text-muted-foreground mb-1.5">
+            Din roll ({roleLabel}) är läs-only — Jarvis apply blockeras i backend/UI.
+          </p>
+        )}
+        {speech.error && (
+          <p className="text-[10px] text-destructive mb-1">{speech.error}</p>
+        )}
         <div className="flex gap-2">
           <Input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Skriv ett meddelande..."
+            placeholder={
+              !isOnline
+                ? 'Offline — endast lokal text…'
+                : speech.listening
+                  ? 'Lyssnar…'
+                  : 'Skriv eller diktera…'
+            }
             disabled={isLoading}
             className="flex-1"
           />
+          {speech.supported && (
+            <Button
+              type="button"
+              variant={speech.listening ? 'default' : 'outline'}
+              size="icon"
+              className="shrink-0"
+              disabled={isLoading}
+              title="Röstinmatning (svenska)"
+              onClick={() => {
+                if (speech.listening) {
+                  speech.stop();
+                  return;
+                }
+                speech.start((text) => {
+                  setInput((prev) => (prev ? `${prev} ${text}` : text).trim());
+                });
+              }}
+            >
+              {speech.listening ? (
+                <MicOff className="h-4 w-4" />
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -300,7 +362,7 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
           </Button>
           <Button
             onClick={sendMessage}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || !isOnline}
             size="icon"
           >
             <Send className="h-4 w-4" />

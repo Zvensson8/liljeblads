@@ -171,8 +171,11 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
         return "Full åtkomst inkl. fakturering, budgetar och alla kostnader";
       case "admin":
         return "Hantera medlemmar, se all finansiell data";
+      case "viewer":
+      case "reader":
+        return "Endast läs — kan inte skapa WO/projekt via UI eller Jarvis apply";
       default:
-        return "Visa fastigheter och komponenter, begränsad ekonomiåtkomst";
+        return "Förvaltare: full produkt (WO, projekt, komponenter), begränsad org-admin";
     }
   };
 
@@ -210,7 +213,13 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
               <div className="flex items-start gap-2">
                 <UserIcon className="h-4 w-4 text-gray-500 mt-0.5" />
                 <div className="text-sm">
-                  <strong>Medlem:</strong> Kan visa fastigheter, komponenter och work orders men ser INTE priser eller kostnadsdata
+                  <strong>Förvaltare:</strong> Full produkt (fastigheter, WO, projekt, Jarvis apply) — inte org-inställningar
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <UserIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div className="text-sm">
+                  <strong>Läsare:</strong> Endast läsa data — inga apply/skrivningar via UI eller Jarvis
                 </div>
               </div>
             </div>
@@ -285,7 +294,13 @@ export function OrganizationMembers({ organizationId, isAdmin, currentUserId }: 
                             <SelectItem value="member">
                               <div className="flex items-center gap-2">
                                 <UserIcon className="h-4 w-4" />
-                                Medlem
+                                Förvaltare
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="viewer">
+                              <div className="flex items-center gap-2">
+                                <UserIcon className="h-4 w-4 opacity-60" />
+                                Läsare
                               </div>
                             </SelectItem>
                           </SelectContent>

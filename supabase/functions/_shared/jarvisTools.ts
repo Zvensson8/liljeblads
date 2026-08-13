@@ -32,6 +32,8 @@ export type ToolContext = {
   /** Authenticated user email only — never use model-supplied recipients for send */
   userEmail: string | null;
   conversationId?: string | null;
+  /** Org membership role (owner|admin|member|viewer) — viewer cannot apply */
+  memberRole?: string | null;
   /** Optional UI route context (property/project where user is browsing) */
   pageContext?: {
     property_id?: string;
@@ -1616,6 +1618,22 @@ export async function executeJarvisTool(
   // undo_* log themselves; batch logs children
   const shouldLog =
     name.startsWith("apply_") || name === "send_to_me";
+
+  // Fas 5: viewer/reader cannot apply or batch writes
+  const role = (ctx.memberRole || "").toLowerCase();
+  if (
+    (role === "viewer" || role === "reader") &&
+    (name.startsWith("apply_") ||
+      name === "batch_apply_actions" ||
+      name === "send_to_me" ||
+      name.startsWith("suggest_"))
+  ) {
+    return {
+      error:
+        "Din roll i organisationen är läsare — du kan fråga om data men inte skapa/ändra via Jarvis.",
+      role_blocked: true,
+    };
+  }
 
   // C: rate limits — apply 30/min, send_to_me 10/hour
   if (name.startsWith("apply_") || name === "batch_apply_actions") {
