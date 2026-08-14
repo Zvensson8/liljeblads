@@ -1,0 +1,32 @@
+{
+  "id": "/prata",
+  "name": "Jarvis",
+  "short_name": "Jarvis",
+  "description": "Prata med Jarvis — Liljeblads",
+  "start_url": "/prata",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#4F9CF9",
+  "background_color": "#1a1f2e",
+  "icons": [
+    {
+      "src": "/placeholder.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/placeholder.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/placeholder.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

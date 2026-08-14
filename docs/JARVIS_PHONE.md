@@ -13,10 +13,11 @@ Två vägar — båda pratar med **samma Liljeblads-data** (org-isolerat).
 
 ## 1. Ikon på telefonen (redan i appen)
 
-1. Öppna `https://liljeblads.vercel.app/prata` (inloggad).
-2. **iPhone:** Dela → **Lägg till på hemskärmen**.
-3. **Android:** meny → **Installera app** / Lägg till på startskärmen.
-4. Tryck ikonen → prata med Ara.
+1. Öppna `https://liljeblads.vercel.app/prata` (inloggad) och vänta tills sidan laddat.
+2. **iPhone:** Dela → **Lägg till på hemskärmen** (måste göras på `/prata`, inte startsidan).
+3. **Android:** meny → **Installera app**.
+4. Ta bort ev. gammal ikon som öppnade bara `liljeblads.vercel.app`.
+5. Tryck **Jarvis** → ska landa på `/prata`.
 
 Det är samma Grok Voice Agent som i chatten, bara helskärm.
 

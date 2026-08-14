@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "robots.txt", "placeholder.svg"],
+      includeAssets: ["favicon.ico", "robots.txt", "placeholder.svg", "jarvis.webmanifest"],
       manifest: {
         name: "Liljeblads – Fastighetshantering",
         short_name: "Liljeblads",

@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button';
 import JarvisVoicePanel from '@/components/ai-chat/JarvisVoicePanel';
 import { useGrokVoiceAgent } from '@/hooks/useGrokVoiceAgent';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { usePrataHomeScreen } from '@/hooks/usePrataHomeScreen';
 
 /** Full-screen voice — add to phone home screen as “Jarvis”. */
 export default function Prata() {
+  usePrataHomeScreen();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
   const voice = useGrokVoiceAgent({
@@ -57,7 +59,8 @@ export default function Prata() {
       <footer className="mt-8 space-y-3 text-center text-xs text-muted-foreground max-w-md mx-auto">
         <p className="flex items-center justify-center gap-1.5">
           <Share className="h-3.5 w-3.5" />
-          iPhone: Dela → Lägg till på hemskärmen. Android: meny → Installera app.
+          Gör det härifrån: iPhone Dela → Lägg till på hemskärmen. Android: Installera app.
+          Ta bort den gamla ikonen först om den öppnade startsidan.
         </p>
         <p>
           Telefonnummer (ring in) sätts i xAI Voice Agent Builder och kopplas mot
