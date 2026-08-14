@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireUserOrServiceRole } from "../_shared/requireUser.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,10 +8,25 @@ const corsHeaders = {
 };
 
 function parseStorageUrl(url: string): { bucket: string; path: string } | null {
-  const publicMatch = url.match(/\/storage\/v1\/object\/public\/([^\/]+)\/(.+)$/);
-  if (publicMatch) return { bucket: publicMatch[1], path: publicMatch[2] };
-  const privateMatch = url.match(/\/storage\/v1\/object\/([^\/]+)\/(.+)$/);
-  if (privateMatch) return { bucket: privateMatch[1], path: privateMatch[2] };
+  try {
+    const path = new URL(url).pathname;
+    const patterns = [
+      /\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/,
+      /\/storage\/v1\/object\/sign\/([^/]+)\/(.+)$/,
+      /\/storage\/v1\/object\/authenticated\/([^/]+)\/(.+)$/,
+    ];
+    for (const re of patterns) {
+      const match = path.match(re);
+      if (match) {
+        return {
+          bucket: decodeURIComponent(match[1]),
+          path: decodeURIComponent(match[2]),
+        };
+      }
+    }
+  } catch {
+    return null;
+  }
   return null;
 }
 
@@ -20,104 +36,60 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Validate authentication
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-
-    // Decode JWT — user session or service_role (embeddings cron)
-    const token = authHeader.replace('Bearer ', '');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    let userId: string;
-    let isServiceRole = false;
-    try {
-      const payloadB64 = token.split('.')[1];
-      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
-      isServiceRole =
-        payload.role === 'service_role' ||
-        (!!supabaseServiceKey && token === supabaseServiceKey);
-      userId = payload.sub || (isServiceRole ? 'service_role' : '');
-      if (!userId && !isServiceRole) throw new Error('No sub');
-    } catch {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
-    // Service role bypasses storage RLS; user JWT enforces it
+    const authed = await requireUserOrServiceRole(req, corsHeaders);
+    if ('response' in authed) return authed.response;
+
+    const isServiceRole = authed.kind === 'service';
+    const userId = isServiceRole ? 'service_role' : authed.user.id;
+
+    // Service role (raw key only) bypasses storage RLS; user JWT enforces it
     const authClient = isServiceRole
       ? createClient(supabaseUrl, supabaseServiceKey)
       : createClient(supabaseUrl, supabaseAnonKey, {
-          global: { headers: { Authorization: authHeader } },
+          global: { headers: { Authorization: req.headers.get('Authorization')! } },
         });
 
-    const { url, maxPages = 10 } = await req.json();
+    const { url, maxPages: rawMaxPages = 10 } = await req.json();
+    const maxPages = Math.min(Math.max(Number(rawMaxPages) || 10, 1), 80);
 
-    if (!url) {
+    if (!url || typeof url !== 'string') {
       return new Response(JSON.stringify({ error: 'URL is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`User ${userId} parsing PDF from URL: ${url}`);
-
-    let data: Uint8Array;
-
-    // Check if this is a Supabase storage URL
-    if (url.includes(supabaseUrl) || url.includes('supabase.co/storage')) {
-      const parsed = parseStorageUrl(url);
-
-      if (parsed) {
-        console.log(`Detected storage: bucket=${parsed.bucket}, path=${parsed.path}`);
-
-        // Use the USER's auth client to download - this enforces storage RLS
-        const { data: fileData, error: downloadError } = await authClient.storage
-          .from(parsed.bucket)
-          .download(parsed.path);
-
-        if (downloadError || !fileData) {
-          console.error(`Storage download failed: ${downloadError?.message}`);
-          return new Response(JSON.stringify({ error: 'Access denied or file not found', text: '' }), {
-            status: 403,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-
-        const arrayBuffer = await fileData.arrayBuffer();
-        data = new Uint8Array(arrayBuffer);
-        console.log(`Downloaded from storage, size: ${data.length} bytes`);
-      } else {
-        const pdfResponse = await fetch(url);
-        if (!pdfResponse.ok) {
-          return new Response(JSON.stringify({ error: 'Failed to fetch PDF', text: '' }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        const arrayBuffer = await pdfResponse.arrayBuffer();
-        data = new Uint8Array(arrayBuffer);
-      }
-    } else {
-      // External URL - direct fetch (user authenticated, so this is allowed)
-      const pdfResponse = await fetch(url);
-      if (!pdfResponse.ok) {
-        return new Response(JSON.stringify({ error: 'Failed to fetch PDF', text: '' }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const arrayBuffer = await pdfResponse.arrayBuffer();
-      data = new Uint8Array(arrayBuffer);
+    const parsed = parseStorageUrl(url);
+    const isOwnStorage =
+      Boolean(parsed) &&
+      (url.startsWith(`${supabaseUrl}/`) || url.includes('.supabase.co/storage/'));
+    if (!isOwnStorage || !parsed) {
+      return new Response(
+        JSON.stringify({ error: 'Only project storage URLs are allowed', text: '' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
+
+    console.log(`User ${userId} parsing PDF from storage: ${parsed.bucket}/${parsed.path}`);
+
+    const { data: fileData, error: downloadError } = await authClient.storage
+      .from(parsed.bucket)
+      .download(parsed.path);
+
+    if (downloadError || !fileData) {
+      console.error(`Storage download failed: ${downloadError?.message}`);
+      return new Response(JSON.stringify({ error: 'Access denied or file not found', text: '' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const arrayBuffer = await fileData.arrayBuffer();
+    const data = new Uint8Array(arrayBuffer);
 
     console.log(`PDF fetched, size: ${data.length} bytes`);
 

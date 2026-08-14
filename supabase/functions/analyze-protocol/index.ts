@@ -126,7 +126,10 @@ serve(async (req) => {
             console.log(`Parsing PDF: ${doc.name}`);
             const parseResponse = await fetch(`${supabaseUrl}/functions/v1/parse-document`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: authHeader,
+              },
               body: JSON.stringify({ url: doc.file_url, maxPages: 10 })
             });
             

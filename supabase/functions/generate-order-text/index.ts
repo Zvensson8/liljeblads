@@ -1,7 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { searchKnowledgeBase } from "../_shared/knowledgeBaseSearch.ts";
 import { chatText } from "../_shared/llmClient.ts";
+import {
+  assertOrgMember,
+  requireUser,
+  serviceRoleClient,
+} from "../_shared/requireUser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +18,9 @@ serve(async (req) => {
   }
 
   try {
+    const authed = await requireUser(req, corsHeaders);
+    if ("response" in authed) return authed.response;
+
     const { workOrderId } = await req.json();
 
     if (!workOrderId) {
@@ -23,18 +30,15 @@ serve(async (req) => {
       });
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const supabaseClient = serviceRoleClient();
 
     const { data: workOrder, error: woError } = await supabaseClient
       .from("work_orders")
       .select(`
         *,
         property:properties (
-          id, name, property_number, address, invoice_address,
-          organization:organizations (name)
+          id, name, property_number, address, invoice_address, organization_id,
+          organization:organizations (id, name)
         )
       `)
       .eq("id", workOrderId)
@@ -43,6 +47,16 @@ serve(async (req) => {
     if (woError || !workOrder) {
       throw new Error("Arbetsorder hittades inte");
     }
+
+    const orgId =
+      workOrder.property?.organization?.id || workOrder.property?.organization_id;
+    const denied = await assertOrgMember(
+      supabaseClient,
+      authed.user.id,
+      orgId,
+      corsHeaders,
+    );
+    if (denied) return denied;
 
     const { data: contacts } = await supabaseClient
       .from("property_contacts")

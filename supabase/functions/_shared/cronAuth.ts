@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { timingSafeEqual } from "./requireUser.ts";
 
 /**
  * Shared auth for cron / internal jobs that run with verify_jwt = false.
@@ -24,8 +25,8 @@ export function assertCronAuthorized(req: Request): Response | null {
     auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : null;
 
   // Prefer explicit cron header; only treat bearer as secret if it matches
-  if (headerSecret && headerSecret === expected) return null;
-  if (bearer && bearer === expected) return null;
+  if (headerSecret && timingSafeEqual(headerSecret, expected)) return null;
+  if (bearer && timingSafeEqual(bearer, expected)) return null;
 
   return new Response(JSON.stringify({ error: "Unauthorized" }), {
     status: 401,

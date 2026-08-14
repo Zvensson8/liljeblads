@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireUser } from "../_shared/requireUser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -104,28 +105,17 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) throw new Error("Missing authorization header");
-
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
     if (!GOOGLE_AI_API_KEY) throw new Error("GOOGLE_AI_API_KEY is not configured");
 
+    const authed = await requireUser(req, corsHeaders);
+    if ("response" in authed) return authed.response;
+    const userId = authed.user.id;
+
     // Read body first (can only be read once)
     const body = await req.json();
-
-    // Decode JWT to get user ID (no API call needed - just base64 decode the payload)
-    const token = authHeader.replace("Bearer ", "");
-    let userId: string;
-    try {
-      const payloadB64 = token.split(".")[1];
-      const payload = JSON.parse(atob(payloadB64));
-      userId = payload.sub;
-      if (!userId) throw new Error("No sub in token");
-    } catch {
-      throw new Error("Invalid token");
-    }
 
     // Check founder role
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);

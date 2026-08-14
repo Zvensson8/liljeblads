@@ -1,7 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { searchKnowledgeBase } from "../_shared/knowledgeBaseSearch.ts";
 import { chatText } from "../_shared/llmClient.ts";
+import {
+  assertOrgMember,
+  requireUser,
+  serviceRoleClient,
+} from "../_shared/requireUser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +18,9 @@ serve(async (req) => {
   }
 
   try {
+    const authed = await requireUser(req, corsHeaders);
+    if ("response" in authed) return authed.response;
+
     const { projectId } = await req.json();
 
     if (!projectId) {
@@ -23,18 +30,15 @@ serve(async (req) => {
       });
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const supabaseClient = serviceRoleClient();
 
     const { data: project, error: pError } = await supabaseClient
       .from("projects")
       .select(`
         *,
         property:properties (
-          id, name, property_number, address, invoice_address,
-          organization:organizations (name)
+          id, name, property_number, address, invoice_address, organization_id,
+          organization:organizations (id, name)
         )
       `)
       .eq("id", projectId)
@@ -43,6 +47,16 @@ serve(async (req) => {
     if (pError || !project) {
       throw new Error("Projekt hittades inte");
     }
+
+    const orgId =
+      project.property?.organization?.id || project.property?.organization_id;
+    const denied = await assertOrgMember(
+      supabaseClient,
+      authed.user.id,
+      orgId,
+      corsHeaders,
+    );
+    if (denied) return denied;
 
     const { data: contacts } = await supabaseClient
       .from("property_contacts")

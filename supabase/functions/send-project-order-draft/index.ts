@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { Resend } from "https://esm.sh/resend@4.0.0";
+import {
+  assertOrgMember,
+  requireUser,
+  serviceRoleClient,
+} from "../_shared/requireUser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +13,6 @@ const corsHeaders = {
 
 interface ProjectOrderRequest {
   projectId: string;
-  userEmail: string;
   customText?: string;
 }
 
@@ -21,19 +24,24 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { projectId, userEmail, customText }: ProjectOrderRequest = await req.json();
+    const authed = await requireUser(req, corsHeaders);
+    if ("response" in authed) return authed.response;
+    if (!authed.user.email) {
+      return new Response(JSON.stringify({ error: "Kontot saknar e-postadress" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+    const userEmail = authed.user.email;
 
-    if (!projectId || !userEmail) {
-      throw new Error("Project ID och användarens e-post är obligatoriska");
+    const { projectId, customText }: ProjectOrderRequest = await req.json();
+
+    if (!projectId) {
+      throw new Error("Project ID är obligatoriskt");
     }
 
-    // Använd service role key för att hämta data
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const supabaseClient = serviceRoleClient();
 
-    // Hämta projekt med fastighet och organisation
     const { data: project, error: projectError } = await supabaseClient
       .from("projects")
       .select(`
@@ -44,7 +52,9 @@ const handler = async (req: Request): Promise<Response> => {
           property_number,
           address,
           invoice_address,
+          organization_id,
           organization:organizations (
+            id,
             name,
             logo_url
           )
@@ -60,6 +70,16 @@ const handler = async (req: Request): Promise<Response> => {
     if (!project.property) {
       throw new Error("Fastighet hittades inte för projektet");
     }
+
+    const orgId =
+      project.property.organization?.id || project.property.organization_id;
+    const denied = await assertOrgMember(
+      supabaseClient,
+      authed.user.id,
+      orgId,
+      corsHeaders,
+    );
+    if (denied) return denied;
 
     // Hämta huvudkontakt
     const { data: contacts } = await supabaseClient
