@@ -63,6 +63,8 @@ export interface ProjectListFilters {
   type?: ProjectType;
   year?: number;
   showArchived?: boolean;
+  /** Only archived rows (Projects “Arkiverade” tab). */
+  archivedOnly?: boolean;
   /** Defense-in-depth filter via property.organization_id */
   organizationId?: string;
 }

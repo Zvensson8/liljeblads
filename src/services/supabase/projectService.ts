@@ -27,7 +27,8 @@ const base = createCrudService<
   defaultOrder: { column: 'created_at', ascending: false },
   applyFilters: (query, filters) => {
     let q = query;
-    if (!filters.showArchived) q = q.eq('is_archived', false);
+    if (filters.archivedOnly) q = q.eq('is_archived', true);
+    else if (!filters.showArchived) q = q.eq('is_archived', false);
     if (filters.propertyId) q = q.eq('property_id', filters.propertyId);
     if (filters.status) q = q.eq('status', filters.status);
     if (filters.type) q = q.eq('type', filters.type);
@@ -49,7 +50,8 @@ async function listForOrganization(
     )
     .order('created_at', { ascending: false });
 
-  if (!filters.showArchived) query = query.eq('is_archived', false);
+  if (filters.archivedOnly) query = query.eq('is_archived', true);
+  else if (!filters.showArchived) query = query.eq('is_archived', false);
   if (filters.propertyId) query = query.eq('property_id', filters.propertyId);
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.type) query = query.eq('type', filters.type);
