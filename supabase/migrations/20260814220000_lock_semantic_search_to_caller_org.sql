@@ -1,9 +1,15 @@
 -- semantic_search_ranked was SECURITY DEFINER, granted to anon, and trusted
 -- the caller-supplied org_id. NULL org_id returned every tenant's embeddings.
 -- Lock search to the authenticated user's org; service_role may still pass org_id.
+-- vector lives in the extensions schema on this project.
+
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+
+DROP FUNCTION IF EXISTS public.semantic_search_ranked(extensions.vector, float, int, uuid, text[], boolean, boolean);
+DROP FUNCTION IF EXISTS public.semantic_search_ranked(extensions.vector, double precision, integer, uuid, text[], boolean, boolean);
 
 CREATE OR REPLACE FUNCTION public.semantic_search_ranked(
-  query_embedding vector(768),
+  query_embedding extensions.vector(768),
   match_threshold float DEFAULT 0.3,
   match_count int DEFAULT 20,
   org_id uuid DEFAULT NULL,
@@ -23,7 +29,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   caller_org uuid;
@@ -71,9 +77,11 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.semantic_search_ranked(vector(768), float, int, uuid, text[], boolean, boolean) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.semantic_search_ranked(vector(768), float, int, uuid, text[], boolean, boolean) FROM anon;
-GRANT EXECUTE ON FUNCTION public.semantic_search_ranked(vector(768), float, int, uuid, text[], boolean, boolean) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.semantic_search_ranked(extensions.vector, float, int, uuid, text[], boolean, boolean) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.semantic_search_ranked(extensions.vector, float, int, uuid, text[], boolean, boolean) FROM anon;
+REVOKE ALL ON FUNCTION public.semantic_search_ranked(extensions.vector, double precision, integer, uuid, text[], boolean, boolean) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.semantic_search_ranked(extensions.vector, double precision, integer, uuid, text[], boolean, boolean) FROM anon;
+GRANT EXECUTE ON FUNCTION public.semantic_search_ranked(extensions.vector, float, int, uuid, text[], boolean, boolean) TO authenticated, service_role;
 
 -- Do not let any authenticated user bump access counters on other orgs.
 CREATE OR REPLACE FUNCTION public.update_embedding_access(
