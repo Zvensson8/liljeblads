@@ -6,6 +6,7 @@ const VOICE_TOOL_NAMES = new Set([
   "get_project",
   "list_work_orders",
   "get_property_overview",
+  "get_energy_overview",
   "list_high_risk_components",
   "list_todos",
   "get_daily_briefing",

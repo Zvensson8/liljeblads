@@ -24,6 +24,7 @@ import {
   UNDO_WINDOW_MS,
 } from "./jarvisUndo.ts";
 import { checkRateLimit } from "./rateLimit.ts";
+import { fetchEnergyPulseOverview } from "./energyPulseClient.ts";
 
 export type ToolContext = {
   supabase: SupabaseClient;
@@ -695,9 +696,24 @@ export const jarvisTools: ChatTool[] = [
   {
     type: "function",
     function: {
+      name: "get_energy_overview",
+      description:
+        "Hämta EnergyPulse-data för en Liljeblads-fastighet: energiklass, intensitet, MEPS-gap, CRREM-stranding och fysiska klimatrisker. Använd när användaren frågar om energi, MEPS, CRREM eller energiprestanda.",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_property_overview",
       description:
-        "Hämta samlad översikt för en fastighet: grunddata (inkl. fakturaadress/invoice_address, adress, fastighetsnummer), komponenter, öppna WO, todos, anteckningar, dokument, högrisk och underhållsplan. Använd vid frågor om fakturaadress eller en specifik fastighet.",
+        "Hämta samlad översikt för en fastighet: grunddata (inkl. fakturaadress/invoice_address, adress, fastighetsnummer), komponenter, öppna WO, todos, anteckningar, dokument, högrisk, underhållsplan och EnergyPulse om kopplat. Använd vid frågor om fakturaadress eller en specifik fastighet.",
       parameters: {
         type: "object",
         properties: {
@@ -2842,6 +2858,31 @@ async function executeJarvisToolInner(
           contacts: contacts.data ?? [],
           high_risk_components: highRisk,
           maintenance_plan: plan.data ?? null,
+          energy: await fetchEnergyPulseOverview(supabase, orgId, pid),
+        };
+      }
+
+      case "get_energy_overview": {
+        const propName = String(rawArgs.property_name || "").trim();
+        const propIdArg = String(rawArgs.property_id || pageContext?.property_id || "").trim();
+        if (!propName && !propIdArg) {
+          return { error: "property_name eller property_id krävs" };
+        }
+        let pq = supabase
+          .from("properties")
+          .select("id, name")
+          .eq("organization_id", orgId)
+          .limit(1);
+        if (propIdArg) pq = pq.eq("id", propIdArg);
+        else pq = pq.ilike("name", `%${propName}%`);
+        const { data: prop, error: pErr } = await pq.maybeSingle();
+        if (pErr) return { error: pErr.message };
+        if (!prop) return { error: "Fastighet hittades inte" };
+        const energy = await fetchEnergyPulseOverview(supabase, orgId, prop.id as string);
+        return {
+          property_id: prop.id,
+          property_name: prop.name,
+          energy,
         };
       }
 

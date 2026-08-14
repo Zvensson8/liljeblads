@@ -15,6 +15,7 @@ import { OrganizationBranding } from "@/components/organization/OrganizationBran
 import { OrganizationInvitations } from "@/components/organization/OrganizationInvitations";
 import { ProjectTemplates } from "@/components/organization/ProjectTemplates";
 import { OrganizationApiKeys } from "@/components/organization/OrganizationApiKeys";
+import { EnergyPulseBridgeSettings } from "@/components/organization/EnergyPulseBridgeSettings";
 import { AgentRiskPolicySettings } from "@/components/organization/AgentRiskPolicySettings";
 import { OrganizationUnitPrices } from "@/components/organization/OrganizationUnitPrices";
 
@@ -307,6 +308,7 @@ export default function OrganizationSettings() {
               {isAdmin && (
                 <TabsContent value="integrations">
                   <OrganizationApiKeys organizationId={organization.id} />
+                  <EnergyPulseBridgeSettings organizationId={organization.id} />
                 </TabsContent>
               )}
 
