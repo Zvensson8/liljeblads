@@ -74,7 +74,7 @@ interface Project {
   } | null;
 }
 
-const PROJECT_LIST_TABS = ["overview", "active", "proposals", "archived"] as const;
+const PROJECT_LIST_TABS = ["active", "proposals", "archived"] as const;
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();

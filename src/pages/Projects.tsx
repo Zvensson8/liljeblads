@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Plus, FolderArchive, Briefcase, Sparkles, Download } from "lucide-react";
 import { toast } from "sonner";
 import { ProjectFormDialog } from "@/components/projects/ProjectFormDialog";
-import { ProjectDashboard } from "@/components/projects/ProjectDashboard";
 import { ProjectProposals } from "@/components/projects/ProjectProposals";
 import { ProjectsFilters } from "@/components/projects/ProjectsFilters";
 import { ProjectsTable } from "@/components/projects/ProjectsTable";
@@ -63,13 +62,13 @@ export default function Projects() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
-  const PROJECT_TABS = ["overview", "active", "proposals", "archived"] as const;
+  const PROJECT_TABS = ["active", "proposals", "archived"] as const;
   type ProjectTab = (typeof PROJECT_TABS)[number];
   const tabFromUrl = searchParams.get("tab");
   const activeTab: ProjectTab =
     tabFromUrl && (PROJECT_TABS as readonly string[]).includes(tabFromUrl)
       ? (tabFromUrl as ProjectTab)
-      : "overview";
+      : "active";
 
   const setActiveTab = (tab: string) => {
     setSearchParams(
@@ -351,7 +350,6 @@ export default function Projects() {
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                   <TabsList>
-                    <TabsTrigger value="overview">Översikt</TabsTrigger>
                     <TabsTrigger value="active">Aktiva projekt</TabsTrigger>
                     <TabsTrigger value="proposals" className="flex items-center gap-1">
                       <Sparkles className="h-3 w-3" />
@@ -379,10 +377,6 @@ export default function Projects() {
                     </Button>
                   </div>
                 </div>
-
-                <TabsContent value="overview" className="space-y-6">
-                  <ProjectDashboard projects={projects} />
-                </TabsContent>
 
                 <TabsContent value="proposals" className="space-y-6">
                   <ProjectProposals />
