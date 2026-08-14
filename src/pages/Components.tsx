@@ -1,39 +1,106 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { useAuth } from '@/hooks/useAuth';
-import { Package, Plus, Download, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import {
+  Package,
+  Plus,
+  Download,
+  LayoutGrid,
+  Table as TableIcon,
+  Search,
+  Filter,
+} from 'lucide-react';
 import { ComponentFormDialog } from '@/components/ComponentFormDialog';
 import { SelectPropertyDialog } from '@/components/SelectPropertyDialog';
 import { ComponentImportDialog } from '@/components/ComponentImportDialog';
 import { exportComponentsToExcel, exportComponentsToPDF } from '@/lib/exportUtils';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useComponents, useDeleteComponent } from '@/hooks/useComponents';
-import { useMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
+import { useLastServiceByComponent, useMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 import { useWorkOrders } from '@/hooks/useWorkOrders';
 import { useComponentRiskList } from '@/hooks/useComponentRisk';
-import { type RiskLevel } from '@/lib/componentRisk';
-import { generateRiskSuggestions } from '@/lib/riskSuggestions';
+import { useProperties } from '@/hooks/useProperties';
 import { useOrganization } from '@/hooks/useOrganization';
-import { toast as sonnerToast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useListSearchParams } from '@/hooks/useListSearchParams';
+import { toast } from 'sonner';
 import {
   filterAndSortComponents,
   hasActiveComponentFilters,
+  uniqueComponentManufacturers,
+  uniqueComponentModels,
+  uniqueComponentTypes,
   type ServiceFilter,
   type ComponentsSort,
 } from '@/lib/componentsListFilter';
+import type { RiskLevel } from '@/lib/componentRisk';
+import { generateRiskSuggestions } from '@/lib/riskSuggestions';
+import { componentPath } from '@/lib/entityPaths';
+import { queryKeys } from '@/lib/queryKeys';
+import { maintenanceHistoryService } from '@/services/supabase';
+import { EntityListHeader } from '@/components/list/EntityListHeader';
+import {
+  EntityListEmpty,
+  EntityListError,
+  EntityListSkeleton,
+} from '@/components/list/EntityListState';
 import { ComponentsFiltersBar } from '@/components/components-list/ComponentsFiltersBar';
 import { ComponentsCardsView } from '@/components/components-list/ComponentsCardsView';
 import { ComponentsTableView } from '@/components/components-list/ComponentsTableView';
 
-interface Component {
+const LIST_DEFAULTS = {
+  tab: 'components',
+  q: '',
+  property: 'all',
+  type: 'all',
+  manufacturer: 'all',
+  model: 'all',
+  service: 'all',
+  risk: 'all',
+  sort: 'default',
+};
+
+const SERVICE_VALUES: ServiceFilter[] = ['all', 'latest', 'none', 'with_service'];
+const RISK_VALUES: Array<'all' | RiskLevel> = ['all', 'low', 'medium', 'high', 'critical'];
+const SORT_VALUES: ComponentsSort[] = ['default', 'risk'];
+const TABS = ['components', 'costs'] as const;
+
+function asService(value: string): ServiceFilter {
+  return SERVICE_VALUES.includes(value as ServiceFilter) ? (value as ServiceFilter) : 'all';
+}
+
+function asRisk(value: string): 'all' | RiskLevel {
+  return RISK_VALUES.includes(value as 'all' | RiskLevel) ? (value as 'all' | RiskLevel) : 'all';
+}
+
+function asSort(value: string): ComponentsSort {
+  return SORT_VALUES.includes(value as ComponentsSort) ? (value as ComponentsSort) : 'default';
+}
+
+type ListComponent = {
   id: string;
   name: string;
   type: string;
@@ -50,36 +117,46 @@ interface Component {
   property_id?: string;
   property_name?: string;
   property_address?: string | null;
-}
+  notes?: string | null;
+};
 
 const Components = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
-  const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
+  const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  const [params, setParam, setMany] = useListSearchParams(LIST_DEFAULTS);
+  const activeTab = TABS.includes(params.tab as (typeof TABS)[number])
+    ? params.tab
+    : 'components';
+
+  const [selectedComponent, setSelectedComponent] = useState<ListComponent | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectPropertyDialogOpen, setSelectPropertyDialogOpen] = useState(false);
-  const [selectedPropertyId, setSelectedPropertyId] = useState('');
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
-  const [filterType, setFilterType] = useState<string>('all');
-  const [filterProperty, setFilterProperty] = useState<string>('all');
-  const [filterManufacturer, setFilterManufacturer] = useState<string>('all');
-  const [filterModel, setFilterModel] = useState<string>('all');
-  const [filterService, setFilterService] = useState<ServiceFilter>('all');
-  const [filterRisk, setFilterRisk] = useState<'all' | RiskLevel>('all');
-  const [sortBy, setSortBy] = useState<ComponentsSort>('default');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
   const [suggesting, setSuggesting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ListComponent | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [user, authLoading, navigate]);
+    if (isMobile) setViewMode('cards');
+  }, [isMobile]);
 
-  const { data: rawComponents = [], isLoading: componentsLoading } = useComponents();
-  const { data: maintenanceRows = [] } = useMaintenanceHistory();
-  const { data: workOrders = [] } = useWorkOrders();
-  const { data: riskList = [] } = useComponentRiskList({ limit: 500 });
+  const {
+    data: rawComponents = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useComponents();
+  const { data: properties = [] } = useProperties();
+  const { data: lastServiceById = {} } = useLastServiceByComponent();
+  const costsEnabled = activeTab === 'costs';
+  const { data: maintenanceRows = [] } = useMaintenanceHistory({}, { enabled: costsEnabled });
+  const { data: workOrders = [] } = useWorkOrders({}, { enabled: costsEnabled });
+
+  const propertyId = params.property !== 'all' ? params.property : undefined;
+  const { data: riskList = [] } = useComponentRiskList(
+    { propertyId, limit: 200 },
+    { enabled: Boolean(propertyId) },
+  );
   const { organization } = useOrganization();
   const deleteComponent = useDeleteComponent();
 
@@ -89,31 +166,38 @@ const Components = () => {
     return m;
   }, [riskList]);
 
-  const components: Component[] = useMemo(
+  const components: ListComponent[] = useMemo(
     () =>
-      rawComponents.map((comp) => ({
-        ...comp,
-        property_name: comp.properties?.name,
-        property_address: comp.properties?.address,
-      })) as Component[],
+      rawComponents
+        .filter((comp) => Boolean(comp.id))
+        .map((comp) => ({
+          ...comp,
+          id: String(comp.id),
+          name: comp.name ?? '',
+          type: String(comp.type ?? ''),
+          status: String(comp.status ?? 'active'),
+          manufacturer: comp.manufacturer ?? null,
+          model: comp.model ?? null,
+          serial_number: comp.serial_number ?? null,
+          room_zone: comp.room_zone ?? null,
+          installation_year: comp.installation_year ?? null,
+          registration_number: comp.registration_number ?? null,
+          refrigerant_code: comp.refrigerant_code ?? null,
+          refrigerant_amount_kg: comp.refrigerant_amount_kg ?? null,
+          refrigerant_type: comp.refrigerant_type ?? null,
+          property_name: comp.properties?.name,
+          property_address: comp.properties?.address,
+        })),
     [rawComponents],
   );
 
   const maintenanceStats = useMemo(() => {
-    const stats: Record<string, { totalCost: number; count: number; lastDate: string | null }> = {};
-    maintenanceRows.forEach((row) => {
-      if (!row.component_id) return;
-      if (!stats[row.component_id]) {
-        stats[row.component_id] = { totalCost: 0, count: 0, lastDate: null };
-      }
-      stats[row.component_id].totalCost += row.cost || 0;
-      stats[row.component_id].count += 1;
-      if (!stats[row.component_id].lastDate || row.performed_date > stats[row.component_id].lastDate!) {
-        stats[row.component_id].lastDate = row.performed_date;
-      }
-    });
+    const stats: Record<string, { lastDate: string | null }> = {};
+    for (const [id, date] of Object.entries(lastServiceById)) {
+      stats[id] = { lastDate: date };
+    }
     return stats;
-  }, [maintenanceRows]);
+  }, [lastServiceById]);
 
   const workOrderStats = useMemo(() => {
     const stats: Record<string, { count: number; totalPrice: number }> = {};
@@ -128,61 +212,79 @@ const Components = () => {
     return stats;
   }, [workOrders]);
 
-  const loading = componentsLoading;
+  const costStats = useMemo(() => {
+    const stats: Record<string, { totalCost: number; count: number }> = {};
+    maintenanceRows.forEach((row) => {
+      if (!row.component_id) return;
+      if (!stats[row.component_id]) {
+        stats[row.component_id] = { totalCost: 0, count: 0 };
+      }
+      stats[row.component_id].totalCost += row.cost || 0;
+      stats[row.component_id].count += 1;
+    });
+    return stats;
+  }, [maintenanceRows]);
 
-  // Get unique values for filter dropdowns
-  const uniqueTypes = [...new Set(components.map(c => c.type))].filter(Boolean).sort((a, b) => a.localeCompare(b, 'sv'));
-  const uniqueProperties = [...new Set(components.map(c => c.property_name))].filter(Boolean).sort((a, b) => (a || '').localeCompare(b || '', 'sv'));
-  const uniqueManufacturers = [...new Set(components.map(c => c.manufacturer))].filter(Boolean).sort((a, b) => (a || '').localeCompare(b || '', 'sv'));
-  const uniqueModels = [...new Set(components.map(c => c.model))].filter(Boolean).sort((a, b) => (a || '').localeCompare(b || '', 'sv'));
+  const uniqueTypes = useMemo(() => uniqueComponentTypes(components), [components]);
+  const uniqueManufacturers = useMemo(
+    () => uniqueComponentManufacturers(components),
+    [components],
+  );
+  const uniqueModels = useMemo(() => uniqueComponentModels(components), [components]);
+  const sortedProperties = useMemo(
+    () => [...properties].sort((a, b) => a.name.localeCompare(b.name, 'sv')),
+    [properties],
+  );
+
+  const effectiveRisk = propertyId ? asRisk(params.risk) : 'all';
+  const effectiveSort = propertyId ? asSort(params.sort) : 'default';
 
   const listFilters = useMemo(
     () => ({
-      filterType,
-      filterProperty,
-      filterManufacturer,
-      filterModel,
-      filterService,
-      filterRisk,
-      sortBy,
+      searchQuery: params.q,
+      filterType: params.type,
+      filterProperty: params.property,
+      filterManufacturer: params.manufacturer,
+      filterModel: params.model,
+      filterService: asService(params.service),
+      filterRisk: effectiveRisk,
+      sortBy: effectiveSort,
     }),
     [
-      filterType,
-      filterProperty,
-      filterManufacturer,
-      filterModel,
-      filterService,
-      filterRisk,
-      sortBy,
+      params.q,
+      params.type,
+      params.property,
+      params.manufacturer,
+      params.model,
+      params.service,
+      effectiveRisk,
+      effectiveSort,
     ],
   );
 
   const filteredComponents = useMemo(
-    () =>
-      filterAndSortComponents(
-        components,
-        listFilters,
-        maintenanceStats,
-        riskById,
-      ),
+    () => filterAndSortComponents(components, listFilters, maintenanceStats, riskById),
     [components, listFilters, maintenanceStats, riskById],
   );
 
   const hasActiveFilters = hasActiveComponentFilters(listFilters);
 
   const clearFilters = () => {
-    setFilterType('all');
-    setFilterProperty('all');
-    setFilterManufacturer('all');
-    setFilterModel('all');
-    setFilterService('all');
-    setFilterRisk('all');
-    setSortBy('default');
+    setMany({
+      q: '',
+      property: 'all',
+      type: 'all',
+      manufacturer: 'all',
+      model: 'all',
+      service: 'all',
+      risk: 'all',
+      sort: 'default',
+    });
   };
 
   const handleGenerateRiskSuggestions = async () => {
     if (!organization?.id) {
-      sonnerToast.error('Ingen organisation hittades');
+      toast.error('Ingen organisation hittades');
       return;
     }
     setSuggesting(true);
@@ -193,20 +295,16 @@ const Components = () => {
         maxSuggestions: 20,
       });
       if (res.created > 0) {
-        sonnerToast.success(
-          `${res.created} riskförslag skapade — granska i AI-inkorgen`,
-        );
+        toast.success(`${res.created} riskförslag skapade — granska i AI-inkorgen`);
       } else {
-        sonnerToast.info(
+        toast.info(
           res.skipped
             ? `Inga nya förslag (${res.skipped} hoppades över p.g.a. dedupe/filter)`
             : 'Inga högriskkomponenter att föreslå',
         );
       }
     } catch (e) {
-      sonnerToast.error(
-        e instanceof Error ? e.message : 'Kunde inte generera riskförslag',
-      );
+      toast.error(e instanceof Error ? e.message : 'Kunde inte generera riskförslag');
     } finally {
       setSuggesting(false);
     }
@@ -214,103 +312,121 @@ const Components = () => {
 
   const handleExport = async (format: 'excel' | 'pdf') => {
     const exportList = filteredComponents.length > 0 ? filteredComponents : components;
-    const exportIds = new Set(exportList.map((c) => c.id));
-
-    const maintenanceRecords: Record<string, typeof maintenanceRows> = {};
-    exportList.forEach((c) => (maintenanceRecords[c.id] = []));
-    maintenanceRows.forEach((row) => {
-      if (!row.component_id || !exportIds.has(row.component_id)) return;
-      maintenanceRecords[row.component_id].push(row);
-    });
-    Object.values(maintenanceRecords).forEach((arr) =>
-      arr.sort((a, b) => (b.performed_date || '').localeCompare(a.performed_date || '')),
-    );
-
-    const datestamp = new Date().toISOString().split('T')[0];
-    if (format === 'excel') {
-      await exportComponentsToExcel(
-        exportList,
-        maintenanceRecords as Parameters<typeof exportComponentsToExcel>[1],
-        `komponenter-${datestamp}.xlsx`
-      );
-      toast({
-        title: 'Export lyckades',
-        description: `${exportList.length} komponenter exporterade till Excel`,
+    if (exportList.length === 0) {
+      toast.error('Inga komponenter att exportera');
+      return;
+    }
+    try {
+      const historyRows = await maintenanceHistoryService.list({});
+      const exportIds = new Set(exportList.map((c) => c.id));
+      const maintenanceRecords: Record<string, typeof historyRows> = {};
+      exportList.forEach((c) => {
+        maintenanceRecords[c.id] = [];
       });
-    } else {
-      exportComponentsToPDF(
-        exportList,
-        maintenanceRecords as Parameters<typeof exportComponentsToPDF>[1],
-        'Komponentregister',
-        `komponenter-${datestamp}.pdf`
-      );
-      toast({
-        title: 'Export lyckades',
-        description: `${exportList.length} komponenter exporterade till PDF`,
+      historyRows.forEach((row) => {
+        if (!row.component_id || !exportIds.has(row.component_id)) return;
+        maintenanceRecords[row.component_id].push(row);
       });
-    }
-  };
+      Object.values(maintenanceRecords).forEach((arr) =>
+        arr.sort((a, b) => (b.performed_date || '').localeCompare(a.performed_date || '')),
+      );
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-500/10 text-green-500 hover:bg-green-500/20';
-      case 'maintenance':
-        return 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20';
-      case 'inactive':
-        return 'bg-red-500/10 text-red-500 hover:bg-red-500/20';
-      default:
-        return 'bg-gray-500/10 text-gray-500 hover:bg-gray-500/20';
+      const datestamp = new Date().toISOString().split('T')[0];
+      if (format === 'excel') {
+        await exportComponentsToExcel(
+          exportList,
+          maintenanceRecords as Parameters<typeof exportComponentsToExcel>[1],
+          `komponenter-${datestamp}.xlsx`,
+        );
+      } else {
+        exportComponentsToPDF(
+          exportList,
+          maintenanceRecords as Parameters<typeof exportComponentsToPDF>[1],
+          'Komponentregister',
+          `komponenter-${datestamp}.pdf`,
+        );
+      }
+      toast.success(`${exportList.length} komponenter exporterade`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Kunde inte exportera');
     }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'Aktiv';
-      case 'maintenance':
-        return 'Underhåll';
-      case 'inactive':
-        return 'Inaktiv';
-      default:
-        return status;
-    }
-  };
-
-  const handleEditComponent = (component: Component) => {
-    setSelectedComponent(component);
-    setDialogOpen(true);
   };
 
   const handleNewComponent = () => {
+    if (params.property !== 'all') {
+      setSelectedComponent(null);
+      setDialogOpen(true);
+      return;
+    }
     setSelectPropertyDialogOpen(true);
   };
 
-  const handlePropertySelected = (propertyId: string) => {
-    setSelectedPropertyId(propertyId);
+  const handlePropertySelected = (nextPropertyId: string) => {
+    setParam('property', nextPropertyId);
     setSelectPropertyDialogOpen(false);
+    setSelectedComponent(null);
     setDialogOpen(true);
   };
 
-  const handleDeleteComponent = (componentId: string, componentName: string) => {
-    if (!confirm(`Är du säker på att du vill ta bort ${componentName}?`)) {
-      return;
+  const handleDeleteComponent = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteComponent.mutateAsync(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch {
+      // hook toasts
     }
-    deleteComponent.mutate(componentId);
   };
 
-  const refreshComponents = () => {
-    // react-query realtime + mutation invalidations handle refetch automatically.
+  const refreshListExtras = () => {
+    void queryClient.invalidateQueries({
+      queryKey: [...queryKeys.maintenanceHistory.all, 'last-service'],
+    });
   };
 
+  const filterBar = (
+    <ComponentsFiltersBar
+      uniqueTypes={uniqueTypes}
+      properties={sortedProperties.map((p) => ({ id: p.id, name: p.name }))}
+      uniqueManufacturers={uniqueManufacturers}
+      uniqueModels={uniqueModels}
+      filterType={params.type}
+      filterProperty={params.property}
+      filterManufacturer={params.manufacturer}
+      filterModel={params.model}
+      filterService={asService(params.service)}
+      filterRisk={effectiveRisk}
+      sortBy={effectiveSort}
+      hasActiveFilters={hasActiveFilters}
+      suggesting={suggesting}
+      riskDisabled={!propertyId}
+      riskListEmpty={riskList.length === 0}
+      onFilterType={(v) => setParam('type', v)}
+      onFilterProperty={(v) => setParam('property', v)}
+      onFilterManufacturer={(v) => setParam('manufacturer', v)}
+      onFilterModel={(v) => setParam('model', v)}
+      onFilterService={(v) => setParam('service', v)}
+      onFilterRisk={(v) => setParam('risk', v)}
+      onSortBy={(v) => setParam('sort', v)}
+      onClearFilters={clearFilters}
+      onGenerateRiskSuggestions={() => void handleGenerateRiskSuggestions()}
+    />
+  );
 
-  if (authLoading || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const costRows = useMemo(
+    () =>
+      [...components]
+        .map((c) => ({
+          ...c,
+          totalCost:
+            (costStats[c.id]?.totalCost || 0) + (workOrderStats[c.id]?.totalPrice || 0),
+          serviceCount: costStats[c.id]?.count || 0,
+          woCount: workOrderStats[c.id]?.count || 0,
+        }))
+        .filter((c) => c.totalCost > 0)
+        .sort((a, b) => b.totalCost - a.totalCost),
+    [components, costStats, workOrderStats],
+  );
 
   return (
     <SidebarProvider>
@@ -319,186 +435,206 @@ const Components = () => {
         <SidebarInset className="flex-1 w-full">
           <header className="sticky top-0 z-10 flex h-14 md:h-16 items-center gap-2 md:gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6">
             <SidebarTrigger className="hidden md:flex" />
-            <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
-              <h1 className="text-lg md:text-xl font-semibold">Komponenter</h1>
-            </div>
+            <EntityListHeader
+              icon={<Package className="h-5 w-5 text-primary shrink-0" />}
+              title="Komponenter"
+              actions={
+                <>
+                  <ComponentImportDialog onSuccess={() => void refetch()} />
+                  {components.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size={isMobile ? 'sm' : 'default'}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Exportera
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => void handleExport('excel')}>
+                          Exportera till Excel
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => void handleExport('pdf')}>
+                          Exportera till PDF
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                  <Button size={isMobile ? 'sm' : 'default'} onClick={handleNewComponent}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ny komponent
+                  </Button>
+                </>
+              }
+            />
           </header>
 
           <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              <Tabs defaultValue="components" className="w-full">
+              <Tabs
+                value={activeTab}
+                onValueChange={(tab) => setParam('tab', tab)}
+                className="w-full"
+              >
                 <TabsList>
                   <TabsTrigger value="components">Komponenter</TabsTrigger>
                   <TabsTrigger value="costs">Kostnadsöversikt</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="components" className="space-y-6">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                      <p className="text-muted-foreground">
-                        Hantera alla komponenter från dina fastigheter
-                      </p>
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-3 flex-wrap w-full">
+                      <div className="relative w-full md:w-72">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Sök namn, typ, tillverkare…"
+                          className="pl-10"
+                          value={params.q}
+                          onChange={(e) => setParam('q', e.target.value)}
+                        />
+                      </div>
+                      {isMobile && (
+                        <Sheet>
+                          <SheetTrigger asChild>
+                            <Button variant="outline" className="h-10">
+                              <Filter className="h-4 w-4 mr-2" />
+                              Filter
+                              {hasActiveFilters && (
+                                <Badge
+                                  variant="secondary"
+                                  className="ml-2 h-5 min-w-5 px-1.5 text-xs"
+                                >
+                                  !
+                                </Badge>
+                              )}
+                            </Button>
+                          </SheetTrigger>
+                          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+                            <SheetHeader>
+                              <SheetTitle>Filter</SheetTitle>
+                            </SheetHeader>
+                            <div className="mt-4">{filterBar}</div>
+                          </SheetContent>
+                        </Sheet>
+                      )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
-                  <div className="flex gap-1 border border-border rounded-lg p-1">
-                    <Button
-                      variant={viewMode === "cards" ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("cards")}
-                      className="h-8"
-                    >
-                      <LayoutGrid className="h-4 w-4 mr-2" />
-                      Kort
-                    </Button>
-                    <Button
-                      variant={viewMode === "table" ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("table")}
-                      className="h-8"
-                    >
-                      <TableIcon className="h-4 w-4 mr-2" />
-                      Tabell
-                    </Button>
-                  </div>
-                  
-                  <Badge variant="outline" className="text-base px-4 py-2">
-                    {filteredComponents.length}{hasActiveFilters ? ` av ${components.length}` : ''} komponenter
-                  </Badge>
-                  <ComponentImportDialog onSuccess={refreshComponents} />
-                  {components.length > 0 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <Download className="h-4 w-4 mr-2" />
-                          Exportera
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1 border border-border rounded-lg p-1">
+                        <Button
+                          variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
+                          size="sm"
+                          onClick={() => setViewMode('cards')}
+                          className="h-8"
+                        >
+                          <LayoutGrid className="h-4 w-4 mr-2" />
+                          Kort
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => handleExport('excel')}>
-                          Exportera till Excel
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                          Exportera till PDF
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                      <Button onClick={handleNewComponent} className="flex-1 sm:flex-none">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Ny komponent
-                      </Button>
+                        <Button
+                          variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                          size="sm"
+                          onClick={() => setViewMode('table')}
+                          className="h-8"
+                        >
+                          <TableIcon className="h-4 w-4 mr-2" />
+                          Tabell
+                        </Button>
+                      </div>
+                      <Badge variant="outline" className="text-sm px-3 py-1">
+                        {filteredComponents.length}
+                        {hasActiveFilters ? ` av ${components.length}` : ''} komponenter
+                      </Badge>
                     </div>
                   </div>
 
-                  {components.length > 0 && (
-                    <ComponentsFiltersBar
-                      uniqueTypes={uniqueTypes}
-                      uniqueProperties={uniqueProperties as string[]}
-                      uniqueManufacturers={uniqueManufacturers as string[]}
-                      uniqueModels={uniqueModels as string[]}
-                      filterType={filterType}
-                      filterProperty={filterProperty}
-                      filterManufacturer={filterManufacturer}
-                      filterModel={filterModel}
-                      filterService={filterService}
-                      filterRisk={filterRisk}
-                      sortBy={sortBy}
-                      hasActiveFilters={hasActiveFilters}
-                      suggesting={suggesting}
-                      riskListEmpty={riskList.length === 0}
-                      onFilterType={setFilterType}
-                      onFilterProperty={setFilterProperty}
-                      onFilterManufacturer={setFilterManufacturer}
-                      onFilterModel={setFilterModel}
-                      onFilterService={setFilterService}
-                      onFilterRisk={setFilterRisk}
-                      onSortBy={setSortBy}
-                      onClearFilters={clearFilters}
-                      onGenerateRiskSuggestions={handleGenerateRiskSuggestions}
+                  {!isMobile && components.length > 0 && filterBar}
+
+                  {isLoading ? (
+                    <EntityListSkeleton />
+                  ) : isError ? (
+                    <EntityListError onRetry={() => void refetch()} />
+                  ) : components.length === 0 ? (
+                    <EntityListEmpty
+                      title="Inga komponenter än"
+                      description="Lägg till den första från en fastighet."
+                      action={
+                        <Button onClick={handleNewComponent}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Ny komponent
+                        </Button>
+                      }
                     />
-                  )}
-
-                  {components.length === 0 ? (
-                    <Card className="text-center py-16 border-dashed">
-                      <CardContent>
-                        <div className="inline-flex p-4 rounded-full bg-primary/10 text-primary mb-4">
-                          <Package className="h-8 w-8" />
-                        </div>
-                        <CardTitle className="mb-2 text-xl">Inga komponenter ännu</CardTitle>
-                        <CardDescription className="text-base mb-4">
-                          Lägg till komponenter från en fastighet eller med knappen ovan
-                        </CardDescription>
-                        <Button onClick={() => navigate('/properties')}>
-                          Gå till Fastigheter
+                  ) : filteredComponents.length === 0 ? (
+                    <EntityListEmpty
+                      title="Inget matchar"
+                      description={
+                        !propertyId && asRisk(params.risk) !== 'all'
+                          ? 'Välj en fastighet för att filtrera på risk.'
+                          : 'Prova ett annat sökord eller filter.'
+                      }
+                      action={
+                        <Button variant="outline" onClick={clearFilters}>
+                          Rensa filter
                         </Button>
-                      </CardContent>
-                    </Card>
+                      }
+                    />
                   ) : viewMode === 'cards' ? (
                     <ComponentsCardsView
                       components={filteredComponents}
                       riskById={riskById}
-                      maintenanceStats={maintenanceStats}
-                      workOrderStats={workOrderStats}
+                      lastServiceById={lastServiceById}
                     />
                   ) : (
                     <ComponentsTableView
                       components={filteredComponents}
                       riskById={riskById}
-                      maintenanceStats={maintenanceStats}
-                      workOrderStats={workOrderStats}
-                      onDelete={handleDeleteComponent}
-                      onRefresh={refreshComponents}
-                      getStatusColor={getStatusColor}
-                      getStatusText={getStatusText}
+                      lastServiceById={lastServiceById}
+                      onDelete={(_id, _name) => {
+                        const found = filteredComponents.find((c) => c.id === _id) ?? null;
+                        setDeleteTarget(found);
+                      }}
+                      onRefresh={refreshListExtras}
                     />
                   )}
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="costs">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Kostnadsöversikt</CardTitle>
-                    <CardDescription>
-                      Analysera och följ upp underhållskostnader för alla komponenter
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {components.length === 0 ? (
-                      <p className="text-center py-8 text-muted-foreground">Inga komponenter att visa</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {[...components]
-                          .map(c => ({
-                            ...c,
-                            totalCost: (maintenanceStats[c.id]?.totalCost || 0) + (workOrderStats[c.id]?.totalPrice || 0),
-                            serviceCount: (maintenanceStats[c.id]?.count || 0),
-                            woCount: (workOrderStats[c.id]?.count || 0),
-                          }))
-                          .filter(c => c.totalCost > 0)
-                          .sort((a, b) => b.totalCost - a.totalCost)
-                          .map(c => (
+                <TabsContent value="costs">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Kostnadsöversikt</CardTitle>
+                      <CardDescription>
+                        Analysera och följ upp underhållskostnader för alla komponenter
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {costRows.length === 0 ? (
+                        <p className="text-center py-8 text-muted-foreground">
+                          Ingen kostnadsdata registrerad ännu
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {costRows.map((c) => (
                             <div
                               key={c.id}
                               className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                              onClick={() => navigate(`/components/${c.id}`)}
+                              onClick={() => navigate(componentPath(c.id))}
                             >
                               <div>
                                 <p className="font-medium">{c.name}</p>
-                                <p className="text-sm text-muted-foreground">{c.property_name} · {c.serviceCount} åtgärder · {c.woCount} arbetsordrar</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {c.property_name} · {c.serviceCount} åtgärder · {c.woCount}{' '}
+                                  arbetsordrar
+                                </p>
                               </div>
-                              <p className="font-semibold">{c.totalCost.toLocaleString('sv-SE')} kr</p>
+                              <p className="font-semibold">
+                                {c.totalCost.toLocaleString('sv-SE')} kr
+                              </p>
                             </div>
                           ))}
-                        {components.every(c => ((maintenanceStats[c.id]?.totalCost || 0) + (workOrderStats[c.id]?.totalPrice || 0)) === 0) && (
-                          <p className="text-center py-8 text-muted-foreground">Ingen kostnadsdata registrerad ännu</p>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </div>
           </main>
         </SidebarInset>
@@ -514,20 +650,42 @@ const Components = () => {
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open);
-          if (!open) {
-            setSelectedComponent(null);
-            setSelectedPropertyId('');
-          }
+          if (!open) setSelectedComponent(null);
         }}
-        propertyId={selectedComponent?.property_id || selectedPropertyId}
+        propertyId={selectedComponent?.property_id || propertyId || ''}
         editingComponent={selectedComponent}
         onSuccess={() => {
           setDialogOpen(false);
           setSelectedComponent(null);
-          setSelectedPropertyId('');
-          refreshComponents();
+          void refetch();
         }}
       />
+
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ta bort komponent?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleteTarget?.name}” tas bort. Servicehistorik och kopplade poster kan påverkas.
+              Det går inte att ångra.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleDeleteComponent()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Ta bort
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 };

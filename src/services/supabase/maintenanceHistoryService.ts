@@ -1,6 +1,7 @@
 /**
  * Maintenance history service — wraps the `maintenance_history` table.
  */
+import { supabase } from '@/integrations/supabase/client';
 import { createCrudService } from './createCrudService';
 import type {
   CreateMaintenanceHistoryInput,
@@ -9,7 +10,7 @@ import type {
   UpdateMaintenanceHistoryInput,
 } from '@/types/domain/maintenanceHistory';
 
-export const maintenanceHistoryService = createCrudService<
+const base = createCrudService<
   MaintenanceHistory,
   CreateMaintenanceHistoryInput,
   UpdateMaintenanceHistoryInput,
@@ -26,3 +27,25 @@ export const maintenanceHistoryService = createCrudService<
     return q;
   },
 });
+
+/** Latest service date per component — two columns only, no full history rows. */
+async function lastServiceByComponent(): Promise<Record<string, string>> {
+  const { data, error } = await supabase
+    .from('maintenance_history')
+    .select('component_id, performed_date')
+    .not('component_id', 'is', null)
+    .order('performed_date', { ascending: false });
+  if (error) throw error;
+  const map: Record<string, string> = {};
+  for (const row of data ?? []) {
+    if (row.component_id && !(row.component_id in map)) {
+      map[row.component_id] = row.performed_date;
+    }
+  }
+  return map;
+}
+
+export const maintenanceHistoryService = {
+  ...base,
+  lastServiceByComponent,
+};

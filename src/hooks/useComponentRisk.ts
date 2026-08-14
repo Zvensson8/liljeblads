@@ -90,7 +90,10 @@ export interface ComponentRiskListFilters {
  * Batch risk for components (optionally scoped to a property).
  * Sorted highest risk first; supports level/confidence filters.
  */
-export function useComponentRiskList(filters: ComponentRiskListFilters = {}) {
+export function useComponentRiskList(
+  filters: ComponentRiskListFilters = {},
+  options?: { enabled?: boolean },
+) {
   const { session } = useAuth();
   const limit = filters.limit ?? 50;
 
@@ -166,7 +169,7 @@ export function useComponentRiskList(filters: ComponentRiskListFilters = {}) {
         limit,
       });
     },
-    enabled: !!session,
+    enabled: !!session && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 30,
   });

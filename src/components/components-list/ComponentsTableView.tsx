@@ -1,11 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
+import { format } from 'date-fns';
+import { sv } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ComponentRiskBadge } from '@/components/ComponentRiskBadge';
-import { LastServiceBadge } from '@/components/LastServiceBadge';
 import { QuickServiceButton } from '@/components/QuickServiceButton';
+import { getTypeDisplayName } from '@/lib/componentTypeLabels';
+import { componentStatusClassName, componentStatusLabel } from '@/lib/componentLabels';
+import { componentPath } from '@/lib/entityPaths';
 import type { ComponentRiskResult } from '@/lib/componentRisk';
 
 export interface ComponentTableItem {
@@ -22,23 +26,17 @@ export interface ComponentTableItem {
 interface ComponentsTableViewProps {
   components: ComponentTableItem[];
   riskById: Map<string, ComponentRiskResult>;
-  maintenanceStats: Record<string, { totalCost: number }>;
-  workOrderStats: Record<string, { totalPrice: number }>;
+  lastServiceById: Record<string, string>;
   onDelete: (id: string, name: string) => void;
   onRefresh: () => void;
-  getStatusColor: (status: string) => string;
-  getStatusText: (status: string) => string;
 }
 
 export function ComponentsTableView({
   components,
   riskById,
-  maintenanceStats,
-  workOrderStats,
+  lastServiceById,
   onDelete,
   onRefresh,
-  getStatusColor,
-  getStatusText,
 }: ComponentsTableViewProps) {
   const navigate = useNavigate();
 
@@ -59,53 +57,55 @@ export function ComponentsTableView({
                 <th className="text-left py-3 px-4 font-medium hidden sm:table-cell">
                   Senaste service
                 </th>
-                <th className="text-left py-3 px-4 font-medium hidden lg:table-cell">Kostnad</th>
                 <th className="text-left py-3 px-4 font-medium">Status</th>
                 <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
               </tr>
             </thead>
             <tbody>
               {components.map((component) => {
-                const totalCost =
-                  (maintenanceStats[component.id]?.totalCost || 0) +
-                  (workOrderStats[component.id]?.totalPrice || 0);
+                const lastService = lastServiceById[component.id];
+                const risk = riskById.get(component.id);
                 return (
                   <tr
                     key={component.id}
                     className="border-b hover:bg-muted/50 cursor-pointer"
-                    onClick={() => navigate(`/components/${component.id}`)}
+                    onClick={() => navigate(componentPath(component.id))}
                   >
                     <td className="py-3 px-4">
                       <div className="font-medium">{component.name}</div>
                       <div className="text-xs text-muted-foreground md:hidden">
-                        {component.type}
+                        {getTypeDisplayName(component.type)}
                       </div>
                       {component.room_zone && (
                         <div className="text-xs text-muted-foreground">{component.room_zone}</div>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-sm hidden md:table-cell">{component.type}</td>
+                    <td className="py-3 px-4 text-sm hidden md:table-cell">
+                      {getTypeDisplayName(component.type)}
+                    </td>
                     <td className="py-3 px-4 text-sm hidden lg:table-cell">
-                      {component.manufacturer || '-'}
+                      {component.manufacturer || '—'}
                     </td>
                     <td className="py-3 px-4">
-                      <div className="text-sm font-medium">{component.property_name}</div>
+                      <div className="text-sm font-medium">
+                        {component.property_name || '—'}
+                      </div>
                     </td>
                     <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                      <ComponentRiskBadge risk={riskById.get(component.id)} compact />
+                      {risk ? (
+                        <ComponentRiskBadge risk={risk} compact />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">–</span>
+                      )}
                     </td>
-                    <td
-                      className="py-2 px-4 hidden sm:table-cell"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <LastServiceBadge componentId={component.id} />
-                    </td>
-                    <td className="py-3 px-4 text-sm hidden lg:table-cell">
-                      {totalCost > 0 ? `${totalCost.toLocaleString('sv-SE')} kr` : '-'}
+                    <td className="py-2 px-4 hidden sm:table-cell text-sm text-muted-foreground">
+                      {lastService
+                        ? format(new Date(lastService), 'd MMM yyyy', { locale: sv })
+                        : 'Ingen service'}
                     </td>
                     <td className="py-3 px-4">
-                      <Badge className={getStatusColor(component.status)}>
-                        {getStatusText(component.status)}
+                      <Badge className={componentStatusClassName(component.status)}>
+                        {componentStatusLabel(component.status)}
                       </Badge>
                     </td>
                     <td className="py-2 px-4">

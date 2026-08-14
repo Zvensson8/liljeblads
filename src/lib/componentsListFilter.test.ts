@@ -2,22 +2,41 @@ import { describe, expect, it } from 'vitest';
 import {
   filterAndSortComponents,
   hasActiveComponentFilters,
+  uniqueComponentManufacturers,
+  uniqueComponentTypes,
 } from '@/lib/componentsListFilter';
 import type { ComponentRiskResult } from '@/lib/componentRisk';
+
+const emptyFilters = {
+  searchQuery: '',
+  filterType: 'all',
+  filterProperty: 'all',
+  filterManufacturer: 'all',
+  filterModel: 'all',
+  filterService: 'all' as const,
+  filterRisk: 'all' as const,
+  sortBy: 'default' as const,
+};
 
 const comps = [
   {
     id: '1',
+    name: 'Ventilation A',
     type: 'SC4.7',
     manufacturer: 'A',
     model: 'M1',
+    serial_number: 'SN-1',
+    property_id: 'p1',
     property_name: 'P1',
   },
   {
     id: '2',
+    name: 'Värmepump B',
     type: 'SC1',
     manufacturer: 'B',
     model: 'M2',
+    serial_number: null,
+    property_id: 'p2',
     property_name: 'P2',
   },
 ];
@@ -65,15 +84,7 @@ describe('componentsListFilter', () => {
   it('filters by type', () => {
     const out = filterAndSortComponents(
       comps,
-      {
-        filterType: 'SC4.7',
-        filterProperty: 'all',
-        filterManufacturer: 'all',
-        filterModel: 'all',
-        filterService: 'all',
-        filterRisk: 'all',
-        sortBy: 'default',
-      },
+      { ...emptyFilters, filterType: 'SC4.7' },
       {},
       riskById,
     );
@@ -81,46 +92,56 @@ describe('componentsListFilter', () => {
     expect(out[0].id).toBe('1');
   });
 
+  it('filters by property id and search', () => {
+    expect(
+      filterAndSortComponents(
+        comps,
+        { ...emptyFilters, filterProperty: 'p2' },
+        {},
+        riskById,
+      ).map((c) => c.id),
+    ).toEqual(['2']);
+
+    expect(
+      filterAndSortComponents(
+        comps,
+        { ...emptyFilters, searchQuery: 'värme' },
+        {},
+        riskById,
+      ).map((c) => c.id),
+    ).toEqual(['2']);
+  });
+
   it('filters and sorts by risk', () => {
     const out = filterAndSortComponents(
       comps,
-      {
-        filterType: 'all',
-        filterProperty: 'all',
-        filterManufacturer: 'all',
-        filterModel: 'all',
-        filterService: 'all',
-        filterRisk: 'high',
-        sortBy: 'risk',
-      },
+      { ...emptyFilters, filterRisk: 'high', sortBy: 'risk' },
       {},
       riskById,
     );
     expect(out.map((c) => c.id)).toEqual(['1']);
   });
 
+  it('filters by missing service', () => {
+    const stats = { '1': { lastDate: '2026-01-01' } };
+    expect(
+      filterAndSortComponents(
+        comps,
+        { ...emptyFilters, filterService: 'none' },
+        stats,
+        riskById,
+      ).map((c) => c.id),
+    ).toEqual(['2']);
+  });
+
   it('hasActiveComponentFilters', () => {
-    expect(
-      hasActiveComponentFilters({
-        filterType: 'all',
-        filterProperty: 'all',
-        filterManufacturer: 'all',
-        filterModel: 'all',
-        filterService: 'all',
-        filterRisk: 'all',
-        sortBy: 'default',
-      }),
-    ).toBe(false);
-    expect(
-      hasActiveComponentFilters({
-        filterType: 'SC1',
-        filterProperty: 'all',
-        filterManufacturer: 'all',
-        filterModel: 'all',
-        filterService: 'all',
-        filterRisk: 'all',
-        sortBy: 'default',
-      }),
-    ).toBe(true);
+    expect(hasActiveComponentFilters(emptyFilters)).toBe(false);
+    expect(hasActiveComponentFilters({ ...emptyFilters, filterType: 'SC1' })).toBe(true);
+    expect(hasActiveComponentFilters({ ...emptyFilters, searchQuery: 'vent' })).toBe(true);
+  });
+
+  it('lists unique types and manufacturers in Swedish order', () => {
+    expect(uniqueComponentTypes(comps)).toEqual(['SC1', 'SC4.7']);
+    expect(uniqueComponentManufacturers(comps)).toEqual(['A', 'B']);
   });
 });

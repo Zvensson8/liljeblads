@@ -25,7 +25,10 @@ export type {
  * Hook: fetch work orders with optional filters. Subscribes to realtime
  * changes on the `work_orders` table and invalidates cache on any change.
  */
-export function useWorkOrders(filters: WorkOrderListFilters = {}) {
+export function useWorkOrders(
+  filters: WorkOrderListFilters = {},
+  options?: { enabled?: boolean },
+) {
   const { session } = useAuth();
   const { organization } = useOrganization();
   const orgId = organization?.id;
@@ -39,7 +42,7 @@ export function useWorkOrders(filters: WorkOrderListFilters = {}) {
   return useQuery({
     queryKey: queryKeys.workOrders.list({ ...merged }),
     queryFn: () => workOrderService.list(merged),
-    enabled: !!session && !!merged.organizationId,
+    enabled: !!session && !!merged.organizationId && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 2,
     gcTime: 1000 * 60 * 30,
   });

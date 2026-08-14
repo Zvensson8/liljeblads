@@ -25,6 +25,7 @@ export type {
  */
 export function useMaintenanceHistory(
   filters: MaintenanceHistoryListFilters = {},
+  options?: { enabled?: boolean },
 ) {
   const { session } = useAuth();
 
@@ -33,7 +34,20 @@ export function useMaintenanceHistory(
   return useQuery({
     queryKey: queryKeys.maintenanceHistory.list({ ...filters }),
     queryFn: () => maintenanceHistoryService.list(filters),
-    enabled: !!session,
+    enabled: !!session && (options?.enabled ?? true),
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 30,
+  });
+}
+
+/** Latest performed_date per component (two columns, not full history). */
+export function useLastServiceByComponent(options?: { enabled?: boolean }) {
+  const { session } = useAuth();
+
+  return useQuery({
+    queryKey: [...queryKeys.maintenanceHistory.all, 'last-service'] as const,
+    queryFn: () => maintenanceHistoryService.lastServiceByComponent(),
+    enabled: !!session && (options?.enabled ?? true),
     staleTime: 1000 * 60 * 2,
     gcTime: 1000 * 60 * 30,
   });

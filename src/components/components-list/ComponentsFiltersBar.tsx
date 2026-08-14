@@ -13,7 +13,7 @@ import type { ComponentsSort, ServiceFilter } from '@/lib/componentsListFilter';
 
 export interface ComponentsFiltersBarProps {
   uniqueTypes: string[];
-  uniqueProperties: string[];
+  properties: Array<{ id: string; name: string }>;
   uniqueManufacturers: string[];
   uniqueModels: string[];
   filterType: string;
@@ -25,6 +25,7 @@ export interface ComponentsFiltersBarProps {
   sortBy: ComponentsSort;
   hasActiveFilters: boolean;
   suggesting: boolean;
+  riskDisabled: boolean;
   riskListEmpty: boolean;
   onFilterType: (v: string) => void;
   onFilterProperty: (v: string) => void;
@@ -40,7 +41,7 @@ export interface ComponentsFiltersBarProps {
 export function ComponentsFiltersBar(props: ComponentsFiltersBarProps) {
   const {
     uniqueTypes,
-    uniqueProperties,
+    properties,
     uniqueManufacturers,
     uniqueModels,
     filterType,
@@ -52,6 +53,7 @@ export function ComponentsFiltersBar(props: ComponentsFiltersBarProps) {
     sortBy,
     hasActiveFilters,
     suggesting,
+    riskDisabled,
     riskListEmpty,
     onFilterType,
     onFilterProperty,
@@ -93,9 +95,9 @@ export function ComponentsFiltersBar(props: ComponentsFiltersBarProps) {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Alla fastigheter</SelectItem>
-          {uniqueProperties.map((prop) => (
-            <SelectItem key={prop} value={prop!}>
-              {prop}
+          {properties.map((prop) => (
+            <SelectItem key={prop.id} value={prop.id}>
+              {prop.name}
             </SelectItem>
           ))}
         </SelectContent>
@@ -108,7 +110,7 @@ export function ComponentsFiltersBar(props: ComponentsFiltersBarProps) {
         <SelectContent>
           <SelectItem value="all">Alla tillverkare</SelectItem>
           {uniqueManufacturers.map((mfr) => (
-            <SelectItem key={mfr} value={mfr!}>
+            <SelectItem key={mfr} value={mfr}>
               {mfr}
             </SelectItem>
           ))}
@@ -122,7 +124,7 @@ export function ComponentsFiltersBar(props: ComponentsFiltersBarProps) {
         <SelectContent>
           <SelectItem value="all">Alla modeller</SelectItem>
           {uniqueModels.map((model) => (
-            <SelectItem key={model} value={model!}>
+            <SelectItem key={model} value={model}>
               {model}
             </SelectItem>
           ))}
@@ -145,8 +147,9 @@ export function ComponentsFiltersBar(props: ComponentsFiltersBarProps) {
       </Select>
 
       <Select
-        value={filterRisk}
+        value={riskDisabled ? 'all' : filterRisk}
         onValueChange={(value) => onFilterRisk(value as 'all' | RiskLevel)}
+        disabled={riskDisabled}
       >
         <SelectTrigger className="w-[160px] h-9">
           <SelectValue placeholder="Risk" />
@@ -159,7 +162,11 @@ export function ComponentsFiltersBar(props: ComponentsFiltersBarProps) {
         </SelectContent>
       </Select>
 
-      <Select value={sortBy} onValueChange={(value) => onSortBy(value as ComponentsSort)}>
+      <Select
+        value={riskDisabled ? 'default' : sortBy}
+        onValueChange={(value) => onSortBy(value as ComponentsSort)}
+        disabled={riskDisabled}
+      >
         <SelectTrigger className="w-[160px] h-9">
           <SelectValue placeholder="Sortering" />
         </SelectTrigger>
@@ -173,7 +180,7 @@ export function ComponentsFiltersBar(props: ComponentsFiltersBarProps) {
         variant="outline"
         size="sm"
         className="h-9"
-        disabled={suggesting || riskListEmpty}
+        disabled={suggesting || riskDisabled || riskListEmpty}
         onClick={onGenerateRiskSuggestions}
       >
         <Sparkles className="h-4 w-4 mr-1" />
