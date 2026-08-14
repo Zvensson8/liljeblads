@@ -31,6 +31,12 @@ export const createPropertyInputSchema = z.object({
   name: z.string().min(1, 'Namn krävs').max(200),
   address: z.string().max(500).optional(),
   description: z.string().max(2000).optional(),
+  property_number: z.string().max(50).optional().nullable(),
+  area_sqm: z.number().optional().nullable(),
+  construction_year: z.number().optional().nullable(),
+  property_type: z.string().max(100).optional().nullable(),
+  loa: z.string().max(100).optional().nullable(),
+  invoice_address: z.string().max(500).optional().nullable(),
 });
 
 export type CreatePropertyInput = z.infer<typeof createPropertyInputSchema>;

@@ -61,6 +61,12 @@ async function createForOrganization(input: {
         name: payload.name.trim(),
         address: payload.address?.trim() || null,
         description: payload.description?.trim() || null,
+        property_number: payload.property_number?.trim() || null,
+        area_sqm: payload.area_sqm ?? null,
+        construction_year: payload.construction_year ?? null,
+        property_type: payload.property_type?.trim() || null,
+        loa: payload.loa?.trim() || null,
+        invoice_address: payload.invoice_address?.trim() || null,
         owner_id: ownerId,
         organization_id: organizationId,
       },
@@ -71,8 +77,35 @@ async function createForOrganization(input: {
   return data as Property;
 }
 
+async function countDependents(propertyId: string): Promise<{
+  components: number;
+  workOrders: number;
+  projects: number;
+}> {
+  const [components, workOrders, projects] = await Promise.all([
+    supabase
+      .from('components')
+      .select('id', { count: 'exact', head: true })
+      .eq('property_id', propertyId),
+    supabase
+      .from('work_orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('property_id', propertyId),
+    supabase
+      .from('projects')
+      .select('id', { count: 'exact', head: true })
+      .eq('property_id', propertyId),
+  ]);
+  return {
+    components: components.count ?? 0,
+    workOrders: workOrders.count ?? 0,
+    projects: projects.count ?? 0,
+  };
+}
+
 export const propertyService = {
   ...base,
   listWithEnergyGrades,
   createForOrganization,
+  countDependents,
 };

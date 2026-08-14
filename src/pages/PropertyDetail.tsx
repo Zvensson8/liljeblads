@@ -58,13 +58,27 @@ const TAB_ITEMS: Array<{ value: string; label: string }> = [
 const PropertyDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [workOrderDialogOpen, setWorkOrderDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
+  const tabFromUrl = searchParams.get('tab') || 'overview';
+  const activeTab = TAB_ITEMS.some((t) => t.value === tabFromUrl)
+    ? tabFromUrl
+    : 'overview';
+  const setActiveTab = (tab: string) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (!tab || tab === 'overview') next.delete('tab');
+        else next.set('tab', tab);
+        return next;
+      },
+      { replace: true },
+    );
+  };
   const { addRecentItem } = useRecentlyVisited();
 
   const {
@@ -117,10 +131,9 @@ const PropertyDetail = () => {
     }
   }, [property, addRecentItem]);
 
-  // Redirect retired property tabs to overview
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && (tab === 'drawings' || tab === 'technical-info' || tab === 'info-categories')) {
+    if (tab && ['drawings', 'technical-info', 'info-categories'].includes(tab)) {
       setActiveTab('overview');
     }
   }, [searchParams]);

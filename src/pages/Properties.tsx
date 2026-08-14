@@ -1,23 +1,22 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, Sparkles, MapPin, Trash2, Search, Filter, LayoutGrid, Table as TableIcon, Loader2, Download } from 'lucide-react';
+import {
+  Building2,
+  Plus,
+  MapPin,
+  Trash2,
+  Search,
+  LayoutGrid,
+  Table as TableIcon,
+  Download,
+} from 'lucide-react';
 import { createWorkbook, addJsonSheet, downloadWorkbook } from '@/lib/excelUtils';
 import { Badge } from '@/components/ui/badge';
 import { getEnergyGradeColor } from '@/lib/energyUtils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PropertyFilterChips } from '@/components/PropertyFilterChips';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,418 +26,232 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useAuth } from '@/hooks/useAuth';
-import { z } from 'zod';
+} from '@/components/ui/alert-dialog';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
-import { useProperties, useCreateProperty, useDeleteProperty, Property } from '@/hooks/useProperties';
+import { PropertyEditDialog } from '@/components/PropertyEditDialog';
+import { EntityListHeader } from '@/components/list/EntityListHeader';
+import {
+  EntityListEmpty,
+  EntityListError,
+  EntityListSkeleton,
+} from '@/components/list/EntityListState';
+import { useListSearchParams } from '@/hooks/useListSearchParams';
+import {
+  useDeleteProperty,
+  useProperties,
+  type Property,
+} from '@/hooks/useProperties';
+import { filterProperties, uniquePropertyTypes } from '@/lib/propertiesListFilter';
+import { propertyPath } from '@/lib/entityPaths';
+import { propertyService } from '@/services/supabase';
+import { cn } from '@/lib/utils';
 
-const propertySchema = z.object({
-  name: z.string().trim().min(1, 'Namn är obligatoriskt').max(200, 'Namn får vara max 200 tecken'),
-  address: z.string().max(500, 'Adress får vara max 500 tecken').optional().or(z.literal('')),
-  description: z.string().max(2000, 'Beskrivning får vara max 2000 tecken').optional().or(z.literal('')),
-});
+const LIST_DEFAULTS = { q: '', type: 'all' };
 
-const Properties = () => {
+export default function Properties() {
+  const navigate = useNavigate();
+  const [params, setParam] = useListSearchParams(LIST_DEFAULTS);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
-  const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
-  const [description, setDescription] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState<Array<{ id: string; label: string; value: string | number | boolean | { type: string; value: string } }>>([]);
-  const [filterType, setFilterType] = useState<string>('');
-  const [filterValue, setFilterValue] = useState<string>('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
-  const { toast } = useToast();
-  const { signOut, user } = useAuth();
-  const navigate = useNavigate();
 
-  // React Query hooks
-  const { data: properties = [], isLoading } = useProperties();
-  const createProperty = useCreateProperty();
+  const { data: properties = [], isLoading, isError, refetch } = useProperties();
   const deleteProperty = useDeleteProperty();
 
-
-
-  const handleCreateProperty = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    try {
-      // Validate input data
-      propertySchema.parse({
-        name,
-        address: address || '',
-        description: description || '',
-      });
-
-      await createProperty.mutateAsync({ name, address, description });
-      setDialogOpen(false);
-      setName('');
-      setAddress('');
-      setDescription('');
-    } catch (error: unknown) {
-      // Handle Zod validation errors
-      if (error instanceof z.ZodError) {
-        const firstError = error.errors[0];
-        toast({
-          title: 'Valideringsfel',
-          description: firstError.message,
-          variant: 'destructive',
-        });
-      }
-    }
-  };
+  const types = useMemo(() => uniquePropertyTypes(properties), [properties]);
+  const filteredProperties = useMemo(
+    () =>
+      filterProperties(properties, {
+        searchQuery: params.q,
+        typeFilter: params.type,
+      }),
+    [properties, params.q, params.type],
+  );
 
   const handleDeleteProperty = async () => {
     if (!propertyToDelete) return;
-    
-    await deleteProperty.mutateAsync(propertyToDelete.id);
-    setDeleteDialogOpen(false);
-    setPropertyToDelete(null);
-  };
-
-  const addFilter = () => {
-    if (!filterType || !filterValue) return;
-    
-    const filterLabels: Record<string, string> = {
-      property_type: 'Typ',
-      construction_year: 'Byggår',
-      area_sqm: 'Area',
-    };
-
-    setFilters([
-      ...filters,
-      {
-        id: `${filterType}-${filterValue}`,
-        label: `${filterLabels[filterType]}: ${filterValue}`,
-        value: { type: filterType, value: filterValue },
-      },
-    ]);
-    setFilterType('');
-    setFilterValue('');
-  };
-
-  const removeFilter = (filterId: string) => {
-    setFilters(filters.filter((f) => f.id !== filterId));
-  };
-
-  const clearAllFilters = () => {
-    setFilters([]);
+    try {
+      const deps = await propertyService.countDependents(propertyToDelete.id);
+      const total = deps.components + deps.workOrders + deps.projects;
+      if (total > 0) {
+        toast.error(
+          `Kan inte ta bort — ${deps.components} komponenter, ${deps.workOrders} arbetsordrar, ${deps.projects} projekt.`,
+        );
+        return;
+      }
+      await deleteProperty.mutateAsync(propertyToDelete.id);
+      setDeleteDialogOpen(false);
+      setPropertyToDelete(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Kunde inte ta bort');
+    }
   };
 
   const handleExportXlsx = async () => {
     try {
       const wb = createWorkbook();
       const data = filteredProperties.map((p) => ({
-        'Namn': p.name,
-        'Adress': p.address || '-',
-        'Typ': p.property_type || '-',
-        'Byggår': p.construction_year || '-',
+        Namn: p.name,
+        Adress: p.address || '-',
+        Typ: p.property_type || '-',
+        Byggår: p.construction_year || '-',
         'Area (m²)': p.area_sqm || '-',
-        'LOA': p.loa || '-',
-        'Fastighetsbeteckning': p.property_number || '-',
-        'Fakturaadress': p.invoice_address || '-',
-        'Energiklass': p.energy_grade || '-',
-        'Beskrivning': p.description || '-',
+        LOA: p.loa || '-',
+        Fastighetsbeteckning: p.property_number || '-',
+        Fakturaadress: p.invoice_address || '-',
+        Energiklass: p.energy_grade || '-',
+        Beskrivning: p.description || '-',
       }));
       addJsonSheet(wb, 'Fastigheter', data);
-      await downloadWorkbook(wb, `Fastigheter_${new Date().toISOString().split('T')[0]}.xlsx`);
-      toast({ title: 'Export klar', description: `${data.length} fastigheter exporterade` });
-    } catch (error) {
-      toast({ title: 'Export misslyckades', description: 'Kunde inte skapa Excel-fil', variant: 'destructive' });
+      await downloadWorkbook(
+        wb,
+        `Fastigheter_${new Date().toISOString().split('T')[0]}.xlsx`,
+      );
+      toast.success(`${data.length} fastigheter exporterade`);
+    } catch {
+      toast.error('Kunde inte skapa Excel-fil');
     }
   };
-
-  const filteredProperties = properties.filter((property) => {
-    // Text search
-    const matchesSearch =
-      property.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      property.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      property.description?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    if (!matchesSearch) return false;
-
-    // Apply filters
-    return filters.every((filter) => {
-      if (typeof filter.value !== 'object') return true;
-      const { type, value } = filter.value;
-      switch (type) {
-        case 'property_type':
-          return property.property_type?.toLowerCase().includes(value.toLowerCase());
-        case 'construction_year':
-          return property.construction_year?.toString() === value;
-        case 'area_sqm':
-          return property.area_sqm && property.area_sqm >= parseInt(value);
-        default:
-          return true;
-      }
-    });
-  });
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
-        
         <div className="flex-1 flex flex-col w-full">
-          {/* Modern Header */}
-          <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-14 md:h-16 items-center gap-2 md:gap-4 px-4 md:px-6">
-              <SidebarTrigger className="hidden md:flex hover:bg-muted rounded-md p-2 transition-colors" />
-              
-              <div className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-primary" />
-                <h1 className="text-lg md:text-xl font-semibold">Fastigheter</h1>
-              </div>
-
-              <div className="flex items-center gap-2 ml-auto">
-                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="font-medium">{properties.length} fastigheter</span>
-                </div>
-              </div>
+          <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur px-4 md:px-6">
+            <div className="flex h-14 md:h-16 items-center gap-2 md:gap-4">
+              <SidebarTrigger className="hidden md:flex" />
+              <EntityListHeader
+                icon={<Building2 className="h-5 w-5 text-primary shrink-0" />}
+                title="Fastigheter"
+                actions={
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => void handleExportXlsx()}
+                      disabled={filteredProperties.length === 0}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportera XLSX
+                    </Button>
+                    <Button onClick={() => setDialogOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ny fastighet
+                    </Button>
+                  </>
+                }
+              />
             </div>
           </header>
 
           <main className="flex-1 overflow-auto pb-20 md:pb-0">
-            <div className="container mx-auto px-4 md:px-6 py-4 md:py-8">
-              
-              {/* Search and Filter Bar */}
-              <div className="space-y-4 mb-8 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <h2 className="text-3xl font-bold tracking-tight">{filteredProperties.length} fastigheter</h2>
-                    <p className="text-muted-foreground">
-                      Hantera dina tilldelade fastigheter
-                    </p>
-                  </div>
-                  
-                  <div className="flex gap-3 items-center flex-wrap">
-                    <div className="relative w-full md:w-96">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Sök fastigheter..."
-                        className="pl-10"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="icon">
-                          <Filter className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-72">
-                        <div className="p-4 space-y-4">
-                          <div className="space-y-2">
-                            <Label>Filtertyp</Label>
-                            <Select value={filterType} onValueChange={setFilterType}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Välj filter" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="property_type">Typ</SelectItem>
-                                <SelectItem value="construction_year">Byggår</SelectItem>
-                                <SelectItem value="area_sqm">Min area (m²)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          {filterType && (
-                            <div className="space-y-2">
-                              <Label>Värde</Label>
-                              <Input
-                                placeholder={
-                                  filterType === 'area_sqm'
-                                    ? 't.ex. 100'
-                                    : filterType === 'construction_year'
-                                    ? 't.ex. 2020'
-                                    : 't.ex. Kontor'
-                                }
-                                value={filterValue}
-                                onChange={(e) => setFilterValue(e.target.value)}
-                              />
-                            </div>
-                          )}
-                          
-                          <Button
-                            className="w-full"
-                            onClick={addFilter}
-                            disabled={!filterType || !filterValue}
-                          >
-                            Lägg till filter
-                          </Button>
-                        </div>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+            <div className="container mx-auto px-4 md:px-6 py-4 md:py-8 space-y-6">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="relative w-full md:max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Sök namn, adress eller beteckning…"
+                    className="pl-10"
+                    value={params.q}
+                    onChange={(e) => setParam('q', e.target.value)}
+                  />
                 </div>
-                
-                <PropertyFilterChips
-                  filters={filters}
-                  onRemoveFilter={removeFilter}
-                  onClearAll={clearAllFilters}
-                />
-              </div>
-
-              {/* Page Actions */}
-              <div className="flex justify-between items-center mb-8">
-                <div className="flex gap-1 border border-border rounded-lg p-1">
+                <div className="flex gap-1 border border-border rounded-lg p-1 self-start">
                   <Button
-                    variant={viewMode === "cards" ? "secondary" : "ghost"}
+                    variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
                     size="sm"
-                    onClick={() => setViewMode("cards")}
                     className="h-8"
+                    onClick={() => setViewMode('cards')}
                   >
                     <LayoutGrid className="h-4 w-4 mr-2" />
                     Kort
                   </Button>
                   <Button
-                    variant={viewMode === "table" ? "secondary" : "ghost"}
+                    variant={viewMode === 'table' ? 'secondary' : 'ghost'}
                     size="sm"
-                    onClick={() => setViewMode("table")}
                     className="h-8"
+                    onClick={() => setViewMode('table')}
                   >
                     <TableIcon className="h-4 w-4 mr-2" />
                     Tabell
                   </Button>
                 </div>
-                
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="gap-2"
-                      onClick={handleExportXlsx}
-                      disabled={filteredProperties.length === 0}
-                    >
-                      <Download className="h-5 w-5" />
-                      Exportera XLSX
-                    </Button>
-                    <DialogTrigger asChild>
-                      <Button size="lg" className="gap-2">
-                        <Plus className="h-5 w-5" />
-                        Ny Fastighet
-                      </Button>
-                    </DialogTrigger>
-                  </div>
-                  <DialogContent className="sm:max-w-[500px]" aria-describedby="create-property-description">
-                    <DialogHeader>
-                      <DialogTitle>Skapa ny fastighet</DialogTitle>
-                      <DialogDescription id="create-property-description" className="sr-only">
-                        Formulär för att skapa en ny fastighet i systemet
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateProperty} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Namn <span className="text-destructive">*</span></Label>
-                        <Input
-                          id="name"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder="T.ex. Storgatan 1"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="address">Adress</Label>
-                        <Input
-                          id="address"
-                          value={address}
-                          onChange={(e) => setAddress(e.target.value)}
-                          placeholder="T.ex. Storgatan 1, 123 45 Stockholm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="description">Beskrivning</Label>
-                        <Textarea
-                          id="description"
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          placeholder="Valfri beskrivning..."
-                          rows={3}
-                        />
-                      </div>
-                      <div className="flex gap-2 pt-4">
-                        <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="flex-1">
-                          Avbryt
-                        </Button>
-                        <Button type="submit" className="flex-1">
-                          Skapa fastighet
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
               </div>
 
-              {/* Properties Grid */}
-              {filteredProperties.length === 0 && searchQuery === '' && filters.length === 0 ? (
-                <Card className="border-dashed animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                  <CardContent className="flex flex-col items-center justify-center py-16">
-                    <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                      <Building2 className="h-10 w-10 text-primary" />
-                    </div>
-                    <CardTitle className="mb-2 text-2xl">Inga fastigheter än</CardTitle>
-                    <CardDescription className="text-base mb-6 text-center max-w-md">
-                      Kom igång genom att skapa din första fastighet och lägga till komponenter
-                    </CardDescription>
-                    <Button onClick={() => setDialogOpen(true)} size="lg" className="gap-2">
-                      <Plus className="h-5 w-5" />
-                      Skapa din första fastighet
+              {types.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant={params.type === 'all' ? 'default' : 'outline'}
+                    className="h-8"
+                    onClick={() => setParam('type', 'all')}
+                  >
+                    Alla
+                  </Button>
+                  {types.map((t) => (
+                    <Button
+                      key={t}
+                      size="sm"
+                      variant={params.type === t ? 'default' : 'outline'}
+                      className="h-8"
+                      onClick={() => setParam('type', t)}
+                    >
+                      {t}
                     </Button>
-                  </CardContent>
-                </Card>
+                  ))}
+                </div>
+              )}
+
+              {isLoading ? (
+                <EntityListSkeleton />
+              ) : isError ? (
+                <EntityListError onRetry={() => void refetch()} />
+              ) : filteredProperties.length === 0 && !params.q && params.type === 'all' ? (
+                <EntityListEmpty
+                  title="Inga fastigheter än"
+                  description="Skapa den första så du kan lägga komponenter och arbetsordrar på den."
+                  action={
+                    <Button onClick={() => setDialogOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ny fastighet
+                    </Button>
+                  }
+                />
               ) : filteredProperties.length === 0 ? (
-                <Card className="border-dashed animate-fade-in">
-                  <CardContent className="flex flex-col items-center justify-center py-16">
-                    <p className="text-muted-foreground mb-4">Inga fastigheter matchar dina filter</p>
-                    <Button variant="outline" onClick={clearAllFilters}>
+                <EntityListEmpty
+                  title="Inget matchar"
+                  description="Prova ett annat sökord eller typ."
+                  action={
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setParam('q', '');
+                        setParam('type', 'all');
+                      }}
+                    >
                       Rensa filter
                     </Button>
-                  </CardContent>
-                </Card>
+                  }
+                />
               ) : viewMode === 'cards' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                  {filteredProperties.map((property, index) => (
-                    <Card 
-                      key={property.id} 
-                      className="group cursor-pointer border-border card-hover animate-scale-in"
-                      style={{ animationDelay: `${0.05 * index}s` }}
-                      onClick={() => navigate(`/property/${property.id}`)}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredProperties.map((property) => (
+                    <Card
+                      key={property.id}
+                      className="group cursor-pointer hover:border-primary/40 transition-colors"
+                      onClick={() => navigate(propertyPath(property.id))}
                     >
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="p-2 rounded-lg bg-primary/10">
-                              <Building2 className="h-5 w-5 text-primary" />
-                            </div>
-                            {property.energy_grade && (
-                              <Badge 
-                                className={`${getEnergyGradeColor(property.energy_grade).bg} ${getEnergyGradeColor(property.energy_grade).text} ${getEnergyGradeColor(property.energy_grade).border} border font-bold text-xs px-2 py-0.5`}
-                              >
-                                {property.energy_grade}
-                              </Badge>
-                            )}
-                          </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-lg group-hover:text-primary transition-colors">
+                            {property.name}
+                          </CardTitle>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 text-destructive opacity-0 group-hover:opacity-100"
                             onClick={(e) => {
                               e.stopPropagation();
                               setPropertyToDelete(property);
@@ -448,27 +261,35 @@ const Properties = () => {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        <CardTitle className="text-xl group-hover:text-primary transition-colors mt-2">
-                          {property.name}
-                        </CardTitle>
-                        {property.property_number && (
-                          <CardDescription className="text-primary/80 font-mono text-sm">
-                            {property.property_number}
-                          </CardDescription>
-                        )}
+                        <div className="flex flex-wrap gap-1.5">
+                          {property.energy_grade && (
+                            <Badge
+                              className={cn(
+                                getEnergyGradeColor(property.energy_grade).bg,
+                                getEnergyGradeColor(property.energy_grade).text,
+                                getEnergyGradeColor(property.energy_grade).border,
+                                'border font-bold text-xs',
+                              )}
+                            >
+                              {property.energy_grade}
+                            </Badge>
+                          )}
+                          {property.property_type && (
+                            <Badge variant="outline">{property.property_type}</Badge>
+                          )}
+                        </div>
                       </CardHeader>
                       <CardContent className="space-y-2 pt-0">
                         {property.address && (
-                          <div className="flex items-start gap-2 text-sm">
-                            <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                            <span className="text-muted-foreground">{property.address}</span>
+                          <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                            <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                            {property.address}
                           </div>
                         )}
-                        {property.loa && (
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">LOA: </span>
-                            <span className="font-medium text-foreground">{property.loa} m²</span>
-                          </div>
+                        {property.property_number && (
+                          <CardDescription className="font-mono text-xs">
+                            {property.property_number}
+                          </CardDescription>
                         )}
                       </CardContent>
                     </Card>
@@ -476,79 +297,52 @@ const Properties = () => {
                 </div>
               ) : (
                 <Card>
-                  <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b text-sm text-muted-foreground">
-                            <th className="text-left py-3 px-4 font-medium">Fastighet</th>
-                            <th className="text-left py-3 px-4 font-medium">Adress</th>
-                            <th className="text-left py-3 px-4 font-medium">LOA</th>
-                            <th className="text-left py-3 px-4 font-medium">Energiklass</th>
-                            <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
+                  <CardContent className="p-0 overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b text-sm text-muted-foreground">
+                          <th className="text-left py-3 px-4 font-medium">Fastighet</th>
+                          <th className="text-left py-3 px-4 font-medium">Adress</th>
+                          <th className="text-left py-3 px-4 font-medium">Typ</th>
+                          <th className="text-left py-3 px-4 font-medium">Energi</th>
+                          <th className="text-left py-3 px-4 font-medium">Åtgärder</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredProperties.map((property) => (
+                          <tr
+                            key={property.id}
+                            className="border-b hover:bg-muted/50 cursor-pointer"
+                            onClick={() => navigate(propertyPath(property.id))}
+                          >
+                            <td className="py-3 px-4 font-medium">{property.name}</td>
+                            <td className="py-3 px-4 text-sm text-muted-foreground">
+                              {property.address || '—'}
+                            </td>
+                            <td className="py-3 px-4 text-sm">
+                              {property.property_type || '—'}
+                            </td>
+                            <td className="py-3 px-4">
+                              {property.energy_grade || '—'}
+                            </td>
+                            <td className="py-3 px-4">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPropertyToDelete(property);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {filteredProperties.map((property) => (
-                            <tr 
-                              key={property.id} 
-                              className="border-b hover:bg-muted/50 cursor-pointer"
-                              onClick={() => navigate(`/property/${property.id}`)}
-                            >
-                              <td className="py-3 px-4">
-                                <div className="flex items-center gap-2">
-                                  <Building2 className="h-4 w-4 text-primary" />
-                                  <div>
-                                    <div className="font-medium">{property.name}</div>
-                                    {property.property_number && (
-                                      <div className="text-xs text-muted-foreground font-mono">
-                                        {property.property_number}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-3 px-4">
-                                {property.address ? (
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                                    <span>{property.address}</span>
-                                  </div>
-                                ) : '-'}
-                              </td>
-                              <td className="py-3 px-4 text-sm">
-                                {property.loa ? `${property.loa} m²` : '-'}
-                              </td>
-                              <td className="py-3 px-4">
-                                {property.energy_grade ? (
-                                  <Badge 
-                                    className={`${getEnergyGradeColor(property.energy_grade).bg} ${getEnergyGradeColor(property.energy_grade).text} ${getEnergyGradeColor(property.energy_grade).border} border font-bold text-xs px-2 py-0.5`}
-                                  >
-                                    {property.energy_grade}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground text-sm">-</span>
-                                )}
-                              </td>
-                              <td className="py-3 px-4">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive hover:text-destructive"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPropertyToDelete(property);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        ))}
+                      </tbody>
+                    </table>
                   </CardContent>
                 </Card>
               )}
@@ -557,20 +351,26 @@ const Properties = () => {
         </div>
       </div>
 
+      <PropertyEditDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        property={null}
+        onSuccess={() => setDialogOpen(false)}
+      />
+
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Ta bort fastighet?</AlertDialogTitle>
             <AlertDialogDescription>
-              Är du säker på att du vill ta bort "{propertyToDelete?.name}"? 
-              Detta kommer även ta bort alla komponenter och kopplad data.
-              Åtgärden kan inte ångras.
+              “{propertyToDelete?.name}” tas bort bara om den saknar komponenter,
+              arbetsordrar och projekt. Annars behåll den — det går inte att ångra.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDeleteProperty}
+            <AlertDialogAction
+              onClick={() => void handleDeleteProperty()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Ta bort
@@ -580,6 +380,4 @@ const Properties = () => {
       </AlertDialog>
     </SidebarProvider>
   );
-};
-
-export default Properties;
+}

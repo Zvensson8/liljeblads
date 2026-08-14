@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getErrorMessage } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ export function PropertyOverview({
   overdueTodos,
   urgentWorkOrders 
 }: PropertyOverviewProps) {
+  const navigate = useNavigate();
   const [sendingEmail, setSendingEmail] = useState(false);
   const { user } = useAuth();
   const { data: contacts = [] } = usePropertyContacts({ propertyId: property.id });
@@ -90,6 +92,32 @@ export function PropertyOverview({
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate(`/work-orders?property=${property.id}`)}
+        >
+          <Wrench className="h-4 w-4 mr-1" />
+          Arbetsordrar ({workOrders.length})
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate(`/components?property=${property.id}`)}
+        >
+          <Settings className="h-4 w-4 mr-1" />
+          Komponenter ({components.length})
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate(`/projects?property=${property.id}`)}
+        >
+          <Building2 className="h-4 w-4 mr-1" />
+          Projekt
+        </Button>
+      </div>
       {/* Alerts Section */}
       {hasAlerts && (
         <Card className="border-orange-500/50 bg-orange-500/5">

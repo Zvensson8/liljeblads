@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useUpdateProperty } from "@/hooks/useProperties";
+import { useCreateProperty, useUpdateProperty } from "@/hooks/useProperties";
 import type { Property } from "@/types/domain";
 import { FileText } from "lucide-react";
 import {
@@ -34,6 +34,7 @@ const propertySchema = z.object({
   property_type: z.string().max(100, "Max 100 tecken").optional(),
   loa: z.string().max(100, "Max 100 tecken").optional(),
   invoice_address: z.string().max(500, "Max 500 tecken").optional(),
+  description: z.string().max(2000, "Max 2000 tecken").optional(),
 });
 
 type PropertyFormData = z.infer<typeof propertySchema>;
@@ -63,23 +64,27 @@ export function PropertyEditDialog({
       property_type: "",
       loa: "",
       invoice_address: "",
+      description: "",
     },
   });
+  const createProperty = useCreateProperty();
+  const isCreate = !property;
+  const saving = updateProperty.isPending || createProperty.isPending;
 
   useEffect(() => {
-    if (property) {
-      form.reset({
-        name: property.name || "",
-        property_number: property.property_number || "",
-        address: property.address || "",
-        area_sqm: property.area_sqm?.toString() || "",
-        construction_year: property.construction_year?.toString() || "",
-        property_type: property.property_type || "",
-        loa: property.loa || "",
-        invoice_address: property.invoice_address || "",
-      });
-    }
-  }, [property, form]);
+    if (!open) return;
+    form.reset({
+      name: property?.name || "",
+      property_number: property?.property_number || "",
+      address: property?.address || "",
+      area_sqm: property?.area_sqm?.toString() || "",
+      construction_year: property?.construction_year?.toString() || "",
+      property_type: property?.property_type || "",
+      loa: property?.loa || "",
+      invoice_address: property?.invoice_address || "",
+      description: property?.description || "",
+    });
+  }, [open, property, form]);
 
   const onSubmit = async (data: PropertyFormData) => {
     const payload = {
@@ -91,12 +96,17 @@ export function PropertyEditDialog({
       property_type: data.property_type || null,
       loa: data.loa || null,
       invoice_address: data.invoice_address || null,
+      description: data.description || null,
     };
 
     try {
-      if (!property) return;
-      await updateProperty.mutateAsync({ id: property.id, patch: payload });
+      if (property) {
+        await updateProperty.mutateAsync({ id: property.id, patch: payload });
+      } else {
+        await createProperty.mutateAsync(payload);
+      }
       onSuccess();
+      onOpenChange(false);
     } catch {
       // toast handled in hook
     }
@@ -106,9 +116,11 @@ export function PropertyEditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl" aria-describedby="edit-property-description">
         <DialogHeader>
-          <DialogTitle>Redigera Fastighet</DialogTitle>
+          <DialogTitle>{isCreate ? "Ny fastighet" : "Redigera fastighet"}</DialogTitle>
           <DialogDescription id="edit-property-description" className="sr-only">
-            Formulär för att redigera fastighetsinformation
+            {isCreate
+              ? "Formulär för att skapa en fastighet"
+              : "Formulär för att redigera fastighetsinformation"}
           </DialogDescription>
         </DialogHeader>
 
@@ -150,6 +162,20 @@ export function PropertyEditDialog({
                   <FormLabel>Adress</FormLabel>
                   <FormControl>
                     <Input placeholder="Gatuadress, postnummer, stad" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Beskrivning</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Valfri beskrivning" rows={2} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -257,8 +283,8 @@ export function PropertyEditDialog({
               >
                 Avbryt
               </Button>
-              <Button type="submit">
-                Spara Ändringar
+              <Button type="submit" disabled={saving}>
+                {isCreate ? "Skapa fastighet" : "Spara"}
               </Button>
             </div>
           </form>
