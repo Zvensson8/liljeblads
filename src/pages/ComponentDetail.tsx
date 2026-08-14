@@ -235,7 +235,7 @@ export default function ComponentDetail() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href={`/properties/${property.id}`} className="flex items-center gap-1">
+                  <BreadcrumbLink href={`/property/${property.id}`} className="flex items-center gap-1">
                     <Building2 className="h-3 w-3" />
                     {property.name}
                   </BreadcrumbLink>

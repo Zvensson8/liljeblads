@@ -112,7 +112,7 @@ const PropertyDetail = () => {
         id: property.id,
         type: 'property',
         title: property.name,
-        path: `/properties/${property.id}`,
+        path: `/property/${property.id}`,
       });
     }
   }, [property, addRecentItem]);

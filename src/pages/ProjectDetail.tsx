@@ -257,7 +257,7 @@ export default function ProjectDetail() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href={`/properties/${project.property_id}`} className="flex items-center gap-1">
+                  <BreadcrumbLink href={`/property/${project.property_id}`} className="flex items-center gap-1">
                     <Building2 className="h-3 w-3" />
                     {propertyName}
                   </BreadcrumbLink>

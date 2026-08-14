@@ -3,7 +3,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
+import { propertyPath } from "@/lib/entityPaths";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { NotificationsProvider } from "@/hooks/useNotifications";
 import { ThemeProvider } from "@/hooks/useTheme";
@@ -49,6 +50,15 @@ const PageLoader = () => (
 
 // Protected route wrapper — redirects to /auth if not authenticated,
 // then ensures org/workspace exists (first-run onboarding).
+/** Old bookmarks / search used /properties/:id — the detail route is /property/:id */
+const PropertyIdRedirect = () => {
+  const { id } = useParams<{ id: string }>();
+  const { search } = useLocation();
+  if (!id) return <Navigate to="/properties" replace />;
+  const tab = new URLSearchParams(search).get("tab");
+  return <Navigate to={propertyPath(id, { tab })} replace />;
+};
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   if (loading) return <PageLoader />;
@@ -77,6 +87,7 @@ const AppContent = () => {
           <Route path="/invite/:token" element={<ProtectedRoute><AcceptInvitation /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/properties" element={<ProtectedRoute><Properties /></ProtectedRoute>} />
+          <Route path="/properties/:id" element={<PropertyIdRedirect />} />
           <Route path="/property/:id" element={<ProtectedRoute><PropertyDetail /></ProtectedRoute>} />
           <Route path="/components" element={<ProtectedRoute><Components /></ProtectedRoute>} />
           <Route path="/components/:id" element={<ProtectedRoute><ComponentDetail /></ProtectedRoute>} />

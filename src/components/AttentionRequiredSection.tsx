@@ -64,7 +64,7 @@ export function AttentionRequiredSection({ propertyId }: AttentionRequiredSectio
           title: t.title,
           subtitle: `${t.properties?.name || ''} - Förfallen ${format(new Date(t.due_date!), 'PPP', { locale: sv })}`,
           severity: 'medium',
-          path: `/properties/${propertyId || t.property_id}?tab=todos`,
+          path: `/property/${propertyId || t.property_id}?tab=todos`,
         }),
       );
 

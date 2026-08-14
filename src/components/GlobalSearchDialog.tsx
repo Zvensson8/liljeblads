@@ -98,7 +98,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
           type = "property";
           title = r.details?.name || r.content.split('.')[0];
           subtitle = r.details?.address || "";
-          path = `/properties/${r.source_id}`;
+          path = `/property/${r.source_id}`;
           break;
         case "components":
           type = "component";
@@ -122,7 +122,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
           type = "todo";
           title = r.details?.title || r.content.split('.')[0];
           subtitle = r.details?.property?.name || r.details?.category || "";
-          path = `/properties/${r.details?.property?.id}?tab=todos`;
+          path = `/property/${r.details?.property?.id}?tab=todos`;
           break;
         case "maintenance_history":
           type = "maintenance";

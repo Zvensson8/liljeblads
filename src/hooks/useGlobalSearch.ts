@@ -64,7 +64,7 @@ export function useGlobalSearch({ query, enabled = true }: GlobalSearchOptions) 
             type: 'property' as const,
             title: p.name,
             subtitle: p.address || `#${p.property_number || p.id.substring(0, 5)}`,
-            path: `/properties/${p.id}`,
+            path: `/property/${p.id}`,
           }))
         );
       }
