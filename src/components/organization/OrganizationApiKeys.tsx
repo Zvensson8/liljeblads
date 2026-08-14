@@ -49,6 +49,7 @@ const AVAILABLE_PERMISSIONS = [
   { id: "list_components", label: "Lista komponenter / risk" },
   { id: "log_service", label: "Logga service" },
   { id: "read_components", label: "Läs komponenter (legacy)" },
+  { id: "jarvis_voice", label: "Jarvis röst / telefon (MCP)" },
 ];
 
 // Generate a secure random API key
@@ -85,7 +86,9 @@ export function OrganizationApiKeys({ organizationId }: OrganizationApiKeysProps
   const [showKey, setShowKey] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '')}/functions/v1/twin-webhook`;
+  const functionsBase = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') + '/functions/v1';
+  const webhookUrl = `${functionsBase}/twin-webhook`;
+  const mcpUrl = `${functionsBase}/jarvis-mcp`;
 
   const handleCreateKey = async () => {
     if (!newKeyName.trim()) {
@@ -166,7 +169,7 @@ export function OrganizationApiKeys({ organizationId }: OrganizationApiKeysProps
               API-integrationer
             </CardTitle>
             <CardDescription>
-              Hantera API-nycklar för externa integrationer som Twin.so
+              Hantera API-nycklar för Twin.so, Grok Voice / telefon (MCP) och andra integrationer.
             </CardDescription>
           </div>
           <Button onClick={() => setShowCreateDialog(true)}>
@@ -193,6 +196,22 @@ export function OrganizationApiKeys({ organizationId }: OrganizationApiKeysProps
           </div>
           <p className="text-xs text-muted-foreground">
             Använd denna URL tillsammans med din API-nyckel för att göra anrop från externa system.
+          </p>
+          <Label className="text-sm font-medium pt-2 block">Jarvis MCP (xAI Voice / telefon)</Label>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 p-2 bg-background rounded text-sm break-all">
+              {mcpUrl}
+            </code>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => copyToClipboard(mcpUrl, "MCP URL")}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Klistra in i xAI Voice Agent Builder + header Authorization: Bearer lbl_…
           </p>
         </div>
 

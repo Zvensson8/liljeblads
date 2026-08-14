@@ -1,6 +1,6 @@
 # Jarvis — snabbguide (1 sida)
 
-**Öppna:** `/jarvis` eller bubblan nere till höger.
+**Öppna:** `/jarvis`, bubblan, **`/prata`** (ikon på telefonen) eller ett nummer via xAI — se `docs/JARVIS_PHONE.md`.
 
 ## Säg så här (fungerar bäst)
 

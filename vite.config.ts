@@ -66,6 +66,12 @@ export default defineConfig(({ mode }) => ({
         ],
         shortcuts: [
           {
+            name: "Prata med Jarvis",
+            short_name: "Jarvis",
+            url: "/prata",
+            icons: [{ src: "/placeholder.svg", sizes: "96x96" }],
+          },
+          {
             name: "Fastigheter",
             short_name: "Fastigheter",
             url: "/properties",

@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.jarvis-voice-tool]
 verify_jwt = false
+
+[functions.jarvis-mcp]
+verify_jwt = false

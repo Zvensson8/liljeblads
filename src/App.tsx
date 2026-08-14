@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { NotificationsProvider } from "@/hooks/useNotifications";
 import { ThemeProvider } from "@/hooks/useTheme";
@@ -37,6 +37,7 @@ const UserSettings = lazy(() => import("./pages/UserSettings"));
 const FounderAdmin = lazy(() => import("./pages/FounderAdmin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Jarvis = lazy(() => import("./pages/Jarvis"));
+const Prata = lazy(() => import("./pages/Prata"));
 const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
 
 // Loading component
@@ -62,6 +63,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AppContent = () => {
   const [searchOpen, setSearchOpen] = React.useState(false);
   const isMobile = useIsMobile();
+  const location = useLocation();
+  const hideChrome = location.pathname === "/prata";
   useGlobalShortcuts(() => setSearchOpen(true));
   
   return (
@@ -81,6 +84,7 @@ const AppContent = () => {
           <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
           <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
           <Route path="/jarvis" element={<ProtectedRoute><Jarvis /></ProtectedRoute>} />
+          <Route path="/prata" element={<ProtectedRoute><Prata /></ProtectedRoute>} />
           <Route path="/ai-chat" element={<Navigate to="/jarvis?tab=chat" replace />} />
           <Route path="/agent" element={<Navigate to="/jarvis?tab=actions" replace />} />
           <Route path="/users" element={<ProtectedRoute><RequireFounder><Users /></RequireFounder></ProtectedRoute>} />
@@ -90,8 +94,8 @@ const AppContent = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
-      {isMobile && <BottomNavigation />}
-      <AIChatBubble />
+      {isMobile && !hideChrome && <BottomNavigation />}
+      {!hideChrome && <AIChatBubble />}
       <InstallPWAPrompt />
     </>
   );
