@@ -60,6 +60,9 @@ verify_jwt = false
 [functions.crewai-webhook]
 verify_jwt = false
 
+[functions.jarvis-webhook]
+verify_jwt = false
+
 [functions.jarvis-tts]
 verify_jwt = false
 
