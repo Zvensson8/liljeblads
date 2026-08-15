@@ -650,6 +650,11 @@ Deno.serve(async (req) => {
         remaining_b10_years: r.remainingB10Years,
         recommendation: r.recommendation,
         age_years: r.ageYears,
+        expected_lifespan_years: r.params.scale,
+        weibull_shape: r.params.shape,
+        weibull_method: r.params.method,
+        median_life_years: r.medianLifeYears,
+        acute_count: r.acuteCount,
       }));
 
       await supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyRow.id);

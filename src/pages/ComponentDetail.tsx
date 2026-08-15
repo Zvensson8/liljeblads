@@ -303,16 +303,29 @@ export default function ComponentDetail() {
 
           <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
             <div className="max-w-7xl mx-auto space-y-6">
-              {risk && risk.riskLevel !== 'low' && (
-                <Card className="border-l-4 border-l-orange-500">
-                  <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div>
+              {risk && (
+                <Card className={risk.riskLevel !== 'low' ? 'border-l-4 border-l-orange-500' : ''}>
+                  <CardContent className="py-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="space-y-1.5">
                       <p className="font-medium">{risk.recommendation}</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Ålder {risk.ageYears.toFixed(1)} år · Tillförlitlighet R(t) {(risk.reliability * 100).toFixed(1)} %
-                        {risk.remainingB10Years != null && ` · B10 kvar ≈ ${risk.remainingB10Years.toFixed(1)} år`}
-                        {' · '}Akuta händelser: {risk.acuteCount}
+                      <p className="text-sm text-muted-foreground">
+                        Risk {risk.riskScore} av 100 är felsannolikhet nu, räknad med Weibull
+                        utifrån installationsår, typens livslängd och akuta fel.
                       </p>
+                      <p className="text-sm text-muted-foreground">
+                        Ålder {risk.ageYears.toFixed(1)} år · {risk.acuteCount} akuta fel ·
+                        tillförlitlighet {(risk.reliability * 100).toFixed(1)} %
+                      </p>
+                      {risk.remainingB10Years != null && (
+                        <p className="text-sm text-muted-foreground">
+                          B10 {risk.remainingB10Years.toFixed(1)} år = tid tills ca 10 % av
+                          liknande enheter förväntas ha fått ett första fel — inte
+                          återstående livslängd
+                          {risk.medianLifeYears != null
+                            ? ` (median ca ${risk.medianLifeYears.toFixed(0)} år, typantagande ${risk.params.scale.toFixed(0)} år).`
+                            : '.'}
+                        </p>
+                      )}
                     </div>
                     <ComponentRiskBadge risk={risk} />
                   </CardContent>

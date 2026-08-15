@@ -104,7 +104,7 @@ function PlanItemRow({ item }: { item: MaintenancePlanItem }) {
         </span>
         {item.remaining_b10_years != null && (
           <span className="text-xs text-muted-foreground">
-            B10 ≈ {Number(item.remaining_b10_years).toFixed(1)} år
+            B10 {Number(item.remaining_b10_years).toFixed(1)} år till 10 %-fel
           </span>
         )}
       </div>
@@ -260,8 +260,10 @@ export function RiskMaintenancePlan({
                   Prediktiv underhållsplan
                 </CardTitle>
                 <CardDescription>
-                  Åtgärder schemalagda per år och kvartal utifrån Weibull-risk.
-                  Komponenter utan tillräcklig risk ingår inte.
+                  Åtgärder schemalagda per år och kvartal utifrån Weibull-risk
+                  (installationsår, typens livslängd, akuta fel). B10 är tid till
+                  10 % risk för första fel, inte återstående livslängd. Komponenter
+                  utan tillräcklig risk ingår inte.
                 </CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
