@@ -2,6 +2,7 @@
  * Component service — wraps the `components` table with property joins.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { repairMaybe, repairSwedishMojibake } from '@/lib/encoding';
 import { createCrudService } from './createCrudService';
 import type {
   ComponentListFilters,
@@ -57,10 +58,33 @@ async function listForOrganization(
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []) as ComponentWithRelations[];
+  return ((data ?? []) as ComponentWithRelations[]).map(repairComponentText);
+}
+
+function repairComponentText(c: ComponentWithRelations): ComponentWithRelations {
+  return {
+    ...c,
+    name: repairSwedishMojibake(c.name ?? ''),
+    manufacturer: repairMaybe(c.manufacturer),
+    model: repairMaybe(c.model),
+    notes: repairMaybe(c.notes),
+    room_zone: repairMaybe(c.room_zone),
+    supplier: repairMaybe(c.supplier),
+    properties: c.properties
+      ? {
+          ...c.properties,
+          name: repairSwedishMojibake(c.properties.name ?? ''),
+          address: repairMaybe(c.properties.address ?? null),
+        }
+      : c.properties,
+  };
 }
 
 export const componentService = {
   ...base,
   list: listForOrganization,
+  getById: async (id: string) => {
+    const row = await base.getById(id);
+    return row ? repairComponentText(row) : null;
+  },
 };

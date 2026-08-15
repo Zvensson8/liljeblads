@@ -13,6 +13,7 @@ import { ComponentTemplate } from '@/hooks/useComponentLibrary';
 import { z } from 'zod';
 import { MaintenanceHistoryDialog } from './MaintenanceHistoryDialog';
 import { getErrorMessage } from '@/lib/utils';
+import { repairMaybe, repairSwedishMojibake } from '@/lib/encoding';
 import type { Tables, TablesInsert, TablesUpdate, Database } from '@/integrations/supabase/types';
 
 type ComponentRow = Tables<'components'>;
@@ -151,15 +152,15 @@ export const ComponentFormDialog = ({
       componentSchema.parse(validationData);
 
       const componentData: TablesInsert<'components'> = {
-        name: designation.trim(),
+        name: repairSwedishMojibake(designation.trim()),
         registration_number: registrationNumber.trim() || null,
         type: componentType as ComponentType,
         installation_year: installationYear ? parseInt(installationYear) : null,
-        manufacturer: manufacturer.trim() || null,
-        model: model.trim() || null,
+        manufacturer: repairMaybe(manufacturer.trim() || null),
+        model: repairMaybe(model.trim() || null),
         serial_number: serialNumber.trim() || null,
-        room_zone: placement.trim() || null,
-        notes: notes.trim() || null,
+        room_zone: repairMaybe(placement.trim() || null),
+        notes: repairMaybe(notes.trim() || null),
         refrigerant_code: refrigerantCode.trim() || null,
         refrigerant_amount_kg: refrigerantAmount ? parseFloat(refrigerantAmount) : null,
         refrigerant_type: refrigerantType.trim() || null,

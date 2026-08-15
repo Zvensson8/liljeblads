@@ -11,6 +11,7 @@ import {
   type ComponentRiskInput,
   type RiskLevel,
 } from "../_shared/componentRisk.ts";
+import { repairMaybe, repairSwedishMojibake } from "../_shared/encoding.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -217,7 +218,11 @@ Deno.serve(async (req) => {
 
       const results = (comps ?? []).map((c) => ({
         ...c,
-        property_name: propMap.get(c.property_id) ?? null,
+        name: repairSwedishMojibake(String(c.name ?? "")),
+        manufacturer: repairMaybe((c.manufacturer as string | null) ?? null),
+        model: repairMaybe((c.model as string | null) ?? null),
+        room_zone: repairMaybe((c.room_zone as string | null) ?? null),
+        property_name: repairMaybe(propMap.get(c.property_id) ?? null),
       }));
 
       await supabase
@@ -257,7 +262,11 @@ Deno.serve(async (req) => {
         type: "list_properties",
         organization_id: keyRow.organization_id,
         count: (props ?? []).length,
-        results: props ?? [],
+        results: (props ?? []).map((p) => ({
+          ...p,
+          name: repairSwedishMojibake(String(p.name ?? "")),
+          address: repairMaybe((p.address as string | null) ?? null),
+        })),
       });
     }
 

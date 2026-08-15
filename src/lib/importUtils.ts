@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import * as XLSX from 'xlsx';
 import type { Database } from '@/integrations/supabase/types';
+import { decodeImportedText, repairImportValue, repairMaybe, repairSwedishMojibake } from '@/lib/encoding';
 
 type ComponentInsert = Database['public']['Tables']['components']['Insert'];
 
@@ -34,7 +35,7 @@ const parseXLSX = (file: File): Promise<ImportRow[]> => {
           reject(new Error('Filen innehåller inga datarader'));
           return;
         }
-        resolve(rows);
+        resolve(rows.map(repairImportRow));
       } catch (error: unknown) {
         reject(new Error(`Fel vid parsing av Excel-fil: ${errorMessage(error)}`));
       }
@@ -51,7 +52,7 @@ export const parseCSV = (file: File): Promise<ImportRow[]> => {
 
     reader.onload = (e) => {
       try {
-        const text = e.target?.result as string;
+        const text = decodeImportedText(e.target?.result as ArrayBuffer);
         const lines = text.split('\n').filter((line) => line.trim());
 
         if (lines.length < 2) {
@@ -70,7 +71,7 @@ export const parseCSV = (file: File): Promise<ImportRow[]> => {
             row[header] = values[index] || '';
           });
 
-          data.push(row);
+          data.push(repairImportRow(row));
         }
 
         resolve(data);
@@ -83,8 +84,16 @@ export const parseCSV = (file: File): Promise<ImportRow[]> => {
       reject(new Error('Kunde inte läsa filen'));
     };
 
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   });
+};
+
+const repairImportRow = (row: ImportRow): ImportRow => {
+  const out: ImportRow = {};
+  for (const [key, value] of Object.entries(row)) {
+    out[repairSwedishMojibake(key)] = repairImportValue(value);
+  }
+  return out;
 };
 
 // Valid component types from database enum
@@ -236,17 +245,17 @@ export const validateAndMatchComponents = async (
         '';
 
       const mappedData: MappedComponentData = {
-        name: col('Beteckning', 'Name'),
+        name: repairSwedishMojibake(col('Beteckning', 'Name')),
         type: typeCode,
-        propertyName: col('Fastighet', 'Property') || undefined,
+        propertyName: repairSwedishMojibake(col('Fastighet', 'Property')) || undefined,
         registration_number: col('Reg.nr', 'Regnr', 'Registration number') || null,
         installation_year: installYear,
-        manufacturer: col('Tillverkare', 'Manufacturer') || null,
-        model: col('Modell', 'Model') || null,
+        manufacturer: repairMaybe(col('Tillverkare', 'Manufacturer') || null),
+        model: repairMaybe(col('Modell', 'Model') || null),
         serial_number: col('Serie-ID', 'Serienummer', 'Serial number') || null,
-        room_zone: placement,
+        room_zone: repairSwedishMojibake(placement),
         status: statusMap[col('Status').toLowerCase()] || 'active',
-        notes: col('Anteckningar', 'Kommentar', 'Notes') || null,
+        notes: repairMaybe(col('Anteckningar', 'Kommentar', 'Notes') || null),
         refrigerant_code: col('Kod', 'Code') || null,
         refrigerant_amount_kg: col('Fyllnadsmängd (kg)') ? parseFloat(col('Fyllnadsmängd (kg)')) : null,
         refrigerant_type: col('Köldmedietyp') || null,
@@ -340,17 +349,17 @@ export const importComponents = async (
     const mapped = data as MappedComponentData;
 
     const insert: ComponentInsert = {
-      name: mapped.name,
+      name: repairSwedishMojibake(mapped.name),
       type: mapped.type as ComponentInsert['type'],
       property_id: propId,
       registration_number: mapped.registration_number ?? null,
       installation_year: mapped.installation_year ?? null,
-      manufacturer: mapped.manufacturer ?? null,
-      model: mapped.model ?? null,
+      manufacturer: repairMaybe(mapped.manufacturer),
+      model: repairMaybe(mapped.model),
       serial_number: mapped.serial_number ?? null,
-      room_zone: mapped.room_zone,
+      room_zone: repairSwedishMojibake(mapped.room_zone),
       status: (mapped.status ?? 'active') as ComponentInsert['status'],
-      notes: mapped.notes ?? null,
+      notes: repairMaybe(mapped.notes),
       refrigerant_code: mapped.refrigerant_code ?? null,
       refrigerant_amount_kg: mapped.refrigerant_amount_kg ?? null,
       refrigerant_type: mapped.refrigerant_type ?? null,

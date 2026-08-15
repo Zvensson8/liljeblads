@@ -36,6 +36,7 @@ import { ComponentDocuments } from "@/components/component/ComponentDocuments";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useRecentlyVisited } from "@/hooks/useRecentlyVisited";
+import { repairMaybe, repairSwedishMojibake } from "@/lib/encoding";
 
 import { QuickServiceButton } from "@/components/QuickServiceButton";
 import { ServiceRecordCard } from "@/components/ServiceRecordCard";
@@ -136,9 +137,25 @@ export default function ComponentDetail() {
         .single();
 
       if (componentError) throw componentError;
-      setComponent(componentData as Component);
+      const raw = componentData as Component;
+      setComponent({
+        ...raw,
+        name: repairSwedishMojibake(raw.name ?? ""),
+        manufacturer: repairMaybe(raw.manufacturer),
+        model: repairMaybe(raw.model),
+        notes: repairMaybe(raw.notes),
+        room_zone: repairMaybe(raw.room_zone),
+      });
       const prop = (componentData as { properties?: PropertyInfo | null }).properties;
-      setProperty(prop ?? null);
+      setProperty(
+        prop
+          ? {
+              ...prop,
+              name: repairSwedishMojibake(prop.name ?? ""),
+              address: repairMaybe(prop.address),
+            }
+          : null,
+      );
 
       const { data: maintenanceData, error: maintenanceError } = await supabase
         .from("maintenance_history")

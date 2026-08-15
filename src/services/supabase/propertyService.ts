@@ -5,6 +5,7 @@
  * domain-specific `listWithEnergyGrades` reader used by `useProperties`.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { repairMaybe, repairSwedishMojibake } from '@/lib/encoding';
 import { createCrudService } from './createCrudService';
 import type { Property, CreatePropertyInput } from '@/types/domain/property';
 
@@ -40,10 +41,10 @@ async function listWithEnergyGrades(organizationId?: string): Promise<Property[]
         .limit(1)
         .maybeSingle();
 
-      return {
+      return repairPropertyText({
         ...property,
         energy_grade: history?.energy_grade ?? null,
-      } as Property;
+      } as Property);
     }),
   );
 }
@@ -58,15 +59,15 @@ async function createForOrganization(input: {
     .from('properties')
     .insert([
       {
-        name: payload.name.trim(),
-        address: payload.address?.trim() || null,
-        description: payload.description?.trim() || null,
+        name: repairSwedishMojibake(payload.name.trim()),
+        address: repairMaybe(payload.address?.trim() || null),
+        description: repairMaybe(payload.description?.trim() || null),
         property_number: payload.property_number?.trim() || null,
         area_sqm: payload.area_sqm ?? null,
         construction_year: payload.construction_year ?? null,
         property_type: payload.property_type?.trim() || null,
         loa: payload.loa?.trim() || null,
-        invoice_address: payload.invoice_address?.trim() || null,
+        invoice_address: repairMaybe(payload.invoice_address?.trim() || null),
         owner_id: ownerId,
         organization_id: organizationId,
       },
@@ -103,8 +104,24 @@ async function countDependents(propertyId: string): Promise<{
   };
 }
 
+function repairPropertyText(property: Property): Property {
+  return {
+    ...property,
+    name: repairSwedishMojibake(property.name ?? ''),
+    address: repairMaybe(property.address),
+    description: repairMaybe(property.description),
+    invoice_address: repairMaybe(property.invoice_address),
+  };
+}
+
 export const propertyService = {
   ...base,
+  list: async (filters?: unknown) =>
+    ((await base.list(filters as never)) as Property[]).map(repairPropertyText),
+  getById: async (id: string) => {
+    const row = await base.getById(id);
+    return row ? repairPropertyText(row) : null;
+  },
   listWithEnergyGrades,
   createForOrganization,
   countDependents,

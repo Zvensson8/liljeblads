@@ -4,6 +4,7 @@
  * (see project memory).
  */
 import { supabase } from '@/integrations/supabase/client';
+import { repairMaybe, repairSwedishMojibake } from '@/lib/encoding';
 import { createCrudService } from './createCrudService';
 import type {
   CreateWorkOrderInput,
@@ -60,10 +61,28 @@ async function listForOrganization(
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []) as WorkOrderWithRelations[];
+  return ((data ?? []) as WorkOrderWithRelations[]).map(repairWorkOrderText);
+}
+
+function repairWorkOrderText(wo: WorkOrderWithRelations): WorkOrderWithRelations {
+  return {
+    ...wo,
+    action: repairSwedishMojibake(wo.action ?? ''),
+    comments: repairMaybe(wo.comments),
+    properties: wo.properties
+      ? { ...wo.properties, name: repairSwedishMojibake(wo.properties.name ?? '') }
+      : wo.properties,
+    components: wo.components
+      ? { ...wo.components, name: repairSwedishMojibake(wo.components.name ?? '') }
+      : wo.components,
+  };
 }
 
 export const workOrderService = {
   ...base,
   list: listForOrganization,
+  getById: async (id: string) => {
+    const row = await base.getById(id);
+    return row ? repairWorkOrderText(row) : null;
+  },
 };
