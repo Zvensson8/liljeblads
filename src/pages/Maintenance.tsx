@@ -52,9 +52,9 @@ export default function Maintenance() {
                 Arbetsplan per fastighet. Kundens Excel är orörd. Weibull och
                 EnergyPulse fylls på automatiskt; övrigt lägger ni in manuellt.
                 Fyll i projektnummer (fastighetsnr +xx eller -xx) så skapas
-                projektet. Flera byten sprids över kvartal efter risk — de
-                klumpas inte i första tillåtna kvartalet. Borttaget kommer
-                inte tillbaka vid nästa Weibull-uppdatering.
+                projektet. Lika dåliga byten paketeras. Tydliga risksteg
+                tas sämsta först med 1–2 år emellan. Borttaget kommer inte
+                tillbaka vid nästa Weibull-uppdatering.
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground">Fastighet</span>

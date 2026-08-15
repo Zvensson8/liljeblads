@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { ComponentRiskResult } from '@/lib/componentRisk';
 import {
+  clusterByRiskScore,
   computePlanPeriod,
   costRoutesToPlan,
   earliestPlanQuarter,
   formatPlanPeriod,
   generateMaintenancePlanItems,
   nextCalendarQuarter,
+  phaseClusterIndexes,
   PLAN_COST_THRESHOLD_SEK,
   resolveEstimatedCost,
   summarizePlanItems,
@@ -163,14 +165,38 @@ describe('maintenancePlanEngine', () => {
       },
     );
     expect(items).toHaveLength(3);
-    expect(items.map((i) => `${i.year}Q${i.quarter}`)).toEqual([
-      '2028Q3',
-      '2028Q4',
-      '2029Q1',
-    ]);
+    expect(new Set(items.map((i) => `${i.year}Q${i.quarter}`))).toEqual(
+      new Set(['2028Q3']),
+    );
   });
 
-  it('phases overdue replacements across quarters by risk, not one dump', () => {
+  it('clusters similar risk into one package and waves the rest by year', () => {
+    expect(
+      clusterByRiskScore([
+        { riskScore: 59 },
+        { riskScore: 59 },
+        { riskScore: 43 },
+        { riskScore: 43 },
+        { riskScore: 31 },
+        { riskScore: 31 },
+      ]).map((c) => c.map((x) => x.riskScore)),
+    ).toEqual([
+      [59, 59],
+      [43, 43],
+      [31, 31],
+    ]);
+
+    const start = 2027 * 4 + 3;
+    expect(
+      phaseClusterIndexes([
+        { maxScore: 59, naturalIdx: start },
+        { maxScore: 43, naturalIdx: start },
+        { maxScore: 31, naturalIdx: start },
+      ]),
+    ).toEqual([start, start + 4, start + 8]);
+  });
+
+  it('packages close scores in one quarter, waves distinct bands a year apart', () => {
     const items = generateMaintenancePlanItems(
       [
         risk({
@@ -245,14 +271,15 @@ describe('maintenancePlanEngine', () => {
       },
     );
     expect(items).toHaveLength(6);
-    expect(items.map((i) => `${i.componentName} ${i.year}Q${i.quarter}`)).toEqual([
-      'Aggregat 1 2027Q4',
-      'Aggregat 2 2028Q1',
-      'LA10 POS 1 2028Q2',
-      'LA10 POS 3 2028Q3',
-      'CA01 2028Q4',
-      'LA05 2029Q1',
-    ]);
+    const byName = Object.fromEntries(
+      items.map((i) => [i.componentName, `${i.year}Q${i.quarter}`]),
+    );
+    expect(byName['Aggregat 1']).toBe('2027Q4');
+    expect(byName['Aggregat 2']).toBe('2027Q4');
+    expect(byName['LA10 POS 1']).toBe('2028Q4');
+    expect(byName['LA10 POS 3']).toBe('2028Q4');
+    expect(byName['CA01']).toBe('2029Q4');
+    expect(byName['LA05']).toBe('2029Q4');
   });
 
   it('resolves unit price case-insensitively', () => {

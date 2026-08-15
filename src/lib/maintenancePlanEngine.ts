@@ -25,8 +25,15 @@ export const PLAN_COST_THRESHOLD_SEK = 75_000;
 /** Q3 2026 → earliest plan slot Q4 2027. */
 export const PLAN_LEAD_QUARTERS = 5;
 
-/** One replace/overhaul per property per quarter. B10-overdue units are phased, not dumped in the first slot. */
-export const MAX_HEAVY_ACTIONS_PER_PROPERTY_QUARTER = 1;
+/** Score drop larger than this starts a new replacement wave. */
+export const RISK_CLUSTER_GAP = 10;
+
+/** Default years between waves that would otherwise collide. */
+export const PHASE_YEAR_QUARTERS = 4;
+
+/** Bigger urgency drop → skip a budget year. */
+export const PHASE_SKIP_YEAR_QUARTERS = 8;
+export const PHASE_SCORE_GAP_FOR_SKIP_YEAR = 20;
 
 export interface PlanGenerateOptions {
   startYear: number;
@@ -209,6 +216,52 @@ export function isHeavyPlanAction(action: PlanActionType): boolean {
   return action === 'replace' || action === 'overhaul';
 }
 
+export function clusterByRiskScore<T extends { riskScore: number }>(
+  items: T[],
+  gap = RISK_CLUSTER_GAP,
+): T[][] {
+  const sorted = [...items].sort((a, b) => b.riskScore - a.riskScore);
+  const clusters: T[][] = [];
+  for (const item of sorted) {
+    const cur = clusters[clusters.length - 1];
+    if (!cur || cur[0].riskScore - item.riskScore > gap) {
+      clusters.push([item]);
+    } else {
+      cur.push(item);
+    }
+  }
+  return clusters;
+}
+
+/** Place waves: same quarter inside a cluster, 1–2 years between clusters. */
+export function phaseClusterIndexes(
+  clusters: Array<{ maxScore: number; naturalIdx: number }>,
+): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < clusters.length; i++) {
+    const natural = clusters[i].naturalIdx;
+    if (i === 0) {
+      out.push(natural);
+      continue;
+    }
+    const scoreGap = clusters[i - 1].maxScore - clusters[i].maxScore;
+    const step =
+      scoreGap >= PHASE_SCORE_GAP_FOR_SKIP_YEAR
+        ? PHASE_SKIP_YEAR_QUARTERS
+        : PHASE_YEAR_QUARTERS;
+    out.push(Math.max(natural, out[i - 1] + step));
+  }
+  return out;
+}
+
+function heavyGroupKey(c: {
+  risk: ComponentRiskResult;
+  actionType: PlanActionType;
+}): string {
+  const typeKey = (c.risk.type ?? '').trim().toLowerCase();
+  return `${c.risk.propertyId ?? '_'}|${typeKey}|${c.actionType}`;
+}
+
 export function inferActionType(risk: ComponentRiskResult): PlanActionType {
   const rec = (risk.recommendation || '').toLowerCase();
   const b10 = risk.remainingB10Years;
@@ -371,41 +424,61 @@ export function generateMaintenancePlanItems(
 
   const placeable = planCandidates.filter((c) => c.targetIdx >= 0);
 
-  // Highest risk first for placement priority
-  placeable.sort((a, b) => {
+  const light = placeable.filter((c) => !isHeavyPlanAction(c.actionType));
+  const heavy = placeable.filter((c) => isHeavyPlanAction(c.actionType));
+
+  const heavyGroups = new Map<string, typeof heavy>();
+  for (const c of heavy) {
+    const key = heavyGroupKey(c);
+    const list = heavyGroups.get(key) ?? [];
+    list.push(c);
+    heavyGroups.set(key, list);
+  }
+
+  const phasedHeavy: typeof placeable = [];
+  for (const group of heavyGroups.values()) {
+    const clustered = clusterByRiskScore(
+      group.map((c) => ({ ...c, riskScore: c.risk.riskScore })),
+    );
+    const idxs = phaseClusterIndexes(
+      clustered.map((cl) => ({
+        maxScore: cl[0].riskScore,
+        naturalIdx: Math.min(...cl.map((x) => x.targetIdx)),
+      })),
+    );
+    clustered.forEach((cl, i) => {
+      const idx = idxs[i];
+      if (idx > endIdx) return;
+      for (const c of cl) {
+        phasedHeavy.push({ ...c, targetIdx: idx });
+      }
+    });
+  }
+
+  // Light items keep B10 timing. Soft cap only — never split a replacement wave.
+  const countByIdx = new Map<number, number>();
+  for (const c of phasedHeavy) {
+    countByIdx.set(c.targetIdx, (countByIdx.get(c.targetIdx) ?? 0) + 1);
+  }
+
+  const placed: typeof placeable = [...phasedHeavy];
+  const lightSorted = [...light].sort((a, b) => {
     if (b.risk.riskScore !== a.risk.riskScore) {
       return b.risk.riskScore - a.risk.riskScore;
     }
-    if (a.targetIdx !== b.targetIdx) return a.targetIdx - b.targetIdx;
     return (a.risk.componentId ?? '').localeCompare(b.risk.componentId ?? '');
   });
 
-  // Soft load-balance: slide lower-priority items forward if the quarter
-  // is full, or if this property already has a replace/overhaul there.
-  const countByIdx = new Map<number, number>();
-  const heavyByPropertyIdx = new Map<string, number>();
-  const placed: typeof placeable = [];
-
-  for (const c of placeable) {
+  for (const c of lightSorted) {
     let idx = c.targetIdx;
     while (idx <= endIdx) {
       const n = countByIdx.get(idx) ?? 0;
-      if (n >= maxPerQ) {
-        idx += 1;
-        continue;
+      if (n < maxPerQ) {
+        countByIdx.set(idx, n + 1);
+        placed.push({ ...c, targetIdx: idx });
+        break;
       }
-      if (isHeavyPlanAction(c.actionType)) {
-        const key = `${c.risk.propertyId ?? '_'}:${idx}`;
-        const heavy = heavyByPropertyIdx.get(key) ?? 0;
-        if (heavy >= MAX_HEAVY_ACTIONS_PER_PROPERTY_QUARTER) {
-          idx += 1;
-          continue;
-        }
-        heavyByPropertyIdx.set(key, heavy + 1);
-      }
-      countByIdx.set(idx, n + 1);
-      placed.push({ ...c, targetIdx: idx });
-      break;
+      idx += 1;
     }
   }
 
