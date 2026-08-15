@@ -126,6 +126,18 @@ export async function completeWorkOrderWithCost(
     }
   }
 
+  try {
+    const { notifyEnergyPulseWorkOrderCompleted } = await import(
+      "@/lib/notifyEnergyPulse"
+    );
+    await notifyEnergyPulseWorkOrderCompleted({
+      workOrderId,
+      propertyId: wo.property_id,
+    });
+  } catch (e) {
+    console.warn("[completeWorkOrder] EnergyPulse notify failed", e);
+  }
+
   return {
     workOrder: updated,
     maintenanceHistoryId,

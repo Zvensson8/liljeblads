@@ -65,8 +65,9 @@ export function EnergyPulseBridgeSettings({
           EnergyPulse
         </CardTitle>
         <CardDescription>
-          Jarvis läser energi, MEPS och CRREM för fastigheter som är länkade i
-          EnergyPulse. Samma hemlighet som ENERGYPULSE_BRIDGE_SECRET.
+          URL + hemlighet (samma som ENERGYPULSE_BRIDGE_SECRET). Används när
+          Jarvis läser energi och när en arbetsorder blir klar (åtgärden
+          markeras genomförd i EnergyPulse).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
