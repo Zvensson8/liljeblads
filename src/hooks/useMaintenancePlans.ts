@@ -31,7 +31,7 @@ export interface MaintenancePlan {
 export interface MaintenancePlanItem {
   id: string;
   plan_id: string;
-  component_id: string;
+  component_id: string | null;
   year: number;
   quarter: number;
   action_type: string;
@@ -45,6 +45,8 @@ export interface MaintenancePlanItem {
   sort_order: number;
   status: string;
   notes: string | null;
+  source: string;
+  external_id: string | null;
   created_at: string;
   components?: {
     id: string;
@@ -149,6 +151,14 @@ export function useCreateMaintenancePlan() {
 
   return useMutation({
     mutationFn: async (input: CreateMaintenancePlanInput): Promise<MaintenancePlan> => {
+      const { data: oldActive, error: oldErr } = await supabase
+        .from('maintenance_plans')
+        .select('id')
+        .eq('property_id', input.propertyId)
+        .eq('status', 'active');
+      if (oldErr) throw oldErr;
+      const oldIds = (oldActive ?? []).map((p) => p.id);
+
       // Archive previous active plans for this property
       const { error: archiveErr } = await supabase
         .from('maintenance_plans')
@@ -208,6 +218,16 @@ export function useCreateMaintenancePlan() {
           await supabase.from('maintenance_plans').delete().eq('id', plan.id);
           throw itemsErr;
         }
+      }
+
+      if (oldIds.length > 0) {
+        const { error: moveErr } = await supabase
+          .from('maintenance_plan_items')
+          .update({ plan_id: plan.id })
+          .in('plan_id', oldIds)
+          .eq('source', 'energypulse')
+          .neq('status', 'skipped');
+        if (moveErr) throw moveErr;
       }
 
       return plan as MaintenancePlan;

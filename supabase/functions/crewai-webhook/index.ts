@@ -43,8 +43,12 @@ interface JarvisWebhookPayload {
     | "mark_processed"
     | "start_agent_run"
     | "finish_agent_run"
-    | "get_notify_email";
+    | "get_notify_email"
+    | "upsert_plan_item";
   action_text?: string;
+  external_id?: string;
+  year?: number;
+  estimated_cost?: string | number;
   component_system?: string;
   priority?: string;
   price_estimate?: string;
@@ -1195,6 +1199,191 @@ Deno.serve(async (req) => {
       });
 
       return json({ success: true, type: "log_service", result: mh });
+    }
+
+    // ============ upsert_plan_item (EnergyPulse → underhållsplan) ============
+    if (payload.type === "upsert_plan_item") {
+      if (
+        !permissions.includes("create_work_order") &&
+        !permissions.includes("create_todo")
+      ) {
+        return json(
+          { success: false, error: "API key missing create_work_order permission" },
+          403,
+        );
+      }
+
+      const title = (payload.action_text ?? "").trim();
+      const externalId = (payload.external_id ?? "").trim();
+      if (!title) {
+        return json({ success: false, error: "action_text is required" }, 400);
+      }
+      if (!externalId) {
+        return json({ success: false, error: "external_id is required" }, 400);
+      }
+
+      const uuidRe =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const propRef = payload.property_id || payload.property_name;
+      if (!propRef) {
+        return json({ success: false, error: "property_id is required" }, 400);
+      }
+
+      let pq = supabase
+        .from("properties")
+        .select("id, name")
+        .eq("organization_id", keyRow.organization_id)
+        .limit(1);
+      pq = uuidRe.test(propRef) ? pq.eq("id", propRef) : pq.ilike("name", propRef);
+      const { data: prop } = await pq.maybeSingle();
+      if (!prop) {
+        return json({ success: false, error: "Fastighet hittades inte" }, 404);
+      }
+      const propertyId = prop.id as string;
+      const propertyName = prop.name as string;
+
+      let componentId: string | null = payload.component_id ?? null;
+      if (componentId) {
+        const { data: comp } = await supabase
+          .from("components")
+          .select("id")
+          .eq("id", componentId)
+          .eq("property_id", propertyId)
+          .maybeSingle();
+        if (!comp) componentId = null;
+      }
+
+      let { data: plan } = await supabase
+        .from("maintenance_plans")
+        .select("id")
+        .eq("property_id", propertyId)
+        .eq("status", "active")
+        .order("generated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!plan) {
+        const now = new Date();
+        let quarter = Math.floor(now.getMonth() / 3) + 2;
+        let year = now.getFullYear();
+        if (quarter > 4) {
+          quarter = 1;
+          year += 1;
+        }
+        const { data: created, error: planErr } = await supabase
+          .from("maintenance_plans")
+          .insert({
+            organization_id: keyRow.organization_id,
+            property_id: propertyId,
+            name: `Underhållsplan ${propertyName} Q${quarter} ${year}`,
+            start_year: year,
+            start_quarter: quarter,
+            horizon_years: 5,
+            min_risk_level: "medium",
+            min_confidence: "medium",
+            status: "active",
+            generated_by: keyRow.created_by ?? null,
+          })
+          .select("id")
+          .single();
+        if (planErr || !created) {
+          return json(
+            { success: false, error: planErr?.message ?? "Kunde inte skapa plan" },
+            500,
+          );
+        }
+        plan = created;
+      }
+
+      const yearNum = Number(payload.year);
+      const year = Number.isFinite(yearNum) && yearNum >= 2000
+        ? Math.round(yearNum)
+        : new Date().getFullYear();
+      let quarter = Number(payload.quarter);
+      if (![1, 2, 3, 4].includes(quarter)) quarter = 1;
+
+      const rawType = (payload.action_type ?? "service").toLowerCase();
+      const actionType = ["replace", "overhaul", "service", "inspect"].includes(rawType)
+        ? rawType
+        : "service";
+
+      let cost: number | null = null;
+      if (payload.estimated_cost != null && payload.estimated_cost !== "") {
+        const n = Number(payload.estimated_cost);
+        if (Number.isFinite(n) && n >= 0) cost = n;
+      } else if (payload.price_estimate) {
+        cost = parsePrice(payload.price_estimate);
+      }
+
+      const notes = (payload.notes ?? payload.raw_context ?? "").trim() || null;
+
+      const { data: existing } = await supabase
+        .from("maintenance_plan_items")
+        .select("id")
+        .eq("source", "energypulse")
+        .eq("external_id", externalId)
+        .maybeSingle();
+
+      const row = {
+        plan_id: plan.id,
+        component_id: componentId,
+        year,
+        quarter,
+        action_type: actionType,
+        title,
+        estimated_cost: cost,
+        cost_source: cost != null ? "manual" : null,
+        notes,
+      };
+
+      if (existing) {
+        const { data: updated, error: updErr } = await supabase
+          .from("maintenance_plan_items")
+          .update(row)
+          .eq("id", existing.id)
+          .select("id, plan_id, title, year, quarter")
+          .single();
+        if (updErr) {
+          return json({ success: false, error: updErr.message }, 500);
+        }
+        await supabase
+          .from("api_keys")
+          .update({ last_used_at: new Date().toISOString() })
+          .eq("id", keyRow.id);
+        return json({
+          success: true,
+          type: "upsert_plan_item",
+          created: false,
+          result: updated,
+        });
+      }
+
+      const { data: inserted, error: insErr } = await supabase
+        .from("maintenance_plan_items")
+        .insert({
+          ...row,
+          risk_level: "medium",
+          risk_score: 0,
+          confidence: "medium",
+          status: "planned",
+          source: "energypulse",
+          external_id: externalId,
+        })
+        .select("id, plan_id, title, year, quarter")
+        .single();
+      if (insErr) {
+        return json({ success: false, error: insErr.message }, 500);
+      }
+      await supabase
+        .from("api_keys")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", keyRow.id);
+      return json({
+        success: true,
+        type: "upsert_plan_item",
+        created: true,
+        result: inserted,
+      });
     }
 
     // ============ todo / work_order (existing behavior) ============

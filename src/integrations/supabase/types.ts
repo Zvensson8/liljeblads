@@ -1361,11 +1361,12 @@ export type Database = {
       maintenance_plan_items: {
         Row: {
           action_type: string
-          component_id: string
+          component_id: string | null
           confidence: string
           cost_source: string | null
           created_at: string
           estimated_cost: number | null
+          external_id: string | null
           id: string
           notes: string | null
           plan_id: string
@@ -1374,17 +1375,19 @@ export type Database = {
           risk_level: string
           risk_score: number
           sort_order: number
+          source: string
           status: string
           title: string
           year: number
         }
         Insert: {
           action_type?: string
-          component_id: string
+          component_id?: string | null
           confidence: string
           cost_source?: string | null
           created_at?: string
           estimated_cost?: number | null
+          external_id?: string | null
           id?: string
           notes?: string | null
           plan_id: string
@@ -1393,17 +1396,19 @@ export type Database = {
           risk_level: string
           risk_score?: number
           sort_order?: number
+          source?: string
           status?: string
           title: string
           year: number
         }
         Update: {
           action_type?: string
-          component_id?: string
+          component_id?: string | null
           confidence?: string
           cost_source?: string | null
           created_at?: string
           estimated_cost?: number | null
+          external_id?: string | null
           id?: string
           notes?: string | null
           plan_id?: string
@@ -1412,6 +1417,7 @@ export type Database = {
           risk_level?: string
           risk_score?: number
           sort_order?: number
+          source?: string
           status?: string
           title?: string
           year?: number

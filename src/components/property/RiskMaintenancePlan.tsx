@@ -63,27 +63,39 @@ function RiskMiniBadge({ level, score }: { level: string; score: number }) {
 }
 
 function PlanItemRow({ item }: { item: MaintenancePlanItem }) {
-  const name = item.components?.name ?? 'Komponent';
+  const name = item.components?.name ?? (item.source === 'energypulse' ? item.title : 'Komponent');
   const type = item.components?.type;
+  const fromEnergy = item.source === 'energypulse';
   return (
     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 p-3 rounded-lg border bg-card hover:bg-accent/30 transition-colors">
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
           <Wrench className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <Link
-            to={`/components/${item.component_id}`}
-            className="font-medium hover:underline truncate"
-          >
-            {name}
-          </Link>
+          {item.component_id ? (
+            <Link
+              to={`/components/${item.component_id}`}
+              className="font-medium hover:underline truncate"
+            >
+              {name}
+            </Link>
+          ) : (
+            <span className="font-medium truncate">{name}</span>
+          )}
           <Badge variant="outline" className="text-xs">
             {actionTypeLabel(item.action_type as PlanActionType)}
           </Badge>
+          {fromEnergy && (
+            <Badge variant="secondary" className="text-xs">
+              Energi
+            </Badge>
+          )}
         </div>
         {type && (
           <p className="text-xs text-muted-foreground pl-5">{type}</p>
         )}
-        <p className="text-sm text-muted-foreground pl-5 line-clamp-2">{item.title}</p>
+        {item.component_id && (
+          <p className="text-sm text-muted-foreground pl-5 line-clamp-2">{item.title}</p>
+        )}
       </div>
       <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0 pl-5 sm:pl-0">
         <RiskMiniBadge level={item.risk_level} score={Number(item.risk_score)} />
