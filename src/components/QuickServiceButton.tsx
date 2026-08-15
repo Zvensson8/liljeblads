@@ -1,11 +1,16 @@
 import { useState, useRef } from 'react';
 import { storageService } from '@/services/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { getErrorMessage } from '@/lib/utils';
 import { useCreateMaintenanceHistory } from '@/hooks/useMaintenanceHistory';
 import { useCreateMaintenanceDocument } from '@/hooks/useMaintenanceDocuments';
+import { useCreateManualPlanItem } from '@/hooks/useMaintenancePlans';
+import { earliestPlanQuarter } from '@/lib/maintenancePlanEngine';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -35,15 +40,26 @@ export const QuickServiceButton = ({
     new Date().toISOString().split('T')[0]
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [supplier, setSupplier] = useState('');
+  const [cost, setCost] = useState('');
+  const [notes, setNotes] = useState('');
+  const [recommendations, setRecommendations] = useState('');
+  const [addToPlan, setAddToPlan] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const createMaintenance = useCreateMaintenanceHistory();
   const createMaintenanceDoc = useCreateMaintenanceDocument();
+  const createManual = useCreateManualPlanItem();
 
   const resetForm = () => {
     setActionType('Service');
     setPerformedDate(new Date().toISOString().split('T')[0]);
     setSelectedFile(null);
+    setSupplier('');
+    setCost('');
+    setNotes('');
+    setRecommendations('');
+    setAddToPlan(false);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,10 +86,22 @@ export const QuickServiceButton = ({
     setLoading(true);
 
     try {
+      const recLines = recommendations
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+      const notesParts = [notes.trim(), recLines.length ? `Rekommendationer:\n${recLines.join('\n')}` : '']
+        .filter(Boolean)
+        .join('\n\n');
+
       const maintenanceRecord = await createMaintenance.mutateAsync({
         component_id: componentId,
         action_type: actionType,
         performed_date: performedDate,
+        supplier: supplier.trim() || null,
+        cost: cost === '' ? null : Number(cost),
+        notes: notesParts || null,
+        category: 'planned',
       });
 
       if (selectedFile && maintenanceRecord) {
@@ -100,6 +128,39 @@ export const QuickServiceButton = ({
           });
         } catch (docError: unknown) {
           console.error('Doc record error:', docError);
+        }
+      }
+
+      if (addToPlan && recLines.length > 0) {
+        const { data: component } = await supabase
+          .from('components')
+          .select('property_id')
+          .eq('id', componentId)
+          .maybeSingle();
+        const propertyId = component?.property_id;
+        if (propertyId) {
+          const { data: plan } = await supabase
+            .from('maintenance_plans')
+            .select('id')
+            .eq('property_id', propertyId)
+            .eq('status', 'active')
+            .order('generated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (plan?.id) {
+            const start = earliestPlanQuarter();
+            for (const title of recLines) {
+              await createManual.mutateAsync({
+                planId: plan.id,
+                propertyId,
+                title,
+                year: start.year,
+                quarter: start.quarter,
+                estimated_cost: null,
+                notes: `Från service ${performedDate} · ${componentName}`,
+              });
+            }
+          }
         }
       }
 
@@ -145,7 +206,8 @@ export const QuickServiceButton = ({
         <DialogHeader>
           <DialogTitle>Registrera service</DialogTitle>
           <DialogDescription>
-            Registrera utförd service för {componentName}
+            Utförd service för {componentName}. Anmärkningar och rekommendationer
+            sparas på historiken.
           </DialogDescription>
         </DialogHeader>
 
@@ -171,6 +233,56 @@ export const QuickServiceButton = ({
                 required
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="quickSupplier">Leverantör</Label>
+              <Input
+                id="quickSupplier"
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quickCost">Kostnad (kr)</Label>
+              <Input
+                id="quickCost"
+                type="number"
+                min={0}
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="quickNotes">Anmärkningar</Label>
+            <Textarea
+              id="quickNotes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="quickRecs">Rekommenderade åtgärder</Label>
+            <Textarea
+              id="quickRecs"
+              value={recommendations}
+              onChange={(e) => setRecommendations(e.target.value)}
+              rows={3}
+              placeholder="En åtgärd per rad"
+            />
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={addToPlan}
+                onCheckedChange={(v) => setAddToPlan(v === true)}
+                disabled={!recommendations.trim()}
+              />
+              Lägg rekommendationer på underhållsplanen
+            </label>
           </div>
 
           <div className="space-y-2">

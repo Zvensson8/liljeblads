@@ -26,8 +26,6 @@ import {
   Home,
   Building2,
 } from "lucide-react";
-import { format } from "date-fns";
-import { sv } from "date-fns/locale";
 import { ProjectCostManagement } from "@/components/projects/ProjectCostManagement";
 import { ProjectChecklistManagement } from "@/components/projects/ProjectChecklistManagement";
 import { ProjectDocuments } from "@/components/projects/ProjectDocuments";
@@ -65,6 +63,8 @@ interface Project {
   is_archived: boolean;
   project_manager: string | null;
   actors: string[] | null;
+  year: number | null;
+  start_quarter: number | null;
   created_at: string;
   updated_at: string;
   /** Supabase embed from `properties (id, name)` — may be null if RLS/missing FK */
@@ -74,7 +74,13 @@ interface Project {
   } | null;
 }
 
-const PROJECT_LIST_TABS = ["active", "proposals", "archived"] as const;
+const PROJECT_LIST_TABS = ["active", "archived"] as const;
+
+const TAB_ALIASES: Record<string, string> = {
+  info: "overview",
+  simulation: "economy",
+  activity: "checklist",
+};
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -89,7 +95,8 @@ export default function ProjectDetail() {
   const { addRecentItem } = useRecentlyVisited();
   const isMobile = useIsMobile();
 
-  const activeTab = searchParams.get("tab") || "overview";
+  const rawTab = searchParams.get("tab") || "overview";
+  const activeTab = TAB_ALIASES[rawTab] ?? rawTab;
 
   // Prefer the tab the user came from (active/archived/…); default to Aktiva projekt
   const fromProjectsTab = (location.state as { fromProjectsTab?: string } | null)?.fromProjectsTab;
@@ -399,109 +406,22 @@ export default function ProjectDetail() {
                 className="w-full"
               >
                 <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-                  <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-8">
+                  <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-5">
                     <TabsTrigger value="overview">Översikt</TabsTrigger>
-                    <TabsTrigger value="info">Information</TabsTrigger>
                     <TabsTrigger value="economy">Ekonomi</TabsTrigger>
                     <TabsTrigger value="work-orders">Arbetsordrar</TabsTrigger>
-                    <TabsTrigger value="simulation">Simulering</TabsTrigger>
                     <TabsTrigger value="documents">Dokument</TabsTrigger>
                     <TabsTrigger value="checklist">Checklista</TabsTrigger>
-                    <TabsTrigger value="activity">Aktivitet</TabsTrigger>
                   </TabsList>
                 </div>
 
                 <TabsContent value="overview" className="space-y-4">
                   <ProjectOverviewTab 
                     project={project}
+                    propertyName={propertyName}
+                    typeBadge={getTypeBadge(project.type)}
                     onNavigate={(tab) => setSearchParams({ tab })}
                   />
-                </TabsContent>
-
-                <TabsContent value="info" className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Projektinformation</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">
-                            Projektnummer
-                          </p>
-                          <p className="text-base">{project.project_number}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">
-                            Fastighet
-                          </p>
-                          <p className="text-base">{propertyName}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">
-                            Typ
-                          </p>
-                          <div className="mt-1">{getTypeBadge(project.type)}</div>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">
-                            Projektledare
-                          </p>
-                          <p className="text-base">
-                            {project.project_manager || "-"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">
-                            Startdatum
-                          </p>
-                          <p className="text-base">
-                            {project.start_date
-                              ? format(new Date(project.start_date), "PPP", {
-                                  locale: sv,
-                                })
-                              : "-"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">
-                            Slutdatum
-                          </p>
-                          <p className="text-base">
-                            {project.end_date
-                              ? format(new Date(project.end_date), "PPP", {
-                                  locale: sv,
-                                })
-                              : "-"}
-                          </p>
-                        </div>
-                      </div>
-
-                      {project.description && (
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground mb-2">
-                            Beskrivning
-                          </p>
-                          <p className="text-base">{project.description}</p>
-                        </div>
-                      )}
-
-                      {project.actors && project.actors.length > 0 && (
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground mb-2">
-                            Aktörer
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {project.actors.map((actor, index) => (
-                              <Badge key={index} variant="secondary">
-                                {actor}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
                 </TabsContent>
 
                 <TabsContent value="economy" className="space-y-4">
@@ -524,23 +444,7 @@ export default function ProjectDetail() {
                       />
                     </CardContent>
                   </Card>
-                </TabsContent>
 
-                <TabsContent value="work-orders">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Arbetsordrar</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ProjectWorkOrders
-                        projectId={project.id}
-                        propertyId={project.property_id}
-                      />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="simulation">
                   <Card>
                     <CardHeader>
                       <CardTitle>Ekonomisimulering</CardTitle>
@@ -568,6 +472,20 @@ export default function ProjectDetail() {
                   </Card>
                 </TabsContent>
 
+                <TabsContent value="work-orders">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Arbetsordrar</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ProjectWorkOrders
+                        projectId={project.id}
+                        propertyId={project.property_id}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
                 <TabsContent value="documents">
                   <Card>
                     <CardHeader>
@@ -582,7 +500,7 @@ export default function ProjectDetail() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="checklist">
+                <TabsContent value="checklist" className="space-y-4">
                   <Card>
                     <CardHeader>
                       <CardTitle>Checklista</CardTitle>
@@ -594,9 +512,6 @@ export default function ProjectDetail() {
                       />
                     </CardContent>
                   </Card>
-                </TabsContent>
-
-                <TabsContent value="activity">
                   <Card>
                     <CardHeader>
                       <CardTitle>Aktivitetslogg</CardTitle>

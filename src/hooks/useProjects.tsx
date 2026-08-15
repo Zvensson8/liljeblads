@@ -90,8 +90,20 @@ export function useUpdateProject() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: UpdateProjectInput }) =>
-      projectService.update(id, patch),
+    mutationFn: async ({ id, patch }: { id: string; patch: UpdateProjectInput }) => {
+      const updated = await projectService.update(id, patch);
+      if (patch.status === 'avslutat') {
+        try {
+          const { completePlanItemsForProject } = await import(
+            '@/lib/completePlanItems'
+          );
+          await completePlanItemsForProject(id);
+        } catch (e) {
+          console.warn('[useUpdateProject] plan items close failed', e);
+        }
+      }
+      return updated;
+    },
     onMutate: async ({ id, patch }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.projects.all });
       const snapshots = queryClient.getQueriesData<ProjectWithRelations[]>({

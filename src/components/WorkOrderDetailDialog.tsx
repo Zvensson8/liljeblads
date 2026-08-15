@@ -76,6 +76,7 @@ export function WorkOrderDetailDialog({
   const [uploading, setUploading] = useState(false);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [convertNumber, setConvertNumber] = useState("");
   const [previewDocument, setPreviewDocument] = useState<WorkOrderFile | null>(null);
   const [exporting, setExporting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -360,35 +361,62 @@ export function WorkOrderDetailDialog({
   // ---- Convert to project ----
   const handleConvertToProject = async () => {
     if (!workOrder) return;
+    const property = (propertiesData ?? []).find((p) => p.id === workOrder.property_id);
+    const { normalizeProjectNumber } = await import("@/lib/projectNumber");
+    const parsed = normalizeProjectNumber(convertNumber, property?.property_number);
+    if (parsed.ok === false) {
+      toast.error(parsed.message);
+      return;
+    }
     setConverting(true);
     try {
-      const projectInsert: CreateProjectInput = {
-        name: workOrder.action,
-        property_id: workOrder.property_id,
-        description: workOrder.comments || `Konverterat från arbetsorder: ${workOrder.action}`,
-        status: "planerat",
-        start_date: workOrder.due_date || new Date().toISOString().split('T')[0],
-        budget: workOrder.price || null,
-        project_number: `WO-${workOrder.id.substring(0, 8)}`,
-        type: "underhall",
-      };
-      const newProject = await createProject.mutateAsync(projectInsert);
-      if (!newProject) throw new Error("Projektet kunde inte skapas");
-      const conversionNote = `Konverterad till projekt ${newProject.project_number} - ${newProject.name}`;
-      const updatedComments = workOrder.comments ? `${workOrder.comments}\n\n${conversionNote}` : conversionNote;
-      const conversionPatch: UpdateWorkOrderInput = { status: "completed", comments: updatedComments };
+      const { data: existing } = await supabase
+        .from("projects")
+        .select("id, property_id, project_number")
+        .eq("project_number", parsed.value)
+        .maybeSingle();
+
+      let projectId: string;
+      if (existing) {
+        if (existing.property_id !== workOrder.property_id) {
+          throw new Error("Projektnumret används redan på en annan fastighet");
+        }
+        projectId = existing.id;
+      } else {
+        const projectInsert: CreateProjectInput = {
+          name: workOrder.action,
+          property_id: workOrder.property_id,
+          description: workOrder.comments || `Från arbetsorder: ${workOrder.action}`,
+          status: "planerat",
+          start_date: workOrder.due_date || new Date().toISOString().split("T")[0],
+          budget: workOrder.price || null,
+          project_number: parsed.value,
+          type: "underhall",
+        };
+        const newProject = await createProject.mutateAsync(projectInsert);
+        if (!newProject) throw new Error("Projektet kunde inte skapas");
+        projectId = newProject.id;
+      }
+
+      const conversionNote = `Kopplad till projekt ${parsed.value}`;
+      const updatedComments = workOrder.comments
+        ? `${workOrder.comments}\n\n${conversionNote}`
+        : conversionNote;
       await updateWorkOrder.mutateAsync({
         id: workOrder.id,
-        patch: conversionPatch,
+        patch: { project_id: projectId, comments: updatedComments },
       });
-      toast.success("Arbetsorder konverterad till projekt!");
+      toast.success("Arbetsorder kopplad till projekt");
       onUpdate();
       setConvertDialogOpen(false);
       setConverting(false);
-      setTimeout(() => { onOpenChange(false); navigate(`/projects/${newProject.id}`); }, 100);
+      setTimeout(() => {
+        onOpenChange(false);
+        navigate(`/projects/${projectId}`);
+      }, 100);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Okänt fel";
-      toast.error("Kunde inte konvertera till projekt: " + msg);
+      toast.error("Kunde inte koppla till projekt: " + msg);
       setConverting(false);
     }
   };
@@ -505,18 +533,34 @@ export function WorkOrderDetailDialog({
         document={previewDocument}
       />
 
-      <AlertDialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
+      <AlertDialog open={convertDialogOpen} onOpenChange={(o) => {
+        setConvertDialogOpen(o);
+        if (o && workOrder) {
+          const property = (propertiesData ?? []).find((p) => p.id === workOrder.property_id);
+          setConvertNumber(property?.property_number?.trim() ?? "");
+        }
+      }}>
         <AlertDialogContent aria-describedby="convert-description">
           <AlertDialogHeader>
-            <AlertDialogTitle>Konvertera till projekt?</AlertDialogTitle>
+            <AlertDialogTitle>Koppla till projekt</AlertDialogTitle>
             <AlertDialogDescription id="convert-description">
-              Detta skapar ett nytt projekt baserat på denna arbetsorder. Arbetsordern arkiveras automatiskt.
+              Ange projektnummer (fastighetsnummer +xx eller -xx). Arbetsordern
+              lämnas öppen under projektet.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="wo-project-number">Projektnummer</Label>
+            <Input
+              id="wo-project-number"
+              value={convertNumber}
+              onChange={(e) => setConvertNumber(e.target.value)}
+              placeholder="Fastighetsnr+xx"
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={converting}>Avbryt</AlertDialogCancel>
             <AlertDialogAction onClick={handleConvertToProject} disabled={converting}>
-              {converting ? "Konverterar..." : "Konvertera till projekt"}
+              {converting ? "Sparar..." : "Skapa / koppla projekt"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

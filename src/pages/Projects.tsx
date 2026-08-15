@@ -7,10 +7,9 @@ import {
 } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { Button } from '@/components/ui/button';
-import { Plus, FolderArchive, Briefcase, Sparkles, Download } from 'lucide-react';
+import { Plus, FolderArchive, Briefcase, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProjectFormDialog } from '@/components/projects/ProjectFormDialog';
-import { ProjectProposals } from '@/components/projects/ProjectProposals';
 import { ProjectsFilters } from '@/components/projects/ProjectsFilters';
 import {
   ProjectsTable,
@@ -36,7 +35,7 @@ import {
   type UpdateProjectInput,
 } from '@/hooks/useProjects';
 
-const PROJECT_TABS = ['active', 'proposals', 'archived'] as const;
+const PROJECT_TABS = ['active', 'archived'] as const;
 type ProjectTab = (typeof PROJECT_TABS)[number];
 
 const LIST_DEFAULTS = {
@@ -292,16 +291,8 @@ export default function Projects() {
               >
                 <TabsList>
                   <TabsTrigger value="active">Aktiva projekt</TabsTrigger>
-                  <TabsTrigger value="proposals" className="flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" />
-                    Förslag
-                  </TabsTrigger>
                   <TabsTrigger value="archived">Arkiverade</TabsTrigger>
                 </TabsList>
-
-                <TabsContent value="proposals" className="space-y-6 mt-6">
-                  <ProjectProposals />
-                </TabsContent>
 
                 <TabsContent value="active" className="space-y-6 mt-6">
                   <ProjectsFilters

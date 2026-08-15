@@ -30,10 +30,13 @@ import {
   useDeleteMaintenancePlanItem,
   useCreateManualPlanItem,
   useSyncWeibullPlan,
+  usePromotePlanItems,
   fetchPurchaseCostMap,
   fetchUnitPriceMap,
   type MaintenancePlanItem,
 } from '@/hooks/useMaintenancePlans';
+import { useProperty } from '@/hooks/useProperties';
+import { normalizeProjectNumber, projectNumberStem } from '@/lib/projectNumber';
 import { useComponentRiskList } from '@/hooks/useComponentRisk';
 import {
   earliestPlanQuarter,
@@ -95,10 +98,16 @@ function PlanItemRow({
   item,
   onEdit,
   onDelete,
+  propertyNumber,
+  onPromote,
+  promoting,
 }: {
   item: MaintenancePlanItem;
   onEdit: (item: MaintenancePlanItem) => void;
   onDelete: (item: MaintenancePlanItem) => void;
+  propertyNumber: string;
+  onPromote: (items: MaintenancePlanItem[], rawNumber: string) => void;
+  promoting: boolean;
 }) {
   const name = item.components?.name ?? (item.source === 'energypulse' ? item.title : 'Komponent');
   const type = item.components?.type;
@@ -131,10 +140,18 @@ function PlanItemRow({
               Manuell
             </Badge>
           )}
-          {item.user_edited && item.source === 'weibull' && (
+          {item.user_edited && item.source === 'weibull' && !item.project_id && (
             <Badge variant="outline" className="text-xs">
               Ändrad
             </Badge>
+          )}
+          {item.projects?.project_number && (
+            <Link
+              to={`/projects/${item.project_id}`}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              {item.projects.project_number}
+            </Link>
           )}
           <span className="text-xs text-muted-foreground">
             {formatYearQuarter(item.year, item.quarter as Quarter)}
@@ -158,20 +175,29 @@ function PlanItemRow({
             B10 {Number(item.remaining_b10_years).toFixed(1)} år till 10 %-fel
           </span>
         )}
+        {!item.project_id && (
+          <PromoteNumberField
+            propertyNumber={propertyNumber}
+            pending={promoting}
+            onSubmit={(raw) => onPromote([item], raw)}
+          />
+        )}
         <div className="flex items-center gap-1">
           <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => onEdit(item)}>
             <Pencil className="h-3.5 w-3.5" />
             Ändra
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 gap-1 text-destructive hover:text-destructive"
-            onClick={() => onDelete(item)}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Ta bort
-          </Button>
+          {!item.project_id && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 gap-1 text-destructive hover:text-destructive"
+              onClick={() => onDelete(item)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Ta bort
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -183,11 +209,17 @@ function QuarterBlock({
   items,
   onEdit,
   onDelete,
+  propertyNumber,
+  onPromote,
+  promoting,
 }: {
   quarter: Quarter;
   items: MaintenancePlanItem[];
   onEdit: (item: MaintenancePlanItem) => void;
   onDelete: (item: MaintenancePlanItem) => void;
+  propertyNumber: string;
+  onPromote: (items: MaintenancePlanItem[], rawNumber: string) => void;
+  promoting: boolean;
 }) {
   const cost = items.reduce(
     (s, i) => s + (i.estimated_cost != null ? Number(i.estimated_cost) : 0),
@@ -197,19 +229,35 @@ function QuarterBlock({
 
   return (
     <div className="rounded-md border border-border/60 p-3 space-y-2 bg-background/50">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h4 className="text-sm font-semibold">Q{quarter}</h4>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{items.length} st</span>
           {hasCost && <span>{formatSek(cost)}</span>}
         </div>
       </div>
+      {items.some((i) => !i.project_id) && (
+        <PromoteNumberField
+          propertyNumber={propertyNumber}
+          pending={promoting}
+          compactLabel="Hela kvartalet"
+          onSubmit={(raw) => onPromote(items.filter((i) => !i.project_id), raw)}
+        />
+      )}
       {items.length === 0 ? (
         <p className="text-xs text-muted-foreground py-2">Inga åtgärder</p>
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
-            <PlanItemRow key={item.id} item={item} onEdit={onEdit} onDelete={onDelete} />
+            <PlanItemRow
+              key={item.id}
+              item={item}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              propertyNumber={propertyNumber}
+              onPromote={onPromote}
+              promoting={promoting}
+            />
           ))}
         </div>
       )}
@@ -231,6 +279,9 @@ export function RiskMaintenancePlan({
   const deleteItem = useDeleteMaintenancePlanItem();
   const createManual = useCreateManualPlanItem();
   const syncWeibull = useSyncWeibullPlan();
+  const promoteItems = usePromotePlanItems();
+  const { data: property } = useProperty(propertyId);
+  const propertyNumber = projectNumberStem(property?.property_number);
   const { data: risks = [], isLoading: risksLoading } = useComponentRiskList({
     propertyId,
     limit: 2000,
@@ -371,7 +422,9 @@ export function RiskMaintenancePlan({
                 <CardDescription>
                   Kundens Excel-plan är orörd. Här jobbar vi: Weibull och
                   EnergyPulse fylls på automatiskt, resten lägger ni in manuellt.
-                  Redigerat och borttaget skrivs inte över.
+                  Fyll i projektnummer ({propertyNumber || 'fastighetsnr'}+xx
+                  eller -xx) så skapas projektet. Redigerat och borttaget skrivs
+                  inte över.
                 </CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -553,6 +606,63 @@ export function RiskMaintenancePlan({
                                   key={q}
                                   quarter={q}
                                   items={yMap?.get(q) ?? []}
+                                  propertyNumber={propertyNumber}
+                                  promoting={promoteItems.isPending}
+                                  onPromote={(rows, raw) => {
+                                    if (!activePlan) return;
+                                    const parsed = normalizeProjectNumber(raw, propertyNumber);
+                                    if (parsed.ok === false) {
+                                      toast({
+                                        title: 'Ogiltigt projektnummer',
+                                        description: parsed.message,
+                                        variant: 'destructive',
+                                      });
+                                      return;
+                                    }
+                                    const budget = rows.reduce(
+                                      (s, i) =>
+                                        s +
+                                        (i.estimated_cost != null
+                                          ? Number(i.estimated_cost)
+                                          : 0),
+                                      0,
+                                    );
+                                    const isEnergy = rows.some((i) => i.source === 'energypulse');
+                                    const name =
+                                      rows.length === 1
+                                        ? rows[0].title
+                                        : `Underhåll ${propertyName ?? propertyNumber} Q${q} ${year}`;
+                                    void promoteItems
+                                      .mutateAsync({
+                                        planId: activePlan.id,
+                                        propertyId,
+                                        propertyName,
+                                        propertyNumber,
+                                        projectNumber: parsed.value,
+                                        itemIds: rows.map((i) => i.id),
+                                        year,
+                                        quarter: q,
+                                        budget: budget > 0 ? budget : null,
+                                        name,
+                                        type: isEnergy ? 'energi' : 'underhall',
+                                      })
+                                      .then((r) => {
+                                        toast({
+                                          title: r.created
+                                            ? 'Projekt skapat'
+                                            : 'Kopplat till befintligt projekt',
+                                          description: r.projectNumber,
+                                        });
+                                      })
+                                      .catch((e: unknown) => {
+                                        toast({
+                                          title: 'Kunde inte skapa projekt',
+                                          description:
+                                            e instanceof Error ? e.message : undefined,
+                                          variant: 'destructive',
+                                        });
+                                      });
+                                  }}
                                   onEdit={setEditing}
                                   onDelete={(item) => {
                                     const ok = window.confirm(
@@ -835,6 +945,52 @@ function PlanItemEditForm({
         </Button>
       </DialogFooter>
     </DialogContent>
+  );
+}
+
+function PromoteNumberField({
+  propertyNumber,
+  pending,
+  onSubmit,
+  compactLabel,
+}: {
+  propertyNumber: string;
+  pending: boolean;
+  onSubmit: (raw: string) => void;
+  compactLabel?: string;
+}) {
+  const stem = propertyNumber || '';
+  const [value, setValue] = useState(stem);
+  useEffect(() => {
+    if (stem && !value) setValue(stem);
+  }, [stem, value]);
+
+  return (
+    <form
+      className="flex items-center gap-1 w-full max-w-[220px]"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(value);
+      }}
+    >
+      <Input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={stem ? `${stem}+xx` : 'Fastighetsnr saknas'}
+        className="h-7 text-xs"
+        disabled={!stem || pending}
+        aria-label={compactLabel ?? 'Projektnummer'}
+      />
+      <Button
+        type="submit"
+        size="sm"
+        variant="secondary"
+        className="h-7 px-2 text-xs shrink-0"
+        disabled={!stem || pending}
+      >
+        {compactLabel ?? 'Projekt'}
+      </Button>
+    </form>
   );
 }
 

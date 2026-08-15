@@ -42,6 +42,21 @@ describe('planWeibullMerge', () => {
     expect(out.map((d) => d.kind)).toEqual(['skip', 'skip']);
   });
 
+  it('does not overwrite a promoted row', () => {
+    const existing: ExistingPlanItem[] = [
+      {
+        id: 'p',
+        component_id: 'c1',
+        source: 'weibull',
+        status: 'promoted',
+        user_edited: false,
+        project_id: 'proj1',
+      },
+    ];
+    const out = planWeibullMerge(existing, [draft('c1')]);
+    expect(out[0]).toEqual({ kind: 'skip', reason: 'edited' });
+  });
+
   it('does not replace a manual or EnergyPulse row on the same component', () => {
     const existing: ExistingPlanItem[] = [
       { id: 'm', component_id: 'c1', source: 'manual', status: 'planned', user_edited: true },

@@ -48,11 +48,18 @@ export interface MaintenancePlanItem {
   source: string;
   external_id: string | null;
   user_edited?: boolean;
+  project_id: string | null;
   created_at: string;
   components?: {
     id: string;
     name: string;
     type: string | null;
+  } | null;
+  projects?: {
+    id: string;
+    project_number: string;
+    name: string;
+    status: string;
   } | null;
 }
 
@@ -132,7 +139,7 @@ export function useMaintenancePlanItems(planId: string | undefined | null) {
       const { data, error } = await supabase
         .from('maintenance_plan_items')
         .select(
-          '*, components(id, name, type)',
+          '*, components(id, name, type), projects(id, project_number, name, status)',
         )
         .eq('plan_id', planId!)
         .neq('status', 'skipped')
@@ -334,7 +341,7 @@ export function useSyncWeibullPlan() {
 
       const { data: existing, error: exErr } = await supabase
         .from('maintenance_plan_items')
-        .select('id, component_id, source, status, user_edited')
+        .select('id, component_id, source, status, user_edited, project_id')
         .eq('plan_id', plan.id);
       if (exErr) throw exErr;
 
@@ -533,6 +540,93 @@ export function useDeleteMaintenancePlanItem() {
         queryKey: queryKeys.maintenancePlans.items(input.planId),
       });
       qc.invalidateQueries({ queryKey: queryKeys.maintenancePlans.all });
+    },
+  });
+}
+
+export function usePromotePlanItems() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      planId: string;
+      propertyId: string;
+      propertyName?: string;
+      propertyNumber: string;
+      projectNumber: string;
+      itemIds: string[];
+      year: number;
+      quarter: number;
+      budget: number | null;
+      name: string;
+      type: 'underhall' | 'energi';
+    }): Promise<{ projectId: string; created: boolean; projectNumber: string }> => {
+      if (input.itemIds.length === 0) {
+        throw new Error('Inga åtgärder att lyfta');
+      }
+
+      const { data: existing, error: findErr } = await supabase
+        .from('projects')
+        .select('id, property_id, project_number')
+        .eq('project_number', input.projectNumber)
+        .maybeSingle();
+      if (findErr) throw findErr;
+
+      let projectId: string;
+      let created = false;
+
+      if (existing) {
+        if (existing.property_id !== input.propertyId) {
+          throw new Error('Projektnumret används redan på en annan fastighet');
+        }
+        projectId = existing.id;
+      } else {
+        const { data: project, error: createErr } = await supabase
+          .from('projects')
+          .insert({
+            property_id: input.propertyId,
+            project_number: input.projectNumber,
+            name: input.name,
+            type: input.type,
+            status: 'planerat',
+            year: input.year,
+            start_quarter: input.quarter,
+            budget: input.budget,
+            forecast: input.budget,
+            created_by: user?.id ?? null,
+            description: `Från underhållsplan ${input.propertyName ?? ''}`.trim(),
+          })
+          .select('id')
+          .single();
+        if (createErr || !project) {
+          throw createErr ?? new Error('Kunde inte skapa projekt');
+        }
+        projectId = project.id;
+        created = true;
+      }
+
+      const { error: linkErr } = await supabase
+        .from('maintenance_plan_items')
+        .update({
+          project_id: projectId,
+          status: 'promoted',
+          user_edited: true,
+        })
+        .in('id', input.itemIds);
+      if (linkErr) throw linkErr;
+
+      return { projectId, created, projectNumber: input.projectNumber };
+    },
+    onSuccess: (_data, input) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.maintenancePlans.items(input.planId),
+      });
+      qc.invalidateQueries({
+        queryKey: queryKeys.maintenancePlans.byProperty(input.propertyId),
+      });
+      qc.invalidateQueries({ queryKey: queryKeys.maintenancePlans.all });
+      qc.invalidateQueries({ queryKey: queryKeys.projects.all });
     },
   });
 }

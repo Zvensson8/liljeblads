@@ -6,6 +6,7 @@ export type ExistingPlanItem = {
   source: string;
   status: string;
   user_edited?: boolean | null;
+  project_id?: string | null;
 };
 
 export type WeibullMergeDecision =
@@ -47,7 +48,7 @@ export function planWeibullMerge(
       if (occupied.has(cid)) return { kind: 'skip', reason: 'not-weibull' };
       return { kind: 'insert', draft };
     }
-    if (row.user_edited || row.status !== 'planned') {
+    if (row.user_edited || row.project_id || row.status !== 'planned') {
       return { kind: 'skip', reason: 'edited' };
     }
     return { kind: 'update', id: row.id, draft };

@@ -51,8 +51,9 @@ export default function Maintenance() {
               <p className="text-sm text-muted-foreground">
                 Arbetsplan per fastighet. Kundens Excel är orörd. Weibull och
                 EnergyPulse fylls på automatiskt; övrigt lägger ni in manuellt.
-                Tid, pris och text går att ändra. Borttaget kommer inte tillbaka
-                vid nästa Weibull-uppdatering. Under 75 000 kr blir arbetsorder.
+                Fyll i projektnummer (fastighetsnr +xx eller -xx) så skapas
+                projektet. Borttaget kommer inte tillbaka vid nästa
+                Weibull-uppdatering.
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground">Fastighet</span>

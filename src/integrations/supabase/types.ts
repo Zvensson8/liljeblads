@@ -1380,6 +1380,7 @@ export type Database = {
           title: string
           year: number
           user_edited: boolean
+          project_id: string | null
         }
         Insert: {
           action_type?: string
@@ -1402,6 +1403,7 @@ export type Database = {
           title: string
           year: number
           user_edited?: boolean
+          project_id?: string | null
         }
         Update: {
           action_type?: string
@@ -1424,6 +1426,7 @@ export type Database = {
           title?: string
           year?: number
           user_edited?: boolean
+          project_id?: string | null
         }
         Relationships: [
           {
@@ -1438,6 +1441,13 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "maintenance_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_plan_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]

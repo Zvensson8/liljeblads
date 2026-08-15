@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -8,14 +9,15 @@ import {
   CheckCircle2, 
   Clock, 
   Activity,
-  TrendingUp,
   FileText,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  CalendarRange,
 } from "lucide-react";
 import { format } from "date-fns";
 import { sv } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { propertyPath } from "@/lib/entityPaths";
 
 interface ProjectOverviewTabProps {
   project: {
@@ -24,8 +26,28 @@ interface ProjectOverviewTabProps {
     forecast: number;
     actual_cost: number;
     property_id: string;
+    project_number: string;
+    project_manager: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    description: string | null;
+    actors: string[] | null;
+    year?: number | null;
+    start_quarter?: number | null;
   };
+  propertyName: string;
+  typeBadge: ReactNode;
   onNavigate: (tab: string) => void;
+}
+
+interface PlanRow {
+  id: string;
+  title: string;
+  year: number;
+  quarter: number;
+  estimated_cost: number | null;
+  source: string;
+  status: string;
 }
 
 interface ChecklistItem {
@@ -42,9 +64,15 @@ interface ActivityLog {
   created_at: string;
 }
 
-export function ProjectOverviewTab({ project, onNavigate }: ProjectOverviewTabProps) {
+export function ProjectOverviewTab({
+  project,
+  propertyName,
+  typeBadge,
+  onNavigate,
+}: ProjectOverviewTabProps) {
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [planItems, setPlanItems] = useState<PlanRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -54,7 +82,7 @@ export function ProjectOverviewTab({ project, onNavigate }: ProjectOverviewTabPr
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [checklistRes, activityRes] = await Promise.all([
+      const [checklistRes, activityRes, planRes] = await Promise.all([
         supabase
           .from("project_checklist_items")
           .select("id, title, completed, deadline")
@@ -66,10 +94,18 @@ export function ProjectOverviewTab({ project, onNavigate }: ProjectOverviewTabPr
           .eq("project_id", project.id)
           .order("created_at", { ascending: false })
           .limit(5),
+        supabase
+          .from("maintenance_plan_items")
+          .select("id, title, year, quarter, estimated_cost, source, status")
+          .eq("project_id", project.id)
+          .neq("status", "skipped")
+          .order("year", { ascending: true })
+          .order("quarter", { ascending: true }),
       ]);
 
       setChecklistItems(checklistRes.data || []);
       setActivityLogs(activityRes.data || []);
+      setPlanItems((planRes.data || []) as PlanRow[]);
     } catch (error) {
       console.error("Error fetching overview data:", error);
     } finally {
@@ -118,6 +154,100 @@ export function ProjectOverviewTab({ project, onNavigate }: ProjectOverviewTabPr
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Projektinformation</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Projektnummer</p>
+              <p className="text-base">{project.project_number}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Fastighet</p>
+              <Link
+                to={propertyPath(project.property_id, { tab: "maintenance-plan" })}
+                className="text-base text-primary hover:underline"
+              >
+                {propertyName}
+              </Link>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Typ</p>
+              <div className="mt-1">{typeBadge}</div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Projektledare</p>
+              <p className="text-base">{project.project_manager || "-"}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Period</p>
+              <p className="text-base">
+                {project.year
+                  ? `Q${project.start_quarter ?? "–"} ${project.year}`
+                  : project.start_date
+                    ? format(new Date(project.start_date), "PPP", { locale: sv })
+                    : "-"}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Slutdatum</p>
+              <p className="text-base">
+                {project.end_date
+                  ? format(new Date(project.end_date), "PPP", { locale: sv })
+                  : "-"}
+              </p>
+            </div>
+          </div>
+          {project.description && (
+            <p className="text-base">{project.description}</p>
+          )}
+          {project.actors && project.actors.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {project.actors.map((actor) => (
+                <Badge key={actor} variant="secondary">
+                  {actor}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {planItems.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarRange className="h-5 w-5" />
+              Från underhållsplan
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {planItems.map((row) => (
+              <div
+                key={row.id}
+                className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{row.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Q{row.quarter} {row.year}
+                    {row.source === "energypulse" ? " · Energi" : ""}
+                    {row.status === "done" ? " · Klar" : ""}
+                  </p>
+                </div>
+                {row.estimated_cost != null && (
+                  <span className="shrink-0 tabular-nums">
+                    {Math.round(Number(row.estimated_cost)).toLocaleString("sv-SE")} kr
+                  </span>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Main Overview Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Economy Card */}
@@ -242,7 +372,7 @@ export function ProjectOverviewTab({ project, onNavigate }: ProjectOverviewTabPr
           <Badge 
             variant="outline" 
             className="cursor-pointer hover:bg-accent"
-            onClick={() => onNavigate("activity")}
+            onClick={() => onNavigate("checklist")}
           >
             Visa alla
           </Badge>
@@ -283,11 +413,11 @@ export function ProjectOverviewTab({ project, onNavigate }: ProjectOverviewTabPr
         </Card>
         <Card 
           className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => onNavigate("simulation")}
+          onClick={() => onNavigate("work-orders")}
         >
           <CardContent className="p-4 text-center">
-            <TrendingUp className="h-8 w-8 mx-auto mb-2 text-primary" />
-            <p className="text-sm font-medium">Simulering</p>
+            <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-primary" />
+            <p className="text-sm font-medium">Arbetsordrar</p>
           </CardContent>
         </Card>
         <Card 

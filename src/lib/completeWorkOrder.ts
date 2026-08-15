@@ -38,7 +38,7 @@ export async function completeWorkOrderWithCost(
 
   const { data: wo, error: fetchErr } = await supabase
     .from("work_orders")
-    .select("id, action, status, price, component_id, contractor, comments, property_id")
+    .select("id, action, status, price, component_id, contractor, comments, property_id, project_id")
     .eq("id", workOrderId)
     .single();
 
@@ -136,6 +136,17 @@ export async function completeWorkOrderWithCost(
     });
   } catch (e) {
     console.warn("[completeWorkOrder] EnergyPulse notify failed", e);
+  }
+
+  if (wo.project_id) {
+    try {
+      const { completePlanItemsIfProjectWorkDone } = await import(
+        "@/lib/completePlanItems"
+      );
+      await completePlanItemsIfProjectWorkDone(wo.project_id);
+    } catch (e) {
+      console.warn("[completeWorkOrder] plan items close failed", e);
+    }
   }
 
   return {
