@@ -55,6 +55,7 @@ const LIST_DEFAULTS = {
   status: 'all',
   contractor: 'all',
   archived: '0',
+  id: '',
 };
 
 const WorkOrders = () => {
@@ -87,6 +88,14 @@ const WorkOrders = () => {
   const updateMutation = useUpdateWorkOrder();
   const deleteMutation = useDeleteWorkOrder();
   const updating = updateMutation.isPending;
+
+  useEffect(() => {
+    if (!params.id || !workOrders?.length) return;
+    const hit = workOrders.find((wo) => wo.id === params.id);
+    if (!hit) return;
+    setDetailOrder(hit);
+    setDetailDialogOpen(true);
+  }, [params.id, workOrders]);
 
   const refetch = () => {
     void refetchQuery();
@@ -768,7 +777,10 @@ const WorkOrders = () => {
 
       <WorkOrderDetailDialog
         open={detailDialogOpen}
-        onOpenChange={setDetailDialogOpen}
+        onOpenChange={(open) => {
+          setDetailDialogOpen(open);
+          if (!open) setParam('id', '');
+        }}
         workOrder={detailOrder}
         onUpdate={refetch}
       />
