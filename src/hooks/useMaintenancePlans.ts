@@ -338,6 +338,43 @@ export function useUpdateMaintenancePlanItem() {
   });
 }
 
+export function useDeleteMaintenancePlanItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      planId: string;
+      propertyId: string;
+      source: string;
+      external_id: string | null;
+    }) => {
+      const { error } = await supabase
+        .from('maintenance_plan_items')
+        .delete()
+        .eq('id', input.id);
+      if (error) throw error;
+
+      if (input.source === 'energypulse' && input.external_id) {
+        const { notifyEnergyPulsePlanItemRemoved } = await import(
+          '@/lib/notifyEnergyPulse'
+        );
+        await notifyEnergyPulsePlanItemRemoved({
+          propertyId: input.propertyId,
+          planItemId: input.id,
+          actionId: input.external_id,
+        });
+      }
+      return input;
+    },
+    onSuccess: (input) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.maintenancePlans.items(input.planId),
+      });
+      qc.invalidateQueries({ queryKey: queryKeys.maintenancePlans.all });
+    },
+  });
+}
+
 export function useArchiveMaintenancePlan() {
   const qc = useQueryClient();
 

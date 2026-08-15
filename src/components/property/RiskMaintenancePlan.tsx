@@ -16,6 +16,7 @@ import {
   Wrench,
   AlertTriangle,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -26,6 +27,7 @@ import {
   useMaintenancePlanItems,
   useMaintenancePlans,
   useUpdateMaintenancePlanItem,
+  useDeleteMaintenancePlanItem,
   type MaintenancePlanItem,
 } from '@/hooks/useMaintenancePlans';
 import { useOrganization } from '@/hooks/useOrganization';
@@ -83,9 +85,11 @@ function RiskMiniBadge({ level, score }: { level: string; score: number }) {
 function PlanItemRow({
   item,
   onEdit,
+  onDelete,
 }: {
   item: MaintenancePlanItem;
   onEdit: (item: MaintenancePlanItem) => void;
+  onDelete: (item: MaintenancePlanItem) => void;
 }) {
   const name = item.components?.name ?? (item.source === 'energypulse' ? item.title : 'Komponent');
   const type = item.components?.type;
@@ -135,10 +139,21 @@ function PlanItemRow({
             B10 {Number(item.remaining_b10_years).toFixed(1)} år till 10 %-fel
           </span>
         )}
-        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => onEdit(item)}>
-          <Pencil className="h-3.5 w-3.5" />
-          Ändra
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => onEdit(item)}>
+            <Pencil className="h-3.5 w-3.5" />
+            Ändra
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1 text-destructive hover:text-destructive"
+            onClick={() => onDelete(item)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Ta bort
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -148,10 +163,12 @@ function QuarterBlock({
   quarter,
   items,
   onEdit,
+  onDelete,
 }: {
   quarter: Quarter;
   items: MaintenancePlanItem[];
   onEdit: (item: MaintenancePlanItem) => void;
+  onDelete: (item: MaintenancePlanItem) => void;
 }) {
   const cost = items.reduce(
     (s, i) => s + (i.estimated_cost != null ? Number(i.estimated_cost) : 0),
@@ -173,7 +190,7 @@ function QuarterBlock({
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
-            <PlanItemRow key={item.id} item={item} onEdit={onEdit} />
+            <PlanItemRow key={item.id} item={item} onEdit={onEdit} onDelete={onDelete} />
           ))}
         </div>
       )}
@@ -190,6 +207,7 @@ export function RiskMaintenancePlan({
   const { organization } = useOrganization();
   const { toast } = useToast();
   const updateItem = useUpdateMaintenancePlanItem();
+  const deleteItem = useDeleteMaintenancePlanItem();
 
   const {
     data: activePlan,
@@ -443,6 +461,35 @@ export function RiskMaintenancePlan({
                                   quarter={q}
                                   items={yMap?.get(q) ?? []}
                                   onEdit={setEditing}
+                                  onDelete={(item) => {
+                                    const ok = window.confirm(
+                                      `Ta bort «${item.title}» från planen?${
+                                        item.source === 'energypulse'
+                                          ? ' EnergyPulse-åtgärden avvisas.'
+                                          : ''
+                                      }`,
+                                    );
+                                    if (!ok || !activePlan) return;
+                                    void deleteItem
+                                      .mutateAsync({
+                                        id: item.id,
+                                        planId: activePlan.id,
+                                        propertyId,
+                                        source: item.source,
+                                        external_id: item.external_id,
+                                      })
+                                      .then(() => {
+                                        toast({ title: 'Åtgärd borttagen' });
+                                      })
+                                      .catch((e: unknown) => {
+                                        toast({
+                                          title: 'Kunde inte ta bort',
+                                          description:
+                                            e instanceof Error ? e.message : undefined,
+                                          variant: 'destructive',
+                                        });
+                                      });
+                                  }}
                                 />
                               ))}
                             </div>

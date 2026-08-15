@@ -110,3 +110,33 @@ export async function notifyEnergyPulsePlanItemUpdated(input: {
     );
   }
 }
+
+export async function notifyEnergyPulsePlanItemRemoved(input: {
+  propertyId: string;
+  planItemId: string;
+  actionId: string;
+}): Promise<void> {
+  const cfg = await energyPulseSettings(input.propertyId);
+  if (!cfg) return;
+
+  const res = await fetch(`${cfg.baseUrl}/api/bridge/plan-item-updated`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${cfg.secret}`,
+    },
+    body: JSON.stringify({
+      plan_item_id: input.planItemId,
+      action_id: input.actionId,
+      removed: true,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.warn(
+      "[notifyEnergyPulse] plan-item-removed",
+      res.status,
+      text.slice(0, 200),
+    );
+  }
+}
