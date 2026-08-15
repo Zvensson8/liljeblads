@@ -176,15 +176,25 @@ async function processOrg(
   }
 
   const ids = components.map((c) => c.id as string);
-  const [purchaseRes, histRes] = await Promise.all([
+  const [purchaseRes, histRes, priceRes, planRes] = await Promise.all([
     supabase
       .from("component_purchase_info")
-      .select("component_id, expected_lifespan_years, purchase_date")
+      .select("component_id, expected_lifespan_years, purchase_date, purchase_cost")
       .in("component_id", ids),
     supabase
       .from("maintenance_history")
       .select("component_id, performed_date, category")
       .in("component_id", ids),
+    supabase
+      .from("component_unit_prices")
+      .select("component_type, replacement_cost")
+      .eq("organization_id", orgId)
+      .eq("is_active", true),
+    supabase
+      .from("maintenance_plan_items")
+      .select("component_id, status, maintenance_plans!inner(status, property_id)")
+      .in("component_id", ids)
+      .eq("maintenance_plans.status", "active"),
   ]);
 
   const purchaseMap = new Map(
@@ -285,6 +295,35 @@ async function processOrg(
       .gte("created_at", since.toISOString()),
   ]);
 
+  const PLAN_COST_THRESHOLD_SEK = 75_000;
+  const purchaseCostById = new Map<string, number>();
+  for (const p of purchaseRes.data ?? []) {
+    if (p.purchase_cost != null) {
+      purchaseCostById.set(p.component_id as string, Number(p.purchase_cost));
+    }
+  }
+  const unitByType = new Map<string, number>();
+  for (const row of priceRes.data ?? []) {
+    const t = String(row.component_type ?? "");
+    const cost = Number(row.replacement_cost);
+    if (!t || !Number.isFinite(cost)) continue;
+    unitByType.set(t, cost);
+    unitByType.set(t.trim().toLowerCase(), cost);
+  }
+  const onActivePlan = new Set(
+    (planRes.data ?? [])
+      .map((r) => r.component_id as string | null)
+      .filter(Boolean) as string[],
+  );
+
+  function estimateCost(componentId: string, type: string | null | undefined): number | null {
+    const t = (type ?? "").trim();
+    if (t && unitByType.has(t)) return unitByType.get(t) ?? null;
+    if (t && unitByType.has(t.toLowerCase())) return unitByType.get(t.toLowerCase()) ?? null;
+    if (purchaseCostById.has(componentId)) return purchaseCostById.get(componentId) ?? null;
+    return null;
+  }
+
   const openWo = new Set(
     (openWoRes.data ?? [])
       .map((w) => w.component_id as string | null)
@@ -307,6 +346,16 @@ async function processOrg(
   for (const risk of risks) {
     if (toInsert.length >= maxPerOrg) break;
     if (openWo.has(risk.componentId) || pendingComponents.has(risk.componentId)) {
+      skipped += 1;
+      continue;
+    }
+    if (onActivePlan.has(risk.componentId)) {
+      skipped += 1;
+      continue;
+    }
+    const est = estimateCost(risk.componentId, risk.type);
+    // ≥ 75 tkr or unknown cost → underhållsplan, not WO
+    if (est == null || !Number.isFinite(est) || est >= PLAN_COST_THRESHOLD_SEK) {
       skipped += 1;
       continue;
     }

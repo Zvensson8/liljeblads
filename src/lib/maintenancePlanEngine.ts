@@ -19,6 +19,12 @@ export type Quarter = 1 | 2 | 3 | 4;
 export type PlanActionType = 'replace' | 'overhaul' | 'service' | 'inspect';
 export type PlanCostSource = 'purchase_info' | 'unit_price' | 'manual';
 
+/** Weibull ≥ this → underhållsplan. Below → arbetsorder. Missing cost → plan. */
+export const PLAN_COST_THRESHOLD_SEK = 75_000;
+
+/** Q3 2026 → earliest plan slot Q4 2027. */
+export const PLAN_LEAD_QUARTERS = 5;
+
 export interface PlanGenerateOptions {
   startYear: number;
   startQuarter: Quarter;
@@ -101,6 +107,20 @@ export function nextCalendarQuarter(asOf: Date = new Date()): {
 } {
   const { year, quarter } = dateToYearQuarter(asOf);
   return addQuarters(year, quarter, 1);
+}
+
+export function earliestPlanQuarter(asOf: Date = new Date()): {
+  year: number;
+  quarter: Quarter;
+} {
+  const { year, quarter } = dateToYearQuarter(asOf);
+  return addQuarters(year, quarter, PLAN_LEAD_QUARTERS);
+}
+
+/** Missing estimate is treated as plan (do not silently create a WO). */
+export function costRoutesToPlan(cost: number | null | undefined): boolean {
+  if (cost == null || !Number.isFinite(cost)) return true;
+  return cost >= PLAN_COST_THRESHOLD_SEK;
 }
 
 export function computePlanPeriod(
@@ -265,10 +285,15 @@ export function generateMaintenancePlanItems(
   const startIdx = yearQuarterIndex(period.startYear, period.startQuarter);
   const endIdx = yearQuarterIndex(period.endYear, period.endQuarter);
 
+  const earliest = earliestPlanQuarter(asOf);
+  const earliestIdx = yearQuarterIndex(earliest.year, earliest.quarter);
+
   const candidates: Array<{
     risk: ComponentRiskResult;
     targetIdx: number;
     actionType: PlanActionType;
+    cost: number | null;
+    costSource: PlanCostSource | null;
   }> = [];
 
   for (const risk of risks) {
@@ -300,15 +325,47 @@ export function generateMaintenancePlanItems(
     // After plan end → exclude
     if (targetIdx > endIdx) continue;
 
+    const { cost, source } = resolveEstimatedCost(risk.componentId, risk.type, opts);
     candidates.push({
       risk,
       targetIdx,
       actionType: inferActionType(risk),
+      cost,
+      costSource: source,
     });
   }
 
+  // Cheap singles stay on the WO path unless the same property+quarter sums ≥ 75 tkr.
+  const groupKey = (c: (typeof candidates)[number]) =>
+    `${c.risk.propertyId ?? c.risk.componentId}:${c.targetIdx}`;
+  const groupSum = new Map<string, { sum: number; unknown: boolean }>();
+  for (const c of candidates) {
+    const key = groupKey(c);
+    const cur = groupSum.get(key) ?? { sum: 0, unknown: false };
+    if (c.cost == null) cur.unknown = true;
+    else cur.sum += c.cost;
+    groupSum.set(key, cur);
+  }
+
+  const planCandidates = candidates.filter((c) => {
+    const g = groupSum.get(groupKey(c));
+    if (!g) return costRoutesToPlan(c.cost);
+    if (g.unknown || g.sum >= PLAN_COST_THRESHOLD_SEK) return true;
+    return costRoutesToPlan(c.cost);
+  });
+
+  for (const c of planCandidates) {
+    if (c.targetIdx < earliestIdx) c.targetIdx = earliestIdx;
+    if (c.targetIdx < startIdx) c.targetIdx = startIdx;
+    if (c.targetIdx > endIdx) {
+      c.targetIdx = -1;
+    }
+  }
+
+  const placeable = planCandidates.filter((c) => c.targetIdx >= 0);
+
   // Highest risk first for placement priority
-  candidates.sort((a, b) => {
+  placeable.sort((a, b) => {
     if (b.risk.riskScore !== a.risk.riskScore) {
       return b.risk.riskScore - a.risk.riskScore;
     }
@@ -317,9 +374,9 @@ export function generateMaintenancePlanItems(
 
   // Soft load-balance: slide lower-priority items forward if quarter full
   const countByIdx = new Map<number, number>();
-  const placed: typeof candidates = [];
+  const placed: typeof placeable = [];
 
-  for (const c of candidates) {
+  for (const c of placeable) {
     let idx = c.targetIdx;
     while (idx <= endIdx) {
       const n = countByIdx.get(idx) ?? 0;
@@ -341,11 +398,6 @@ export function generateMaintenancePlanItems(
 
   return placed.map((c, i) => {
     const { year, quarter } = indexToYearQuarter(c.targetIdx);
-    const { cost, source } = resolveEstimatedCost(
-      c.risk.componentId,
-      c.risk.type,
-      opts,
-    );
     return {
       componentId: c.risk.componentId,
       componentName: c.risk.name,
@@ -358,8 +410,8 @@ export function generateMaintenancePlanItems(
       riskScore: c.risk.riskScore,
       remainingB10Years: c.risk.remainingB10Years,
       confidence: c.risk.confidence,
-      estimatedCost: cost,
-      costSource: source,
+      estimatedCost: c.cost,
+      costSource: c.costSource,
       sortOrder: i,
     };
   });

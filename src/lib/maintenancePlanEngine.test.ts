@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { ComponentRiskResult } from '@/lib/componentRisk';
 import {
   computePlanPeriod,
+  costRoutesToPlan,
+  earliestPlanQuarter,
   formatPlanPeriod,
   generateMaintenancePlanItems,
   nextCalendarQuarter,
+  PLAN_COST_THRESHOLD_SEK,
   resolveEstimatedCost,
   summarizePlanItems,
 } from '@/lib/maintenancePlanEngine';
@@ -83,13 +86,84 @@ describe('maintenancePlanEngine', () => {
         purchaseCosts: { c2: 50_000 },
       },
     );
-    expect(items).toHaveLength(2);
-    expect(items[0]).toMatchObject({ year: 2027, quarter: 2, componentId: 'c1' });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ year: 2027, quarter: 4, componentId: 'c1' });
     expect(items.find((i) => i.componentId === 'c1')?.estimatedCost).toBe(100_000);
     expect(items.find((i) => i.componentId === 'c1')?.costSource).toBe('unit_price');
-    expect(items.find((i) => i.componentId === 'c2')?.estimatedCost).toBe(50_000);
+    expect(items.find((i) => i.componentId === 'c2')).toBeUndefined();
     expect(items.find((i) => i.componentId === 'c3')).toBeUndefined();
     expect(items.find((i) => i.componentId === 'c4')).toBeUndefined();
+  });
+
+  it('earliest plan quarter is now + 5 (Q3 2026 → Q4 2027)', () => {
+    expect(earliestPlanQuarter(new Date('2026-08-15'))).toEqual({
+      year: 2027,
+      quarter: 4,
+    });
+    expect(costRoutesToPlan(40_000)).toBe(false);
+    expect(costRoutesToPlan(PLAN_COST_THRESHOLD_SEK)).toBe(true);
+    expect(costRoutesToPlan(null)).toBe(true);
+  });
+
+  it('keeps a 40 tkr high-risk item off the plan (WO path)', () => {
+    const items = generateMaintenancePlanItems(
+      [
+        risk({
+          componentId: 'cheap',
+          propertyId: 'p1',
+          riskLevel: 'high',
+          riskScore: 70,
+          remainingB10Years: 1,
+          confidence: 'medium',
+        }),
+      ],
+      {
+        startYear: 2027,
+        startQuarter: 4,
+        asOf: new Date('2026-08-15'),
+        purchaseCosts: { cheap: 40_000 },
+      },
+    );
+    expect(items).toHaveLength(0);
+  });
+
+  it('bundles cheap same-quarter items onto the plan when they sum over 75 tkr', () => {
+    const items = generateMaintenancePlanItems(
+      [
+        risk({
+          componentId: 'a',
+          propertyId: 'p1',
+          riskLevel: 'high',
+          riskScore: 70,
+          remainingB10Years: 2,
+          confidence: 'medium',
+        }),
+        risk({
+          componentId: 'b',
+          propertyId: 'p1',
+          riskLevel: 'high',
+          riskScore: 65,
+          remainingB10Years: 2,
+          confidence: 'medium',
+        }),
+        risk({
+          componentId: 'c',
+          propertyId: 'p1',
+          riskLevel: 'high',
+          riskScore: 60,
+          remainingB10Years: 2,
+          confidence: 'medium',
+        }),
+      ],
+      {
+        startYear: 2027,
+        startQuarter: 4,
+        asOf: new Date('2026-08-15'),
+        purchaseCosts: { a: 30_000, b: 30_000, c: 25_000 },
+      },
+    );
+    expect(items).toHaveLength(3);
+    expect(items.every((i) => i.year === 2028 && i.quarter === 3)).toBe(true);
   });
 
   it('resolves unit price case-insensitively', () => {
@@ -131,7 +205,7 @@ describe('maintenancePlanEngine', () => {
       startQuarter: 2,
       horizonYears: 5,
     });
-    expect(sum.itemCount).toBe(2);
-    expect(sum.totalEstimatedCost).toBe(150_000);
+    expect(sum.itemCount).toBe(1);
+    expect(sum.totalEstimatedCost).toBe(100_000);
   });
 });
