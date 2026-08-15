@@ -161,7 +161,8 @@ export function GenerateMaintenancePlanDialog({
             Fyller på Weibull utan att skriva över redigerat eller borttaget.
             Kundens Excel är orörd — det här är arbetsplanen. Över 75 000 kr
             läggs här, tidigast om 12 månader + ett kvartal eller senare om B10
-            säger det. Under 75 000 kr blir arbetsorder.
+            säger det. Flera byten på samma fastighet sprids över kvartal
+            (högst risk först). Under 75 000 kr blir arbetsorder.
           </DialogDescription>
         </DialogHeader>
 

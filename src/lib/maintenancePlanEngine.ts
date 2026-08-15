@@ -25,6 +25,9 @@ export const PLAN_COST_THRESHOLD_SEK = 75_000;
 /** Q3 2026 → earliest plan slot Q4 2027. */
 export const PLAN_LEAD_QUARTERS = 5;
 
+/** One replace/overhaul per property per quarter. B10-overdue units are phased, not dumped in the first slot. */
+export const MAX_HEAVY_ACTIONS_PER_PROPERTY_QUARTER = 1;
+
 export interface PlanGenerateOptions {
   startYear: number;
   startQuarter: Quarter;
@@ -202,6 +205,10 @@ export function resolveEstimatedCost(
 
 // ── Action type ──────────────────────────────────────────────────
 
+export function isHeavyPlanAction(action: PlanActionType): boolean {
+  return action === 'replace' || action === 'overhaul';
+}
+
 export function inferActionType(risk: ComponentRiskResult): PlanActionType {
   const rec = (risk.recommendation || '').toLowerCase();
   const b10 = risk.remainingB10Years;
@@ -369,25 +376,37 @@ export function generateMaintenancePlanItems(
     if (b.risk.riskScore !== a.risk.riskScore) {
       return b.risk.riskScore - a.risk.riskScore;
     }
-    return a.targetIdx - b.targetIdx;
+    if (a.targetIdx !== b.targetIdx) return a.targetIdx - b.targetIdx;
+    return (a.risk.componentId ?? '').localeCompare(b.risk.componentId ?? '');
   });
 
-  // Soft load-balance: slide lower-priority items forward if quarter full
+  // Soft load-balance: slide lower-priority items forward if the quarter
+  // is full, or if this property already has a replace/overhaul there.
   const countByIdx = new Map<number, number>();
+  const heavyByPropertyIdx = new Map<string, number>();
   const placed: typeof placeable = [];
 
   for (const c of placeable) {
     let idx = c.targetIdx;
     while (idx <= endIdx) {
       const n = countByIdx.get(idx) ?? 0;
-      if (n < maxPerQ) {
-        countByIdx.set(idx, n + 1);
-        placed.push({ ...c, targetIdx: idx });
-        break;
+      if (n >= maxPerQ) {
+        idx += 1;
+        continue;
       }
-      idx += 1;
+      if (isHeavyPlanAction(c.actionType)) {
+        const key = `${c.risk.propertyId ?? '_'}:${idx}`;
+        const heavy = heavyByPropertyIdx.get(key) ?? 0;
+        if (heavy >= MAX_HEAVY_ACTIONS_PER_PROPERTY_QUARTER) {
+          idx += 1;
+          continue;
+        }
+        heavyByPropertyIdx.set(key, heavy + 1);
+      }
+      countByIdx.set(idx, n + 1);
+      placed.push({ ...c, targetIdx: idx });
+      break;
     }
-    // If could not place within horizon after sliding, drop
   }
 
   // Chronological then risk

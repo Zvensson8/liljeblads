@@ -422,7 +422,8 @@ export function RiskMaintenancePlan({
                 <CardDescription>
                   Kundens Excel-plan är orörd. Här jobbar vi: Weibull och
                   EnergyPulse fylls på automatiskt, resten lägger ni in manuellt.
-                  Fyll i projektnummer ({propertyNumber || 'fastighetsnr'}+xx
+                  Byten som annars skulle landa samma kvartal sprids efter
+                  risk. Fyll i projektnummer ({propertyNumber || 'fastighetsnr'}+xx
                   eller -xx) så skapas projektet. Redigerat och borttaget skrivs
                   inte över.
                 </CardDescription>

@@ -163,7 +163,96 @@ describe('maintenancePlanEngine', () => {
       },
     );
     expect(items).toHaveLength(3);
-    expect(items.every((i) => i.year === 2028 && i.quarter === 3)).toBe(true);
+    expect(items.map((i) => `${i.year}Q${i.quarter}`)).toEqual([
+      '2028Q3',
+      '2028Q4',
+      '2029Q1',
+    ]);
+  });
+
+  it('phases overdue replacements across quarters by risk, not one dump', () => {
+    const items = generateMaintenancePlanItems(
+      [
+        risk({
+          componentId: 'agg1',
+          propertyId: 'nolhaga-2',
+          name: 'Aggregat 1',
+          type: 'SC4.7',
+          riskLevel: 'high',
+          riskScore: 59,
+          remainingB10Years: 0,
+          confidence: 'medium',
+          recommendation: 'Byt',
+        }),
+        risk({
+          componentId: 'agg2',
+          propertyId: 'nolhaga-2',
+          name: 'Aggregat 2',
+          type: 'SC4.7',
+          riskLevel: 'high',
+          riskScore: 59,
+          remainingB10Years: 0,
+          confidence: 'medium',
+          recommendation: 'Byt',
+        }),
+        risk({
+          componentId: 'la10-3',
+          propertyId: 'nolhaga-2',
+          name: 'LA10 POS 3',
+          type: 'SC4.7',
+          riskLevel: 'medium',
+          riskScore: 43,
+          remainingB10Years: 0,
+          confidence: 'medium',
+        }),
+        risk({
+          componentId: 'la10-1',
+          propertyId: 'nolhaga-2',
+          name: 'LA10 POS 1',
+          type: 'SC4.7',
+          riskLevel: 'medium',
+          riskScore: 43,
+          remainingB10Years: 0,
+          confidence: 'medium',
+        }),
+        risk({
+          componentId: 'ca01',
+          propertyId: 'nolhaga-2',
+          name: 'CA01',
+          type: 'SC4.7',
+          riskLevel: 'medium',
+          riskScore: 31,
+          remainingB10Years: 0,
+          confidence: 'medium',
+        }),
+        risk({
+          componentId: 'la05',
+          propertyId: 'nolhaga-2',
+          name: 'LA05',
+          type: 'SC4.7',
+          riskLevel: 'medium',
+          riskScore: 31,
+          remainingB10Years: 0,
+          confidence: 'medium',
+        }),
+      ],
+      {
+        startYear: 2027,
+        startQuarter: 4,
+        horizonYears: 10,
+        minRiskLevel: 'medium',
+        asOf: new Date('2026-08-15'),
+      },
+    );
+    expect(items).toHaveLength(6);
+    expect(items.map((i) => `${i.componentName} ${i.year}Q${i.quarter}`)).toEqual([
+      'Aggregat 1 2027Q4',
+      'Aggregat 2 2028Q1',
+      'LA10 POS 1 2028Q2',
+      'LA10 POS 3 2028Q3',
+      'CA01 2028Q4',
+      'LA05 2029Q1',
+    ]);
   });
 
   it('resolves unit price case-insensitively', () => {
