@@ -47,6 +47,7 @@ export interface MaintenancePlanItem {
   notes: string | null;
   source: string;
   external_id: string | null;
+  user_edited?: boolean;
   created_at: string;
   components?: {
     id: string;
@@ -134,6 +135,7 @@ export function useMaintenancePlanItems(planId: string | undefined | null) {
           '*, components(id, name, type)',
         )
         .eq('plan_id', planId!)
+        .neq('status', 'skipped')
         .order('year', { ascending: true })
         .order('quarter', { ascending: true })
         .order('sort_order', { ascending: true });
@@ -208,6 +210,8 @@ export function useCreateMaintenancePlan() {
           cost_source: item.costSource as PlanCostSource | null,
           sort_order: item.sortOrder ?? i,
           status: 'planned',
+          source: 'weibull',
+          user_edited: false,
         }));
 
         const { error: itemsErr } = await supabase
@@ -236,6 +240,163 @@ export function useCreateMaintenancePlan() {
       qc.invalidateQueries({
         queryKey: queryKeys.maintenancePlans.byProperty(plan.property_id),
       });
+    },
+  });
+}
+
+export function useCreateManualPlanItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      planId: string;
+      propertyId: string;
+      title: string;
+      year: number;
+      quarter: number;
+      estimated_cost: number | null;
+      notes: string | null;
+      componentId?: string | null;
+    }) => {
+      const { error } = await supabase.from('maintenance_plan_items').insert({
+        plan_id: input.planId,
+        component_id: input.componentId || null,
+        year: input.year,
+        quarter: input.quarter,
+        action_type: 'service',
+        title: input.title.trim(),
+        notes: input.notes,
+        estimated_cost: input.estimated_cost,
+        cost_source: 'manual',
+        risk_level: 'medium',
+        risk_score: 0,
+        confidence: 'medium',
+        status: 'planned',
+        source: 'manual',
+        user_edited: true,
+        sort_order: 0,
+      });
+      if (error) throw error;
+      return input;
+    },
+    onSuccess: (input) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.maintenancePlans.items(input.planId),
+      });
+      qc.invalidateQueries({ queryKey: queryKeys.maintenancePlans.all });
+    },
+  });
+}
+
+export function useSyncWeibullPlan() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      organizationId: string;
+      propertyId: string;
+      propertyName?: string;
+      drafts: PlanItemDraft[];
+    }): Promise<{ planId: string; created: number; updated: number; skipped: number }> => {
+      const { planWeibullMerge } = await import('@/lib/mergeWeibullPlan');
+      const { earliestPlanQuarter } = await import('@/lib/maintenancePlanEngine');
+
+      let { data: plan, error: planErr } = await supabase
+        .from('maintenance_plans')
+        .select('*')
+        .eq('property_id', input.propertyId)
+        .eq('status', 'active')
+        .order('generated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (planErr) throw planErr;
+
+      if (!plan) {
+        const start = earliestPlanQuarter();
+        const created = await supabase
+          .from('maintenance_plans')
+          .insert({
+            organization_id: input.organizationId,
+            property_id: input.propertyId,
+            name: planName(input.propertyName, start.year, start.quarter, 5),
+            start_year: start.year,
+            start_quarter: start.quarter,
+            horizon_years: 5,
+            min_risk_level: 'high',
+            min_confidence: 'medium',
+            status: 'active',
+            generated_by: user?.id ?? null,
+          })
+          .select('*')
+          .single();
+        if (created.error || !created.data) throw created.error ?? new Error('Kunde inte skapa plan');
+        plan = created.data;
+      }
+
+      const { data: existing, error: exErr } = await supabase
+        .from('maintenance_plan_items')
+        .select('id, component_id, source, status, user_edited')
+        .eq('plan_id', plan.id);
+      if (exErr) throw exErr;
+
+      const decisions = planWeibullMerge(existing ?? [], input.drafts);
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+
+      for (const d of decisions) {
+        if (d.kind === 'skip') {
+          skipped += 1;
+          continue;
+        }
+        const row = {
+          year: d.draft.year,
+          quarter: d.draft.quarter,
+          action_type: d.draft.actionType,
+          title: d.draft.title,
+          risk_level: d.draft.riskLevel,
+          risk_score: d.draft.riskScore,
+          remaining_b10_years: d.draft.remainingB10Years,
+          confidence: d.draft.confidence,
+          estimated_cost: d.draft.estimatedCost,
+          cost_source: d.draft.costSource,
+        };
+        if (d.kind === 'insert') {
+          const { error } = await supabase.from('maintenance_plan_items').insert({
+            ...row,
+            plan_id: plan.id,
+            component_id: d.draft.componentId,
+            status: 'planned',
+            source: 'weibull',
+            user_edited: false,
+            sort_order: d.draft.sortOrder,
+          });
+          if (error) throw error;
+          created += 1;
+        } else {
+          const { error } = await supabase
+            .from('maintenance_plan_items')
+            .update(row)
+            .eq('id', d.id);
+          if (error) throw error;
+          updated += 1;
+        }
+      }
+
+      await supabase
+        .from('maintenance_plans')
+        .update({ generated_at: new Date().toISOString() })
+        .eq('id', plan.id);
+
+      return { planId: plan.id, created, updated, skipped };
+    },
+    onSuccess: (data, input) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.maintenancePlans.byProperty(input.propertyId),
+      });
+      qc.invalidateQueries({
+        queryKey: queryKeys.maintenancePlans.items(data.planId),
+      });
+      qc.invalidateQueries({ queryKey: queryKeys.maintenancePlans.all });
     },
   });
 }
@@ -308,6 +469,7 @@ export function useUpdateMaintenancePlanItem() {
           notes: input.notes,
           estimated_cost: input.estimated_cost,
           cost_source: 'manual',
+          user_edited: true,
         })
         .eq('id', input.id);
       if (error) throw error;
@@ -350,7 +512,7 @@ export function useDeleteMaintenancePlanItem() {
     }) => {
       const { error } = await supabase
         .from('maintenance_plan_items')
-        .delete()
+        .update({ status: 'skipped', user_edited: true })
         .eq('id', input.id);
       if (error) throw error;
 

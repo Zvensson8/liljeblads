@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,8 +28,17 @@ import {
   useMaintenancePlans,
   useUpdateMaintenancePlanItem,
   useDeleteMaintenancePlanItem,
+  useCreateManualPlanItem,
+  useSyncWeibullPlan,
+  fetchPurchaseCostMap,
+  fetchUnitPriceMap,
   type MaintenancePlanItem,
 } from '@/hooks/useMaintenancePlans';
+import { useComponentRiskList } from '@/hooks/useComponentRisk';
+import {
+  earliestPlanQuarter,
+  generateMaintenancePlanItems,
+} from '@/lib/maintenancePlanEngine';
 import { useOrganization } from '@/hooks/useOrganization';
 import { GenerateMaintenancePlanDialog } from '@/components/property/GenerateMaintenancePlanDialog';
 import {
@@ -115,6 +124,16 @@ function PlanItemRow({
           {fromEnergy && (
             <Badge variant="secondary" className="text-xs">
               Energi
+            </Badge>
+          )}
+          {item.source === 'manual' && (
+            <Badge variant="outline" className="text-xs">
+              Manuell
+            </Badge>
+          )}
+          {item.user_edited && item.source === 'weibull' && (
+            <Badge variant="outline" className="text-xs">
+              Ändrad
             </Badge>
           )}
           <span className="text-xs text-muted-foreground">
@@ -203,11 +222,19 @@ export function RiskMaintenancePlan({
   propertyName,
 }: RiskMaintenancePlanProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
   const [editing, setEditing] = useState<MaintenancePlanItem | null>(null);
+  const syncedFor = useRef<string | null>(null);
   const { organization } = useOrganization();
   const { toast } = useToast();
   const updateItem = useUpdateMaintenancePlanItem();
   const deleteItem = useDeleteMaintenancePlanItem();
+  const createManual = useCreateManualPlanItem();
+  const syncWeibull = useSyncWeibullPlan();
+  const { data: risks = [], isLoading: risksLoading } = useComponentRiskList({
+    propertyId,
+    limit: 2000,
+  });
 
   const {
     data: activePlan,
@@ -288,6 +315,41 @@ export function RiskMaintenancePlan({
 
   const archivedCount = allPlans.filter((p) => p.status === 'archived').length;
 
+  const runWeibullSync = async () => {
+    if (!organization?.id) return null;
+    const start = earliestPlanQuarter();
+    const [purchaseCosts, unitPrices] = await Promise.all([
+      fetchPurchaseCostMap(risks.map((r) => r.componentId)),
+      fetchUnitPriceMap(organization.id),
+    ]);
+    const drafts = generateMaintenancePlanItems(risks, {
+      startYear: start.year,
+      startQuarter: start.quarter,
+      horizonYears: 5,
+      purchaseCosts,
+      unitPricesByType: unitPrices,
+    });
+    const result = await syncWeibull.mutateAsync({
+      organizationId: organization.id,
+      propertyId,
+      propertyName,
+      drafts,
+    });
+    await refetchPlan();
+    return result;
+  };
+
+  useEffect(() => {
+    if (planLoading || risksLoading || !organization?.id) return;
+    if (syncedFor.current === propertyId) return;
+    syncedFor.current = propertyId;
+    void runWeibullSync().catch(() => {
+      syncedFor.current = null;
+    });
+    // Intentionally once per property visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planLoading, risksLoading, propertyId, organization?.id]);
+
   if (planLoading) {
     return (
       <div className="space-y-4">
@@ -307,38 +369,62 @@ export function RiskMaintenancePlan({
                   Underhållsplan
                 </CardTitle>
                 <CardDescription>
-                  Föreslås när den behövs (B10), men tidigast om 12 månader + ett
-                  kvartal. Under 75 000 kr blir arbetsorder. Tid, pris och text
-                  går att ändra — EnergyPulse-rader synkas tillbaka.
+                  Kundens Excel-plan är orörd. Här jobbar vi: Weibull och
+                  EnergyPulse fylls på automatiskt, resten lägger ni in manuellt.
+                  Redigerat och borttaget skrivs inte över.
                 </CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    void runWeibullSync()
+                      .then((r) => {
+                        if (!r) return;
+                        toast({
+                          title: 'Weibull uppdaterad',
+                          description: `${r.created} nya · ${r.updated} uppdaterade · ${r.skipped} orörda`,
+                        });
+                      })
+                      .catch((e: unknown) => {
+                        toast({
+                          title: 'Kunde inte uppdatera Weibull',
+                          description: e instanceof Error ? e.message : undefined,
+                          variant: 'destructive',
+                        });
+                      })
+                  }
+                  disabled={syncWeibull.isPending || !organization?.id}
+                  className="gap-1"
+                >
+                  <RefreshCw className={`h-4 w-4 ${syncWeibull.isPending ? 'animate-spin' : ''}`} />
+                  Uppdatera Weibull
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setManualOpen(true)}
+                  className="gap-1"
+                >
+                  <Plus className="h-4 w-4" />
+                  Ny åtgärd
+                </Button>
                 {activePlan && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDialogOpen(true)}
-                      className="gap-1"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Omräkna
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleArchive}
-                      disabled={archivePlan.isPending}
-                      className="gap-1"
-                    >
-                      <Archive className="h-4 w-4" />
-                      Arkivera
-                    </Button>
-                  </>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleArchive}
+                    disabled={archivePlan.isPending}
+                    className="gap-1"
+                  >
+                    <Archive className="h-4 w-4" />
+                    Arkivera
+                  </Button>
                 )}
                 <Button size="sm" onClick={() => setDialogOpen(true)} className="gap-1">
                   <Plus className="h-4 w-4" />
-                  {activePlan ? 'Ny plan' : 'Skapa underhållsplan'}
+                  {activePlan ? 'Förhandsgranska' : 'Skapa underhållsplan'}
                 </Button>
               </div>
             </CardHeader>
@@ -348,13 +434,20 @@ export function RiskMaintenancePlan({
                 <div className="text-center py-10 space-y-3">
                   <AlertTriangle className="h-10 w-10 mx-auto text-muted-foreground/60" />
                   <p className="text-muted-foreground max-w-md mx-auto">
-                    Ingen aktiv underhållsplan. Välj startkvartal (t.ex. Q2 2027) och
-                    generera en 5-årsplan baserad på prediktiv risk.
+                    {syncWeibull.isPending
+                      ? 'Hämtar Weibull-förslag…'
+                      : 'Ingen plan ännu. Weibull fylls på automatiskt. Ni kan också lägga in egna åtgärder (det som idag ligger i Excel).'}
                   </p>
-                  <Button onClick={() => setDialogOpen(true)} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Skapa underhållsplan
-                  </Button>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button onClick={() => setManualOpen(true)} variant="outline" className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Ny åtgärd
+                    </Button>
+                    <Button onClick={() => setDialogOpen(true)} className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Skapa underhållsplan
+                    </Button>
+                  </div>
                   {archivedCount > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {archivedCount} arkiverad(e) plan(er) finns sparade
@@ -513,6 +606,42 @@ export function RiskMaintenancePlan({
           onCreated={() => refetchPlan()}
         />
       )}
+
+      <ManualPlanItemDialog
+        open={manualOpen}
+        pending={createManual.isPending || syncWeibull.isPending}
+        onClose={() => setManualOpen(false)}
+        onSave={async (patch) => {
+          try {
+            let planId = activePlan?.id;
+            if (!planId) {
+              const created = await runWeibullSync();
+              planId = created?.planId;
+            }
+            if (!planId) {
+              toast({
+                title: 'Ingen plan att lägga på',
+                description: 'Försök igen när planen skapats.',
+                variant: 'destructive',
+              });
+              return;
+            }
+            await createManual.mutateAsync({
+              planId,
+              propertyId,
+              ...patch,
+            });
+            toast({ title: 'Manuell åtgärd tillagd' });
+            setManualOpen(false);
+          } catch (e) {
+            toast({
+              title: 'Kunde inte lägga till',
+              description: e instanceof Error ? e.message : undefined,
+              variant: 'destructive',
+            });
+          }
+        }}
+      />
 
       <PlanItemEditDialog
         item={editing}
@@ -706,5 +835,132 @@ function PlanItemEditForm({
         </Button>
       </DialogFooter>
     </DialogContent>
+  );
+}
+
+function ManualPlanItemDialog({
+  open,
+  pending,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  pending: boolean;
+  onClose: () => void;
+  onSave: (patch: {
+    title: string;
+    year: number;
+    quarter: number;
+    estimated_cost: number | null;
+    notes: string | null;
+  }) => Promise<void>;
+}) {
+  const earliest = earliestPlanQuarter();
+  const [title, setTitle] = useState('');
+  const [year, setYear] = useState(earliest.year);
+  const [quarter, setQuarter] = useState<Quarter>(earliest.quarter);
+  const [cost, setCost] = useState('');
+  const [notes, setNotes] = useState('');
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Ny manuell åtgärd</DialogTitle>
+          <DialogDescription>
+            Det som idag ligger i kundens Excel — tak, fönster, målning, övrigt
+            underhåll. Skriver inte i kundens fil.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Åtgärd</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="T.ex. Ommålning trapphus"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>År</Label>
+              <Input
+                type="number"
+                min={2020}
+                max={2100}
+                value={year}
+                onChange={(e) => setYear(Number(e.target.value) || earliest.year)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Kvartal</Label>
+              <Select
+                value={String(quarter)}
+                onValueChange={(v) => setQuarter(Number(v) as Quarter)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Q1</SelectItem>
+                  <SelectItem value="2">Q2</SelectItem>
+                  <SelectItem value="3">Q3</SelectItem>
+                  <SelectItem value="4">Q4</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Uppskattat pris (kr)</Label>
+            <Input
+              type="number"
+              min={0}
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              placeholder="—"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Information</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Valfritt"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Avbryt
+          </Button>
+          <Button
+            disabled={pending || !title.trim()}
+            onClick={() =>
+              void onSave({
+                title: title.trim(),
+                year,
+                quarter,
+                estimated_cost: cost === '' ? null : Number(cost),
+                notes: notes.trim() || null,
+              }).then(() => {
+                setTitle('');
+                setCost('');
+                setNotes('');
+                setYear(earliest.year);
+                setQuarter(earliest.quarter);
+              })
+            }
+          >
+            Lägg till
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

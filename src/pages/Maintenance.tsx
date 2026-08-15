@@ -49,10 +49,10 @@ export default function Maintenance() {
           <main className="p-4 md:p-6 space-y-6">
             <div className="max-w-3xl space-y-2">
               <p className="text-sm text-muted-foreground">
-                Prediktiv plan per fastighet. Åtgärder föreslås när de behövs
-                (B10), men tidigast om 12 månader + ett kvartal. Under 75 000 kr
-                blir arbetsorder. Tid, pris och information går att ändra.
-                EnergyPulse-rader synkas tillbaka.
+                Arbetsplan per fastighet. Kundens Excel är orörd. Weibull och
+                EnergyPulse fylls på automatiskt; övrigt lägger ni in manuellt.
+                Tid, pris och text går att ändra. Borttaget kommer inte tillbaka
+                vid nästa Weibull-uppdatering. Under 75 000 kr blir arbetsorder.
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground">Fastighet</span>
@@ -98,7 +98,9 @@ export default function Maintenance() {
                 )}
                 <ul className="grid gap-2 md:grid-cols-2">
                   {orgPlans.map((plan) => {
-                    const items = plan.maintenance_plan_items ?? [];
+                    const items = (plan.maintenance_plan_items ?? []).filter(
+                      (i) => i.status !== 'skipped',
+                    );
                     const cost = items.reduce(
                       (s, i) =>
                         s + (i.estimated_cost != null ? Number(i.estimated_cost) : 0),

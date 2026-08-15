@@ -1379,6 +1379,7 @@ export type Database = {
           status: string
           title: string
           year: number
+          user_edited: boolean
         }
         Insert: {
           action_type?: string
@@ -1400,6 +1401,7 @@ export type Database = {
           status?: string
           title: string
           year: number
+          user_edited?: boolean
         }
         Update: {
           action_type?: string
@@ -1421,6 +1423,7 @@ export type Database = {
           status?: string
           title?: string
           year?: number
+          user_edited?: boolean
         }
         Relationships: [
           {

@@ -23,7 +23,7 @@ import { useComponentRiskList } from '@/hooks/useComponentRisk';
 import {
   fetchPurchaseCostMap,
   fetchUnitPriceMap,
-  useCreateMaintenancePlan,
+  useSyncWeibullPlan,
 } from '@/hooks/useMaintenancePlans';
 import {
   formatPlanPeriod,
@@ -68,7 +68,7 @@ export function GenerateMaintenancePlanDialog({
   const [previewing, setPreviewing] = useState(false);
 
   const { toast } = useToast();
-  const createPlan = useCreateMaintenancePlan();
+  const syncPlan = useSyncWeibullPlan();
 
   // Fetch all property risks (no min filter — engine applies dialog filters)
   const { data: risks = [], isLoading: risksLoading } = useComponentRiskList({
@@ -121,20 +121,15 @@ export function GenerateMaintenancePlanDialog({
       return;
     }
     try {
-      await createPlan.mutateAsync({
+      const result = await syncPlan.mutateAsync({
         organizationId,
         propertyId,
         propertyName,
-        startYear,
-        startQuarter,
-        horizonYears,
-        minRiskLevel,
-        minConfidence,
-        items: preview,
+        drafts: preview,
       });
       toast({
-        title: 'Underhållsplan sparad',
-        description: `${preview.length} åtgärder · ${formatPlanPeriod(summary!.period)}`,
+        title: 'Underhållsplan uppdaterad',
+        description: `${result.created} nya · ${result.updated} uppdaterade · ${result.skipped} orörda (redigerade/borttagna). ${formatPlanPeriod(summary!.period)}`,
       });
       setPreview(null);
       onOpenChange(false);
@@ -160,12 +155,13 @@ export function GenerateMaintenancePlanDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarRange className="h-5 w-5" />
-            Skapa underhållsplan
+            Uppdatera Weibull-plan
           </DialogTitle>
           <DialogDescription>
-            Weibull-åtgärder över 75 000 kr läggs här, tidigast om 12 månader +
-            ett kvartal eller senare om B10 säger det. Under 75 000 kr blir
-            arbetsorder. EnergyPulse-rader följer med.
+            Fyller på Weibull utan att skriva över redigerat eller borttaget.
+            Kundens Excel är orörd — det här är arbetsplanen. Över 75 000 kr
+            läggs här, tidigast om 12 månader + ett kvartal eller senare om B10
+            säger det. Under 75 000 kr blir arbetsorder.
           </DialogDescription>
         </DialogHeader>
 
@@ -327,9 +323,9 @@ export function GenerateMaintenancePlanDialog({
               </Button>
               <Button
                 onClick={handleSave}
-                disabled={createPlan.isPending}
+                disabled={syncPlan.isPending}
               >
-                {createPlan.isPending && (
+                {syncPlan.isPending && (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 )}
                 Spara plan
