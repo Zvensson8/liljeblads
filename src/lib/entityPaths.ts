@@ -16,3 +16,10 @@ export function projectPath(id: string): string {
 export function componentPath(id: string): string {
   return `/components/${id}`;
 }
+
+export function maintenancePath(opts?: { property?: string | null }): string {
+  const property = opts?.property?.trim();
+  return property
+    ? `/maintenance?property=${encodeURIComponent(property)}`
+    : '/maintenance';
+}

@@ -240,6 +240,104 @@ export function useCreateMaintenancePlan() {
   });
 }
 
+export interface OrgActivePlan {
+  id: string;
+  property_id: string;
+  name: string;
+  start_year: number;
+  start_quarter: number;
+  horizon_years: number;
+  generated_at: string;
+  properties: { id: string; name: string } | null;
+  maintenance_plan_items: Array<{
+    id: string;
+    year: number;
+    quarter: number;
+    title: string;
+    estimated_cost: number | null;
+    source: string;
+    status: string;
+    risk_level: string;
+  }>;
+}
+
+export function useOrgActiveMaintenancePlans(organizationId: string | undefined) {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.maintenancePlans.byOrg(organizationId ?? 'none'),
+    queryFn: async (): Promise<OrgActivePlan[]> => {
+      const { data, error } = await supabase
+        .from('maintenance_plans')
+        .select(
+          'id, property_id, name, start_year, start_quarter, horizon_years, generated_at, properties(id, name), maintenance_plan_items(id, year, quarter, title, estimated_cost, source, status, risk_level)',
+        )
+        .eq('organization_id', organizationId!)
+        .eq('status', 'active')
+        .order('generated_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as OrgActivePlan[];
+    },
+    enabled: !!session && !!organizationId,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+export interface UpdatePlanItemInput {
+  id: string;
+  planId: string;
+  propertyId: string;
+  year: number;
+  quarter: number;
+  title: string;
+  notes: string | null;
+  estimated_cost: number | null;
+  source: string;
+  external_id: string | null;
+}
+
+export function useUpdateMaintenancePlanItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpdatePlanItemInput): Promise<UpdatePlanItemInput> => {
+      const { error } = await supabase
+        .from('maintenance_plan_items')
+        .update({
+          year: input.year,
+          quarter: input.quarter,
+          title: input.title.trim(),
+          notes: input.notes,
+          estimated_cost: input.estimated_cost,
+          cost_source: 'manual',
+        })
+        .eq('id', input.id);
+      if (error) throw error;
+
+      if (input.source === 'energypulse' && input.external_id) {
+        const { notifyEnergyPulsePlanItemUpdated } = await import(
+          '@/lib/notifyEnergyPulse'
+        );
+        await notifyEnergyPulsePlanItemUpdated({
+          propertyId: input.propertyId,
+          planItemId: input.id,
+          actionId: input.external_id,
+          title: input.title.trim(),
+          notes: input.notes,
+          plannedYear: input.year,
+          plannedQuarter: input.quarter,
+          investmentCost: input.estimated_cost,
+        });
+      }
+      return input;
+    },
+    onSuccess: (input) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.maintenancePlans.items(input.planId),
+      });
+      qc.invalidateQueries({ queryKey: queryKeys.maintenancePlans.all });
+    },
+  });
+}
+
 export function useArchiveMaintenancePlan() {
   const qc = useQueryClient();
 

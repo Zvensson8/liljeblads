@@ -33,6 +33,7 @@ const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const Users = lazy(() => import("./pages/Users"));
 const WorkOrders = lazy(() => import("./pages/WorkOrders"));
 const Projects = lazy(() => import("./pages/Projects"));
+const Maintenance = lazy(() => import("./pages/Maintenance"));
 const OrganizationSettings = lazy(() => import("./pages/OrganizationSettings"));
 const UserSettings = lazy(() => import("./pages/UserSettings"));
 const FounderAdmin = lazy(() => import("./pages/FounderAdmin"));
@@ -92,6 +93,7 @@ const AppContent = () => {
           <Route path="/components" element={<ProtectedRoute><Components /></ProtectedRoute>} />
           <Route path="/components/:id" element={<ProtectedRoute><ComponentDetail /></ProtectedRoute>} />
           <Route path="/work-orders" element={<ProtectedRoute><WorkOrders /></ProtectedRoute>} />
+          <Route path="/maintenance" element={<ProtectedRoute><Maintenance /></ProtectedRoute>} />
           <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
           <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
           <Route path="/jarvis" element={<ProtectedRoute><Jarvis /></ProtectedRoute>} />

@@ -1,4 +1,4 @@
-import { Building2, Compass, Home, LogOut, Settings, Users, Wrench, Briefcase, Building, Crown, UserCog, Bot, type LucideIcon } from "lucide-react";
+import { Building2, Compass, Home, LogOut, Settings, Users, Wrench, Briefcase, Building, Crown, UserCog, Bot, CalendarRange, type LucideIcon } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,6 +30,7 @@ const navigationItems: Array<{ title: string; url: string; icon: LucideIcon; mod
   { title: "Fastigheter", url: "/properties", icon: Building2, moduleName: "properties" },
   { title: "Komponenter", url: "/components", icon: Settings, moduleName: "components" },
   { title: "Arbetsordrar", url: "/work-orders", icon: Wrench, moduleName: "work-orders" },
+  { title: "Underhåll", url: "/maintenance", icon: CalendarRange, moduleName: "maintenance" },
   { title: "Projekthantering", url: "/projects", icon: Briefcase, moduleName: "projects" },
   { title: "Jarvis", url: "/jarvis", icon: Bot, moduleName: "ai-chat" },
 ];

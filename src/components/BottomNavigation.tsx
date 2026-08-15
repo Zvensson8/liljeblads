@@ -29,6 +29,7 @@ export const BottomNavigation = () => {
   ];
 
   const allSecondaryNavItems = [
+    { path: '/maintenance', label: 'Underhåll', moduleName: 'maintenance' as ModuleName },
     { path: '/projects', label: 'Projekt', moduleName: 'projects' as ModuleName },
     { path: '/jarvis', label: 'Jarvis', moduleName: 'ai-chat' as ModuleName },
     { path: '/user/settings', label: 'Mina inställningar', moduleName: 'dashboard' as ModuleName },

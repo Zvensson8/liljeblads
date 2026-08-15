@@ -28,7 +28,7 @@ import {
 import {
   formatPlanPeriod,
   generateMaintenancePlanItems,
-  nextCalendarQuarter,
+  earliestPlanQuarter,
   summarizePlanItems,
   type PlanItemDraft,
   type Quarter,
@@ -58,9 +58,9 @@ export function GenerateMaintenancePlanDialog({
   organizationId,
   onCreated,
 }: GenerateMaintenancePlanDialogProps) {
-  const next = nextCalendarQuarter();
-  const [startYear, setStartYear] = useState(next.year);
-  const [startQuarter, setStartQuarter] = useState<Quarter>(next.quarter);
+  const earliest = earliestPlanQuarter();
+  const [startYear, setStartYear] = useState(earliest.year);
+  const [startQuarter, setStartQuarter] = useState<Quarter>(earliest.quarter);
   const [horizonYears, setHorizonYears] = useState(5);
   const [minRiskLevel, setMinRiskLevel] = useState<RiskLevel>('high');
   const [minConfidence, setMinConfidence] = useState<Confidence>('medium');
@@ -163,8 +163,9 @@ export function GenerateMaintenancePlanDialog({
             Skapa underhållsplan
           </DialogTitle>
           <DialogDescription>
-            Prediktiv 5-årsplan baserad på komponentrisk. Välj startdatum som år och
-            kvartal — endast åtgärder med tillräcklig risk inkluderas.
+            Weibull-åtgärder över 75 000 kr läggs här, tidigast om 12 månader +
+            ett kvartal eller senare om B10 säger det. Under 75 000 kr blir
+            arbetsorder. EnergyPulse-rader följer med.
           </DialogDescription>
         </DialogHeader>
 
@@ -179,7 +180,7 @@ export function GenerateMaintenancePlanDialog({
                 max={2100}
                 value={startYear}
                 onChange={(e) => {
-                  setStartYear(Number(e.target.value) || next.year);
+                  setStartYear(Number(e.target.value) || earliest.year);
                   setPreview(null);
                 }}
               />

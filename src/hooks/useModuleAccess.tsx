@@ -7,6 +7,7 @@ export type ModuleName =
   | "properties"
   | "components"
   | "work-orders"
+  | "maintenance"
   | "projects"
   | "ai-chat";
 
@@ -16,6 +17,7 @@ const ALL_MODULES: ModuleName[] = [
   "properties",
   "components",
   "work-orders",
+  "maintenance",
   "projects",
   "ai-chat",
 ];

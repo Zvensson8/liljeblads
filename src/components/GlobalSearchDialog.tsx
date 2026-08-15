@@ -8,7 +8,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Building2, Package, Wrench, Briefcase, Search, Sparkles, CheckSquare, Calendar, Plus, FileDown, LogOut, Settings, LayoutDashboard, FolderKanban, Bot } from "lucide-react";
+import { Building2, Package, Wrench, Briefcase, Search, Sparkles, CheckSquare, Calendar, CalendarRange, Plus, FileDown, LogOut, Settings, LayoutDashboard, FolderKanban, Bot } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAISearch, AISearchResult } from "@/hooks/useAISearch";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
@@ -48,6 +48,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
       { id: 'nav-dashboard', label: 'Gå till Dashboard', icon: LayoutDashboard, run: () => navigate('/dashboard') },
       { id: 'nav-properties', label: 'Gå till Fastigheter', icon: Building2, run: () => navigate('/properties') },
       { id: 'nav-workorders', label: 'Gå till Arbetsordrar', icon: Wrench, run: () => navigate('/work-orders') },
+      { id: 'nav-maintenance', label: 'Gå till Underhåll', icon: CalendarRange, run: () => navigate('/maintenance') },
       { id: 'nav-projects', label: 'Gå till Projekt', icon: FolderKanban, run: () => navigate('/projects') },
       { id: 'nav-components', label: 'Gå till Komponenter', icon: Wrench, run: () => navigate('/components') },
       { id: 'nav-ai', label: 'Gå till Jarvis', icon: Bot, run: () => navigate('/jarvis') },

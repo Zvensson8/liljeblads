@@ -25,6 +25,7 @@ import {
   useArchiveMaintenancePlan,
   useMaintenancePlanItems,
   useMaintenancePlans,
+  useUpdateMaintenancePlanItem,
   type MaintenancePlanItem,
 } from '@/hooks/useMaintenancePlans';
 import { useOrganization } from '@/hooks/useOrganization';
@@ -40,8 +41,25 @@ import {
 import { riskLevelColor, riskLevelLabel, type RiskLevel } from '@/lib/componentRisk';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { PropertyMaintenancePlan } from '@/components/property/PropertyMaintenancePlan';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Pencil } from 'lucide-react';
 
 interface RiskMaintenancePlanProps {
   propertyId: string;
@@ -62,7 +80,13 @@ function RiskMiniBadge({ level, score }: { level: string; score: number }) {
   );
 }
 
-function PlanItemRow({ item }: { item: MaintenancePlanItem }) {
+function PlanItemRow({
+  item,
+  onEdit,
+}: {
+  item: MaintenancePlanItem;
+  onEdit: (item: MaintenancePlanItem) => void;
+}) {
   const name = item.components?.name ?? (item.source === 'energypulse' ? item.title : 'Komponent');
   const type = item.components?.type;
   const fromEnergy = item.source === 'energypulse';
@@ -89,12 +113,16 @@ function PlanItemRow({ item }: { item: MaintenancePlanItem }) {
               Energi
             </Badge>
           )}
+          <span className="text-xs text-muted-foreground">
+            {formatYearQuarter(item.year, item.quarter as Quarter)}
+          </span>
         </div>
         {type && (
           <p className="text-xs text-muted-foreground pl-5">{type}</p>
         )}
-        {item.component_id && (
-          <p className="text-sm text-muted-foreground pl-5 line-clamp-2">{item.title}</p>
+        <p className="text-sm text-muted-foreground pl-5 line-clamp-2">{item.title}</p>
+        {item.notes && (
+          <p className="text-xs text-muted-foreground pl-5 line-clamp-2">{item.notes}</p>
         )}
       </div>
       <div className="flex sm:flex-col items-center sm:items-end gap-2 shrink-0 pl-5 sm:pl-0">
@@ -107,6 +135,10 @@ function PlanItemRow({ item }: { item: MaintenancePlanItem }) {
             B10 {Number(item.remaining_b10_years).toFixed(1)} år till 10 %-fel
           </span>
         )}
+        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => onEdit(item)}>
+          <Pencil className="h-3.5 w-3.5" />
+          Ändra
+        </Button>
       </div>
     </div>
   );
@@ -115,9 +147,11 @@ function PlanItemRow({ item }: { item: MaintenancePlanItem }) {
 function QuarterBlock({
   quarter,
   items,
+  onEdit,
 }: {
   quarter: Quarter;
   items: MaintenancePlanItem[];
+  onEdit: (item: MaintenancePlanItem) => void;
 }) {
   const cost = items.reduce(
     (s, i) => s + (i.estimated_cost != null ? Number(i.estimated_cost) : 0),
@@ -139,7 +173,7 @@ function QuarterBlock({
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
-            <PlanItemRow key={item.id} item={item} />
+            <PlanItemRow key={item.id} item={item} onEdit={onEdit} />
           ))}
         </div>
       )}
@@ -152,8 +186,10 @@ export function RiskMaintenancePlan({
   propertyName,
 }: RiskMaintenancePlanProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<MaintenancePlanItem | null>(null);
   const { organization } = useOrganization();
   const { toast } = useToast();
+  const updateItem = useUpdateMaintenancePlanItem();
 
   const {
     data: activePlan,
@@ -245,25 +281,17 @@ export function RiskMaintenancePlan({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Tabs defaultValue="risk-plan">
-        <TabsList>
-          <TabsTrigger value="risk-plan">Riskplan 5 år</TabsTrigger>
-          <TabsTrigger value="service-calendar">Servicekalender</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="risk-plan" className="space-y-4 mt-4">
           <Card className="border-border/50">
             <CardHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div className="space-y-1">
                 <CardTitle className="flex items-center gap-2">
                   <CalendarRange className="h-5 w-5" />
-                  Prediktiv underhållsplan
+                  Underhållsplan
                 </CardTitle>
                 <CardDescription>
-                  Åtgärder schemalagda per år och kvartal utifrån Weibull-risk
-                  (installationsår, typens livslängd, akuta fel). B10 är tid till
-                  10 % risk för första fel, inte återstående livslängd. Komponenter
-                  utan tillräcklig risk ingår inte.
+                  Föreslås när den behövs (B10), men tidigast om 12 månader + ett
+                  kvartal. Under 75 000 kr blir arbetsorder. Tid, pris och text
+                  går att ändra — EnergyPulse-rader synkas tillbaka.
                 </CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -414,6 +442,7 @@ export function RiskMaintenancePlan({
                                   key={q}
                                   quarter={q}
                                   items={yMap?.get(q) ?? []}
+                                  onEdit={setEditing}
                                 />
                               ))}
                             </div>
@@ -426,12 +455,6 @@ export function RiskMaintenancePlan({
               </CardContent>
             )}
           </Card>
-        </TabsContent>
-
-        <TabsContent value="service-calendar" className="mt-4">
-          <PropertyMaintenancePlan propertyId={propertyId} />
-        </TabsContent>
-      </Tabs>
 
       {organization?.id && (
         <GenerateMaintenancePlanDialog
@@ -443,6 +466,198 @@ export function RiskMaintenancePlan({
           onCreated={() => refetchPlan()}
         />
       )}
+
+      <PlanItemEditDialog
+        item={editing}
+        planId={activePlan?.id ?? null}
+        propertyId={propertyId}
+        pending={updateItem.isPending}
+        onClose={() => setEditing(null)}
+        onSave={async (patch) => {
+          if (!editing || !activePlan) return;
+          try {
+            await updateItem.mutateAsync({
+              id: editing.id,
+              planId: activePlan.id,
+              propertyId,
+              year: patch.year,
+              quarter: patch.quarter,
+              title: patch.title,
+              notes: patch.notes,
+              estimated_cost: patch.estimated_cost,
+              source: editing.source,
+              external_id: editing.external_id,
+            });
+            toast({
+              title: 'Åtgärd uppdaterad',
+              description:
+                editing.source === 'energypulse'
+                  ? 'Synkad till EnergyPulse.'
+                  : undefined,
+            });
+            setEditing(null);
+          } catch (e) {
+            toast({
+              title: 'Kunde inte spara',
+              description: e instanceof Error ? e.message : undefined,
+              variant: 'destructive',
+            });
+          }
+        }}
+      />
     </div>
+  );
+}
+
+function PlanItemEditDialog({
+  item,
+  planId,
+  propertyId,
+  pending,
+  onClose,
+  onSave,
+}: {
+  item: MaintenancePlanItem | null;
+  planId: string | null;
+  propertyId: string;
+  pending: boolean;
+  onClose: () => void;
+  onSave: (patch: {
+    year: number;
+    quarter: number;
+    title: string;
+    notes: string | null;
+    estimated_cost: number | null;
+  }) => Promise<void>;
+}) {
+  void planId;
+  void propertyId;
+
+  return (
+    <Dialog
+      open={Boolean(item)}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      {item && (
+        <PlanItemEditForm
+          key={item.id}
+          item={item}
+          pending={pending}
+          onClose={onClose}
+          onSave={onSave}
+        />
+      )}
+    </Dialog>
+  );
+}
+
+function PlanItemEditForm({
+  item,
+  pending,
+  onClose,
+  onSave,
+}: {
+  item: MaintenancePlanItem;
+  pending: boolean;
+  onClose: () => void;
+  onSave: (patch: {
+    year: number;
+    quarter: number;
+    title: string;
+    notes: string | null;
+    estimated_cost: number | null;
+  }) => Promise<void>;
+}) {
+  const [year, setYear] = useState(item.year);
+  const [quarter, setQuarter] = useState<Quarter>(item.quarter as Quarter);
+  const [title, setTitle] = useState(item.title);
+  const [notes, setNotes] = useState(item.notes ?? '');
+  const [cost, setCost] = useState(
+    item.estimated_cost != null ? String(item.estimated_cost) : '',
+  );
+
+  return (
+    <DialogContent className="max-w-md">
+      <DialogHeader>
+        <DialogTitle>Ändra underhållsåtgärd</DialogTitle>
+        <DialogDescription>
+          Tid, pris och text. EnergyPulse-rader skickas tillbaka vid spara.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label>Åtgärd</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>År</Label>
+            <Input
+              type="number"
+              min={2020}
+              max={2100}
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value) || item.year)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Kvartal</Label>
+            <Select
+              value={String(quarter)}
+              onValueChange={(v) => setQuarter(Number(v) as Quarter)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Q1</SelectItem>
+                <SelectItem value="2">Q2</SelectItem>
+                <SelectItem value="3">Q3</SelectItem>
+                <SelectItem value="4">Q4</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Uppskattat pris (kr)</Label>
+          <Input
+            type="number"
+            min={0}
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            placeholder="—"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Information</Label>
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose}>
+          Avbryt
+        </Button>
+        <Button
+          disabled={pending || !title.trim()}
+          onClick={() =>
+            void onSave({
+              year,
+              quarter,
+              title: title.trim(),
+              notes: notes.trim() || null,
+              estimated_cost: cost === '' ? null : Number(cost),
+            })
+          }
+        >
+          Spara
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }

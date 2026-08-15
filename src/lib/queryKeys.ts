@@ -54,6 +54,8 @@ export const queryKeys = {
     ...makeEntityKeys('maintenance-plans'),
     byProperty: (propertyId: string) =>
       ['maintenance-plans', 'property', propertyId] as const,
+    byOrg: (organizationId: string) =>
+      ['maintenance-plans', 'org', organizationId] as const,
     items: (planId: string) =>
       ['maintenance-plans', 'items', planId] as const,
   },
