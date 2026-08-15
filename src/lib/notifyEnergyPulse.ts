@@ -15,7 +15,7 @@ export async function notifyEnergyPulseWorkOrderCompleted(input: {
   const orgId = prop?.organization_id;
   if (!orgId) return;
 
-  const { data: settings } = await supabase
+  const { data: settings } = await (supabase as any)
     .from("organization_jarvis_settings")
     .select("energypulse_base_url, energypulse_bridge_secret")
     .eq("organization_id", orgId)
