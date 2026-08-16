@@ -39,6 +39,7 @@ const UserSettings = lazy(() => import("./pages/UserSettings"));
 const FounderAdmin = lazy(() => import("./pages/FounderAdmin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Jarvis = lazy(() => import("./pages/Jarvis"));
+const AgentActivity = lazy(() => import("./pages/AgentActivity"));
 const Prata = lazy(() => import("./pages/Prata"));
 const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
 
@@ -99,7 +100,7 @@ const AppContent = () => {
           <Route path="/jarvis" element={<ProtectedRoute><Jarvis /></ProtectedRoute>} />
           <Route path="/prata" element={<ProtectedRoute><Prata /></ProtectedRoute>} />
           <Route path="/ai-chat" element={<Navigate to="/jarvis?tab=chat" replace />} />
-          <Route path="/agent" element={<Navigate to="/jarvis?tab=actions" replace />} />
+          <Route path="/agent" element={<ProtectedRoute><AgentActivity /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><RequireFounder><Users /></RequireFounder></ProtectedRoute>} />
           <Route path="/user/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
           <Route path="/organization/settings" element={<ProtectedRoute><RequireFounder><OrganizationSettings /></RequireFounder></ProtectedRoute>} />

@@ -195,13 +195,53 @@ export default function AgentActivity({ embedded = false }: { embedded?: boolean
             <div className="max-w-6xl mx-auto space-y-6 p-4 md:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <p className="text-muted-foreground text-sm">
-                  Jarvis-förslag senaste 30 dagarna: föreslaget → godkänt → utfört
+                  Gamla utkast (risk/WO) som väntar på godkännande. Jarvis
+                  skriver numera direkt i chatten — den här kön kan rensas.
                 </p>
                 <div className="flex gap-2">
                   {!embedded && (
                     <Button variant="outline" size="sm" onClick={() => navigate('/jarvis?tab=chat')}>
                       <Bot className="h-4 w-4 mr-1" />
                       Jarvis-chat
+                    </Button>
+                  )}
+                  {pendingActions.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            `Ta bort ${pendingActions.length} väntande förslag?`,
+                          )
+                        ) {
+                          return;
+                        }
+                        void Promise.all(
+                          pendingActions.map((a) =>
+                            updateAction.mutateAsync({
+                              id: a.id,
+                              patch: {
+                                status: 'rejected',
+                                reviewed_by: user?.id,
+                                reviewed_at: new Date().toISOString(),
+                                rejection_reason: 'Rensad',
+                              },
+                            }),
+                          ),
+                        )
+                          .then(() => {
+                            toast.success('Väntande förslag borttagna');
+                            invalidate();
+                          })
+                          .catch((e: unknown) => {
+                            toast.error(
+                              getErrorMessage(e) || 'Kunde inte rensa',
+                            );
+                          });
+                      }}
+                    >
+                      Rensa väntande
                     </Button>
                   )}
                   {isFounder && (

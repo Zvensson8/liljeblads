@@ -1,10 +1,9 @@
 import { useSearchParams } from 'react-router-dom';
-import { Bot, MessageSquare, Sparkles, History } from 'lucide-react';
+import { Bot, MessageSquare, History } from 'lucide-react';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AIChat from '@/pages/AIChat';
-import AgentActivity from '@/pages/AgentActivity';
 import JarvisRecentActions from '@/components/ai-chat/JarvisRecentActions';
 
 /**
@@ -14,8 +13,7 @@ import JarvisRecentActions from '@/components/ai-chat/JarvisRecentActions';
 export default function Jarvis() {
   const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get('tab');
-  const tab =
-    raw === 'actions' || raw === 'log' ? raw : 'chat';
+  const tab = raw === 'log' ? raw : 'chat';
 
   const setTab = (value: string) => {
     setSearchParams(
@@ -40,7 +38,7 @@ export default function Jarvis() {
               <h1 className="text-lg md:text-xl font-semibold">Jarvis</h1>
             </div>
             <p className="hidden sm:block text-sm text-muted-foreground ml-2">
-              Fråga, agera, spåra — och godkänn förslag
+              Fråga och agera. Loggen visar vad som gjorts.
             </p>
           </header>
 
@@ -55,13 +53,6 @@ export default function Jarvis() {
                   Chat
                 </TabsTrigger>
                 <TabsTrigger
-                  value="actions"
-                  className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1"
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Förslag
-                </TabsTrigger>
-                <TabsTrigger
                   value="log"
                   className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1"
                 >
@@ -73,9 +64,6 @@ export default function Jarvis() {
 
             <TabsContent value="chat" className="flex-1 m-0 min-h-0 data-[state=inactive]:hidden">
               <AIChat embedded />
-            </TabsContent>
-            <TabsContent value="actions" className="flex-1 m-0 min-h-0 data-[state=inactive]:hidden">
-              <AgentActivity embedded />
             </TabsContent>
             <TabsContent
               value="log"
