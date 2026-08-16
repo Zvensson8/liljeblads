@@ -32,6 +32,7 @@ const LABELS: Record<string, string> = {
   apply_create_project: 'Nytt projekt',
   apply_work_order_status: 'WO-status',
   apply_project_status: 'Projektstatus',
+  apply_update_project: 'Projekt uppdaterat',
   apply_add_project_cost: 'Projektkostnad',
   apply_add_budget_item: 'Budgetrad',
   apply_complete_todo: 'Todo klar',

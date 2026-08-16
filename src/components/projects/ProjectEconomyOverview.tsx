@@ -10,9 +10,9 @@ import { useLogProjectActivity } from "@/hooks/useProjectActivityLog";
 
 interface ProjectEconomyOverviewProps {
   projectId: string;
-  budget: number;
-  forecast: number;
-  actualCost: number;
+  budget: number | null;
+  forecast: number | null;
+  actualCost: number | null;
   onUpdate: () => void;
 }
 
@@ -24,8 +24,11 @@ export function ProjectEconomyOverview({
   onUpdate,
 }: ProjectEconomyOverviewProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editBudget, setEditBudget] = useState(budget);
-  const [editForecast, setEditForecast] = useState(forecast);
+  const budgetN = Number(budget ?? 0);
+  const forecastN = Number(forecast ?? 0);
+  const actualN = Number(actualCost ?? 0);
+  const [editBudget, setEditBudget] = useState(budgetN);
+  const [editForecast, setEditForecast] = useState(forecastN);
   const [saving, setSaving] = useState(false);
   const updateProject = useUpdateProject();
   const logActivity = useLogProjectActivity();
@@ -39,11 +42,11 @@ export function ProjectEconomyOverview({
       });
 
       const changes = [];
-      if (editBudget !== budget) {
-        changes.push(`Budget ändrad från ${budget.toLocaleString("sv-SE")} kr till ${editBudget.toLocaleString("sv-SE")} kr`);
+      if (editBudget !== budgetN) {
+        changes.push(`Budget ändrad från ${budgetN.toLocaleString("sv-SE")} kr till ${editBudget.toLocaleString("sv-SE")} kr`);
       }
-      if (editForecast !== forecast) {
-        changes.push(`Prognos ändrad från ${forecast.toLocaleString("sv-SE")} kr till ${editForecast.toLocaleString("sv-SE")} kr`);
+      if (editForecast !== forecastN) {
+        changes.push(`Prognos ändrad från ${forecastN.toLocaleString("sv-SE")} kr till ${editForecast.toLocaleString("sv-SE")} kr`);
       }
 
       if (changes.length > 0) {
@@ -65,13 +68,13 @@ export function ProjectEconomyOverview({
   };
 
   const handleCancel = () => {
-    setEditBudget(budget);
-    setEditForecast(forecast);
+    setEditBudget(budgetN);
+    setEditForecast(forecastN);
     setIsEditing(false);
   };
 
-  const variance = budget > 0 ? ((actualCost - budget) / budget) * 100 : 0;
-  const forecastVariance = budget > 0 ? ((forecast - budget) / budget) * 100 : 0;
+  const variance = budgetN > 0 ? ((actualN - budgetN) / budgetN) * 100 : 0;
+  const forecastVariance = budgetN > 0 ? ((forecastN - budgetN) / budgetN) * 100 : 0;
 
   return (
     <div className="space-y-6">
@@ -124,7 +127,7 @@ export function ProjectEconomyOverview({
                 />
               ) : (
                 <p className="text-2xl font-bold">
-                  {budget.toLocaleString("sv-SE")} kr
+                  {budgetN.toLocaleString("sv-SE")} kr
                 </p>
               )}
               <p className="text-sm text-muted-foreground">
@@ -146,7 +149,7 @@ export function ProjectEconomyOverview({
               ) : (
                 <div className="space-y-1">
                   <p className="text-2xl font-bold">
-                    {forecast.toLocaleString("sv-SE")} kr
+                    {forecastN.toLocaleString("sv-SE")} kr
                   </p>
                   <p
                     className={`text-sm font-medium ${
@@ -173,7 +176,7 @@ export function ProjectEconomyOverview({
               <Label>Utfall (hittills)</Label>
               <div className="space-y-1">
                 <p className="text-2xl font-bold">
-                  {actualCost.toLocaleString("sv-SE")} kr
+                  {actualN.toLocaleString("sv-SE")} kr
                 </p>
                 <p
                   className={`text-sm font-medium ${
@@ -203,7 +206,7 @@ export function ProjectEconomyOverview({
                   Kvarstående enligt prognos
                 </p>
                 <p className="text-lg font-semibold">
-                  {(forecast - actualCost).toLocaleString("sv-SE")} kr
+                  {(forecastN - actualN).toLocaleString("sv-SE")} kr
                 </p>
               </div>
               <div>
@@ -211,9 +214,9 @@ export function ProjectEconomyOverview({
                   Kvarstående budget
                 </p>
                 <p className={`text-lg font-semibold ${
-                  (budget - actualCost) < 0 ? "text-red-600" : ""
+                  (budgetN - actualN) < 0 ? "text-red-600" : ""
                 }`}>
-                  {(budget - actualCost).toLocaleString("sv-SE")} kr
+                  {(budgetN - actualN).toLocaleString("sv-SE")} kr
                 </p>
               </div>
             </div>

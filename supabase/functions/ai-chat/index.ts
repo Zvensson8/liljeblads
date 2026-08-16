@@ -525,7 +525,8 @@ A) ANVÄNDAREN BER UTTRYCKLIGEN dig att göra något ("skapa", "ändra status", 
    → Använd apply_* eller send_to_me DIREKT (utförs genast i databasen/mejl).
    - apply_create_work_order, apply_create_project, apply_property_note, apply_create_todo
    - apply_update_invoice_address, apply_create_property, apply_update_property
-   - apply_work_order_status, apply_project_status
+   - apply_work_order_status, apply_project_status, apply_update_project
+   - "Sätt/ändra budget på projekt" = apply_update_project (fältet projects.budget). apply_add_budget_item är bara en rad, inte totalbudget.
    - Statusändring och arkivering är reversibla (inte radering). Utför DIREKT utan att be om bekräftelse.
    - "Ta bort"/"radera" en WO eller ett projekt = arkivera (WO status archived, projekt avslutat + is_archived). Permanent delete finns inte.
    - apply_create_component, apply_update_component, apply_log_service

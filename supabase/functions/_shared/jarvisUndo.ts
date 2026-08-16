@@ -89,6 +89,17 @@ export function extractReversePayload(
         },
       };
     }
+    case "apply_update_project": {
+      const p = result.project as { id?: string } | undefined;
+      const prev = result.previous as Record<string, unknown> | undefined;
+      if (!p?.id || !prev) return null;
+      return {
+        kind: "update",
+        table: "projects",
+        id: String(p.id),
+        fields: prev,
+      };
+    }
     case "apply_update_property": {
       const p = result.property as { id?: string } | undefined;
       const prev = result.previous as Record<string, unknown> | undefined;

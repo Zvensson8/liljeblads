@@ -11,9 +11,9 @@ import { toast } from "sonner";
 
 interface ProjectSimulationProps {
   projectId: string;
-  currentBudget: number;
-  currentForecast: number;
-  currentActualCost: number;
+  currentBudget: number | null;
+  currentForecast: number | null;
+  currentActualCost: number | null;
   onApply?: (newForecast: number) => void;
 }
 
@@ -24,17 +24,20 @@ export function ProjectSimulation({
   currentActualCost,
   onApply,
 }: ProjectSimulationProps) {
-  const [simulatedBudget, setSimulatedBudget] = useState(currentBudget);
-  const [simulatedForecast, setSimulatedForecast] = useState(currentForecast);
-  const [simulatedActualCost, setSimulatedActualCost] = useState(currentActualCost);
+  const budgetN = Number(currentBudget ?? 0);
+  const forecastN = Number(currentForecast ?? 0);
+  const actualN = Number(currentActualCost ?? 0);
+  const [simulatedBudget, setSimulatedBudget] = useState(budgetN);
+  const [simulatedForecast, setSimulatedForecast] = useState(forecastN);
+  const [simulatedActualCost, setSimulatedActualCost] = useState(actualN);
   const [additionalCosts, setAdditionalCosts] = useState<{id: string; description: string; amount: number; isNew?: boolean}[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setSimulatedBudget(currentBudget);
-    setSimulatedForecast(currentForecast);
-    setSimulatedActualCost(currentActualCost);
-  }, [currentBudget, currentForecast, currentActualCost]);
+    setSimulatedBudget(budgetN);
+    setSimulatedForecast(forecastN);
+    setSimulatedActualCost(actualN);
+  }, [budgetN, forecastN, actualN]);
 
   useEffect(() => {
     if (projectId) {
@@ -59,9 +62,9 @@ export function ProjectSimulation({
   };
 
   const handleReset = () => {
-    setSimulatedBudget(currentBudget);
-    setSimulatedForecast(currentForecast);
-    setSimulatedActualCost(currentActualCost);
+    setSimulatedBudget(budgetN);
+    setSimulatedForecast(forecastN);
+    setSimulatedActualCost(actualN);
     fetchAdditionalCosts();
   };
 
@@ -180,15 +183,15 @@ export function ProjectSimulation({
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Budget</p>
-              <p className="text-xl font-bold">{currentBudget.toLocaleString("sv-SE")} kr</p>
+              <p className="text-xl font-bold">{budgetN.toLocaleString("sv-SE")} kr</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground mb-1">Prognos</p>
-              <p className="text-xl font-bold">{currentForecast.toLocaleString("sv-SE")} kr</p>
+              <p className="text-xl font-bold">{forecastN.toLocaleString("sv-SE")} kr</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground mb-1">Utfall</p>
-              <p className="text-xl font-bold">{currentActualCost.toLocaleString("sv-SE")} kr</p>
+              <p className="text-xl font-bold">{actualN.toLocaleString("sv-SE")} kr</p>
             </div>
           </div>
         </CardContent>

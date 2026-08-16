@@ -129,6 +129,7 @@ export const BATCHABLE_APPLY_TOOLS = [
   'apply_create_contact',
   'apply_work_order_status',
   'apply_project_status',
+  'apply_update_project',
   'apply_update_invoice_address',
   'apply_update_property',
   'apply_update_component',

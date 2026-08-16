@@ -22,9 +22,9 @@ import { propertyPath } from "@/lib/entityPaths";
 interface ProjectOverviewTabProps {
   project: {
     id: string;
-    budget: number;
-    forecast: number;
-    actual_cost: number;
+    budget: number | null;
+    forecast: number | null;
+    actual_cost: number | null;
     property_id: string;
     project_number: string;
     project_manager: string | null;
@@ -117,12 +117,16 @@ export function ProjectOverviewTab({
   const totalCount = checklistItems.length;
   const checklistProgress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
-  const budgetProgress = project.budget > 0 
-    ? Math.min((project.actual_cost / project.budget) * 100, 100)
+  const budget = Number(project.budget ?? 0);
+  const forecast = Number(project.forecast ?? 0);
+  const actualCost = Number(project.actual_cost ?? 0);
+
+  const budgetProgress = budget > 0
+    ? Math.min((actualCost / budget) * 100, 100)
     : 0;
   
-  const variance = project.budget > 0
-    ? ((project.actual_cost - project.budget) / project.budget) * 100
+  const variance = budget > 0
+    ? ((actualCost - budget) / budget) * 100
     : 0;
 
   const nextDeadline = checklistItems
@@ -267,19 +271,19 @@ export function ProjectOverviewTab({
               <div>
                 <p className="text-xs text-muted-foreground">Budget</p>
                 <p className="text-lg font-bold">
-                  {(project.budget / 1000).toFixed(0)}k
+                  {(budget / 1000).toFixed(0)}k
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Utfall</p>
                 <p className="text-lg font-bold">
-                  {(project.actual_cost / 1000).toFixed(0)}k
+                  {(actualCost / 1000).toFixed(0)}k
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Prognos</p>
                 <p className="text-lg font-bold">
-                  {(project.forecast / 1000).toFixed(0)}k
+                  {(forecast / 1000).toFixed(0)}k
                 </p>
               </div>
             </div>

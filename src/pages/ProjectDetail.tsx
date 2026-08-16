@@ -57,9 +57,9 @@ interface Project {
   property_id: string;
   start_date: string | null;
   end_date: string | null;
-  budget: number;
-  forecast: number;
-  actual_cost: number;
+  budget: number | null;
+  forecast: number | null;
+  actual_cost: number | null;
   is_archived: boolean;
   project_manager: string | null;
   actors: string[] | null;
@@ -244,8 +244,12 @@ export default function ProjectDetail() {
     return null;
   }
 
-  const variance = project.budget > 0
-    ? ((project.actual_cost - project.budget) / project.budget) * 100
+  const budget = Number(project.budget ?? 0);
+  const forecast = Number(project.forecast ?? 0);
+  const actualCost = Number(project.actual_cost ?? 0);
+
+  const variance = budget > 0
+    ? ((actualCost - budget) / budget) * 100
     : 0;
 
   return (
@@ -338,7 +342,7 @@ export default function ProjectDetail() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-xl md:text-2xl font-bold">
-                      {(project.budget / 1000).toFixed(0)}k
+                      {(budget / 1000).toFixed(0)}k
                     </p>
                   </CardContent>
                 </Card>
@@ -354,7 +358,7 @@ export default function ProjectDetail() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-xl md:text-2xl font-bold">
-                      {(project.forecast / 1000).toFixed(0)}k
+                      {(forecast / 1000).toFixed(0)}k
                     </p>
                   </CardContent>
                 </Card>
@@ -370,7 +374,7 @@ export default function ProjectDetail() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-xl md:text-2xl font-bold">
-                      {(project.actual_cost / 1000).toFixed(0)}k
+                      {(actualCost / 1000).toFixed(0)}k
                     </p>
                   </CardContent>
                 </Card>
@@ -427,9 +431,9 @@ export default function ProjectDetail() {
                 <TabsContent value="economy" className="space-y-4">
                   <ProjectEconomyOverview
                     projectId={project.id}
-                    budget={project.budget}
-                    forecast={project.forecast}
-                    actualCost={project.actual_cost}
+                    budget={budget}
+                    forecast={forecast}
+                    actualCost={actualCost}
                     onUpdate={fetchProject}
                   />
                   
@@ -452,9 +456,9 @@ export default function ProjectDetail() {
                     <CardContent>
                       <ProjectSimulation
                         projectId={project.id}
-                        currentBudget={project.budget}
-                        currentForecast={project.forecast}
-                        currentActualCost={project.actual_cost}
+                        currentBudget={budget}
+                        currentForecast={forecast}
+                        currentActualCost={actualCost}
                         onApply={async (newForecast) => {
                           try {
                             await updateProject.mutateAsync({

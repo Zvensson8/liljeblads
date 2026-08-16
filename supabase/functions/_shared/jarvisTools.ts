@@ -270,6 +270,7 @@ const BATCHABLE_TOOLS = new Set([
   "apply_create_contact",
   "apply_work_order_status",
   "apply_project_status",
+  "apply_update_project",
   "apply_update_invoice_address",
   "apply_update_property",
   "apply_update_component",
@@ -806,6 +807,33 @@ export const jarvisTools: ChatTool[] = [
   {
     type: "function",
     function: {
+      name: "apply_update_project",
+      description:
+        "Uppdatera projektets fält DIREKT: budget, prognos, namn, typ, år, kvartal. Använd detta när användaren säger sätt/ändra/uppdatera budget på ett projekt. INTE apply_add_budget_item (det är en budgetrad, inte projektets budget).",
+      parameters: {
+        type: "object",
+        properties: {
+          project_id: { type: "string" },
+          project_number: { type: "string" },
+          project_name: { type: "string" },
+          name: { type: "string" },
+          property_name: { type: "string" },
+          budget: { type: "number", description: "Projektets totalbudget i kr" },
+          forecast: { type: "number" },
+          description: { type: "string" },
+          year: { type: "number" },
+          start_quarter: { type: "number" },
+          type: {
+            type: "string",
+            enum: ["investering", "underhall", "energi", "annat"],
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "apply_update_invoice_address",
       description:
         "Uppdatera fakturaadress på fastighet DIREKT (när användaren ber om det).",
@@ -1202,7 +1230,8 @@ export const jarvisTools: ChatTool[] = [
     type: "function",
     function: {
       name: "apply_add_budget_item",
-      description: "Lägg till budgetrad på projekt DIREKT (project_budget_items).",
+      description:
+        "Lägg till en budgetRAD (kostnadspost) på projektet. För att ändra projektets totalbudget: apply_update_project med budget.",
       parameters: {
         type: "object",
         properties: {
@@ -2436,6 +2465,93 @@ async function executeJarvisToolInner(
             previous_status: existing.status,
             previous_is_archived: existing.is_archived ?? false,
             summary: `Projekt ${updated.project_number || updated.name}: ${existing.status} → ${status}${archive ? " (arkiverat)" : ""}`,
+          },
+          {
+            entity_type: "project",
+            entity_id: updated.id as string,
+            path: `/projects/${updated.id}`,
+          },
+        );
+      }
+
+      case "apply_update_project": {
+        const project = await resolveOneProject(supabase, orgId, rawArgs, pageContext);
+        if (!project) return { error: "Projekt hittades inte" };
+
+        const { data: existing, error: exErr } = await supabase
+          .from("projects")
+          .select(
+            "id, name, project_number, budget, forecast, description, year, start_quarter, type",
+          )
+          .eq("id", project.id)
+          .maybeSingle();
+        if (exErr) return { error: exErr.message };
+        if (!existing) return { error: "Projekt hittades inte" };
+
+        const patch: Record<string, unknown> = {};
+        if (rawArgs.budget != null && !Number.isNaN(Number(rawArgs.budget))) {
+          patch.budget = Number(rawArgs.budget);
+        }
+        if (rawArgs.forecast != null && !Number.isNaN(Number(rawArgs.forecast))) {
+          patch.forecast = Number(rawArgs.forecast);
+        }
+        if (rawArgs.name != null && String(rawArgs.name).trim()) {
+          patch.name = String(rawArgs.name).trim();
+        }
+        if (rawArgs.description != null) {
+          patch.description = String(rawArgs.description);
+        }
+        if (rawArgs.year != null && !Number.isNaN(Number(rawArgs.year))) {
+          patch.year = Number(rawArgs.year);
+        }
+        if (
+          rawArgs.start_quarter != null &&
+          !Number.isNaN(Number(rawArgs.start_quarter))
+        ) {
+          const q = Number(rawArgs.start_quarter);
+          if (q < 1 || q > 4) return { error: "start_quarter måste vara 1–4" };
+          patch.start_quarter = q;
+        }
+        const ptype = String(rawArgs.type || "").trim();
+        if (
+          ptype &&
+          (["investering", "underhall", "energi", "annat"] as const).includes(
+            ptype as "underhall",
+          )
+        ) {
+          patch.type = ptype;
+        }
+        if (!Object.keys(patch).length) {
+          return { error: "Inga fält att uppdatera (budget, forecast, namn, …)" };
+        }
+
+        const previous: Record<string, unknown> = {};
+        for (const key of Object.keys(patch)) {
+          previous[key] = (existing as Record<string, unknown>)[key] ?? null;
+        }
+
+        const { data: updated, error } = await supabase
+          .from("projects")
+          .update(patch)
+          .eq("id", project.id)
+          .select("id, name, project_number, budget, forecast, type, year, start_quarter")
+          .single();
+        if (error) return { error: error.message };
+
+        const bits: string[] = [];
+        if (patch.budget != null) {
+          bits.push(`budget ${Number(patch.budget).toLocaleString("sv-SE")} kr`);
+        }
+        if (patch.forecast != null) {
+          bits.push(`prognos ${Number(patch.forecast).toLocaleString("sv-SE")} kr`);
+        }
+        if (patch.name) bits.push(`namn ${String(patch.name)}`);
+        return withDeepLink(
+          {
+            applied: true,
+            project: updated,
+            previous,
+            summary: `Projekt ${updated.project_number || updated.name}: ${bits.join(", ") || "uppdaterat"}`,
           },
           {
             entity_type: "project",

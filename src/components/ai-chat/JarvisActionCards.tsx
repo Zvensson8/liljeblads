@@ -24,6 +24,7 @@ export type JarvisAppliedAction = {
 const toolLabels: Record<string, string> = {
   apply_work_order_status: 'Arbetsorder status',
   apply_project_status: 'Projekt status',
+  apply_update_project: 'Projekt uppdaterat',
   apply_update_invoice_address: 'Fakturaadress',
   apply_create_work_order: 'Ny arbetsorder',
   apply_create_project: 'Nytt projekt',
