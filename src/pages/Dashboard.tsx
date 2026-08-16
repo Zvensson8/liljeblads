@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AttentionRequiredSection } from '@/components/AttentionRequiredSection';
 import { RecentlyVisitedWidget } from '@/components/RecentlyVisitedWidget';
+import { TodoWidget } from '@/components/TodoWidget';
 import { PropertyMapDialog } from '@/components/maps/PropertyMapDialog';
 import { KPIWidget } from '@/components/dashboard/widgets/KPIWidget';
 import { JarvisHealthWidget } from '@/components/dashboard/JarvisHealthWidget';
@@ -223,6 +224,10 @@ const Dashboard = () => {
                   <KPIWidget key={kpi.title} {...kpi} />
                 ))}
               </div>
+
+              <TodoWidget
+                propertyId={selectedProperty === 'all' ? undefined : selectedProperty}
+              />
 
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="md:col-span-1">
