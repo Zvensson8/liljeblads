@@ -519,6 +519,7 @@ GROUNDING (sanning från verktyg — non-negotiable):
 - Om fältet är null/tomt: säg tydligt "ej registrerad i systemet" (inte generiskt "saknas").
 - Fältet fakturaadress heter invoice_address på properties.
 - Om SIDOKONTEXT anger property_id/project_id: använd det som default (användaren är på den sidan).
+- Underhållsplan = maintenance_plans + maintenance_plan_items. Att-göra = property_todos. Blanda inte.
 
 SKRIV — VÄLJ RÄTT LÄGE:
 A) ANVÄNDAREN BER UTTRYCKLIGEN dig att göra något ("skapa", "ändra status", "uppdatera", "lägg till", "logga service", "skicka till mig"):
@@ -532,6 +533,7 @@ A) ANVÄNDAREN BER UTTRYCKLIGEN dig att göra något ("skapa", "ändra status", 
    - apply_create_component, apply_update_component, apply_log_service
    - apply_create_contact, apply_update_contact
    - apply_create_todo, apply_complete_todo, list_todos
+   - Underhållsplan ≠ todos. "Skapa/synka underhållsplan från projekt" = apply_sync_plan_from_projects (ETT anrop för hela org, inte batch av todos). Lista med list_maintenance_plan. Todo-tabellen har title/notes, inte description.
    - apply_add_project_cost, apply_add_budget_item, list_project_costs
    - apply_complete_checklist_item
    - send_to_me — e-post ENDAST till inloggad användare (aldrig extern mottagare)

@@ -1156,7 +1156,11 @@ export const jarvisTools: ChatTool[] = [
         type: "object",
         properties: {
           title: { type: "string" },
-          description: { type: "string" },
+          notes: { type: "string" },
+          description: {
+            type: "string",
+            description: "Alias för notes (kolumnen heter notes, inte description)",
+          },
           property_name: { type: "string" },
           property_id: { type: "string" },
           due_date: { type: "string" },
@@ -1400,6 +1404,36 @@ export const jarvisTools: ChatTool[] = [
           stop_on_error: { type: "boolean" },
         },
         required: ["actions"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_maintenance_plan",
+      description:
+        "Lista underhållsplan + rader för en fastighet (eller översikt för hela org). Underhållsplan är INTE todos.",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_sync_plan_from_projects",
+      description:
+        "Synka aktiva projekt till underhållsplanen. Skapar plan om den saknas. Varje aktivt projekt blir/uppdateras som en planrad (samma namn, år, kvartal, budget, projektnummer). INTE todos. Utelämna fastighet = alla fastigheter i org (ett anrop, ingen batch).",
+      parameters: {
+        type: "object",
+        properties: {
+          property_name: { type: "string" },
+          property_id: { type: "string" },
+        },
       },
     },
   },
@@ -2537,6 +2571,18 @@ async function executeJarvisToolInner(
           .select("id, name, project_number, budget, forecast, type, year, start_quarter")
           .single();
         if (error) return { error: error.message };
+
+        const planPatch: Record<string, unknown> = {};
+        if (patch.budget != null) planPatch.estimated_cost = patch.budget;
+        if (patch.year != null) planPatch.year = patch.year;
+        if (patch.start_quarter != null) planPatch.quarter = patch.start_quarter;
+        if (patch.name) planPatch.title = patch.name;
+        if (Object.keys(planPatch).length) {
+          await supabase
+            .from("maintenance_plan_items")
+            .update(planPatch)
+            .eq("project_id", project.id);
+        }
 
         const bits: string[] = [];
         if (patch.budget != null) {
@@ -3689,7 +3735,10 @@ async function executeJarvisToolInner(
           .insert({
             property_id: prop.id,
             title,
-            description: (rawArgs.description as string) || null,
+            notes:
+              (rawArgs.notes as string) ||
+              (rawArgs.description as string) ||
+              null,
             due_date: (rawArgs.due_date as string) || null,
             priority: String(rawArgs.priority || "medium"),
             completed: false,
@@ -3957,6 +4006,219 @@ async function executeJarvisToolInner(
             entity_id: updated.project_id as string,
             path: `/projects/${updated.project_id}`,
           },
+        );
+      }
+
+      case "list_maintenance_plan": {
+        const prop = rawArgs.property_id || rawArgs.property_name
+          ? await resolveOneProperty(supabase, orgId, rawArgs, pageContext)
+          : null;
+        if (rawArgs.property_id || rawArgs.property_name) {
+          if (!prop) return { error: "Fastighet hittades inte" };
+        }
+
+        let plansQ = supabase
+          .from("maintenance_plans")
+          .select(
+            "id, name, property_id, start_year, start_quarter, horizon_years, status, generated_at, properties(id, name)",
+          )
+          .eq("organization_id", orgId)
+          .eq("status", "active")
+          .order("generated_at", { ascending: false });
+        if (prop) plansQ = plansQ.eq("property_id", prop.id);
+        const { data: plans, error: planErr } = await plansQ.limit(prop ? 1 : 80);
+        if (planErr) return { error: planErr.message };
+
+        const planIds = (plans ?? []).map((p) => p.id as string);
+        let items: Array<Record<string, unknown>> = [];
+        if (planIds.length) {
+          const { data: rows, error: itemErr } = await supabase
+            .from("maintenance_plan_items")
+            .select(
+              "id, plan_id, title, year, quarter, estimated_cost, source, status, project_id, projects(id, project_number, name, budget, year, start_quarter)",
+            )
+            .in("plan_id", planIds)
+            .neq("status", "skipped")
+            .order("year", { ascending: true })
+            .order("quarter", { ascending: true })
+            .limit(500);
+          if (itemErr) return { error: itemErr.message };
+          items = (rows ?? []) as Array<Record<string, unknown>>;
+        }
+
+        return {
+          property: prop ? { id: prop.id, name: prop.name } : null,
+          plans: plans ?? [],
+          items,
+          hint: "Underhållsplan ≠ todos. Synka projekt hit med apply_sync_plan_from_projects.",
+        };
+      }
+
+      case "apply_sync_plan_from_projects": {
+        const one = rawArgs.property_id || rawArgs.property_name
+          ? await resolveOneProperty(supabase, orgId, rawArgs, pageContext)
+          : null;
+        if ((rawArgs.property_id || rawArgs.property_name) && !one) {
+          return { error: "Fastighet hittades inte" };
+        }
+
+        const { ids, names } = one
+          ? { ids: [one.id], names: new Map([[one.id, one.name]]) }
+          : await resolvePropertyIds(supabase, orgId);
+
+        if (!ids.length) return { error: "Inga fastigheter i organisationen" };
+
+        const now = new Date();
+        let startYear = now.getFullYear();
+        let startQuarter = Math.floor(now.getMonth() / 3) + 1 + 5;
+        while (startQuarter > 4) {
+          startQuarter -= 4;
+          startYear += 1;
+        }
+
+        let plansCreated = 0;
+        let itemsCreated = 0;
+        let itemsUpdated = 0;
+        const perProperty: Array<Record<string, unknown>> = [];
+
+        for (const propertyId of ids.slice(0, 80)) {
+          const { data: existingPlan } = await supabase
+            .from("maintenance_plans")
+            .select("id")
+            .eq("property_id", propertyId)
+            .eq("status", "active")
+            .order("generated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          let planId = existingPlan?.id as string | undefined;
+          if (!planId) {
+            const pname = names.get(propertyId) || "Fastighet";
+            const created = await supabase
+              .from("maintenance_plans")
+              .insert({
+                organization_id: orgId,
+                property_id: propertyId,
+                name: `Underhållsplan ${pname} Q${startQuarter} ${startYear}`,
+                start_year: startYear,
+                start_quarter: startQuarter,
+                horizon_years: 5,
+                min_risk_level: "high",
+                min_confidence: "medium",
+                status: "active",
+                generated_by: userId,
+              })
+              .select("id")
+              .single();
+            if (created.error || !created.data) {
+              perProperty.push({
+                property: names.get(propertyId),
+                error: created.error?.message ?? "kunde inte skapa plan",
+              });
+              continue;
+            }
+            planId = created.data.id as string;
+            plansCreated += 1;
+          }
+
+          const { data: projects, error: pErr } = await supabase
+            .from("projects")
+            .select("id, name, project_number, year, start_quarter, budget, type")
+            .eq("property_id", propertyId)
+            .eq("is_archived", false)
+            .neq("status", "avslutat");
+          if (pErr) {
+            perProperty.push({
+              property: names.get(propertyId),
+              error: pErr.message,
+            });
+            continue;
+          }
+
+          const { data: existingItems } = await supabase
+            .from("maintenance_plan_items")
+            .select("id, project_id")
+            .eq("plan_id", planId)
+            .not("project_id", "is", null);
+          const byProject = new Map(
+            (existingItems ?? [])
+              .filter((i) => i.project_id)
+              .map((i) => [i.project_id as string, i.id as string]),
+          );
+
+          let createdHere = 0;
+          let updatedHere = 0;
+          for (const proj of projects ?? []) {
+            const year = proj.year || startYear;
+            const quarter = proj.start_quarter || startQuarter;
+            const row = {
+              year,
+              quarter,
+              title: proj.name,
+              estimated_cost: proj.budget,
+              cost_source: "manual" as const,
+              action_type:
+                proj.type === "energi" ? "overhaul" : "replace",
+              notes: `Från projekt ${proj.project_number}`,
+            };
+            const existingId = byProject.get(proj.id as string);
+            if (existingId) {
+              const { error } = await supabase
+                .from("maintenance_plan_items")
+                .update(row)
+                .eq("id", existingId);
+              if (!error) {
+                updatedHere += 1;
+                itemsUpdated += 1;
+              }
+            } else {
+              const { error } = await supabase
+                .from("maintenance_plan_items")
+                .insert({
+                  ...row,
+                  plan_id: planId,
+                  component_id: null,
+                  risk_level: "medium",
+                  risk_score: 0,
+                  confidence: "medium",
+                  status: "promoted",
+                  source: "manual",
+                  user_edited: true,
+                  project_id: proj.id,
+                  sort_order: 0,
+                });
+              if (!error) {
+                createdHere += 1;
+                itemsCreated += 1;
+              }
+            }
+          }
+
+          perProperty.push({
+            property: names.get(propertyId),
+            plan_id: planId,
+            projects: (projects ?? []).length,
+            created: createdHere,
+            updated: updatedHere,
+          });
+        }
+
+        return withDeepLink(
+          {
+            applied: true,
+            plans_created: plansCreated,
+            items_created: itemsCreated,
+            items_updated: itemsUpdated,
+            properties: perProperty,
+            summary: `Underhållsplan synkad från projekt: ${itemsCreated} nya rader, ${itemsUpdated} uppdaterade, ${plansCreated} nya planer.`,
+          },
+          one
+            ? {
+                entity_type: "property",
+                entity_id: one.id,
+                path: `/maintenance?property=${one.id}`,
+              }
+            : { path: "/maintenance" },
         );
       }
 

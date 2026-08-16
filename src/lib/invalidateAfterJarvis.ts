@@ -8,6 +8,7 @@ const PROJECT_TOOLS = new Set([
   'apply_add_budget_item',
   'apply_add_project_cost',
   'apply_complete_checklist_item',
+  'apply_sync_plan_from_projects',
 ]);
 
 const WORK_ORDER_TOOLS = new Set([
@@ -57,6 +58,9 @@ export function invalidateAfterJarvisApplies(
 
   if (hit(PROJECT_TOOLS)) {
     queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+    if (tools.has('apply_sync_plan_from_projects')) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.maintenancePlans.all });
+    }
   }
   if (hit(WORK_ORDER_TOOLS)) {
     queryClient.invalidateQueries({ queryKey: queryKeys.workOrders.all });

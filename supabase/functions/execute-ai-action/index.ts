@@ -330,7 +330,8 @@ serve(async (req) => {
             .insert({
               property_id: propertyId,
               title: (payload.title as string) || 'Jarvis-föreslagen uppgift',
-              description:
+              notes:
+                (payload.notes as string) ||
                 (payload.description as string) ||
                 (action.reasoning as string) ||
                 null,
