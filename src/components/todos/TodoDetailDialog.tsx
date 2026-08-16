@@ -124,6 +124,7 @@ export function TodoDetailDialog({ todo, open, onOpenChange, onUpdate }: TodoDet
     } else {
       toast.success("Ändringar sparade");
       onUpdate();
+      onOpenChange(false);
     }
   };
 
