@@ -20,6 +20,7 @@ import JarvisActionCards, {
   type JarvisAppliedAction,
 } from '@/components/ai-chat/JarvisActionCards';
 import { mergeAppliedActions } from '@/lib/jarvisActionFromMessage';
+import { invalidateAfterJarvisApplies } from '@/lib/invalidateAfterJarvis';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useOrgRole } from '@/hooks/useOrgRole';
 import { useSpeechToText } from '@/hooks/useSpeechToText';
@@ -295,6 +296,7 @@ export default function AIChat({ embedded = false }: { embedded?: boolean }) {
 
       if (applied.length) {
         rememberApplied(assistantId, applied);
+        invalidateAfterJarvisApplies(queryClient, applied);
         toast.success(
           applied.some((a) => a.sent) ? 'Klart — skickat till dig' : 'Åtgärd utförd',
         );

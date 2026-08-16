@@ -10,6 +10,8 @@ import JarvisActionCards, {
   type JarvisAppliedAction,
 } from '@/components/ai-chat/JarvisActionCards';
 import { mergeAppliedActions } from '@/lib/jarvisActionFromMessage';
+import { invalidateAfterJarvisApplies } from '@/lib/invalidateAfterJarvis';
+import { useQueryClient } from '@tanstack/react-query';
 import JarvisRecentActions from '@/components/ai-chat/JarvisRecentActions';
 import JarvisVoicePanel from '@/components/ai-chat/JarvisVoicePanel';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -39,6 +41,7 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const aiChat = useAIChat();
+  const queryClient = useQueryClient();
   const pageContext = useJarvisPageContext();
   const isOnline = useOnlineStatus();
   const { canWrite, isViewer, roleLabel } = useOrgRole();
@@ -131,7 +134,10 @@ export default function AIChatDialog({ open, onOpenChange }: AIChatDialogProps) 
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-      if (applied.length) setLastApplied(applied);
+      if (applied.length) {
+        setLastApplied(applied);
+        invalidateAfterJarvisApplies(queryClient, applied);
+      }
       return messageText;
     } catch (error: unknown) {
       const err = error as { context?: { status?: number }; status?: number } | null;

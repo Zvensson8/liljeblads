@@ -12,6 +12,7 @@ const VOICE_TOOL_NAMES = new Set([
   "get_daily_briefing",
   "apply_work_order_status",
   "apply_project_status",
+  "apply_update_project",
   "apply_create_work_order",
   "apply_property_note",
   "apply_create_todo",
